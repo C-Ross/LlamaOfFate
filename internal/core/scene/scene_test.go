@@ -1,0 +1,245 @@
+package scene
+
+import (
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestNewScene(t *testing.T) {
+	id := "test-scene"
+	name := "The Abandoned Library"
+	description := "Dust motes dance in shafts of light streaming through broken windows"
+
+	scene := NewScene(id, name, description)
+
+	assert.Equal(t, id, scene.ID)
+	assert.Equal(t, name, scene.Name)
+	assert.Equal(t, description, scene.Description)
+	assert.Empty(t, scene.SituationAspects)
+	assert.Empty(t, scene.Characters)
+	assert.False(t, scene.IsConflict)
+	assert.Nil(t, scene.ConflictState)
+	
+	// Check timestamps
+	assert.WithinDuration(t, time.Now(), scene.CreatedAt, time.Second)
+	assert.WithinDuration(t, time.Now(), scene.UpdatedAt, time.Second)
+}
+
+func TestScene_AddCharacter(t *testing.T) {
+	scene := NewScene("test", "Test Scene", "Test")
+	originalTime := scene.UpdatedAt
+
+	time.Sleep(1 * time.Millisecond) // Ensure time difference
+
+	characterID := "char-123"
+	scene.AddCharacter(characterID)
+
+	assert.Len(t, scene.Characters, 1)
+	assert.Equal(t, characterID, scene.Characters[0])
+	assert.True(t, scene.UpdatedAt.After(originalTime))
+
+	// Test adding duplicate character
+	scene.AddCharacter(characterID)
+	assert.Len(t, scene.Characters, 1, "Should not add duplicate characters")
+}
+
+func TestScene_RemoveCharacter(t *testing.T) {
+	scene := NewScene("test", "Test Scene", "Test")
+
+	// Add characters
+	scene.AddCharacter("char-1")
+	scene.AddCharacter("char-2")
+	scene.AddCharacter("char-3")
+	scene.ActiveCharacter = "char-2"
+
+	originalTime := scene.UpdatedAt
+	time.Sleep(1 * time.Millisecond)
+
+	// Remove middle character
+	scene.RemoveCharacter("char-2")
+
+	assert.Len(t, scene.Characters, 2)
+	
+	// Check that char-2 is not in the list
+	assert.NotContains(t, scene.Characters, "char-2")
+	
+	// Check that active character was cleared
+	assert.Empty(t, scene.ActiveCharacter)
+	assert.True(t, scene.UpdatedAt.After(originalTime))
+
+	// Test removing non-existent character
+	originalLength := len(scene.Characters)
+	scene.RemoveCharacter("non-existent")
+	assert.Len(t, scene.Characters, originalLength, "Should not change list when removing non-existent character")
+}
+
+func TestScene_AddSituationAspect(t *testing.T) {
+	scene := NewScene("test", "Test Scene", "Test")
+	originalTime := scene.UpdatedAt
+
+	time.Sleep(1 * time.Millisecond)
+
+	aspect := NewSituationAspect("aspect-1", "Dark and Foreboding", "char-123", 2)
+	scene.AddSituationAspect(aspect)
+
+	assert.Len(t, scene.SituationAspects, 1)
+	assert.Equal(t, "Dark and Foreboding", scene.SituationAspects[0].Aspect)
+	assert.True(t, scene.UpdatedAt.After(originalTime))
+}
+
+func TestScene_RemoveSituationAspect(t *testing.T) {
+	scene := NewScene("test", "Test Scene", "Test")
+
+	// Add aspects
+	aspect1 := NewSituationAspect("aspect-1", "Dark", "char-1", 1)
+	aspect2 := NewSituationAspect("aspect-2", "Creaky", "char-2", 1)
+	scene.AddSituationAspect(aspect1)
+	scene.AddSituationAspect(aspect2)
+
+	originalTime := scene.UpdatedAt
+	time.Sleep(1 * time.Millisecond)
+
+	// Remove first aspect
+	scene.RemoveSituationAspect("aspect-1")
+
+	assert.Len(t, scene.SituationAspects, 1)
+	assert.Equal(t, "aspect-2", scene.SituationAspects[0].ID)
+	assert.True(t, scene.UpdatedAt.After(originalTime))
+}
+
+func TestScene_GetSituationAspect(t *testing.T) {
+	scene := NewScene("test", "Test Scene", "Test")
+
+	aspect := NewSituationAspect("aspect-1", "Mysterious", "char-1", 1)
+	scene.AddSituationAspect(aspect)
+
+	// Test finding existing aspect
+	found := scene.GetSituationAspect("aspect-1")
+	require.NotNil(t, found)
+	assert.Equal(t, "Mysterious", found.Aspect)
+
+	// Test finding non-existent aspect
+	notFound := scene.GetSituationAspect("non-existent")
+	assert.Nil(t, notFound)
+}
+
+func TestScene_StartConflict(t *testing.T) {
+	scene := NewScene("test", "Test Scene", "Test")
+
+	participants := []ConflictParticipant{
+		{CharacterID: "char-1", Initiative: 3, Active: true},
+		{CharacterID: "char-2", Initiative: 1, Active: true},
+	}
+
+	originalTime := scene.UpdatedAt
+	time.Sleep(1 * time.Millisecond)
+
+	scene.StartConflict(participants)
+
+	assert.True(t, scene.IsConflict)
+	require.NotNil(t, scene.ConflictState)
+	assert.Len(t, scene.ConflictState.Participants, 2)
+	assert.Equal(t, 1, scene.ConflictState.Round)
+	assert.Equal(t, 0, scene.ConflictState.CurrentTurn)
+	assert.True(t, scene.UpdatedAt.After(originalTime))
+}
+
+func TestScene_EndConflict(t *testing.T) {
+	scene := NewScene("test", "Test Scene", "Test")
+
+	// Start a conflict first
+	participants := []ConflictParticipant{
+		{CharacterID: "char-1", Initiative: 3, Active: true},
+	}
+	scene.StartConflict(participants)
+
+	originalTime := scene.UpdatedAt
+	time.Sleep(1 * time.Millisecond)
+
+	scene.EndConflict()
+
+	assert.False(t, scene.IsConflict)
+	assert.Nil(t, scene.ConflictState)
+	assert.True(t, scene.UpdatedAt.After(originalTime))
+}
+
+func TestScene_GetCurrentActor(t *testing.T) {
+	scene := NewScene("test", "Test Scene", "Test")
+
+	// Test with no conflict
+	actor := scene.GetCurrentActor()
+	assert.Empty(t, actor)
+
+	// Start conflict
+	participants := []ConflictParticipant{
+		{CharacterID: "char-1", Initiative: 3, Active: true},
+		{CharacterID: "char-2", Initiative: 1, Active: true},
+	}
+	scene.StartConflict(participants)
+
+	// Test getting current actor
+	actor = scene.GetCurrentActor()
+	assert.Equal(t, "char-1", actor)
+}
+
+func TestScene_NextTurn(t *testing.T) {
+	scene := NewScene("test", "Test Scene", "Test")
+
+	// Test with no conflict
+	scene.NextTurn() // Should not crash
+
+	// Start conflict
+	participants := []ConflictParticipant{
+		{CharacterID: "char-1", Initiative: 3, Active: true},
+		{CharacterID: "char-2", Initiative: 1, Active: true},
+	}
+	scene.StartConflict(participants)
+
+	originalTime := scene.UpdatedAt
+	time.Sleep(1 * time.Millisecond)
+
+	// Test advancing turn
+	scene.NextTurn()
+	assert.Equal(t, 1, scene.ConflictState.CurrentTurn)
+	assert.Equal(t, 1, scene.ConflictState.Round)
+
+	// Test wrapping to next round
+	scene.NextTurn()
+	assert.Equal(t, 0, scene.ConflictState.CurrentTurn, "Should wrap to turn 0")
+	assert.Equal(t, 2, scene.ConflictState.Round)
+	assert.True(t, scene.UpdatedAt.After(originalTime))
+}
+
+func TestNewSituationAspect(t *testing.T) {
+	id := "aspect-123"
+	aspect := "On Fire"
+	createdBy := "char-456"
+	freeInvokes := 2
+
+	situationAspect := NewSituationAspect(id, aspect, createdBy, freeInvokes)
+
+	assert.Equal(t, id, situationAspect.ID)
+	assert.Equal(t, aspect, situationAspect.Aspect)
+	assert.Equal(t, createdBy, situationAspect.CreatedBy)
+	assert.Equal(t, freeInvokes, situationAspect.FreeInvokes)
+	assert.Equal(t, "scene", situationAspect.Duration)
+	assert.WithinDuration(t, time.Now(), situationAspect.CreatedAt, time.Second)
+}
+
+func TestSituationAspect_UseFreeInvoke(t *testing.T) {
+	aspect := NewSituationAspect("test", "Test Aspect", "char", 2)
+
+	// Test using free invoke
+	assert.True(t, aspect.UseFreeInvoke())
+	assert.Equal(t, 1, aspect.FreeInvokes)
+
+	// Use last free invoke
+	aspect.UseFreeInvoke()
+	assert.Equal(t, 0, aspect.FreeInvokes)
+
+	// Test using when no free invokes available
+	assert.False(t, aspect.UseFreeInvoke())
+}
