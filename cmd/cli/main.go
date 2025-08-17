@@ -50,7 +50,7 @@ func main() {
 func handleArgs(args []string, cli *text.CLI) {
 	switch args[0] {
 	case "version":
-		fmt.Printf("%s v%s\n", AppName, AppVersion)
+		showVersion()
 	case "help":
 		showHelp()
 	default:
@@ -67,4 +67,18 @@ func showHelp() {
 	fmt.Println("  version  - Show version information")
 	fmt.Println()
 	fmt.Println("If no command is provided, starts in interactive mode.")
+}
+
+func showVersion() {
+	fmt.Printf("%s v%s\n", AppName, AppVersion)
+	fmt.Println("A Fate Core RPG with LLM integration")
+	fmt.Println()
+	fmt.Println("This work is based on Fate Core System,")
+	fmt.Println("products of Evil Hat Productions, LLC, developed, authored, and edited")
+	fmt.Println("by Leonard Balsera, Brian Engard, Jeremy Keller, Ryan Macklin, Mike Olson,")
+	fmt.Println("Clark Valentine, Amanda Valentine, Fred Hicks, and Rob Donoghue, and")
+	fmt.Println("licensed for our use under the Creative Commons Attribution 3.0 Unported")
+	fmt.Println("license (http://creativecommons.org/licenses/by/3.0/).")
+	fmt.Println()
+	fmt.Println("Fate Core System Reference Document: https://fate-srd.com/")
 }
