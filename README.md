@@ -50,78 +50,33 @@ Fate™ is a trademark of Evil Hat Productions, LLC.
 LlamaOfFate/
 ├── cmd/
 │   └── cli/                    # Command-line interface
-│       └── main.go
 ├── internal/
 │   ├── core/                   # Core game mechanics
 │   │   ├── character/          # Character management
-│   │   │   ├── character.go
-│   │   │   ├── aspects.go
-│   │   │   ├── skills.go
-│   │   │   ├── stunts.go
-│   │   │   └── stress.go
 │   │   ├── dice/               # Dice rolling and probability
-│   │   │   ├── dice.go
-│   │   │   └── ladder.go
 │   │   ├── scene/              # Scene and conflict management
-│   │   │   ├── scene.go
-│   │   │   ├── conflict.go
-│   │   │   └── aspects.go
 │   │   └── action/             # Action resolution system
-│   │       ├── action.go
-│   │       ├── outcome.go
-│   │       └── modifiers.go
 │   ├── llm/                    # LLM integration layer
-│   │   ├── service.go          # LLM service interface
-│   │   ├── parser.go           # Action parsing
-│   │   ├── narrator.go         # Narrative generation
 │   │   └── ollama/             # Ollama-specific implementation
-│   │       └── client.go
 │   ├── engine/                 # Game engine coordination
-│   │   ├── engine.go           # Main game engine
-│   │   ├── state.go            # Game state management
-│   │   └── events.go           # Event system
 │   ├── storage/                # Data persistence
-│   │   ├── interface.go        # Storage interface
 │   │   ├── memory/             # In-memory storage
-│   │   │   └── memory.go
 │   │   └── json/               # JSON file storage
-│   │       └── json.go
 │   └── ui/                     # User interface components
 │       ├── text/               # Text-based interface
-│       │   ├── cli.go
-│       │   └── commands.go
 │       └── web/                # Web interface
-│           ├── handlers.go
-│           ├── websocket.go
 │           └── static/
 ├── pkg/                        # Public API packages
 │   ├── types/                  # Shared type definitions
-│   │   ├── character.go
-│   │   ├── scene.go
-│   │   ├── action.go
-│   │   └── game.go
 │   └── client/                 # Client library for external integrations
-│       └── client.go
 ├── configs/                    # Configuration files
-│   ├── default.yaml
-│   ├── skills.yaml             # Default Fate Core skills
-│   ├── stunts.yaml             # Default stunts library
-│   └── llm.yaml                # LLM service configuration
 ├── docs/                       # Documentation
-│   ├── api.md
-│   ├── setup.md
 │   └── examples/
 ├── scripts/                    # Build and development scripts
-│   ├── build.sh
-│   └── dev.sh
 ├── test/                       # Integration tests
 │   ├── fixtures/               # Test data
 │   └── integration/
-├── go.mod
-├── go.sum
-├── Makefile
-├── Dockerfile
-└── README.md
+└── [standard Go project files]
 ```
 
 ### Package Responsibilities
