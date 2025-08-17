@@ -20,5 +20,9 @@ go.work
 # Build output
 bin/
 
+# Configuration files with sensitive information
+configs/azure-llm.yaml
+*.local.yaml
+
 
 

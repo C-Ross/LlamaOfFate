@@ -1,0 +1,19 @@
+# Azure ML Configuration for Llama
+# Copy this file to azure-llm.yaml and fill in your actual values
+# DO NOT commit azure-llm.yaml to version control
+
+# Your Azure ML endpoint URL
+# Example: "https://your-endpoint.inference.ai.azure.com"
+api_endpoint: "https://your-endpoint.inference.ai.azure.com"
+
+# Your Azure ML API key
+# This should be kept secret and not committed to version control
+api_key: "your-api-key-here"
+
+# The Llama model to use
+# Options: Meta-Llama-3.1-405B-Instruct, Meta-Llama-3.1-70B-Instruct, Meta-Llama-3.1-8B-Instruct, 
+#          Llama-4-Maverick-17B-128E-Instruct-FP8
+model_name: "Llama-4-Maverick-17B-128E-Instruct-FP8"
+
+# Request timeout in seconds (optional, default: 60)
+timeout: 300
