@@ -50,7 +50,10 @@ result := roller.RollWithModifier(skill, action.CalculateBonus())
 - **Stress**: Physical/Mental tracks, configurable boxes
 - **Consequences**: Mild(2), Moderate(4), Severe(6), Extreme(8)
 
+When you need to consider the rules use the Fate Core SRD at https://fate-srd.com/fate-core.
+
 ## Important Notes
 - Character aspects are **flexible** (not fixed 5-aspect model)
 - Always use testify assertions in tests
 - Follow existing package structure and naming
+- Credit the Fate SRD where appropriate.
