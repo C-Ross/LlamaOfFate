@@ -15,9 +15,10 @@ test/integration/  - Integration tests
 ## Development Standards
 
 ### Testing (REQUIRED)
-- **Use testify for ALL tests**: `assert.Equal(t, expected, actual)`, `require.NotNil(t, object)`
-- **Maintain high coverage**: Unit tests per package + integration tests
-- **Seeded rollers for tests**: `dice.NewSeededRoller(12345)` for predictable results
+- Use testify for ALL tests: `assert.Equal(t, expected, actual)`, `require.NotNil(t, object)`
+- Maintain high coverage: Unit tests per package + integration tests
+- Specify dice rolls: Whenever reasonable, specify the dice roll instead of using a roller.
+- Seeded rollers for tests: `dice.NewSeededRoller(12345)` for predictable results if you need a roller.
 
 ### Build System
 ```bash
@@ -26,6 +27,10 @@ make test       # Run all tests
 make run        # Build and run
 make clean      # Clean artifacts
 ```
+
+### Format
+- Format according to `go fmt`
+- Use Go template for prompts
 
 ## Key Patterns
 
