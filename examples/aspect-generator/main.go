@@ -59,7 +59,7 @@ func main() {
 		context     string
 		targetType  string
 		existing    []string
-		seed        int64
+		rollResult  dice.CheckResult
 	}{
 		{
 			name:        "Rooftop Chase - Athletics",
@@ -70,7 +70,7 @@ func main() {
 			context:     "A chase scene across the rooftops of the old town. Narrow alleys below, various building heights, clotheslines and chimneys provide obstacles and opportunities.",
 			targetType:  "situation",
 			existing:    []string{"Narrow Alleyways Below", "Uneven Rooftop Heights"},
-			seed:        12345,
+			rollResult:  dice.CheckResult{Roll: &dice.Roll{Dice: [4]dice.FateDie{dice.Plus, dice.Blank, dice.Plus, dice.Minus}, Total: 1}, BaseSkill: dice.Great, Modifier: 0, FinalValue: dice.Superb}, // Great(4) + 1 = Superb(5)
 		},
 		{
 			name:        "Stealth Infiltration",
@@ -81,7 +81,7 @@ func main() {
 			context:     "The grand estate's courtyard at night. Manicured gardens with topiary, a central fountain, and several guard patrols. Gas lamps provide pools of light with deep shadows between.",
 			targetType:  "character",
 			existing:    []string{"Patrolling Guards", "Pools of Lamplight", "Ornate Topiary"},
-			seed:        54321,
+			rollResult:  dice.CheckResult{Roll: &dice.Roll{Dice: [4]dice.FateDie{dice.Blank, dice.Plus, dice.Blank, dice.Plus}, Total: 2}, BaseSkill: dice.Good, Modifier: 0, FinalValue: dice.Superb}, // Good(3) + 2 = Superb(5)
 		},
 		{
 			name:        "Deception Distraction",
@@ -92,7 +92,7 @@ func main() {
 			context:     "Inside the estate during a fancy party. Well-dressed guests, servants carrying trays, guards trying to blend in while staying alert. Perfect cover for social engineering.",
 			targetType:  "situation",
 			existing:    []string{"Crowded Party", "Distracted Guards", "Gossiping Nobles"},
-			seed:        98765,
+			rollResult:  dice.CheckResult{Roll: &dice.Roll{Dice: [4]dice.FateDie{dice.Minus, dice.Blank, dice.Blank, dice.Plus}, Total: 0}, BaseSkill: dice.Fair, Modifier: 0, FinalValue: dice.Fair}, // Fair(2) + 0 = Fair(2)
 		},
 	}
 
@@ -112,23 +112,18 @@ func main() {
 		testAction.RawInput = scenario.rawInput
 		testAction.Difficulty = scenario.difficulty
 
-		// Roll the dice with seeded roller for reproducible results
-		roller := dice.NewSeededRoller(scenario.seed)
-		skillLevel := char.GetSkill(scenario.skill)
-		checkResult := roller.RollWithModifier(skillLevel, 0)
-		outcome := checkResult.CompareAgainst(scenario.difficulty)
-
-		// Store results in action
-		testAction.CheckResult = checkResult
+		// Use the predefined roll result and derive outcome using CompareAgainst
+		testAction.CheckResult = &scenario.rollResult
+		outcome := scenario.rollResult.CompareAgainst(scenario.difficulty)
 		testAction.Outcome = outcome
 
 		fmt.Printf("Action: %s\n", testAction.Description)
 		fmt.Printf("Player Intent: %s\n", testAction.RawInput)
-		fmt.Printf("Skill Used: %s (%s)\n", scenario.skill, skillLevel.String())
+		fmt.Printf("Skill Used: %s (%s)\n", scenario.skill, scenario.rollResult.BaseSkill.String())
 		fmt.Printf("Difficulty: %s\n", scenario.difficulty.String())
-		fmt.Printf("Roll: %s (Total: %+d)\n", checkResult.Roll.String(), checkResult.Roll.Total)
+		fmt.Printf("Roll: %s (Total: %+d)\n", scenario.rollResult.Roll.String(), scenario.rollResult.Roll.Total)
 		fmt.Printf("Final Result: %s vs %s = %s (%+d shifts)\n",
-			checkResult.FinalValue.String(),
+			scenario.rollResult.FinalValue.String(),
 			scenario.difficulty.String(),
 			outcome.Type.String(),
 			outcome.Shifts)
