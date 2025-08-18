@@ -1,0 +1,45 @@
+Generate an aspect for a Create an Advantage action with the following details:
+
+CHARACTER: {{.Character.Name}}
+{{- if .Character.Aspects.HighConcept}}
+High Concept: {{.Character.Aspects.HighConcept}}
+{{- end}}
+{{- if .Character.Aspects.Trouble}}
+Trouble: {{.Character.Aspects.Trouble}}
+{{- end}}
+{{- $allAspects := .Character.Aspects.GetAll}}
+{{- if gt (len $allAspects) 2}}
+Other Aspects: {{range $i, $aspect := slice $allAspects 2}}{{if $i}}, {{end}}{{$aspect}}{{end}}
+{{- end}}
+
+ACTION ATTEMPT:
+Skill Used: {{.Action.Skill}} ({{.Character.GetSkill .Action.Skill}})
+Description: {{.Action.Description}}
+{{- if .Action.RawInput}}
+Player's Intent: {{.Action.RawInput}}
+{{- end}}
+
+ROLL OUTCOME:
+Result: {{.Outcome.Type}} ({{printf "%+d" .Outcome.Shifts}} shifts)
+{{- if and .Outcome.Result .Outcome.Result.Roll}}
+Dice Roll: {{.Outcome.Result.Roll}} (Total: {{printf "%+d" .Outcome.Result.Roll.Total}})
+Final Value: {{.Outcome.Result.FinalValue}} vs Difficulty {{.Outcome.Difficulty}}
+{{- else}}
+Difficulty: {{.Outcome.Difficulty}}
+{{- end}}
+
+{{- if .Context}}
+SCENE CONTEXT:
+{{.Context}}
+{{- end}}
+
+{{- if .ExistingAspects}}
+EXISTING ASPECTS IN PLAY:
+{{- range .ExistingAspects}}
+- {{.}}
+{{- end}}
+{{- end}}
+
+TARGET TYPE: {{.TargetType}}
+
+Generate an appropriate aspect based on this Create an Advantage attempt:
