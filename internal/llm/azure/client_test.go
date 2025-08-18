@@ -27,7 +27,7 @@ func TestNewClient(t *testing.T) {
 	assert.Equal(t, config.APIKey, client.config.APIKey)
 	assert.Equal(t, config.ModelName, client.config.ModelName)
 	assert.NotNil(t, client.httpClient)
-	
+
 	modelInfo := client.GetModelInfo()
 	assert.Equal(t, "Meta-Llama-3.1-405B-Instruct", modelInfo.Name)
 	assert.Equal(t, "Azure ML", modelInfo.Provider)
@@ -44,7 +44,7 @@ func TestNewClientWithDefaults(t *testing.T) {
 
 	assert.NotNil(t, client)
 	assert.NotNil(t, client.httpClient)
-	
+
 	// Check defaults are applied
 	modelInfo := client.GetModelInfo()
 	assert.Contains(t, modelInfo.Description, "Azure ML hosted")
@@ -52,8 +52,8 @@ func TestNewClientWithDefaults(t *testing.T) {
 
 func TestGetMaxTokensForModel(t *testing.T) {
 	tests := []struct {
-		modelName    string
-		expectedMax  int
+		modelName   string
+		expectedMax int
 	}{
 		{"Meta-Llama-3.1-405B-Instruct", 2048},
 		{"Meta-Llama-3.1-70B-Instruct", 2048},
@@ -240,13 +240,13 @@ func TestChatCompletionStream(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Len(t, chunks, 3) // Should receive 3 chunks before [DONE]
-	
+
 	// Check first chunk
 	assert.Equal(t, "test-id", chunks[0].ID)
 	assert.Equal(t, "chat.completion.chunk", chunks[0].Object)
 	assert.Len(t, chunks[0].Choices, 1)
 	assert.NotNil(t, chunks[0].Choices[0].Delta)
-	
+
 	// Check that we got content in the chunks
 	var content string
 	for _, chunk := range chunks {

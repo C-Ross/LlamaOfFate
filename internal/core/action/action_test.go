@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestActionType_String(t *testing.T) {
@@ -44,7 +44,7 @@ func TestNewAction(t *testing.T) {
 	assert.Empty(t, action.Aspects)
 	assert.Empty(t, action.Stunts)
 	assert.Empty(t, action.Effects)
-	
+
 	// Check timestamp is recent
 	assert.WithinDuration(t, time.Now(), action.Timestamp, time.Second)
 }
@@ -145,7 +145,7 @@ func TestAction_IsSuccessWithStyle(t *testing.T) {
 func TestAspectInvoke(t *testing.T) {
 	invoke := AspectInvoke{
 		AspectText:    "Wizard Detective",
-		Source:        "character", 
+		Source:        "character",
 		SourceID:      "char-123",
 		IsFree:        true,
 		FatePointCost: 0,

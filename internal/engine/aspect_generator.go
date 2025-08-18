@@ -13,22 +13,22 @@ import (
 
 // AspectGenerationRequest contains all the information needed to generate an aspect
 type AspectGenerationRequest struct {
-	Character   *character.Character `json:"character"`
-	Action      *action.Action       `json:"action"`
-	Outcome     *dice.Outcome        `json:"outcome"`
-	Context     string               `json:"context"`     // Scene description or situational context
-	TargetType  string               `json:"target_type"` // "character", "scene", "object", "situation"
-	ExistingAspects []string          `json:"existing_aspects,omitempty"` // Aspects already in play
+	Character       *character.Character `json:"character"`
+	Action          *action.Action       `json:"action"`
+	Outcome         *dice.Outcome        `json:"outcome"`
+	Context         string               `json:"context"`                    // Scene description or situational context
+	TargetType      string               `json:"target_type"`                // "character", "scene", "object", "situation"
+	ExistingAspects []string             `json:"existing_aspects,omitempty"` // Aspects already in play
 }
 
 // AspectGenerationResponse contains the generated aspect and related information
 type AspectGenerationResponse struct {
-	AspectText    string `json:"aspect_text"`
-	Description   string `json:"description"`
-	Duration      string `json:"duration"`       // "scene", "session", "permanent"
-	FreeInvokes   int    `json:"free_invokes"`   // Number of free invokes granted
-	IsBoost       bool   `json:"is_boost"`       // True if this is a boost (one free invoke)
-	Reasoning     string `json:"reasoning"`      // Explanation of why this aspect was chosen
+	AspectText  string `json:"aspect_text"`
+	Description string `json:"description"`
+	Duration    string `json:"duration"`     // "scene", "session", "permanent"
+	FreeInvokes int    `json:"free_invokes"` // Number of free invokes granted
+	IsBoost     bool   `json:"is_boost"`     // True if this is a boost (one free invoke)
+	Reasoning   string `json:"reasoning"`    // Explanation of why this aspect was chosen
 }
 
 // AspectGenerator handles generating aspects based on Create an Advantage attempts
@@ -54,7 +54,7 @@ func (ag *AspectGenerator) GenerateAspect(ctx context.Context, req AspectGenerat
 	}
 
 	prompt := ag.buildPrompt(req)
-	
+
 	llmReq := llm.CompletionRequest{
 		Messages: []llm.Message{
 			{Role: "system", Content: ag.getSystemPrompt()},
@@ -109,9 +109,9 @@ Your response must be in JSON format with these fields:
 // buildPrompt constructs the detailed prompt for aspect generation
 func (ag *AspectGenerator) buildPrompt(req AspectGenerationRequest) string {
 	var prompt strings.Builder
-	
+
 	prompt.WriteString("Generate an aspect for a Create an Advantage action with the following details:\n\n")
-	
+
 	// Character information
 	prompt.WriteString(fmt.Sprintf("CHARACTER: %s\n", req.Character.Name))
 	if req.Character.Aspects.HighConcept != "" {
@@ -131,7 +131,7 @@ func (ag *AspectGenerator) buildPrompt(req AspectGenerationRequest) string {
 		}
 		prompt.WriteString("\n")
 	}
-	
+
 	// Action details
 	prompt.WriteString(fmt.Sprintf("\nACTION ATTEMPT:\n"))
 	prompt.WriteString(fmt.Sprintf("Skill Used: %s (%s)\n", req.Action.Skill, req.Character.GetSkill(req.Action.Skill).String()))
@@ -139,34 +139,34 @@ func (ag *AspectGenerator) buildPrompt(req AspectGenerationRequest) string {
 	if req.Action.RawInput != "" {
 		prompt.WriteString(fmt.Sprintf("Player's Intent: %s\n", req.Action.RawInput))
 	}
-	
+
 	// Roll outcome
 	prompt.WriteString(fmt.Sprintf("\nROLL OUTCOME:\n"))
 	prompt.WriteString(fmt.Sprintf("Result: %s (%+d shifts)\n", req.Outcome.Type.String(), req.Outcome.Shifts))
 	if req.Outcome.Result != nil && req.Outcome.Result.Roll != nil {
 		prompt.WriteString(fmt.Sprintf("Dice Roll: %s (Total: %+d)\n", req.Outcome.Result.Roll.String(), req.Outcome.Result.Roll.Total))
-		prompt.WriteString(fmt.Sprintf("Final Value: %s vs Difficulty %s\n", 
+		prompt.WriteString(fmt.Sprintf("Final Value: %s vs Difficulty %s\n",
 			req.Outcome.Result.FinalValue.String(), req.Outcome.Difficulty.String()))
 	} else {
 		prompt.WriteString(fmt.Sprintf("Difficulty: %s\n", req.Outcome.Difficulty.String()))
 	}
-	
+
 	// Context and existing aspects
 	if req.Context != "" {
 		prompt.WriteString(fmt.Sprintf("\nSCENE CONTEXT:\n%s\n", req.Context))
 	}
-	
+
 	if len(req.ExistingAspects) > 0 {
 		prompt.WriteString(fmt.Sprintf("\nEXISTING ASPECTS IN PLAY:\n"))
 		for _, aspect := range req.ExistingAspects {
 			prompt.WriteString(fmt.Sprintf("- %s\n", aspect))
 		}
 	}
-	
+
 	prompt.WriteString(fmt.Sprintf("\nTARGET TYPE: %s\n", req.TargetType))
-	
+
 	prompt.WriteString("\nGenerate an appropriate aspect based on this Create an Advantage attempt:")
-	
+
 	return prompt.String()
 }
 
@@ -174,11 +174,11 @@ func (ag *AspectGenerator) buildPrompt(req AspectGenerationRequest) string {
 func (ag *AspectGenerator) parseResponse(content string, outcome *dice.Outcome) (*AspectGenerationResponse, error) {
 	// This is a simplified parser. In a production system, you'd want more robust JSON parsing
 	// For now, we'll extract key information and provide defaults based on the outcome
-	
+
 	response := &AspectGenerationResponse{
 		Duration: "scene", // Default duration
 	}
-	
+
 	// Set defaults based on outcome type
 	switch outcome.Type {
 	case dice.SuccessWithStyle:
@@ -199,7 +199,7 @@ func (ag *AspectGenerator) parseResponse(content string, outcome *dice.Outcome) 
 		response.Reasoning = "The Create an Advantage attempt failed"
 		return response, nil
 	}
-	
+
 	// Try to extract aspect text from the response
 	// Look for JSON-like content or extract meaningful phrases
 	lines := strings.Split(content, "\n")
@@ -209,7 +209,7 @@ func (ag *AspectGenerator) parseResponse(content string, outcome *dice.Outcome) 
 			// Try to extract JSON value
 			parts := strings.Split(line, ":")
 			if len(parts) > 1 {
-				aspectText := strings.Trim(parts[1], ` "`,)
+				aspectText := strings.Trim(parts[1], ` "`)
 				aspectText = strings.TrimSuffix(aspectText, ",")
 				aspectText = strings.Trim(aspectText, `"`)
 				if aspectText != "" {
@@ -219,7 +219,7 @@ func (ag *AspectGenerator) parseResponse(content string, outcome *dice.Outcome) 
 		} else if strings.Contains(line, `"description"`) {
 			parts := strings.Split(line, ":")
 			if len(parts) > 1 {
-				description := strings.Trim(parts[1], ` "`,)
+				description := strings.Trim(parts[1], ` "`)
 				description = strings.TrimSuffix(description, ",")
 				description = strings.Trim(description, `"`)
 				if description != "" {
@@ -229,7 +229,7 @@ func (ag *AspectGenerator) parseResponse(content string, outcome *dice.Outcome) 
 		} else if strings.Contains(line, `"reasoning"`) {
 			parts := strings.Split(line, ":")
 			if len(parts) > 1 {
-				reasoning := strings.Trim(parts[1], ` "`,)
+				reasoning := strings.Trim(parts[1], ` "`)
 				reasoning = strings.TrimSuffix(reasoning, ",")
 				reasoning = strings.Trim(reasoning, `"`)
 				if reasoning != "" {
@@ -238,7 +238,7 @@ func (ag *AspectGenerator) parseResponse(content string, outcome *dice.Outcome) 
 			}
 		}
 	}
-	
+
 	// If we couldn't extract from JSON, try to find the aspect in the text
 	if response.AspectText == "" {
 		// Look for quoted strings that might be aspects
@@ -251,7 +251,7 @@ func (ag *AspectGenerator) parseResponse(content string, outcome *dice.Outcome) 
 			}
 		}
 	}
-	
+
 	// Fallback: provide a generic aspect based on the outcome
 	if response.AspectText == "" {
 		switch outcome.Type {
@@ -265,6 +265,6 @@ func (ag *AspectGenerator) parseResponse(content string, outcome *dice.Outcome) 
 		response.Description = "Generated aspect based on roll outcome"
 		response.Reasoning = "Fallback aspect when LLM response couldn't be parsed"
 	}
-	
+
 	return response, nil
 }

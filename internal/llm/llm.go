@@ -10,32 +10,32 @@ type Message struct {
 
 // CompletionRequest represents a request to generate text completion
 type CompletionRequest struct {
-	Messages          []Message `json:"messages"`
-	MaxTokens         int       `json:"max_tokens,omitempty"`
-	Temperature       float64   `json:"temperature,omitempty"`
-	TopP              float64   `json:"top_p,omitempty"`
-	PresencePenalty   float64   `json:"presence_penalty,omitempty"`
-	FrequencyPenalty  float64   `json:"frequency_penalty,omitempty"`
-	Model             string    `json:"model,omitempty"`
-	Stream            bool      `json:"stream,omitempty"`
+	Messages         []Message `json:"messages"`
+	MaxTokens        int       `json:"max_tokens,omitempty"`
+	Temperature      float64   `json:"temperature,omitempty"`
+	TopP             float64   `json:"top_p,omitempty"`
+	PresencePenalty  float64   `json:"presence_penalty,omitempty"`
+	FrequencyPenalty float64   `json:"frequency_penalty,omitempty"`
+	Model            string    `json:"model,omitempty"`
+	Stream           bool      `json:"stream,omitempty"`
 }
 
 // CompletionResponse represents the response from a completion request
 type CompletionResponse struct {
-	ID      string                   `json:"id"`
-	Object  string                   `json:"object"`
-	Created int64                    `json:"created"`
-	Model   string                   `json:"model"`
+	ID      string                     `json:"id"`
+	Object  string                     `json:"object"`
+	Created int64                      `json:"created"`
+	Model   string                     `json:"model"`
 	Choices []CompletionResponseChoice `json:"choices"`
-	Usage   CompletionUsage          `json:"usage,omitempty"`
+	Usage   CompletionUsage            `json:"usage,omitempty"`
 }
 
 // CompletionResponseChoice represents a single completion choice
 type CompletionResponseChoice struct {
-	Index        int                    `json:"index"`
-	Message      Message                `json:"message"`
-	FinishReason string                 `json:"finish_reason"`
-	Delta        *Message               `json:"delta,omitempty"` // For streaming responses
+	Index        int      `json:"index"`
+	Message      Message  `json:"message"`
+	FinishReason string   `json:"finish_reason"`
+	Delta        *Message `json:"delta,omitempty"` // For streaming responses
 }
 
 // CompletionUsage represents token usage information
@@ -52,11 +52,11 @@ type StreamHandler func(chunk CompletionResponse) error
 type LLMClient interface {
 	// ChatCompletion sends a chat completion request and returns the response
 	ChatCompletion(ctx context.Context, req CompletionRequest) (*CompletionResponse, error)
-	
+
 	// ChatCompletionStream sends a streaming chat completion request
 	// The handler function is called for each chunk received
 	ChatCompletionStream(ctx context.Context, req CompletionRequest, handler StreamHandler) error
-	
+
 	// GetModelInfo returns information about the model being used
 	GetModelInfo() ModelInfo
 }

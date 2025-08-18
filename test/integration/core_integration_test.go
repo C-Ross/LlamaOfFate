@@ -3,12 +3,12 @@ package core_test
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestIntegration_BasicGameplay demonstrates core systems working together
@@ -45,10 +45,10 @@ func TestIntegration_BasicGameplay(t *testing.T) {
 	testAction.AddAspectInvoke(aspectInvoke)
 
 	// Simulate the action resolution
-	roller := dice.NewSeededRoller(12345) // Use seeded roller for predictable test
+	roller := dice.NewSeededRoller(12345)   // Use seeded roller for predictable test
 	baseSkill := char.GetSkill("Athletics") // Good (+3)
 	bonus := testAction.CalculateBonus()    // +2 from aspect
-	
+
 	checkResult := roller.RollWithModifier(baseSkill, bonus)
 	testAction.CheckResult = checkResult
 	testAction.Outcome = checkResult.CompareAgainst(testAction.Difficulty)
@@ -86,7 +86,7 @@ func TestIntegration_StressAndConsequences(t *testing.T) {
 	assert.True(t, fighter.TakeStress(character.PhysicalStress, 2))
 
 	// Try to take stress when track is full
-	assert.False(t, fighter.TakeStress(character.PhysicalStress, 1), 
+	assert.False(t, fighter.TakeStress(character.PhysicalStress, 1),
 		"Should not be able to take 1-stress when box already filled")
 
 	// Verify track state
@@ -194,7 +194,7 @@ func TestIntegration_CompleteActionResolution(t *testing.T) {
 
 	// Process the action
 	roller := dice.NewSeededRoller(54321)
-	baseSkill := character.GetSkill("Deceive") // Fair (+2)
+	baseSkill := character.GetSkill("Deceive")      // Fair (+2)
 	totalBonus := infiltrateAction.CalculateBonus() // +4 total
 
 	// Spend fate point

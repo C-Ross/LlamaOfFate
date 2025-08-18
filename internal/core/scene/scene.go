@@ -6,32 +6,32 @@ import (
 
 // Scene represents the current game scene
 type Scene struct {
-	ID            string            `json:"id"`
-	Name          string            `json:"name"`
-	Description   string            `json:"description"`
-	
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+
 	// Scene Elements
 	SituationAspects []SituationAspect `json:"situation_aspects"`
 	Characters       []string          `json:"character_ids"`
 	ActiveCharacter  string            `json:"active_character_id,omitempty"`
-	
+
 	// Scene State
-	IsConflict       bool              `json:"is_conflict"`
-	ConflictState    *ConflictState    `json:"conflict_state,omitempty"`
-	
+	IsConflict    bool           `json:"is_conflict"`
+	ConflictState *ConflictState `json:"conflict_state,omitempty"`
+
 	// Metadata
-	CreatedAt        time.Time         `json:"created_at"`
-	UpdatedAt        time.Time         `json:"updated_at"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // SituationAspect represents environmental or temporary aspects
 type SituationAspect struct {
-	ID           string    `json:"id"`
-	Aspect       string    `json:"aspect"`
-	FreeInvokes  int       `json:"free_invokes"`
-	Duration     string    `json:"duration"` // "scene", "scenario", "permanent"
-	CreatedBy    string    `json:"created_by"` // character ID
-	CreatedAt    time.Time `json:"created_at"`
+	ID          string    `json:"id"`
+	Aspect      string    `json:"aspect"`
+	FreeInvokes int       `json:"free_invokes"`
+	Duration    string    `json:"duration"`   // "scene", "scenario", "permanent"
+	CreatedBy   string    `json:"created_by"` // character ID
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // ConflictState manages conflict mechanics
@@ -81,7 +81,7 @@ func (s *Scene) AddCharacter(characterID string) {
 			return
 		}
 	}
-	
+
 	s.Characters = append(s.Characters, characterID)
 	s.UpdatedAt = time.Now()
 }
@@ -95,7 +95,7 @@ func (s *Scene) RemoveCharacter(characterID string) {
 			break
 		}
 	}
-	
+
 	// If this was the active character, clear it
 	if s.ActiveCharacter == characterID {
 		s.ActiveCharacter = ""
@@ -139,12 +139,12 @@ func (s *Scene) StartConflict(participants []ConflictParticipant) {
 		Round:           1,
 		Zones:           make([]Zone, 0),
 	}
-	
+
 	// TODO: Sort participants by initiative
 	for _, participant := range participants {
 		s.ConflictState.InitiativeOrder = append(s.ConflictState.InitiativeOrder, participant.CharacterID)
 	}
-	
+
 	s.UpdatedAt = time.Now()
 }
 
@@ -160,7 +160,7 @@ func (s *Scene) GetCurrentActor() string {
 	if !s.IsConflict || s.ConflictState == nil || len(s.ConflictState.InitiativeOrder) == 0 {
 		return ""
 	}
-	
+
 	return s.ConflictState.InitiativeOrder[s.ConflictState.CurrentTurn]
 }
 
@@ -169,13 +169,13 @@ func (s *Scene) NextTurn() {
 	if !s.IsConflict || s.ConflictState == nil {
 		return
 	}
-	
+
 	s.ConflictState.CurrentTurn++
 	if s.ConflictState.CurrentTurn >= len(s.ConflictState.InitiativeOrder) {
 		s.ConflictState.CurrentTurn = 0
 		s.ConflictState.Round++
 	}
-	
+
 	s.UpdatedAt = time.Now()
 }
 

@@ -9,33 +9,33 @@ import (
 
 // Character represents a player character or NPC
 type Character struct {
-	ID          string                  `json:"id"`
-	Name        string                  `json:"name"`
-	Description string                  `json:"description"`
-	
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+
 	// Core Character Elements
-	Aspects     Aspects                 `json:"aspects"`
-	Skills      map[string]dice.Ladder  `json:"skills"`
-	Stunts      []Stunt                 `json:"stunts"`
-	
+	Aspects Aspects                `json:"aspects"`
+	Skills  map[string]dice.Ladder `json:"skills"`
+	Stunts  []Stunt                `json:"stunts"`
+
 	// Resources
-	FatePoints  int                     `json:"fate_points"`
-	Refresh     int                     `json:"refresh"`
-	
+	FatePoints int `json:"fate_points"`
+	Refresh    int `json:"refresh"`
+
 	// Health and Status
 	StressTracks map[string]*StressTrack `json:"stress_tracks"`
 	Consequences []Consequence           `json:"consequences"`
-	
+
 	// Metadata
-	CreatedAt   time.Time               `json:"created_at"`
-	UpdatedAt   time.Time               `json:"updated_at"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // Aspects holds the character aspects
 type Aspects struct {
-	HighConcept   string   `json:"high_concept"`
-	Trouble       string   `json:"trouble"`
-	OtherAspects  []string `json:"other_aspects"`
+	HighConcept  string   `json:"high_concept"`
+	Trouble      string   `json:"trouble"`
+	OtherAspects []string `json:"other_aspects"`
 }
 
 // GetAll returns all aspects as a slice
@@ -162,13 +162,13 @@ func (st *StressTrack) TakeStress(amount int) bool {
 	if amount <= 0 || amount > len(st.Boxes) {
 		return false
 	}
-	
+
 	// Check if the specific box is available (1-indexed)
 	boxIndex := amount - 1
 	if boxIndex >= len(st.Boxes) || st.Boxes[boxIndex] {
 		return false
 	}
-	
+
 	st.Boxes[boxIndex] = true
 	return true
 }
@@ -178,12 +178,12 @@ func (st *StressTrack) ClearStress(box int) bool {
 	if box <= 0 || box > len(st.Boxes) {
 		return false
 	}
-	
+
 	boxIndex := box - 1
 	if !st.Boxes[boxIndex] {
 		return false
 	}
-	
+
 	st.Boxes[boxIndex] = false
 	return true
 }
@@ -239,13 +239,13 @@ type Consequence struct {
 // NewCharacter creates a new character with default values
 func NewCharacter(id, name string) *Character {
 	return &Character{
-		ID:           id,
-		Name:         name,
-		Aspects:      Aspects{OtherAspects: make([]string, 0)},
-		Skills:       make(map[string]dice.Ladder),
-		Stunts:       make([]Stunt, 0),
-		FatePoints:   3, // Default starting fate points
-		Refresh:      3, // Default refresh
+		ID:         id,
+		Name:       name,
+		Aspects:    Aspects{OtherAspects: make([]string, 0)},
+		Skills:     make(map[string]dice.Ladder),
+		Stunts:     make([]Stunt, 0),
+		FatePoints: 3, // Default starting fate points
+		Refresh:    3, // Default refresh
 		StressTracks: map[string]*StressTrack{
 			string(PhysicalStress): NewStressTrack(PhysicalStress, 2),
 			string(MentalStress):   NewStressTrack(MentalStress, 2),
@@ -327,13 +327,13 @@ func (c *Character) HasAspect(aspect string) bool {
 			return true
 		}
 	}
-	
+
 	// Also check consequences as they create temporary aspects
 	for _, consequence := range c.Consequences {
 		if consequence.Aspect == aspect {
 			return true
 		}
 	}
-	
+
 	return false
 }

@@ -34,44 +34,44 @@ func (at ActionType) String() string {
 
 // Action represents a character's attempted action
 type Action struct {
-	ID           string            `json:"id"`
-	CharacterID  string            `json:"character_id"`
-	Type         ActionType        `json:"type"`
-	Skill        string            `json:"skill"`
-	Description  string            `json:"description"`
-	RawInput     string            `json:"raw_input"`
-	
+	ID          string     `json:"id"`
+	CharacterID string     `json:"character_id"`
+	Type        ActionType `json:"type"`
+	Skill       string     `json:"skill"`
+	Description string     `json:"description"`
+	RawInput    string     `json:"raw_input"`
+
 	// Action Modifiers
-	Difficulty   dice.Ladder       `json:"difficulty"`
-	Aspects      []AspectInvoke    `json:"aspects"`
-	Stunts       []string          `json:"stunt_ids"`
-	
+	Difficulty dice.Ladder    `json:"difficulty"`
+	Aspects    []AspectInvoke `json:"aspects"`
+	Stunts     []string       `json:"stunt_ids"`
+
 	// Results
-	CheckResult  *dice.CheckResult `json:"check_result,omitempty"`
-	Outcome      *dice.Outcome     `json:"outcome,omitempty"`
-	Effects      []Effect          `json:"effects"`
-	
+	CheckResult *dice.CheckResult `json:"check_result,omitempty"`
+	Outcome     *dice.Outcome     `json:"outcome,omitempty"`
+	Effects     []Effect          `json:"effects"`
+
 	// Narrative
-	ResultText   string            `json:"result_text"`
-	
-	Timestamp    time.Time         `json:"timestamp"`
+	ResultText string `json:"result_text"`
+
+	Timestamp time.Time `json:"timestamp"`
 }
 
 // AspectInvoke represents using an aspect in an action
 type AspectInvoke struct {
 	AspectText    string `json:"aspect_text"`
-	Source        string `json:"source"`        // "character", "situation", "consequence"
+	Source        string `json:"source"` // "character", "situation", "consequence"
 	SourceID      string `json:"source_id"`
 	IsFree        bool   `json:"is_free"`
 	FatePointCost int    `json:"fate_point_cost"`
-	Bonus         int    `json:"bonus"`         // Usually +2
+	Bonus         int    `json:"bonus"` // Usually +2
 }
 
 // Effect represents a mechanical effect of an action
 type Effect struct {
-	Type        string      `json:"type"`        // "stress", "consequence", "aspect", "advantage", "boost"
-	Target      string      `json:"target"`      // Character or scene ID
-	Value       interface{} `json:"value"`       // Type-specific data
+	Type        string      `json:"type"`   // "stress", "consequence", "aspect", "advantage", "boost"
+	Target      string      `json:"target"` // Character or scene ID
+	Value       interface{} `json:"value"`  // Type-specific data
 	Description string      `json:"description"`
 }
 
@@ -104,14 +104,14 @@ func (a *Action) AddEffect(effect Effect) {
 // CalculateBonus calculates the total bonus from aspects and stunts
 func (a *Action) CalculateBonus() int {
 	bonus := 0
-	
+
 	// Add bonuses from aspect invocations
 	for _, aspect := range a.Aspects {
 		bonus += aspect.Bonus
 	}
-	
+
 	// TODO: Add stunt bonuses when stunt system is implemented
-	
+
 	return bonus
 }
 

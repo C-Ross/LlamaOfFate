@@ -56,14 +56,14 @@ func NewClient(config Config) *Client {
 func (c *Client) ChatCompletion(ctx context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
 	// Force streaming to false for non-streaming requests
 	req.Stream = false
-	
+
 	// Set the model name if not already set
 	if req.Model == "" {
 		req.Model = c.config.ModelName
 	}
-	
-	url := c.config.APIEndpoint 
-	
+
+	url := c.config.APIEndpoint
+
 	reqBody, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
@@ -99,14 +99,14 @@ func (c *Client) ChatCompletion(ctx context.Context, req llm.CompletionRequest) 
 func (c *Client) ChatCompletionStream(ctx context.Context, req llm.CompletionRequest, handler llm.StreamHandler) error {
 	// Force streaming to true
 	req.Stream = true
-	
+
 	// Set the model name if not already set
 	if req.Model == "" {
 		req.Model = c.config.ModelName
 	}
-	
-	url := c.config.APIEndpoint 
-	
+
+	url := c.config.APIEndpoint
+
 	reqBody, err := json.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("failed to marshal request: %w", err)
@@ -141,7 +141,7 @@ func (c *Client) GetModelInfo() llm.ModelInfo {
 // setHeaders sets the required headers for Azure ML API requests
 func (c *Client) setHeaders(req *http.Request) {
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	// Handle different Azure authentication formats
 	// If the key already starts with "Bearer " or "api-key ", use it as-is
 	// Otherwise, assume it's a raw key and add "Bearer " prefix
@@ -155,40 +155,40 @@ func (c *Client) setHeaders(req *http.Request) {
 // processStreamingResponse processes the streaming response from Azure ML
 func (c *Client) processStreamingResponse(body io.Reader, handler llm.StreamHandler) error {
 	scanner := bufio.NewScanner(body)
-	
+
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		
+
 		// Skip empty lines
 		if line == "" {
 			continue
 		}
-		
+
 		// Check for the end of stream
 		if line == "data: [DONE]" {
 			break
 		}
-		
+
 		// Parse the data line
 		if strings.HasPrefix(line, "data: ") {
 			jsonData := strings.TrimPrefix(line, "data: ")
-			
+
 			var chunk llm.CompletionResponse
 			if err := json.Unmarshal([]byte(jsonData), &chunk); err != nil {
 				// Log the error but continue processing
 				continue
 			}
-			
+
 			if err := handler(chunk); err != nil {
 				return fmt.Errorf("handler error: %w", err)
 			}
 		}
 	}
-	
+
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("error reading stream: %w", err)
 	}
-	
+
 	return nil
 }
 

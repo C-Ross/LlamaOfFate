@@ -22,7 +22,7 @@ func TestNewScene(t *testing.T) {
 	assert.Empty(t, scene.Characters)
 	assert.False(t, scene.IsConflict)
 	assert.Nil(t, scene.ConflictState)
-	
+
 	// Check timestamps
 	assert.WithinDuration(t, time.Now(), scene.CreatedAt, time.Second)
 	assert.WithinDuration(t, time.Now(), scene.UpdatedAt, time.Second)
@@ -62,10 +62,10 @@ func TestScene_RemoveCharacter(t *testing.T) {
 	scene.RemoveCharacter("char-2")
 
 	assert.Len(t, scene.Characters, 2)
-	
+
 	// Check that char-2 is not in the list
 	assert.NotContains(t, scene.Characters, "char-2")
-	
+
 	// Check that active character was cleared
 	assert.Empty(t, scene.ActiveCharacter)
 	assert.True(t, scene.UpdatedAt.After(originalTime))

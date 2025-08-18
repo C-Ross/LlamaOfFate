@@ -30,9 +30,9 @@ func (d FateDie) String() string {
 
 // Roll represents a 4dF dice roll
 type Roll struct {
-	Dice   [4]FateDie `json:"dice"`
-	Total  int        `json:"total"`
-	RolledAt time.Time `json:"rolled_at"`
+	Dice     [4]FateDie `json:"dice"`
+	Total    int        `json:"total"`
+	RolledAt time.Time  `json:"rolled_at"`
 }
 
 // String returns a formatted representation of the roll
@@ -64,7 +64,7 @@ func (r *Roller) Roll4dF() *Roll {
 	roll := &Roll{
 		RolledAt: time.Now(),
 	}
-	
+
 	total := 0
 	for i := 0; i < 4; i++ {
 		// Each die has 1/3 chance each of -1, 0, +1
@@ -72,7 +72,7 @@ func (r *Roller) Roll4dF() *Roll {
 		roll.Dice[i] = FateDie(value)
 		total += value
 	}
-	
+
 	roll.Total = total
 	return roll
 }
@@ -81,12 +81,12 @@ func (r *Roller) Roll4dF() *Roll {
 func (r *Roller) RollWithModifier(skill Ladder, modifier int) *CheckResult {
 	roll := r.Roll4dF()
 	finalValue := Ladder(int(skill) + roll.Total + modifier)
-	
+
 	return &CheckResult{
-		Roll:        roll,
-		BaseSkill:   skill,
-		Modifier:    modifier,
-		FinalValue:  finalValue,
+		Roll:         roll,
+		BaseSkill:    skill,
+		Modifier:     modifier,
+		FinalValue:   finalValue,
 		CalculatedAt: time.Now(),
 	}
 }
@@ -108,7 +108,7 @@ func (cr *CheckResult) String() string {
 // CompareAgainst compares this result against a difficulty and returns the outcome
 func (cr *CheckResult) CompareAgainst(difficulty Ladder) *Outcome {
 	shifts := cr.FinalValue.Compare(difficulty)
-	
+
 	var result OutcomeType
 	switch {
 	case shifts < 0:
@@ -120,7 +120,7 @@ func (cr *CheckResult) CompareAgainst(difficulty Ladder) *Outcome {
 	default: // shifts >= 3
 		result = SuccessWithStyle
 	}
-	
+
 	return &Outcome{
 		Type:       result,
 		Shifts:     shifts,
@@ -157,8 +157,8 @@ func (o OutcomeType) String() string {
 
 // Outcome represents the result of comparing a check against a difficulty
 type Outcome struct {
-	Type       OutcomeType   `json:"type"`
-	Shifts     int           `json:"shifts"`
-	Result     *CheckResult  `json:"result"`
-	Difficulty Ladder        `json:"difficulty"`
+	Type       OutcomeType  `json:"type"`
+	Shifts     int          `json:"shifts"`
+	Result     *CheckResult `json:"result"`
+	Difficulty Ladder       `json:"difficulty"`
 }
