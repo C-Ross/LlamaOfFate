@@ -1,0 +1,21 @@
+CHARACTER INFORMATION:
+Name: {{.Character.Name}}
+{{- if .Character.Aspects.HighConcept}}
+High Concept: {{.Character.Aspects.HighConcept}}
+{{- end}}
+{{- if .Character.Aspects.Trouble}}
+Trouble: {{.Character.Aspects.Trouble}}
+{{- end}}
+{{- $allAspects := .Character.Aspects.GetAll}}
+{{- if $allAspects}}
+Aspects: {{range $i, $aspect := $allAspects}}{{if $i}}, {{end}}{{$aspect}}{{end}}
+{{- end}}
+Notable Skills: {{if .Character.Skills}}{{range $skill, $level := .Character.Skills}}{{$skill}} {{$level.String}}, {{end}}{{else}}No notable skills above Mediocre{{end}}
+
+{{- if .Context}}
+CURRENT SITUATION:
+{{.Context}}
+{{- end}}
+
+PLAYER INPUT:
+"{{.RawInput}}"
