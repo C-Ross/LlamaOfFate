@@ -22,11 +22,11 @@ type ActionParseRequest struct {
 
 // ActionParseResponse represents the LLM's response for action parsing
 type ActionParseResponse struct {
-	ActionType  string `json:"action_type"`  // "Overcome", "Create an Advantage", "Attack", "Defend"
-	Skill       string `json:"skill"`        // The Fate Core skill to use
-	Description string `json:"description"`  // Clean description of what they're trying to do
-	Reasoning   string `json:"reasoning"`    // Explanation of the choice
-	Confidence  int    `json:"confidence"`   // 1-10 scale of how confident the LLM is
+	ActionType  string `json:"action_type"` // "Overcome", "Create an Advantage", "Attack", "Defend"
+	Skill       string `json:"skill"`       // The Fate Core skill to use
+	Description string `json:"description"` // Clean description of what they're trying to do
+	Reasoning   string `json:"reasoning"`   // Explanation of the choice
+	Confidence  int    `json:"confidence"`  // 1-10 scale of how confident the LLM is
 }
 
 // ActionParser handles parsing user input into structured actions using LLM
@@ -62,7 +62,7 @@ func (ap *ActionParser) ParseAction(ctx context.Context, req ActionParseRequest)
 				Content: systemPrompt,
 			},
 			{
-				Role:    "user", 
+				Role:    "user",
 				Content: userPrompt,
 			},
 		},
@@ -151,11 +151,11 @@ func generateActionID() string {
 func cleanJSONResponse(content string) string {
 	// Remove markdown code block formatting
 	content = strings.TrimSpace(content)
-	
+
 	// If there are multiple JSON blocks, take the last one (the corrected response)
 	blocks := strings.Split(content, "```")
 	var jsonBlocks []string
-	
+
 	for _, block := range blocks {
 		block = strings.TrimSpace(block)
 		if strings.HasPrefix(block, "json\n") {
@@ -168,25 +168,25 @@ func cleanJSONResponse(content string) string {
 			jsonBlocks = append(jsonBlocks, block)
 		}
 	}
-	
+
 	// If we found JSON blocks, use the last one
 	if len(jsonBlocks) > 0 {
 		return jsonBlocks[len(jsonBlocks)-1]
 	}
-	
+
 	// Fallback: simple cleanup
 	if strings.HasPrefix(content, "```json") {
 		content = strings.TrimPrefix(content, "```json")
 	} else if strings.HasPrefix(content, "```") {
 		content = strings.TrimPrefix(content, "```")
 	}
-	
+
 	if strings.HasSuffix(content, "```") {
 		content = strings.TrimSuffix(content, "```")
 	}
-	
+
 	// Trim any remaining whitespace
 	content = strings.TrimSpace(content)
-	
+
 	return content
 }

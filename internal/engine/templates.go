@@ -21,10 +21,10 @@ var actionParsePromptTemplate string
 
 // Template instances
 var (
-	AspectGenerationPrompt     *template.Template
-	SystemPrompt              *template.Template
-	ActionParseSystemPrompt   *template.Template
-	ActionParsePrompt         *template.Template
+	AspectGenerationPrompt  *template.Template
+	SystemPrompt            *template.Template
+	ActionParseSystemPrompt *template.Template
+	ActionParsePrompt       *template.Template
 )
 
 func init() {
