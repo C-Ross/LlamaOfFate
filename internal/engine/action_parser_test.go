@@ -25,6 +25,7 @@ func TestActionParser_ParseAction_Overcome(t *testing.T) {
 		"action_type": "Overcome",
 		"skill": "Athletics",
 		"description": "Jump across the wide chasm",
+		"target": "",
 		"reasoning": "Player wants to get past an obstacle using physical movement",
 		"confidence": 9
 	}`
@@ -52,6 +53,7 @@ func TestActionParser_ParseAction_Overcome(t *testing.T) {
 	assert.Equal(t, action.Overcome, parsedAction.Type)
 	assert.Equal(t, "Athletics", parsedAction.Skill)
 	assert.Equal(t, "Jump across the wide chasm", parsedAction.Description)
+	assert.Equal(t, "", parsedAction.Target)
 	assert.Equal(t, "I want to jump across the chasm", parsedAction.RawInput)
 	assert.Equal(t, char.ID, parsedAction.CharacterID)
 }
@@ -62,6 +64,7 @@ func TestActionParser_ParseAction_CreateAdvantage(t *testing.T) {
 		"action_type": "Create an Advantage",
 		"skill": "Stealth",
 		"description": "Find a hidden vantage point to observe the guards",
+		"target": "",
 		"reasoning": "Player wants to set up an advantage for future actions using stealth",
 		"confidence": 8
 	}`
@@ -89,6 +92,7 @@ func TestActionParser_ParseAction_CreateAdvantage(t *testing.T) {
 	assert.Equal(t, action.CreateAdvantage, parsedAction.Type)
 	assert.Equal(t, "Stealth", parsedAction.Skill)
 	assert.Equal(t, "Find a hidden vantage point to observe the guards", parsedAction.Description)
+	assert.Equal(t, "", parsedAction.Target)
 	assert.Equal(t, char.ID, parsedAction.CharacterID)
 }
 
@@ -98,6 +102,7 @@ func TestActionParser_ParseAction_Attack(t *testing.T) {
 		"action_type": "Attack",
 		"skill": "Fight",
 		"description": "Strike the orc with my sword",
+		"target": "orc",
 		"reasoning": "Player is trying to harm an enemy in melee combat",
 		"confidence": 10
 	}`
@@ -125,6 +130,7 @@ func TestActionParser_ParseAction_Attack(t *testing.T) {
 	assert.Equal(t, action.Attack, parsedAction.Type)
 	assert.Equal(t, "Fight", parsedAction.Skill)
 	assert.Equal(t, "Strike the orc with my sword", parsedAction.Description)
+	assert.Equal(t, "orc", parsedAction.Target)
 }
 
 func TestActionParser_ParseAction_Defend(t *testing.T) {
@@ -133,6 +139,7 @@ func TestActionParser_ParseAction_Defend(t *testing.T) {
 		"action_type": "Defend",
 		"skill": "Athletics",
 		"description": "Dodge the incoming arrow",
+		"target": "",
 		"reasoning": "Player is trying to avoid an incoming attack using agility",
 		"confidence": 9
 	}`
@@ -159,6 +166,7 @@ func TestActionParser_ParseAction_Defend(t *testing.T) {
 	assert.Equal(t, action.Defend, parsedAction.Type)
 	assert.Equal(t, "Athletics", parsedAction.Skill)
 	assert.Equal(t, "Dodge the incoming arrow", parsedAction.Description)
+	assert.Equal(t, "", parsedAction.Target)
 }
 
 func TestActionParser_ParseAction_InvalidJSON(t *testing.T) {
@@ -191,6 +199,7 @@ func TestActionParser_ParseAction_InvalidActionType(t *testing.T) {
 		"action_type": "InvalidType",
 		"skill": "Athletics",
 		"description": "Do something",
+		"target": "",
 		"reasoning": "Test invalid action type",
 		"confidence": 5
 	}`

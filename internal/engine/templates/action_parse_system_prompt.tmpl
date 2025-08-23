@@ -31,12 +31,15 @@ ANALYSIS GUIDELINES:
 - Look for keywords that suggest specific actions (sneak=Stealth, lie=Deceive, etc.)
 - Default to the most obvious skill unless character background suggests otherwise
 - Be confident in common mappings but note uncertainty for ambiguous cases
+- Identify the target only if it's a specific character or aspect being affected
+- Leave target blank for self-actions, environmental interactions, or general obstacles
 
 Your response must be valid JSON with these exact fields:
 {
   "action_type": "One of the four action types exactly as listed above",
   "skill": "One of the 18 Fate Core skills exactly as listed above", 
   "description": "Clean, concise description of what they're trying to do",
+  "target": "Specific character name or aspect being targeted (leave blank for self/environment/general actions)",
   "reasoning": "Brief explanation of your choices",
   "confidence": 1-10
 }

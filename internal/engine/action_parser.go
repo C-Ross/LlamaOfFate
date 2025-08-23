@@ -25,6 +25,7 @@ type ActionParseResponse struct {
 	ActionType  string `json:"action_type"` // "Overcome", "Create an Advantage", "Attack", "Defend"
 	Skill       string `json:"skill"`       // The Fate Core skill to use
 	Description string `json:"description"` // Clean description of what they're trying to do
+	Target      string `json:"target"`      // The target of the action (character, object, or description)
 	Reasoning   string `json:"reasoning"`   // Explanation of the choice
 	Confidence  int    `json:"confidence"`  // 1-10 scale of how confident the LLM is
 }
@@ -103,6 +104,7 @@ func (ap *ActionParser) ParseAction(ctx context.Context, req ActionParseRequest)
 		parseResp.Description,
 	)
 	parsedAction.RawInput = req.RawInput
+	parsedAction.Target = parseResp.Target
 
 	return parsedAction, nil
 }

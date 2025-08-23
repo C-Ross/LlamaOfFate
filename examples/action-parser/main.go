@@ -121,6 +121,9 @@ func main() {
 		fmt.Printf("   Type: %s\n", parsedAction.Type.String())
 		fmt.Printf("   Skill: %s (%s)\n", parsedAction.Skill, char.GetSkill(parsedAction.Skill).String())
 		fmt.Printf("   Description: %s\n", parsedAction.Description)
+		if parsedAction.Target != "" {
+			fmt.Printf("   Target: %s\n", parsedAction.Target)
+		}
 		fmt.Printf("   Action ID: %s\n", parsedAction.ID)
 		fmt.Println()
 	}

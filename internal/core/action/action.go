@@ -40,6 +40,7 @@ type Action struct {
 	Skill       string     `json:"skill"`
 	Description string     `json:"description"`
 	RawInput    string     `json:"raw_input"`
+	Target      string     `json:"target,omitempty"` // The target of the action (character ID, object, or description)
 
 	// Action Modifiers
 	Difficulty dice.Ladder    `json:"difficulty"`
@@ -89,6 +90,13 @@ func NewAction(id, characterID string, actionType ActionType, skill, description
 		Effects:     make([]Effect, 0),
 		Timestamp:   time.Now(),
 	}
+}
+
+// NewActionWithTarget creates a new action with a target
+func NewActionWithTarget(id, characterID string, actionType ActionType, skill, description, target string) *Action {
+	action := NewAction(id, characterID, actionType, skill, description)
+	action.Target = target
+	return action
 }
 
 // AddAspectInvoke adds an aspect invocation to the action
