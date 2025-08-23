@@ -2,10 +2,13 @@ package text
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"strings"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 )
 
@@ -69,6 +72,8 @@ func (c *CLI) processCommand(input string) bool {
 		c.showHelp()
 	case "version":
 		fmt.Printf("Engine version: %s\n", c.engine.GetVersion())
+	case "scene":
+		c.startSampleScene()
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
 		fmt.Println("Type 'help' for available commands.")
@@ -82,7 +87,48 @@ func (c *CLI) showHelp() {
 	fmt.Println("Available commands:")
 	fmt.Println("  help, h        - Show this help message")
 	fmt.Println("  version        - Show engine version")
+	fmt.Println("  scene          - Start a sample scene")
 	fmt.Println("  quit, exit, q  - Exit the application")
 	fmt.Println()
 	fmt.Println("More commands will be added as the system is developed.")
+}
+
+// startSampleScene starts a sample scene for testing
+func (c *CLI) startSampleScene() {
+	fmt.Println("Starting sample scene...")
+
+	// Create a sample character
+	player := character.NewCharacter("player1", "Test Character")
+	player.Aspects.HighConcept = "Brave Adventurer"
+	player.Aspects.Trouble = "Too Curious for My Own Good"
+	player.SetSkill("Athletics", dice.Good)
+	player.SetSkill("Fight", dice.Fair)
+	player.SetSkill("Notice", dice.Fair)
+
+	// Get scene manager
+	sceneManager := c.engine.GetSceneManager()
+	if sceneManager == nil {
+		fmt.Println("Error: Scene manager not available")
+		return
+	}
+
+	// Start scene
+	err := sceneManager.StartScene(
+		"test-scene",
+		"A Mysterious Cave",
+		"You stand at the entrance of a dark cave. Cool air flows from within, "+
+			"and you can hear the distant sound of dripping water. "+
+			"Strange symbols are carved into the stone archway above.",
+		player,
+	)
+	if err != nil {
+		fmt.Printf("Error starting scene: %v\n", err)
+		return
+	}
+
+	// Run scene loop
+	ctx := context.Background()
+	if err := sceneManager.RunSceneLoop(ctx); err != nil {
+		fmt.Printf("Scene error: %v\n", err)
+	}
 }

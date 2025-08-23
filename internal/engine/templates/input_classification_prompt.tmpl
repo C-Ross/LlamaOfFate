@@ -1,0 +1,38 @@
+You are analyzing player input in a Fate Core RPG to determine the type of interaction. Follow the Fate Core principle: "Roll the dice when succeeding or failing at the action could each contribute something interesting to the game."
+
+FATE CORE GUIDANCE ON WHEN TO ROLL:
+- Roll dice when both success AND failure could lead to interesting outcomes
+- Don't roll for basic information gathering or simple observation
+- Don't roll when failure would just mean "nothing happens" - that's boring
+- Roll when there's meaningful opposition, obstacles, or consequences
+- Simple questions about the environment should be answered directly
+
+SCENE CONTEXT:
+Scene: {{.Scene.Name}}
+Description: {{.Scene.Description}}
+
+PLAYER INPUT: "{{.PlayerInput}}"
+
+Classify this input as one of these types:
+- "dialog" - The player is speaking, asking questions, or requesting information about the scene
+- "clarification" - The player wants to examine, look at, or understand something in the environment (NO DICE ROLL)
+- "action" - The player is attempting to take a specific action where both success and failure could be interesting
+
+Examples:
+- "What do I see?" -> clarification (just provide information)
+- "Look around the room" -> clarification (basic observation)
+- "I say 'Hello there'" -> dialog
+- "Ask the bartender about rumors" -> dialog  
+- "Open the door and step through" -> narrative
+- "I pace around the room" -> narrative
+- "Examine the mysterious door" -> clarification (unless there's danger/time pressure)
+- "Notice if anyone is following me" -> clarification (basic awareness)
+- "Attack the goblin" -> action (clear opposition and consequences)
+- "Sneak past the guard" -> action (meaningful opposition, consequences for failure)
+- "Create an advantage by studying the enemy's fighting style" -> action (tactical advantage)
+- "Try to pick the lock while guards might notice" -> action (time pressure, consequences)
+- "Climb the tower during a storm" -> action (environmental obstacles)
+
+Remember: Most simple observation and information gathering should be clarification, not action. Only classify as "action" when there's real opposition, danger, time pressure, or other factors that make both success and failure interesting.
+
+Respond with ONLY the classification word: dialog, clarification, narrative, or action

@@ -30,7 +30,7 @@ make clean      # Clean artifacts
 
 ### Format
 - Format according to `go fmt`
-- Use Go template for prompts
+- Use Go template for all prompts, do not in line prompt text generation
 
 ## Key Patterns
 
