@@ -15,9 +15,11 @@ import (
 
 // ActionParseRequest represents a request to parse user input into an action
 type ActionParseRequest struct {
-	Character *character.Character `json:"character"`
-	RawInput  string               `json:"raw_input"`
-	Context   string               `json:"context,omitempty"` // Scene description, recent events, etc.
+	Character       *character.Character   `json:"character"`
+	RawInput        string                 `json:"raw_input"`
+	Context         string                 `json:"context,omitempty"`          // Scene description, recent events, etc.
+	Scene           interface{}            `json:"scene,omitempty"`            // Current scene object
+	OtherCharacters []*character.Character `json:"other_characters,omitempty"` // Other characters in the scene
 }
 
 // ActionParseResponse represents the LLM's response for action parsing
@@ -25,7 +27,7 @@ type ActionParseResponse struct {
 	ActionType  string `json:"action_type"` // "Overcome", "Create an Advantage", "Attack", "Defend"
 	Skill       string `json:"skill"`       // The Fate Core skill to use
 	Description string `json:"description"` // Clean description of what they're trying to do
-	Target      string `json:"target"`      // The target of the action (character, object, or description)
+	Target      string `json:"target"`      // The target of the action (if any)
 	Reasoning   string `json:"reasoning"`   // Explanation of the choice
 	Confidence  int    `json:"confidence"`  // 1-10 scale of how confident the LLM is
 }
@@ -33,13 +35,20 @@ type ActionParseResponse struct {
 // ActionParser handles parsing user input into structured actions using LLM
 type ActionParser struct {
 	llmClient llm.LLMClient
+	debug     bool
 }
 
 // NewActionParser creates a new action parser with the given LLM client
 func NewActionParser(llmClient llm.LLMClient) *ActionParser {
 	return &ActionParser{
 		llmClient: llmClient,
+		debug:     false,
 	}
+}
+
+// SetDebug enables or disables debug mode for prompt logging
+func (ap *ActionParser) SetDebug(enabled bool) {
+	ap.debug = enabled
 }
 
 // ParseAction analyzes user input and returns a structured action using LLM
@@ -71,6 +80,16 @@ func (ap *ActionParser) ParseAction(ctx context.Context, req ActionParseRequest)
 		Temperature: 0.3, // Lower temperature for more consistent parsing
 	}
 
+	// Debug output if enabled
+	if ap.debug {
+		fmt.Println("\n=== ACTION PARSER DEBUG ===")
+		fmt.Println("SYSTEM PROMPT:")
+		fmt.Println(systemPrompt)
+		fmt.Println("\nUSER PROMPT:")
+		fmt.Println(userPrompt)
+		fmt.Println("=== END ACTION PARSER DEBUG ===")
+	}
+
 	// Get LLM response
 	resp, err := ap.llmClient.ChatCompletion(ctx, llmReq)
 	if err != nil {
@@ -96,15 +115,27 @@ func (ap *ActionParser) ParseAction(ctx context.Context, req ActionParseRequest)
 
 	// Create the action
 	actionID := generateActionID()
-	parsedAction := action.NewAction(
-		actionID,
-		req.Character.ID,
-		actionType,
-		parseResp.Skill,
-		parseResp.Description,
-	)
+
+	var parsedAction *action.Action
+	if parseResp.Target != "" {
+		parsedAction = action.NewActionWithTarget(
+			actionID,
+			req.Character.ID,
+			actionType,
+			parseResp.Skill,
+			parseResp.Description,
+			parseResp.Target,
+		)
+	} else {
+		parsedAction = action.NewAction(
+			actionID,
+			req.Character.ID,
+			actionType,
+			parseResp.Skill,
+			parseResp.Description,
+		)
+	}
 	parsedAction.RawInput = req.RawInput
-	parsedAction.Target = parseResp.Target
 
 	return parsedAction, nil
 }

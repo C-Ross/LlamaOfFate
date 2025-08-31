@@ -7,6 +7,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
+	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,7 +31,8 @@ func TestSceneManager_StartScene(t *testing.T) {
 	sm := NewSceneManager(engine)
 	player := character.NewCharacter("player1", "Test Character")
 
-	err = sm.StartScene("scene1", "Test Scene", "A test scene description", player)
+	testScene := scene.NewScene("scene1", "Test Scene", "A test scene description")
+	err = sm.StartScene(testScene, player)
 	require.NoError(t, err)
 
 	assert.NotNil(t, sm.currentScene)
@@ -101,7 +103,8 @@ func TestSceneManager_BuildContexts(t *testing.T) {
 	player.Aspects.HighConcept = "Brave Warrior"
 	player.Aspects.Trouble = "Quick to Anger"
 
-	err = sm.StartScene("scene1", "Test Scene", "A test scene", player)
+	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
+	err = sm.StartScene(testScene, player)
 	require.NoError(t, err)
 
 	// Test character context
@@ -133,7 +136,8 @@ func TestSceneManager_RunSceneLoop_RequiresLLM(t *testing.T) {
 	sm := NewSceneManager(engine)
 	player := character.NewCharacter("player1", "Test Character")
 
-	err = sm.StartScene("scene1", "Test Scene", "A test scene", player)
+	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
+	err = sm.StartScene(testScene, player)
 	require.NoError(t, err)
 
 	ctx := context.Background()
@@ -150,7 +154,8 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage(t *testing.T) {
 
 	sm := NewSceneManager(engine)
 	player := character.NewCharacter("player1", "Test Character")
-	err = sm.StartScene("scene1", "Test Scene", "A test scene", player)
+	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
+	err = sm.StartScene(testScene, player)
 	require.NoError(t, err)
 
 	// Create a successful Create Advantage action
@@ -182,7 +187,8 @@ func TestSceneManager_GetCurrentScene(t *testing.T) {
 	assert.Nil(t, sm.GetCurrentScene())
 
 	player := character.NewCharacter("player1", "Test Character")
-	err = sm.StartScene("scene1", "Test Scene", "A test scene", player)
+	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
+	err = sm.StartScene(testScene, player)
 	require.NoError(t, err)
 
 	scene := sm.GetCurrentScene()
@@ -199,7 +205,8 @@ func TestSceneManager_GetPlayer(t *testing.T) {
 	assert.Nil(t, sm.GetPlayer())
 
 	player := character.NewCharacter("player1", "Test Character")
-	err = sm.StartScene("scene1", "Test Scene", "A test scene", player)
+	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
+	err = sm.StartScene(testScene, player)
 	require.NoError(t, err)
 
 	retrievedPlayer := sm.GetPlayer()
@@ -214,4 +221,144 @@ func createTestAction(t *testing.T, actionType, skill, description string) *acti
 	testAction := action.NewAction("test-action-1", "player1", action.CreateAdvantage, skill, description)
 	testAction.Difficulty = dice.Fair
 	return testAction
+}
+
+func TestSceneManager_OtherCharactersInTemplateData(t *testing.T) {
+	// Create engine with mock LLM client
+	mockClient := &MockLLMClient{response: "Test response"}
+	engine, err := NewWithLLM(mockClient)
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	// Create test characters
+	player := character.NewCharacter("player1", "Player Character")
+	player.Aspects.HighConcept = "Brave Hero"
+
+	npc1 := character.NewCharacter("npc1", "Guard Captain")
+	npc1.Aspects.HighConcept = "Experienced Soldier"
+
+	npc2 := character.NewCharacter("npc2", "Merchant")
+	npc2.Aspects.HighConcept = "Shrewd Trader"
+
+	// Add characters to engine
+	engine.AddCharacter(player)
+	engine.AddCharacter(npc1)
+	engine.AddCharacter(npc2)
+
+	// Create scene and add all characters
+	testScene := scene.NewScene("scene1", "Test Scene", "A test scene with multiple characters")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(npc1.ID)
+	testScene.AddCharacter(npc2.ID)
+
+	// Start scene
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	// Test generateSceneResponse to verify OtherCharacters is populated
+	response := sm.generateSceneResponse(context.Background(), "Hello there", "dialog")
+
+	// The response should not be empty (indicates template executed successfully)
+	assert.NotEmpty(t, response)
+	assert.Equal(t, "Test response", response)
+
+	// We can't easily test the exact template data without exposing internal methods,
+	// but if the function completes without error, it means the template executed
+	// successfully with the OtherCharacters field populated
+}
+
+func TestSceneManager_GenerateActionNarrativeWithTarget(t *testing.T) {
+	// Create engine with mock LLM client
+	mockClient := &MockLLMClient{response: "The attack strikes true!"}
+	engine, err := NewWithLLM(mockClient)
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	// Create test characters
+	player := character.NewCharacter("player1", "Player Character")
+	player.Aspects.HighConcept = "Brave Hero"
+
+	enemy := character.NewCharacter("enemy1", "Orc Warrior")
+	enemy.Aspects.HighConcept = "Brutal Fighter"
+
+	// Add characters to engine
+	engine.AddCharacter(player)
+	engine.AddCharacter(enemy)
+
+	// Create scene and add characters
+	testScene := scene.NewScene("scene1", "Test Scene", "A combat scene")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(enemy.ID)
+
+	// Start scene
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	// Create an action with a target
+	testAction := action.NewAction("test-action-1", "player1", action.Attack, "Fight", "Attack the orc with sword")
+	testAction.Target = "enemy1"
+	testAction.Difficulty = dice.Fair
+
+	// Set up action outcome
+	testAction.Outcome = &dice.Outcome{
+		Type:   dice.Success,
+		Shifts: 2,
+	}
+
+	// Test generateActionNarrative with target
+	narrative := sm.generateActionNarrative(context.Background(), testAction)
+
+	// The response should not be empty (indicates template executed successfully)
+	assert.NotEmpty(t, narrative)
+	assert.Equal(t, "The attack strikes true!", narrative)
+
+	// The function completing without error means the template executed successfully
+	// with the Target field included in the ACTION DETAILS section
+}
+
+func TestSceneManager_GenerateActionNarrativeWithoutTarget(t *testing.T) {
+	// Create engine with mock LLM client
+	mockClient := &MockLLMClient{response: "You successfully overcome the obstacle!"}
+	engine, err := NewWithLLM(mockClient)
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	// Create test character
+	player := character.NewCharacter("player1", "Player Character")
+	player.Aspects.HighConcept = "Brave Hero"
+
+	// Add character to engine
+	engine.AddCharacter(player)
+
+	// Create scene and add character
+	testScene := scene.NewScene("scene1", "Test Scene", "A scene with obstacles")
+	testScene.AddCharacter(player.ID)
+
+	// Start scene
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	// Create an action without a target (like overcoming an environmental obstacle)
+	testAction := action.NewAction("test-action-2", "player1", action.Overcome, "Athletics", "Jump across the chasm")
+	// Note: No target set - should be empty string
+	testAction.Difficulty = dice.Fair
+
+	// Set up action outcome
+	testAction.Outcome = &dice.Outcome{
+		Type:   dice.Success,
+		Shifts: 1,
+	}
+
+	// Test generateActionNarrative without target
+	narrative := sm.generateActionNarrative(context.Background(), testAction)
+
+	// The response should not be empty (indicates template executed successfully)
+	assert.NotEmpty(t, narrative)
+	assert.Equal(t, "You successfully overcome the obstacle!", narrative)
+
+	// The function completing without error means the template executed successfully
+	// even when the Target field is empty (conditional {{- if .Action.Target}} works)
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
+	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 )
@@ -55,14 +56,15 @@ func main() {
 	// Create a sample character
 	player := createSampleCharacter()
 
-	// Get the scene manager
-	sceneManager := gameEngine.GetSceneManager()
-	if sceneManager == nil {
-		log.Fatal("Scene manager not available")
-	}
+	// Create an opponent character
+	opponent := createSampleOpponent()
 
-	// Start a rich sample scene
-	err = sceneManager.StartScene(
+	// Register characters with the engine
+	gameEngine.AddCharacter(player)
+	gameEngine.AddCharacter(opponent)
+
+	// Create a pre-configured scene with multiple characters
+	sampleScene := scene.NewScene(
 		"abandoned-tower",
 		"The Abandoned Wizard's Tower",
 		"You stand before a crumbling stone tower that stretches high into the mist. "+
@@ -70,8 +72,28 @@ func main() {
 			"The heavy wooden door hangs ajar, revealing darkness within. "+
 			"Ancient runes are carved deep into the stone archway, still glowing faintly with magical energy. "+
 			"The air hums with residual magic, and you hear the distant sound of something large moving inside.",
-		player,
 	)
+
+	// Add characters to the scene
+	sampleScene.AddCharacter(player.ID)
+	sampleScene.AddCharacter(opponent.ID)
+
+	// Get the scene manager
+	sceneManager := gameEngine.GetSceneManager()
+	if sceneManager == nil {
+		log.Fatal("Scene manager not available")
+	}
+
+	// Enable debug mode to show prompts
+	sceneManager.SetDebug(true)
+
+	// Also enable debug mode on the action parser if available
+	if actionParser := gameEngine.GetActionParser(); actionParser != nil {
+		actionParser.SetDebug(true)
+	}
+
+	// Start the scene with the pre-configured scene
+	err = sceneManager.StartScene(sampleScene, player)
 	if err != nil {
 		log.Fatalf("Failed to start scene: %v", err)
 	}
@@ -136,4 +158,31 @@ func createSampleCharacter() *character.Character {
 	player.Refresh = 3
 
 	return player
+}
+
+func createSampleOpponent() *character.Character {
+	opponent := character.NewCharacter("goblin-guard", "Goblin Guard")
+
+	// Set aspects
+	opponent.Aspects.HighConcept = "Sneaky Tower Guardian"
+	opponent.Aspects.Trouble = "Greedy and Cowardly"
+	opponent.Aspects.AddAspect("Sharp-Eared")
+	opponent.Aspects.AddAspect("Knows the Tower's Secrets")
+
+	// Set skills focused on stealth and combat
+	opponent.SetSkill("Stealth", dice.Great)    // +4 - Primary skill
+	opponent.SetSkill("Notice", dice.Good)      // +3
+	opponent.SetSkill("Fight", dice.Good)       // +3
+	opponent.SetSkill("Athletics", dice.Fair)   // +2
+	opponent.SetSkill("Burglary", dice.Fair)    // +2
+	opponent.SetSkill("Will", dice.Fair)        // +2
+	opponent.SetSkill("Deceive", dice.Average)  // +1
+	opponent.SetSkill("Physique", dice.Average) // +1
+	opponent.SetSkill("Provoke", dice.Average)  // +1
+
+	// Set fate points and refresh
+	opponent.FatePoints = 2
+	opponent.Refresh = 2
+
+	return opponent
 }

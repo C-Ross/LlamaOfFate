@@ -329,3 +329,85 @@ func TestCleanJSONResponse(t *testing.T) {
 		})
 	}
 }
+
+func TestActionParser_ParseAction_WithOtherCharacters(t *testing.T) {
+	// Setup mock LLM response
+	mockResponse := `{
+		"action_type": "Attack",
+		"skill": "Fight",
+		"description": "Attack the orc warrior with my sword",
+		"target": "orc-warrior",
+		"reasoning": "Player wants to attack a specific enemy",
+		"confidence": 9
+	}`
+
+	mockClient := &MockLLMClient{response: mockResponse}
+	parser := NewActionParser(mockClient)
+
+	// Create test character
+	char := character.NewCharacter("test-char", "Test Hero")
+	char.Aspects.HighConcept = "Brave Fighter"
+	char.SetSkill("Fight", dice.Good)
+
+	// Create other characters in scene
+	orc := character.NewCharacter("orc-warrior", "Orc Warrior")
+	orc.Aspects.HighConcept = "Brutal Fighter"
+
+	goblin := character.NewCharacter("goblin-scout", "Goblin Scout")
+	goblin.Aspects.HighConcept = "Sneaky Archer"
+
+	// Test request with other characters - this should trigger the template error
+	req := ActionParseRequest{
+		Character:       char,
+		RawInput:        "I attack the orc warrior with my sword",
+		Context:         "In combat with multiple enemies",
+		OtherCharacters: []*character.Character{orc, goblin},
+	}
+
+	// This should now work successfully with the fixed template
+	parsedAction, err := parser.ParseAction(context.Background(), req)
+
+	// We expect this to succeed now
+	require.NoError(t, err)
+	assert.Equal(t, action.Attack, parsedAction.Type)
+	assert.Equal(t, "Fight", parsedAction.Skill)
+	assert.Equal(t, "Attack the orc warrior with my sword", parsedAction.Description)
+	assert.Equal(t, "orc-warrior", parsedAction.Target)
+	assert.Equal(t, char.ID, parsedAction.CharacterID)
+}
+
+func TestActionParser_TemplateErrorRegression(t *testing.T) {
+	// This test verifies the fix for the template error:
+	// "failed to execute user prompt template: template: action_parse:18:5:
+	// executing "action_parse" at <ne $id $.Character.ID>: error calling ne: incompatible types for comparison"
+
+	// The error occurred because the template was trying to range over OtherCharacters
+	// as if it was a map[string]*character.Character when it's actually []*character.Character
+
+	mockResponse := `{
+		"action_type": "Attack",
+		"skill": "Fight",
+		"description": "Attack with sword",
+		"target": "enemy",
+		"reasoning": "Combat action",
+		"confidence": 9
+	}`
+
+	mockClient := &MockLLMClient{response: mockResponse}
+	parser := NewActionParser(mockClient)
+
+	char := character.NewCharacter("hero", "Hero")
+	enemy := character.NewCharacter("enemy", "Enemy")
+
+	// This used to cause the template error when OtherCharacters was populated
+	req := ActionParseRequest{
+		Character:       char,
+		RawInput:        "attack enemy",
+		Context:         "combat",
+		OtherCharacters: []*character.Character{enemy}, // This triggers the template section that was broken
+	}
+
+	// This should work now (would have failed before the fix)
+	_, err := parser.ParseAction(context.Background(), req)
+	require.NoError(t, err, "Template should handle OtherCharacters slice correctly")
+}

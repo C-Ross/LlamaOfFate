@@ -7,6 +7,17 @@ Description: {{.Scene.Name}}
 CHARACTER:
 {{.CharacterContext}}
 
+{{- if .OtherCharacters}}
+OTHER CHARACTERS IN SCENE:
+{{- range $char := .OtherCharacters}}
+- {{$char.Name}} ({{$char.ID}}): 
+  {{- if $char.Aspects.HighConcept}} High Concept: {{$char.Aspects.HighConcept}}{{end}}
+  {{- if $char.Aspects.Trouble}}, Trouble: {{$char.Aspects.Trouble}}{{end}}
+  {{- $charAspects := $char.Aspects.GetAll}}
+  {{- if $charAspects}}, Aspects: {{range $i, $aspect := $charAspects}}{{if $i}}, {{end}}{{$aspect}}{{end}}{{end}}
+{{- end}}
+{{- end}}
+
 AVAILABLE ASPECTS:
 {{.AspectsContext}}
 
@@ -17,6 +28,9 @@ ACTION DETAILS:
 Action Type: {{.Action.Type.String}}
 Skill Used: {{.Action.Skill}}
 Description: {{.Action.Description}}
+{{- if .Action.Target}}
+Target: {{.Action.Target}}
+{{- end}}
 Outcome: {{.Action.Outcome.Type.String}}
 Shifts: {{.Action.Outcome.Shifts}}
 

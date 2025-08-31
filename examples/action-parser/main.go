@@ -27,6 +27,9 @@ func main() {
 	// Create action parser
 	actionParser := engine.NewActionParser(azureClient)
 
+	// Enable debug mode to show prompts sent to LLM
+	actionParser.SetDebug(true)
+
 	// Create a test character
 	char := character.NewCharacter("player-001", "Zara the Swift")
 	char.Aspects.HighConcept = "Acrobatic Cat Burglar"
@@ -66,14 +69,19 @@ func main() {
 			context: "In the castle courtyard with two guards patrolling near the main entrance",
 		},
 		{
-			name:    "Social Deception",
+			name:    "Social Deception with Target",
 			input:   "I'm going to pretend to be a servant and tell the guard that the lord wants to see him urgently",
 			context: "Standing near the entrance to the lord's private chambers, with a single guard blocking the way",
 		},
 		{
-			name:    "Combat Attack",
+			name:    "Combat Attack with Target",
 			input:   "I attack the bandit with my dagger!",
 			context: "In melee combat with a bandit who just drew his sword",
+		},
+		{
+			name:    "Ranged Attack with Target",
+			input:   "I shoot the crossbow at the orc captain",
+			context: "In a battle against several orcs, with their captain commanding from the rear",
 		},
 		{
 			name:    "Defensive Action",
@@ -81,21 +89,49 @@ func main() {
 			context: "A crossbow-wielding enemy is shooting at me from across the room",
 		},
 		{
-			name:    "Investigation",
-			input:   "I want to carefully examine the room for clues about who was here",
+			name:    "Investigation with Target",
+			input:   "I want to carefully examine the desk for clues about who was here",
 			context: "In the burglarized mansion's study, looking for evidence of the thief",
 		},
 		{
-			name:    "Create Advantage",
-			input:   "I'll use my knowledge of the city to find a good vantage point where I can observe the target",
-			context: "Trying to stake out a noble's house in a district I know well",
+			name:    "Create Advantage with Target",
+			input:   "I'll use my knowledge of the city to find a good vantage point where I can observe the noble's house",
+			context: "Trying to stake out Lord Blackwood's mansion in a district I know well",
 		},
 		{
-			name:    "Overcome Obstacle",
+			name:    "Overcome Obstacle with Target",
 			input:   "I need to pick the lock on this chest without making any noise",
 			context: "In the noble's bedroom at night, with guards patrolling nearby",
 		},
+		{
+			name:    "Social Attack with Target",
+			input:   "I want to intimidate the informant into telling me what he knows about the heist",
+			context: "Meeting with a nervous street contact in a dark alley",
+		},
+		{
+			name:    "Create Advantage on Enemy",
+			input:   "I'm going to try to trip the guard with my rope to knock him off balance",
+			context: "Fighting a heavily armored guard in the castle corridor",
+		},
+		{
+			name:    "Multi-target Area Effect",
+			input:   "I throw a smoke bomb to obscure the vision of all the guards in the room",
+			context: "Surrounded by three guards in the treasury, need to escape",
+		},
 	}
+
+	// Create some other characters for scenarios involving multiple characters
+	bandit := character.NewCharacter("bandit-1", "Bandit")
+	bandit.Aspects.HighConcept = "Desperate Cutthroat"
+	bandit.SetSkill("Fight", dice.Fair)
+
+	orcCaptain := character.NewCharacter("orc-captain", "Orc Captain")
+	orcCaptain.Aspects.HighConcept = "Battle-Hardened Leader"
+	orcCaptain.SetSkill("Fight", dice.Good)
+
+	guard := character.NewCharacter("guard-1", "Castle Guard")
+	guard.Aspects.HighConcept = "Loyal Protector"
+	guard.SetSkill("Fight", dice.Fair)
 
 	ctx := context.Background()
 
@@ -104,11 +140,22 @@ func main() {
 		fmt.Printf("Player Input: \"%s\"\n", test.input)
 		fmt.Printf("Context: %s\n", test.context)
 
+		// Add other characters for combat scenarios
+		var otherCharacters []*character.Character
+		if test.name == "Combat Attack with Target" {
+			otherCharacters = []*character.Character{bandit}
+		} else if test.name == "Ranged Attack with Target" {
+			otherCharacters = []*character.Character{orcCaptain}
+		} else if test.name == "Create Advantage on Enemy" {
+			otherCharacters = []*character.Character{guard}
+		}
+
 		// Parse the player input
 		req := engine.ActionParseRequest{
-			Character: char,
-			RawInput:  test.input,
-			Context:   test.context,
+			Character:       char,
+			RawInput:        test.input,
+			Context:         test.context,
+			OtherCharacters: otherCharacters,
 		}
 
 		parsedAction, err := actionParser.ParseAction(ctx, req)

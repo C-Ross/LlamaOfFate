@@ -24,6 +24,7 @@ type SceneManager struct {
 	reader              *bufio.Reader
 	roller              *dice.Roller
 	conversationHistory []ConversationEntry
+	debug               bool
 }
 
 // ConversationEntry represents a single exchange in the scene
@@ -48,6 +49,7 @@ type SceneResponseData struct {
 	ConversationContext string
 	PlayerInput         string
 	InteractionType     string
+	OtherCharacters     []*character.Character
 }
 
 // ActionNarrativeData holds the data for action narrative template
@@ -57,6 +59,7 @@ type ActionNarrativeData struct {
 	AspectsContext      string
 	ConversationContext string
 	Action              *action.Action
+	OtherCharacters     []*character.Character
 }
 
 // NewSceneManager creates a new scene manager
@@ -66,15 +69,27 @@ func NewSceneManager(engine *Engine) *SceneManager {
 		reader:              bufio.NewReader(os.Stdin),
 		roller:              dice.NewRoller(),
 		conversationHistory: make([]ConversationEntry, 0),
+		debug:               false,
 	}
 }
 
-// StartScene begins a new scene with the given description
-func (sm *SceneManager) StartScene(id, name, description string, player *character.Character) error {
-	sm.currentScene = scene.NewScene(id, name, description)
+// SetDebug enables or disables debug mode for prompt logging
+func (sm *SceneManager) SetDebug(enabled bool) {
+	sm.debug = enabled
+}
+
+// StartScene begins a new scene with the given pre-configured scene
+func (sm *SceneManager) StartScene(scene *scene.Scene, player *character.Character) error {
+	sm.currentScene = scene
 	sm.player = player
+
+	// Ensure the player is in the scene
 	sm.currentScene.AddCharacter(player.ID)
-	sm.currentScene.ActiveCharacter = player.ID
+
+	// Set active character to player if not already set
+	if sm.currentScene.ActiveCharacter == "" {
+		sm.currentScene.ActiveCharacter = player.ID
+	}
 
 	// Display scene description
 	sm.displayScene()
@@ -132,6 +147,10 @@ func (sm *SceneManager) processInput(ctx context.Context, input string) bool {
 
 	// Use LLM to determine the type of input
 	inputType := sm.classifyInput(ctx, input)
+
+	if sm.debug {
+		fmt.Println("DEBUG: Input Classified as ", inputType)
+	}
 
 	switch inputType {
 	case "dialog", "clarification":
@@ -221,6 +240,14 @@ func (sm *SceneManager) classifyInput(ctx context.Context, input string) string 
 		Temperature: 0.1, // Low temperature for consistent classification
 	}
 
+	// Debug output if enabled
+	if sm.debug {
+		fmt.Println("\n=== SCENE MANAGER DEBUG (INPUT CLASSIFICATION) ===")
+		fmt.Println("PROMPT:")
+		fmt.Println(prompt)
+		fmt.Println("=== END SCENE MANAGER DEBUG ===")
+	}
+
 	resp, err := sm.engine.llmClient.ChatCompletion(ctx, req)
 	if err != nil || len(resp.Choices) == 0 {
 		return "dialog" // Default fallback
@@ -260,10 +287,23 @@ func (sm *SceneManager) handleAction(ctx context.Context, input string) {
 
 	// Parse the action using the action parser
 	if sm.engine.actionParser != nil {
+		// Get other characters in the scene from the engine's registry
+		otherCharactersMap := sm.engine.GetCharactersByScene(sm.currentScene)
+		// Remove the player from other characters (they're already the main character)
+		delete(otherCharactersMap, sm.player.ID)
+
+		// Convert map to slice for ActionParseRequest
+		var otherCharacters []*character.Character
+		for _, char := range otherCharactersMap {
+			otherCharacters = append(otherCharacters, char)
+		}
+
 		action, err := sm.engine.actionParser.ParseAction(ctx, ActionParseRequest{
-			Character: sm.player,
-			RawInput:  input,
-			Context:   sm.currentScene.Description,
+			Character:       sm.player,
+			RawInput:        input,
+			Context:         sm.currentScene.Description,
+			Scene:           sm.currentScene,
+			OtherCharacters: otherCharacters,
 		})
 
 		if err != nil {
@@ -322,6 +362,15 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 		return ""
 	}
 
+	// Get other characters in the scene
+	otherCharactersMap := sm.engine.GetCharactersByScene(sm.currentScene)
+	delete(otherCharactersMap, sm.player.ID) // Remove the player
+
+	var otherCharacters []*character.Character
+	for _, char := range otherCharactersMap {
+		otherCharacters = append(otherCharacters, char)
+	}
+
 	// Prepare template data
 	data := SceneResponseData{
 		Scene:               sm.currentScene,
@@ -330,6 +379,7 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 		ConversationContext: sm.buildConversationContext(),
 		PlayerInput:         input,
 		InteractionType:     interactionType,
+		OtherCharacters:     otherCharacters,
 	}
 
 	// Execute the template
@@ -348,6 +398,14 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 		Temperature: 0.7,
 	}
 
+	// Debug output if enabled
+	if sm.debug {
+		fmt.Println("\n=== SCENE MANAGER DEBUG (SCENE RESPONSE) ===")
+		fmt.Println("PROMPT:")
+		fmt.Println(prompt)
+		fmt.Println("=== END SCENE MANAGER DEBUG ===")
+	}
+
 	resp, err := sm.engine.llmClient.ChatCompletion(ctx, req)
 	if err != nil || len(resp.Choices) == 0 {
 		return ""
@@ -362,6 +420,15 @@ func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedActio
 		return ""
 	}
 
+	// Get other characters in the scene
+	otherCharactersMap := sm.engine.GetCharactersByScene(sm.currentScene)
+	delete(otherCharactersMap, sm.player.ID) // Remove the player
+
+	var otherCharacters []*character.Character
+	for _, char := range otherCharactersMap {
+		otherCharacters = append(otherCharacters, char)
+	}
+
 	// Prepare template data
 	data := ActionNarrativeData{
 		Scene:               sm.currentScene,
@@ -369,6 +436,7 @@ func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedActio
 		AspectsContext:      sm.buildAspectsContext(),
 		ConversationContext: sm.buildConversationContext(),
 		Action:              parsedAction,
+		OtherCharacters:     otherCharacters,
 	}
 
 	// Execute the template
@@ -385,6 +453,14 @@ func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedActio
 		},
 		MaxTokens:   200,
 		Temperature: 0.8,
+	}
+
+	// Debug output if enabled
+	if sm.debug {
+		fmt.Println("\n=== SCENE MANAGER DEBUG (ACTION NARRATIVE) ===")
+		fmt.Println("PROMPT:")
+		fmt.Println(prompt)
+		fmt.Println("=== END SCENE MANAGER DEBUG ===")
 	}
 
 	resp, err := sm.engine.llmClient.ChatCompletion(ctx, req)

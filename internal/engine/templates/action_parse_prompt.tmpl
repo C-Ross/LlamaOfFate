@@ -12,6 +12,19 @@ Aspects: {{range $i, $aspect := $allAspects}}{{if $i}}, {{end}}{{$aspect}}{{end}
 {{- end}}
 Notable Skills: {{if .Character.Skills}}{{range $skill, $level := .Character.Skills}}{{$skill}} {{$level.String}}, {{end}}{{else}}No notable skills above Mediocre{{end}}
 
+{{- if .OtherCharacters}}
+OTHER CHARACTERS IN SCENE:
+{{- range $char := .OtherCharacters}}
+{{if ne $char.ID $.Character.ID}}
+- {{$char.Name}} ({{$char.ID}}): 
+  {{- if $char.Aspects.HighConcept}} High Concept: {{$char.Aspects.HighConcept}}{{end}}
+  {{- if $char.Aspects.Trouble}}, Trouble: {{$char.Aspects.Trouble}}{{end}}
+  {{- $charAspects := $char.Aspects.GetAll}}
+  {{- if $charAspects}}, Aspects: {{range $i, $aspect := $charAspects}}{{if $i}}, {{end}}{{$aspect}}{{end}}{{end}}
+{{- end}}
+{{- end}}
+{{- end}}
+
 {{- if .Context}}
 CURRENT SITUATION:
 {{.Context}}

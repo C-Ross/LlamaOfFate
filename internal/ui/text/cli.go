@@ -9,6 +9,7 @@ import (
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
+	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 )
 
@@ -105,6 +106,18 @@ func (c *CLI) startSampleScene() {
 	player.SetSkill("Fight", dice.Fair)
 	player.SetSkill("Notice", dice.Fair)
 
+	// Create a sample scene
+	sampleScene := scene.NewScene(
+		"test-scene",
+		"A Mysterious Cave",
+		"You stand at the entrance of a dark cave. Cool air flows from within, "+
+			"and you can hear the distant sound of dripping water. "+
+			"Strange symbols are carved into the stone archway above.",
+	)
+
+	// Add the player to the scene
+	sampleScene.AddCharacter(player.ID)
+
 	// Get scene manager
 	sceneManager := c.engine.GetSceneManager()
 	if sceneManager == nil {
@@ -113,14 +126,7 @@ func (c *CLI) startSampleScene() {
 	}
 
 	// Start scene
-	err := sceneManager.StartScene(
-		"test-scene",
-		"A Mysterious Cave",
-		"You stand at the entrance of a dark cave. Cool air flows from within, "+
-			"and you can hear the distant sound of dripping water. "+
-			"Strange symbols are carved into the stone archway above.",
-		player,
-	)
+	err := sceneManager.StartScene(sampleScene, player)
 	if err != nil {
 		fmt.Printf("Error starting scene: %v\n", err)
 		return
