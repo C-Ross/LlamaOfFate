@@ -20,6 +20,12 @@ go.work
 # Build output
 bin/
 
+# Action binaries and executables
+action-parser
+llm-scene-loop
+fate-guided-scene
+main
+
 # Configuration files with sensitive information
 configs/azure-llm.yaml
 *.local.yaml
