@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -149,7 +150,10 @@ func (sm *SceneManager) processInput(ctx context.Context, input string) bool {
 	inputType := sm.classifyInput(ctx, input)
 
 	if sm.debug {
-		fmt.Println("DEBUG: Input Classified as ", inputType)
+		slog.Debug("Input classified",
+			"component", "scene_manager",
+			"input_type", inputType,
+			"input", input)
 	}
 
 	switch inputType {
@@ -242,10 +246,9 @@ func (sm *SceneManager) classifyInput(ctx context.Context, input string) string 
 
 	// Debug output if enabled
 	if sm.debug {
-		fmt.Println("\n=== SCENE MANAGER DEBUG (INPUT CLASSIFICATION) ===")
-		fmt.Println("PROMPT:")
-		fmt.Println(prompt)
-		fmt.Println("=== END SCENE MANAGER DEBUG ===")
+		slog.Debug("Scene manager input classification LLM request",
+			"component", "scene_manager",
+			"prompt", prompt)
 	}
 
 	resp, err := sm.engine.llmClient.ChatCompletion(ctx, req)
@@ -400,10 +403,9 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 
 	// Debug output if enabled
 	if sm.debug {
-		fmt.Println("\n=== SCENE MANAGER DEBUG (SCENE RESPONSE) ===")
-		fmt.Println("PROMPT:")
-		fmt.Println(prompt)
-		fmt.Println("=== END SCENE MANAGER DEBUG ===")
+		slog.Debug("Scene manager scene response LLM request",
+			"component", "scene_manager",
+			"prompt", prompt)
 	}
 
 	resp, err := sm.engine.llmClient.ChatCompletion(ctx, req)
@@ -457,10 +459,9 @@ func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedActio
 
 	// Debug output if enabled
 	if sm.debug {
-		fmt.Println("\n=== SCENE MANAGER DEBUG (ACTION NARRATIVE) ===")
-		fmt.Println("PROMPT:")
-		fmt.Println(prompt)
-		fmt.Println("=== END SCENE MANAGER DEBUG ===")
+		slog.Debug("Scene manager action narrative LLM request",
+			"component", "scene_manager",
+			"prompt", prompt)
 	}
 
 	resp, err := sm.engine.llmClient.ChatCompletion(ctx, req)

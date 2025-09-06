@@ -11,9 +11,13 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+	"github.com/C-Ross/LlamaOfFate/internal/logging"
 )
 
 func main() {
+	// Setup logging early
+	logging.SetupDefaultLogging()
+
 	fmt.Println("=== Fate Core Aspect Generator Example ===")
 	fmt.Println()
 

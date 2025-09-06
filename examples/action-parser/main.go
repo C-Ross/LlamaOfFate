@@ -9,9 +9,12 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+	"github.com/C-Ross/LlamaOfFate/internal/logging"
 )
 
 func main() {
+	logging.SetupDefaultLogging()
+
 	fmt.Println("=== Fate Core Action Parser Example ===")
 	fmt.Println()
 

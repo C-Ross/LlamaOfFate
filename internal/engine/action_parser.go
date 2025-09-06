@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -82,12 +83,10 @@ func (ap *ActionParser) ParseAction(ctx context.Context, req ActionParseRequest)
 
 	// Debug output if enabled
 	if ap.debug {
-		fmt.Println("\n=== ACTION PARSER DEBUG ===")
-		fmt.Println("SYSTEM PROMPT:")
-		fmt.Println(systemPrompt)
-		fmt.Println("\nUSER PROMPT:")
-		fmt.Println(userPrompt)
-		fmt.Println("=== END ACTION PARSER DEBUG ===")
+		slog.Debug("Action parser LLM request",
+			"component", "action_parser",
+			"system_prompt", systemPrompt,
+			"user_prompt", userPrompt)
 	}
 
 	// Get LLM response

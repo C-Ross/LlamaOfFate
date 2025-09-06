@@ -7,9 +7,13 @@ import (
 
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+	"github.com/C-Ross/LlamaOfFate/internal/logging"
 )
 
 func main() {
+	// Setup logging early
+	logging.SetupDefaultLogging()
+
 	// Load configuration from file
 	config, err := azure.LoadConfig("configs/azure-llm.yaml")
 	if err != nil {

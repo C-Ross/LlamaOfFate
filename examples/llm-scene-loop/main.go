@@ -11,9 +11,12 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+	"github.com/C-Ross/LlamaOfFate/internal/logging"
 )
 
 func main() {
+	logging.SetupDefaultLogging()
+
 	fmt.Println("=== LlamaOfFate Enhanced Scene Demo with LLM ===")
 	fmt.Println("This demonstrates the LLM-driven scene loop with intelligent")
 	fmt.Println("classification of dialog, clarification, and actions.")

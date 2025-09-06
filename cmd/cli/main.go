@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
+	"github.com/C-Ross/LlamaOfFate/internal/logging"
 	"github.com/C-Ross/LlamaOfFate/internal/ui/text"
 )
 
@@ -15,6 +16,9 @@ const (
 )
 
 func main() {
+	// Setup logging early
+	logging.SetupDefaultLogging()
+
 	fmt.Printf("%s v%s - A Fate Core RPG with LLM integration\n", AppName, AppVersion)
 	fmt.Println("====================================================")
 
