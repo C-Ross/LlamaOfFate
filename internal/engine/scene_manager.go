@@ -26,14 +26,7 @@ type SceneManager struct {
 	roller              *dice.Roller
 	conversationHistory []ConversationEntry
 	debug               bool
-}
-
-// ConversationEntry represents a single exchange in the scene
-type ConversationEntry struct {
-	PlayerInput string    `json:"player_input"`
-	GMResponse  string    `json:"gm_response"`
-	Timestamp   time.Time `json:"timestamp"`
-	Type        string    `json:"type"` // "dialog", "action", "clarification"
+	ui                  UI
 }
 
 // InputClassificationData holds the data for input classification template
@@ -79,6 +72,11 @@ func (sm *SceneManager) SetDebug(enabled bool) {
 	sm.debug = enabled
 }
 
+// SetUI sets the UI for the scene manager
+func (sm *SceneManager) SetUI(ui UI) {
+	sm.ui = ui
+}
+
 // StartScene begins a new scene with the given pre-configured scene
 func (sm *SceneManager) StartScene(scene *scene.Scene, player *character.Character) error {
 	sm.currentScene = scene
@@ -92,8 +90,7 @@ func (sm *SceneManager) StartScene(scene *scene.Scene, player *character.Charact
 		sm.currentScene.ActiveCharacter = player.ID
 	}
 
-	// Display scene description
-	sm.displayScene()
+	// Scene description will be displayed by the terminal UI when needed
 
 	return nil
 }
@@ -108,44 +105,36 @@ func (sm *SceneManager) RunSceneLoop(ctx context.Context) error {
 		return fmt.Errorf("LLM client is required for scene loop functionality")
 	}
 
-	fmt.Println("\n--- Scene Loop Started ---")
-	fmt.Println("Type 'help' for commands, 'exit' to end the scene, or describe what you want to do.")
+	if sm.ui == nil {
+		return fmt.Errorf("UI is required for scene loop functionality")
+	}
+
+	sm.ui.DisplaySystemMessage("--- Scene Loop Started ---")
+	sm.ui.DisplaySystemMessage("Type 'help' for commands, 'exit' to end the scene, or describe what you want to do.")
 
 	for {
-		fmt.Print("\n> ")
-
-		input, err := sm.reader.ReadString('\n')
+		input, isExit, err := sm.ui.ReadInput()
 		if err != nil {
 			return fmt.Errorf("failed to read input: %w", err)
 		}
 
-		input = strings.TrimSpace(input)
 		if input == "" {
 			continue
 		}
 
 		// Check for scene exit
-		if shouldExit := sm.processInput(ctx, input); shouldExit {
+		if isExit {
 			break
 		}
+
+		sm.processInput(ctx, input)
 	}
 
 	return nil
 }
 
-// processInput handles player input and returns true if the scene should end
-func (sm *SceneManager) processInput(ctx context.Context, input string) bool {
-	// Handle special commands first
-	if sm.handleSpecialCommands(input) {
-		return false
-	}
-
-	// Check for exit commands
-	if sm.isExitCommand(input) {
-		fmt.Println("\n--- Scene Ended ---")
-		return true
-	}
-
+// processInput handles player input
+func (sm *SceneManager) processInput(ctx context.Context, input string) {
 	// Use LLM to determine the type of input
 	inputType := sm.classifyInput(ctx, input)
 
@@ -165,55 +154,6 @@ func (sm *SceneManager) processInput(ctx context.Context, input string) bool {
 		// Default to dialog if classification is unclear
 		sm.handleDialog(ctx, input)
 	}
-
-	return false
-}
-
-// handleSpecialCommands processes special scene commands
-func (sm *SceneManager) handleSpecialCommands(input string) bool {
-	parts := strings.Fields(strings.ToLower(input))
-	if len(parts) == 0 {
-		return false
-	}
-
-	command := parts[0]
-
-	switch command {
-	case "help":
-		sm.showHelp()
-		return true
-	case "scene":
-		sm.displayScene()
-		return true
-	case "character", "char":
-		sm.displayCharacter()
-		return true
-	case "status":
-		sm.displayStatus()
-		return true
-	case "aspects":
-		sm.displayAspects()
-		return true
-	case "history", "conversation":
-		sm.displayConversationHistory()
-		return true
-	}
-
-	return false
-}
-
-// isExitCommand checks if the input is an exit command
-func (sm *SceneManager) isExitCommand(input string) bool {
-	exitCommands := []string{"exit", "quit", "end", "leave", "resolve"}
-	lowerInput := strings.ToLower(strings.TrimSpace(input))
-
-	for _, cmd := range exitCommands {
-		if lowerInput == cmd {
-			return true
-		}
-	}
-
-	return false
 }
 
 // classifyInput uses LLM to determine if input is dialog, clarification, or action
@@ -271,22 +211,20 @@ func (sm *SceneManager) classifyInput(ctx context.Context, input string) string 
 
 // handleDialog processes dialog and clarification requests
 func (sm *SceneManager) handleDialog(ctx context.Context, input string) {
-	fmt.Printf("\nYou: %s\n", input)
-
 	// Generate LLM response
 	response := sm.generateSceneResponse(ctx, input, "dialog")
 	if response != "" {
-		fmt.Printf("\nGM: %s\n", response)
+		sm.ui.DisplayDialog(input, response)
 		// Record this exchange in conversation history
 		sm.addToConversationHistory(input, response, "dialog")
 	} else {
-		fmt.Printf("\nGM: [Unable to generate response - check LLM connection]\n")
+		sm.ui.DisplayDialog(input, "[Unable to generate response - check LLM connection]")
 	}
 }
 
 // handleAction processes player actions
 func (sm *SceneManager) handleAction(ctx context.Context, input string) {
-	fmt.Printf("\nYou attempt to: %s\n", input)
+	sm.ui.DisplayActionAttempt(input)
 
 	// Parse the action using the action parser
 	if sm.engine.actionParser != nil {
@@ -310,20 +248,18 @@ func (sm *SceneManager) handleAction(ctx context.Context, input string) {
 		})
 
 		if err != nil {
-			fmt.Printf("Failed to parse action: %v\n", err)
+			sm.ui.DisplaySystemMessage(fmt.Sprintf("Failed to parse action: %v", err))
 			return
 		}
 
 		sm.resolveAction(ctx, action)
 	} else {
-		fmt.Println("Action parser not available - LLM client required for action processing.")
+		sm.ui.DisplaySystemMessage("Action parser not available - LLM client required for action processing.")
 	}
 }
 
 // resolveAction fully resolves a parsed action
 func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.Action) {
-	fmt.Printf("Action: %s using %s\n", parsedAction.Type.String(), parsedAction.Skill)
-
 	// Get character's skill level
 	skillLevel := sm.player.GetSkill(parsedAction.Skill)
 
@@ -338,21 +274,21 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 	outcome := result.CompareAgainst(parsedAction.Difficulty)
 	parsedAction.Outcome = outcome
 
-	// Display result
-	fmt.Printf("Skill (%s): %s (%+d)\n", parsedAction.Skill, skillLevel.String(), int(skillLevel))
-	if parsedAction.CalculateBonus() != 0 {
-		fmt.Printf("Bonuses: %+d\n", parsedAction.CalculateBonus())
-	}
-	fmt.Printf("Rolled: %s (Total: %s vs Difficulty %s)\n",
+	// Display result using UI
+	resultString := fmt.Sprintf("%s (Total: %s vs Difficulty %s)",
 		result.String(), result.FinalValue.String(), parsedAction.Difficulty.String())
-	fmt.Printf("Outcome: %s\n", outcome.Type.String())
+	sm.ui.DisplayActionResult(parsedAction.Skill,
+		fmt.Sprintf("%s (%+d)", skillLevel.String(), int(skillLevel)),
+		parsedAction.CalculateBonus(),
+		resultString,
+		outcome.Type.String())
 
 	// Generate narrative result with LLM
 	narrative := sm.generateActionNarrative(ctx, parsedAction)
 	if narrative != "" {
-		fmt.Printf("\n%s\n", narrative)
+		sm.ui.DisplayNarrative(narrative)
 	} else {
-		fmt.Printf("\n[Unable to generate narrative - check LLM connection]\n")
+		sm.ui.DisplayNarrative("[Unable to generate narrative - check LLM connection]")
 	}
 
 	// Apply mechanical effects based on action type and outcome
@@ -501,140 +437,12 @@ func (sm *SceneManager) applyActionEffects(parsedAction *action.Action) {
 			)
 
 			sm.currentScene.AddSituationAspect(situationAspect)
-			fmt.Printf("Created situation aspect: '%s' with %d free invoke(s)\n",
-				aspectName, freeInvokes)
+			sm.ui.DisplaySystemMessage(fmt.Sprintf("Created situation aspect: '%s' with %d free invoke(s)",
+				aspectName, freeInvokes))
 		}
 	}
 
 	// TODO: Add more action type effects (Attack, Defend, etc.)
-}
-
-// Display methods
-func (sm *SceneManager) displayScene() {
-	fmt.Printf("\n=== %s ===\n", sm.currentScene.Name)
-	fmt.Printf("%s\n", sm.currentScene.Description)
-
-	if len(sm.currentScene.SituationAspects) > 0 {
-		fmt.Println("\nSituation Aspects:")
-		for _, aspect := range sm.currentScene.SituationAspects {
-			invokes := ""
-			if aspect.FreeInvokes > 0 {
-				invokes = fmt.Sprintf(" (%d free invoke(s))", aspect.FreeInvokes)
-			}
-			fmt.Printf("  - %s%s\n", aspect.Aspect, invokes)
-		}
-	}
-}
-
-func (sm *SceneManager) displayCharacter() {
-	if sm.player == nil {
-		fmt.Println("No active character.")
-		return
-	}
-
-	fmt.Printf("\n=== %s ===\n", sm.player.Name)
-	fmt.Printf("High Concept: %s\n", sm.player.Aspects.HighConcept)
-	fmt.Printf("Trouble: %s\n", sm.player.Aspects.Trouble)
-
-	if len(sm.player.Aspects.OtherAspects) > 0 {
-		fmt.Println("Other Aspects:")
-		for _, aspect := range sm.player.Aspects.OtherAspects {
-			if aspect != "" {
-				fmt.Printf("  - %s\n", aspect)
-			}
-		}
-	}
-
-	fmt.Printf("Fate Points: %d\n", sm.player.FatePoints)
-}
-
-func (sm *SceneManager) displayStatus() {
-	if sm.player == nil {
-		return
-	}
-
-	fmt.Println("\n=== Status ===")
-
-	// Show stress tracks
-	for trackType, track := range sm.player.StressTracks {
-		fmt.Printf("%s: %s\n", strings.ToUpper(trackType[:1])+trackType[1:], track.String())
-	}
-
-	// Show consequences
-	if len(sm.player.Consequences) > 0 {
-		fmt.Println("\nConsequences:")
-		for _, consequence := range sm.player.Consequences {
-			fmt.Printf("  %s: %s\n", consequence.Type, consequence.Aspect)
-		}
-	}
-}
-
-func (sm *SceneManager) displayAspects() {
-	fmt.Println("\n=== Available Aspects ===")
-
-	if sm.player != nil {
-		fmt.Println("Character Aspects:")
-		for _, aspect := range sm.player.Aspects.GetAll() {
-			fmt.Printf("  - %s\n", aspect)
-		}
-	}
-
-	if len(sm.currentScene.SituationAspects) > 0 {
-		fmt.Println("\nSituation Aspects:")
-		for _, aspect := range sm.currentScene.SituationAspects {
-			invokes := ""
-			if aspect.FreeInvokes > 0 {
-				invokes = fmt.Sprintf(" (%d free)", aspect.FreeInvokes)
-			}
-			fmt.Printf("  - %s%s\n", aspect.Aspect, invokes)
-		}
-	}
-}
-
-func (sm *SceneManager) showHelp() {
-	fmt.Println("\n=== Scene Commands ===")
-	fmt.Println("  help           - Show this help")
-	fmt.Println("  scene          - Show scene description")
-	fmt.Println("  character      - Show character details")
-	fmt.Println("  status         - Show character status (stress, consequences)")
-	fmt.Println("  aspects        - Show all available aspects")
-	fmt.Println("  history        - Show recent conversation history")
-	fmt.Println("  exit/quit      - End the scene")
-	fmt.Println("\n=== Natural Language Input ===")
-	fmt.Println("The system uses AI to understand your intent. You can:")
-	fmt.Println("")
-	fmt.Println("Dialog & Questions:")
-	fmt.Println("  \"What do I see?\" \"Look around\" \"Examine the door\"")
-	fmt.Println("  \"I say 'Hello there'\" \"Ask about the treasure\"")
-	fmt.Println("")
-	fmt.Println("Actions (requiring dice rolls):")
-	fmt.Println("  \"Attack the goblin\" \"Sneak past the guard\"")
-	fmt.Println("  \"Create an advantage by analyzing the situation\"")
-	fmt.Println("  \"Overcome the obstacle by climbing\"")
-	fmt.Println("")
-	fmt.Println("The AI will determine whether you're asking questions,")
-	fmt.Println("taking actions, or having conversations automatically!")
-}
-
-func (sm *SceneManager) displayConversationHistory() {
-	fmt.Println("\n=== Recent Conversation ===")
-
-	if len(sm.conversationHistory) == 0 {
-		fmt.Println("No conversation history yet.")
-		return
-	}
-
-	// Show last 5 exchanges
-	start := len(sm.conversationHistory) - 5
-	if start < 0 {
-		start = 0
-	}
-
-	for i := start; i < len(sm.conversationHistory); i++ {
-		entry := sm.conversationHistory[i]
-		fmt.Printf("\n[%s] You: %s\n", entry.Type, entry.PlayerInput)
-		fmt.Printf("GM: %s\n", entry.GMResponse)
-	}
 }
 
 // GetCurrentScene returns the current scene
@@ -646,6 +454,14 @@ func (sm *SceneManager) GetCurrentScene() *scene.Scene {
 func (sm *SceneManager) GetPlayer() *character.Character {
 	return sm.player
 }
+
+// GetConversationHistory returns the conversation history
+func (sm *SceneManager) GetConversationHistory() []ConversationEntry {
+	return sm.conversationHistory
+}
+
+// Ensure SceneManager implements the SceneInfo interface
+var _ SceneInfo = (*SceneManager)(nil)
 
 // addToConversationHistory adds an exchange to the conversation history
 func (sm *SceneManager) addToConversationHistory(playerInput, gmResponse, interactionType string) {

@@ -12,6 +12,38 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// MockUI implements the UI interface for testing
+type MockUI struct {
+	displayedMessages []string
+	lastInput         string
+	lastExit          bool
+	lastError         error
+}
+
+func (m *MockUI) ReadInput() (input string, isExit bool, err error) {
+	return m.lastInput, m.lastExit, m.lastError
+}
+
+func (m *MockUI) DisplayActionAttempt(description string) {
+	m.displayedMessages = append(m.displayedMessages, "ActionAttempt: "+description)
+}
+
+func (m *MockUI) DisplayActionResult(skill string, skillLevel string, bonuses int, result string, outcome string) {
+	m.displayedMessages = append(m.displayedMessages, "ActionResult: "+outcome)
+}
+
+func (m *MockUI) DisplayNarrative(narrative string) {
+	m.displayedMessages = append(m.displayedMessages, "Narrative: "+narrative)
+}
+
+func (m *MockUI) DisplayDialog(playerInput, gmResponse string) {
+	m.displayedMessages = append(m.displayedMessages, "Dialog: "+playerInput+" -> "+gmResponse)
+}
+
+func (m *MockUI) DisplaySystemMessage(message string) {
+	m.displayedMessages = append(m.displayedMessages, "System: "+message)
+}
+
 func TestNewSceneManager(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
@@ -42,37 +74,6 @@ func TestSceneManager_StartScene(t *testing.T) {
 	assert.Equal(t, player, sm.player)
 	assert.Contains(t, sm.currentScene.Characters, player.ID)
 	assert.Equal(t, player.ID, sm.currentScene.ActiveCharacter)
-}
-
-func TestSceneManager_IsExitCommand(t *testing.T) {
-	engine, err := New()
-	require.NoError(t, err)
-
-	sm := NewSceneManager(engine)
-
-	testCases := []struct {
-		input    string
-		expected bool
-	}{
-		{"exit", true},
-		{"quit", true},
-		{"end", true},
-		{"leave", true},
-		{"resolve", true},
-		{"EXIT", true},
-		{"QUIT", true},
-		{"  exit  ", true},
-		{"help", false},
-		{"attack the goblin", false},
-		{"", false},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.input, func(t *testing.T) {
-			result := sm.isExitCommand(tc.input)
-			assert.Equal(t, tc.expected, result)
-		})
-	}
 }
 
 func TestSceneManager_ConversationHistory(t *testing.T) {
@@ -146,6 +147,14 @@ func TestSceneManager_RunSceneLoop_RequiresLLM(t *testing.T) {
 	err = sm.RunSceneLoop(ctx)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "LLM client is required")
+
+	// Even with LLM client, should fail because no UI is configured
+	mockClient := &MockLLMClient{}
+	engine.llmClient = mockClient
+
+	err = sm.RunSceneLoop(ctx)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "UI is required")
 }
 
 func TestSceneManager_ApplyActionEffects_CreateAdvantage(t *testing.T) {
@@ -153,6 +162,9 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine)
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
 	player := character.NewCharacter("player1", "Test Character")
 	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
 	err = sm.StartScene(testScene, player)
@@ -176,6 +188,10 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage(t *testing.T) {
 	assert.Contains(t, newAspect.Aspect, "Advantage from")
 	assert.Equal(t, player.ID, newAspect.CreatedBy)
 	assert.True(t, newAspect.FreeInvokes > 0)
+
+	// Verify UI was called
+	assert.True(t, len(mockUI.displayedMessages) > 0)
+	assert.Contains(t, mockUI.displayedMessages[0], "Created situation aspect")
 }
 
 func TestSceneManager_GetCurrentScene(t *testing.T) {

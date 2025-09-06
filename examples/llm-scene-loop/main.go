@@ -12,6 +12,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
+	"github.com/C-Ross/LlamaOfFate/internal/ui/terminal"
 )
 
 func main() {
@@ -117,6 +118,10 @@ func main() {
 
 	// Run the scene loop
 	ctx := context.Background()
+	terminal := terminal.NewTerminalUI()
+	sceneManager.SetUI(terminal)
+	terminal.SetSceneInfo(sceneManager)
+
 	if err := sceneManager.RunSceneLoop(ctx); err != nil {
 		log.Fatalf("Scene loop error: %v", err)
 	}
