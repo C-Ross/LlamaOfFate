@@ -82,7 +82,7 @@ func (ag *AspectGenerator) GenerateAspect(ctx context.Context, req AspectGenerat
 // getSystemPrompt returns the system prompt for aspect generation
 func (ag *AspectGenerator) getSystemPrompt() string {
 	var buf bytes.Buffer
-	err := SystemPrompt.Execute(&buf, nil)
+	err := AspectGenerationSystemPrompt.Execute(&buf, nil)
 	if err != nil {
 		// Fallback to hardcoded prompt if template fails
 		return `You are an expert Game Master for the Fate Core RPG system. Your job is to generate appropriate aspects based on a character's "Create an Advantage" action and the outcome of their dice roll.
