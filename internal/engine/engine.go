@@ -8,9 +8,9 @@ import (
 
 // Engine represents the core game engine
 type Engine struct {
-	actionParser    *ActionParser
-	sceneManager    *SceneManager
-	llmClient       llm.LLMClient
+	actionParser      *ActionParser
+	sceneManager      *SceneManager
+	llmClient         llm.LLMClient
 	characterRegistry map[string]*character.Character
 }
 
