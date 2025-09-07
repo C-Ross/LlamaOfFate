@@ -14,6 +14,8 @@ test/integration/  - Integration tests
 
 ## Development Standards
 
+Prefer early returns to reduce nesting.
+
 ### Testing (REQUIRED)
 - Use testify for ALL tests: `assert.Equal(t, expected, actual)`, `require.NotNil(t, object)`
 - Maintain high coverage: Unit tests per package + integration tests
