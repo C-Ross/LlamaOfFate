@@ -88,14 +88,6 @@ func main() {
 		log.Fatal("Scene manager not available")
 	}
 
-	// Enable debug mode to show prompts
-	sceneManager.SetDebug(true)
-
-	// Also enable debug mode on the action parser if available
-	if actionParser := gameEngine.GetActionParser(); actionParser != nil {
-		actionParser.SetDebug(true)
-	}
-
 	// Start the scene with the pre-configured scene
 	err = sceneManager.StartScene(sampleScene, player)
 	if err != nil {

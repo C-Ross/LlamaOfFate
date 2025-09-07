@@ -36,20 +36,13 @@ type ActionParseResponse struct {
 // ActionParser handles parsing user input into structured actions using LLM
 type ActionParser struct {
 	llmClient llm.LLMClient
-	debug     bool
 }
 
 // NewActionParser creates a new action parser with the given LLM client
 func NewActionParser(llmClient llm.LLMClient) *ActionParser {
 	return &ActionParser{
 		llmClient: llmClient,
-		debug:     false,
 	}
-}
-
-// SetDebug enables or disables debug mode for prompt logging
-func (ap *ActionParser) SetDebug(enabled bool) {
-	ap.debug = enabled
 }
 
 // ParseAction analyzes user input and returns a structured action using LLM
@@ -81,13 +74,10 @@ func (ap *ActionParser) ParseAction(ctx context.Context, req ActionParseRequest)
 		Temperature: 0.3, // Lower temperature for more consistent parsing
 	}
 
-	// Debug output if enabled
-	if ap.debug {
-		slog.Debug("Action parser LLM request",
-			"component", "action_parser",
-			"system_prompt", systemPrompt,
-			"user_prompt", userPrompt)
-	}
+	slog.Debug("Action parser LLM request",
+		"component", "action_parser",
+		"system_prompt", systemPrompt,
+		"user_prompt", userPrompt)
 
 	// Get LLM response
 	resp, err := ap.llmClient.ChatCompletion(ctx, llmReq)

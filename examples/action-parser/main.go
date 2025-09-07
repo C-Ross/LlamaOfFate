@@ -30,9 +30,6 @@ func main() {
 	// Create action parser
 	actionParser := engine.NewActionParser(azureClient)
 
-	// Enable debug mode to show prompts sent to LLM
-	actionParser.SetDebug(true)
-
 	// Create a test character
 	char := character.NewCharacter("player-001", "Zara the Swift")
 	char.Aspects.HighConcept = "Acrobatic Cat Burglar"

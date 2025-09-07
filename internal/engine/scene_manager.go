@@ -25,7 +25,6 @@ type SceneManager struct {
 	reader              *bufio.Reader
 	roller              *dice.Roller
 	conversationHistory []ConversationEntry
-	debug               bool
 	ui                  UI
 }
 
@@ -63,13 +62,7 @@ func NewSceneManager(engine *Engine) *SceneManager {
 		reader:              bufio.NewReader(os.Stdin),
 		roller:              dice.NewRoller(),
 		conversationHistory: make([]ConversationEntry, 0),
-		debug:               false,
 	}
-}
-
-// SetDebug enables or disables debug mode for prompt logging
-func (sm *SceneManager) SetDebug(enabled bool) {
-	sm.debug = enabled
 }
 
 // SetUI sets the UI for the scene manager
@@ -138,12 +131,10 @@ func (sm *SceneManager) processInput(ctx context.Context, input string) {
 	// Use LLM to determine the type of input
 	inputType := sm.classifyInput(ctx, input)
 
-	if sm.debug {
-		slog.Debug("Input classified",
-			"component", "scene_manager",
-			"input_type", inputType,
-			"input", input)
-	}
+	slog.Debug("Input classified",
+		"component", "scene_manager",
+		"input_type", inputType,
+		"input", input)
 
 	switch inputType {
 	case "dialog", "clarification":
@@ -184,12 +175,10 @@ func (sm *SceneManager) classifyInput(ctx context.Context, input string) string 
 		Temperature: 0.1, // Low temperature for consistent classification
 	}
 
-	// Debug output if enabled
-	if sm.debug {
-		slog.Debug("Scene manager input classification LLM request",
-			"component", "scene_manager",
-			"prompt", prompt)
-	}
+	// Debug output
+	slog.Debug("Scene manager input classification LLM request",
+		"component", "scene_manager",
+		"prompt", prompt)
 
 	resp, err := sm.engine.llmClient.ChatCompletion(ctx, req)
 	if err != nil || len(resp.Choices) == 0 {
@@ -337,12 +326,10 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 		Temperature: 0.7,
 	}
 
-	// Debug output if enabled
-	if sm.debug {
-		slog.Debug("Scene manager scene response LLM request",
-			"component", "scene_manager",
-			"prompt", prompt)
-	}
+	// Debug output
+	slog.Debug("Scene manager scene response LLM request",
+		"component", "scene_manager",
+		"prompt", prompt)
 
 	resp, err := sm.engine.llmClient.ChatCompletion(ctx, req)
 	if err != nil || len(resp.Choices) == 0 {
@@ -393,12 +380,10 @@ func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedActio
 		Temperature: 0.8,
 	}
 
-	// Debug output if enabled
-	if sm.debug {
-		slog.Debug("Scene manager action narrative LLM request",
-			"component", "scene_manager",
-			"prompt", prompt)
-	}
+	// Debug output
+	slog.Debug("Scene manager action narrative LLM request",
+		"component", "scene_manager",
+		"prompt", prompt)
 
 	resp, err := sm.engine.llmClient.ChatCompletion(ctx, req)
 	if err != nil || len(resp.Choices) == 0 {
