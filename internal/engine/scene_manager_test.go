@@ -273,9 +273,10 @@ func TestSceneManager_OtherCharactersInTemplateData(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test generateSceneResponse to verify OtherCharacters is populated
-	response := sm.generateSceneResponse(context.Background(), "Hello there", "dialog")
+	response, err := sm.generateSceneResponse(context.Background(), "Hello there", "dialog")
 
 	// The response should not be empty (indicates template executed successfully)
+	require.NoError(t, err)
 	assert.NotEmpty(t, response)
 	assert.Equal(t, "Test response", response)
 
@@ -324,9 +325,10 @@ func TestSceneManager_GenerateActionNarrativeWithTarget(t *testing.T) {
 	}
 
 	// Test generateActionNarrative with target
-	narrative := sm.generateActionNarrative(context.Background(), testAction)
+	narrative, err := sm.generateActionNarrative(context.Background(), testAction)
 
 	// The response should not be empty (indicates template executed successfully)
+	require.NoError(t, err)
 	assert.NotEmpty(t, narrative)
 	assert.Equal(t, "The attack strikes true!", narrative)
 
@@ -369,9 +371,10 @@ func TestSceneManager_GenerateActionNarrativeWithoutTarget(t *testing.T) {
 	}
 
 	// Test generateActionNarrative without target
-	narrative := sm.generateActionNarrative(context.Background(), testAction)
+	narrative, err := sm.generateActionNarrative(context.Background(), testAction)
 
 	// The response should not be empty (indicates template executed successfully)
+	require.NoError(t, err)
 	assert.NotEmpty(t, narrative)
 	assert.Equal(t, "You successfully overcome the obstacle!", narrative)
 

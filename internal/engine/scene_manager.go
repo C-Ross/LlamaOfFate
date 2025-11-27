@@ -17,6 +17,19 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 )
 
+const (
+	// Component identifier for logging
+	componentSceneManager = "scene_manager"
+
+	// Input classification types
+	inputTypeDialog        = "dialog"
+	inputTypeClarification = "clarification"
+	inputTypeAction        = "action"
+
+	// User-facing messages
+	msgLLMUnavailable = "[The mists of fate obscure my vision...]"
+)
+
 // SceneManager handles the main scene loop and player interactions
 type SceneManager struct {
 	engine              *Engine
@@ -129,17 +142,24 @@ func (sm *SceneManager) RunSceneLoop(ctx context.Context) error {
 // processInput handles player input
 func (sm *SceneManager) processInput(ctx context.Context, input string) {
 	// Use LLM to determine the type of input
-	inputType := sm.classifyInput(ctx, input)
+	inputType, err := sm.classifyInput(ctx, input)
+	if err != nil {
+		slog.Warn("Input classification failed, defaulting to dialog",
+			"component", componentSceneManager,
+			"input", input,
+			"error", err)
+		inputType = inputTypeDialog // Graceful fallback
+	}
 
 	slog.Debug("Input classified",
-		"component", "scene_manager",
+		"component", componentSceneManager,
 		"input_type", inputType,
 		"input", input)
 
 	switch inputType {
-	case "dialog", "clarification":
+	case inputTypeDialog, inputTypeClarification:
 		sm.handleDialog(ctx, input)
-	case "action":
+	case inputTypeAction:
 		sm.handleAction(ctx, input)
 	default:
 		// Default to dialog if classification is unclear
@@ -148,9 +168,9 @@ func (sm *SceneManager) processInput(ctx context.Context, input string) {
 }
 
 // classifyInput uses LLM to determine if input is dialog, clarification, or action
-func (sm *SceneManager) classifyInput(ctx context.Context, input string) string {
+func (sm *SceneManager) classifyInput(ctx context.Context, input string) (string, error) {
 	if sm.engine.llmClient == nil {
-		return "dialog" // Default fallback
+		return "", fmt.Errorf("classifyInput: %w", ErrLLMUnavailable)
 	}
 
 	// Prepare template data
@@ -162,7 +182,7 @@ func (sm *SceneManager) classifyInput(ctx context.Context, input string) string 
 	// Execute the template
 	var buf bytes.Buffer
 	if err := InputClassificationPrompt.Execute(&buf, data); err != nil {
-		return "dialog" // Default fallback on template error
+		return "", fmt.Errorf("classifyInput: %w: %v", ErrLLMInvalidResponse, err)
 	}
 
 	prompt := buf.String()
@@ -177,38 +197,48 @@ func (sm *SceneManager) classifyInput(ctx context.Context, input string) string 
 
 	// Debug output
 	slog.Debug("Scene manager input classification LLM request",
-		"component", "scene_manager",
+		"component", componentSceneManager,
 		"prompt", prompt)
 
 	resp, err := sm.engine.llmClient.ChatCompletion(ctx, req)
-	if err != nil || len(resp.Choices) == 0 {
-		return "dialog" // Default fallback
+	if err != nil {
+		return "", fmt.Errorf("classifyInput: %w: %v", ErrLLMUnavailable, err)
+	}
+
+	if len(resp.Choices) == 0 {
+		return "", fmt.Errorf("classifyInput: %w", ErrLLMInvalidResponse)
 	}
 
 	classification := strings.ToLower(strings.TrimSpace(resp.Choices[0].Message.Content))
 
 	// Validate the response is one of our expected types
-	validTypes := []string{"dialog", "clarification", "action"}
-	for _, validType := range validTypes {
-		if classification == validType {
-			return classification
-		}
+	switch classification {
+	case inputTypeDialog, inputTypeClarification, inputTypeAction:
+		return classification, nil
+	default:
+		slog.Warn("Unexpected classification from LLM",
+			"component", componentSceneManager,
+			"classification", classification)
+		return "", fmt.Errorf("unexpected classification: %s", classification)
 	}
-
-	return "dialog" // Default if classification is unexpected
 }
 
 // handleDialog processes dialog and clarification requests
 func (sm *SceneManager) handleDialog(ctx context.Context, input string) {
 	// Generate LLM response
-	response := sm.generateSceneResponse(ctx, input, "dialog")
-	if response != "" {
-		sm.ui.DisplayDialog(input, response)
-		// Record this exchange in conversation history
-		sm.addToConversationHistory(input, response, "dialog")
-	} else {
-		sm.ui.DisplayDialog(input, "[Unable to generate response - check LLM connection]")
+	response, err := sm.generateSceneResponse(ctx, input, inputTypeDialog)
+	if err != nil {
+		slog.Error("Dialog generation failed",
+			"component", componentSceneManager,
+			"input", input,
+			"error", err)
+		sm.ui.DisplayDialog(input, msgLLMUnavailable)
+		return
 	}
+
+	sm.ui.DisplayDialog(input, response)
+	// Record this exchange in conversation history
+	sm.addToConversationHistory(input, response, inputTypeDialog)
 }
 
 // handleAction processes player actions
@@ -272,22 +302,26 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 		resultString,
 		outcome.Type.String())
 
-	// Generate narrative result with LLM
-	narrative := sm.generateActionNarrative(ctx, parsedAction)
-	if narrative != "" {
-		sm.ui.DisplayNarrative(narrative)
-	} else {
-		sm.ui.DisplayNarrative("[Unable to generate narrative - check LLM connection]")
+	// Generate narrative with error handling
+	narrative, err := sm.generateActionNarrative(ctx, parsedAction)
+	if err != nil {
+		slog.Error("Action narrative generation failed",
+			"component", componentSceneManager,
+			"action_id", parsedAction.ID,
+			"error", err)
+		// Provide mechanical fallback
+		narrative = sm.buildMechanicalNarrative(parsedAction)
 	}
+	sm.ui.DisplayNarrative(narrative)
 
 	// Apply mechanical effects based on action type and outcome
 	sm.applyActionEffects(parsedAction)
 }
 
 // generateSceneResponse generates an LLM response for dialog/clarification
-func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string, interactionType string) string {
+func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string, interactionType string) (string, error) {
 	if sm.engine.llmClient == nil {
-		return ""
+		return "", fmt.Errorf("generateSceneResponse: %w", ErrLLMUnavailable)
 	}
 
 	// Get other characters in the scene
@@ -313,7 +347,7 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 	// Execute the template
 	var buf bytes.Buffer
 	if err := SceneResponsePrompt.Execute(&buf, data); err != nil {
-		return "" // Return empty on template error
+		return "", fmt.Errorf("generateSceneResponse: %w: %v", ErrLLMInvalidResponse, err)
 	}
 
 	prompt := buf.String()
@@ -328,21 +362,25 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 
 	// Debug output
 	slog.Debug("Scene manager scene response LLM request",
-		"component", "scene_manager",
+		"component", componentSceneManager,
 		"prompt", prompt)
 
 	resp, err := sm.engine.llmClient.ChatCompletion(ctx, req)
-	if err != nil || len(resp.Choices) == 0 {
-		return ""
+	if err != nil {
+		return "", fmt.Errorf("generateSceneResponse: %w: %v", ErrLLMUnavailable, err)
 	}
 
-	return strings.TrimSpace(resp.Choices[0].Message.Content)
+	if len(resp.Choices) == 0 {
+		return "", fmt.Errorf("generateSceneResponse: %w", ErrLLMInvalidResponse)
+	}
+
+	return strings.TrimSpace(resp.Choices[0].Message.Content), nil
 }
 
 // generateActionNarrative generates narrative text for action results
-func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedAction *action.Action) string {
+func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedAction *action.Action) (string, error) {
 	if sm.engine.llmClient == nil {
-		return ""
+		return "", fmt.Errorf("generateActionNarrative: %w", ErrLLMUnavailable)
 	}
 
 	// Get other characters in the scene
@@ -367,7 +405,7 @@ func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedActio
 	// Execute the template
 	var buf bytes.Buffer
 	if err := ActionNarrativePrompt.Execute(&buf, data); err != nil {
-		return "" // Return empty on template error
+		return "", fmt.Errorf("generateActionNarrative: %w: %v", ErrLLMInvalidResponse, err)
 	}
 
 	prompt := buf.String()
@@ -382,21 +420,25 @@ func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedActio
 
 	// Debug output
 	slog.Debug("Scene manager action narrative LLM request",
-		"component", "scene_manager",
+		"component", componentSceneManager,
 		"prompt", prompt)
 
 	resp, err := sm.engine.llmClient.ChatCompletion(ctx, req)
-	if err != nil || len(resp.Choices) == 0 {
-		return ""
+	if err != nil {
+		return "", fmt.Errorf("generateActionNarrative: %w: %v", ErrLLMUnavailable, err)
+	}
+
+	if len(resp.Choices) == 0 {
+		return "", fmt.Errorf("generateActionNarrative: %w", ErrLLMInvalidResponse)
 	}
 
 	narrative := strings.TrimSpace(resp.Choices[0].Message.Content)
 
 	// Add this to conversation history as well
 	actionDescription := fmt.Sprintf("Attempted: %s (Outcome: %s)", parsedAction.Description, parsedAction.Outcome.Type.String())
-	sm.addToConversationHistory(actionDescription, narrative, "action")
+	sm.addToConversationHistory(actionDescription, narrative, inputTypeAction)
 
-	return narrative
+	return narrative, nil
 }
 
 // applyActionEffects applies mechanical effects based on action results
@@ -486,6 +528,26 @@ func (sm *SceneManager) buildConversationContext() string {
 	}
 
 	return context.String()
+}
+
+// buildMechanicalNarrative creates a basic narrative from action data when LLM is unavailable
+func (sm *SceneManager) buildMechanicalNarrative(a *action.Action) string {
+	if a.Outcome == nil {
+		return fmt.Sprintf("Your attempt to %s...", a.Description)
+	}
+
+	switch a.Outcome.Type {
+	case dice.SuccessWithStyle:
+		return fmt.Sprintf("Your attempt to %s succeeds brilliantly!", a.Description)
+	case dice.Success:
+		return fmt.Sprintf("Your attempt to %s succeeds.", a.Description)
+	case dice.Tie:
+		return fmt.Sprintf("Your attempt to %s partially succeeds.", a.Description)
+	case dice.Failure:
+		return fmt.Sprintf("Your attempt to %s fails.", a.Description)
+	default:
+		return fmt.Sprintf("Your attempt to %s completes.", a.Description)
+	}
 }
 
 // buildCharacterContext builds character information for LLM context
