@@ -3,8 +3,9 @@
 # DO NOT commit azure-llm.yaml to version control
 
 # Your Azure ML endpoint URL
-# Example: "https://your-endpoint.inference.ai.azure.com"
-api_endpoint: "https://your-endpoint.inference.ai.azure.com"
+# Example: "https://your-resource-name.cognitiveservices.azure.com/openai/deployments/your-deployment-name/chat/completions?api-version=2024-05-01-preview"
+# NOTE: Ensure the URL includes the full deployment path
+api_endpoint: "https://your-resource-name.cognitiveservices.azure.com/openai/deployments/your-deployment-name/chat/completions?api-version=2024-05-01-preview"
 
 # Your Azure ML API key
 # This should be kept secret and not committed to version control
