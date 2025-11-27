@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -69,6 +70,18 @@ func (c *Client) ChatCompletion(ctx context.Context, req llm.CompletionRequest) 
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
+	slog.Debug("Azure ChatCompletion request",
+		slog.String("component", "azure_llm"),
+		slog.String("endpoint", url),
+		slog.String("model", req.Model),
+		slog.Bool("stream", req.Stream),
+		slog.Int("messages", len(req.Messages)),
+		slog.Int("max_tokens", req.MaxTokens),
+		slog.Float64("temperature", req.Temperature),
+		slog.String("payload", string(reqBody)))
+
+	start := time.Now()
+
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(reqBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -78,19 +91,72 @@ func (c *Client) ChatCompletion(ctx context.Context, req llm.CompletionRequest) 
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
+		slog.Error("Azure ChatCompletion request error",
+			slog.String("component", "azure_llm"),
+			slog.String("endpoint", url),
+			slog.String("model", req.Model),
+			slog.Any("error", err))
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
 	defer resp.Body.Close()
 
+	headers := resp.Header.Clone()
+
+	slog.Debug("Azure ChatCompletion headers",
+		slog.String("component", "azure_llm"),
+		slog.String("endpoint", url),
+		slog.String("model", req.Model),
+		slog.Int("status", resp.StatusCode),
+		slog.Any("headers", headers))
+
+	duration := time.Since(start)
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		slog.Error("Azure ChatCompletion read error",
+			slog.String("component", "azure_llm"),
+			slog.String("endpoint", url),
+			slog.String("model", req.Model),
+			slog.Duration("duration", duration),
+			slog.Any("headers", headers),
+			slog.Any("error", err))
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
 	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
+		slog.Error("Azure ChatCompletion non-200 response",
+			slog.String("component", "azure_llm"),
+			slog.String("endpoint", url),
+			slog.String("model", req.Model),
+			slog.Int("status", resp.StatusCode),
+			slog.Duration("duration", duration),
+			slog.Any("headers", headers),
+			slog.String("body", string(bodyBytes)))
 		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	var response llm.CompletionResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+	if err := json.Unmarshal(bodyBytes, &response); err != nil {
+		slog.Error("Azure ChatCompletion decode error",
+			slog.String("component", "azure_llm"),
+			slog.String("endpoint", url),
+			slog.String("model", req.Model),
+			slog.Duration("duration", duration),
+			slog.Any("headers", headers),
+			slog.Any("error", err),
+			slog.String("raw_body", string(bodyBytes)))
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
+
+	slog.Debug("Azure ChatCompletion response",
+		slog.String("component", "azure_llm"),
+		slog.String("endpoint", url),
+		slog.String("model", req.Model),
+		slog.Int("status", resp.StatusCode),
+		slog.Duration("duration", duration),
+		slog.Any("headers", headers),
+		slog.Int("choices", len(response.Choices)),
+		slog.String("raw_body", string(bodyBytes)))
 
 	return &response, nil
 }
@@ -112,6 +178,16 @@ func (c *Client) ChatCompletionStream(ctx context.Context, req llm.CompletionReq
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
+	slog.Debug("Azure ChatCompletionStream request",
+		slog.String("component", "azure_llm"),
+		slog.String("endpoint", url),
+		slog.String("model", req.Model),
+		slog.Bool("stream", req.Stream),
+		slog.Int("messages", len(req.Messages)),
+		slog.String("payload", string(reqBody)))
+
+	start := time.Now()
+
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(reqBody))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
@@ -121,14 +197,43 @@ func (c *Client) ChatCompletionStream(ctx context.Context, req llm.CompletionReq
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
+		slog.Error("Azure ChatCompletionStream request error",
+			slog.String("component", "azure_llm"),
+			slog.String("endpoint", url),
+			slog.String("model", req.Model),
+			slog.Any("error", err))
 		return fmt.Errorf("failed to send request: %w", err)
 	}
 	defer resp.Body.Close()
 
+	headers := resp.Header.Clone()
+
+	slog.Debug("Azure ChatCompletionStream headers",
+		slog.String("component", "azure_llm"),
+		slog.String("endpoint", url),
+		slog.String("model", req.Model),
+		slog.Int("status", resp.StatusCode),
+		slog.Any("headers", headers))
+
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
+		slog.Error("Azure ChatCompletionStream non-200 response",
+			slog.String("component", "azure_llm"),
+			slog.String("endpoint", url),
+			slog.String("model", req.Model),
+			slog.Int("status", resp.StatusCode),
+			slog.Duration("duration", time.Since(start)),
+			slog.Any("headers", headers),
+			slog.String("body", string(bodyBytes)))
 		return fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(bodyBytes))
 	}
+
+	slog.Debug("Azure ChatCompletionStream response started",
+		slog.String("component", "azure_llm"),
+		slog.String("endpoint", url),
+		slog.String("model", req.Model),
+		slog.Duration("handshake_duration", time.Since(start)),
+		slog.Any("headers", headers))
 
 	return c.processStreamingResponse(resp.Body, handler)
 }
@@ -159,6 +264,10 @@ func (c *Client) processStreamingResponse(body io.Reader, handler llm.StreamHand
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 
+		slog.Debug("Azure ChatCompletionStream line",
+			slog.String("component", "azure_llm"),
+			slog.String("line", line))
+
 		// Skip empty lines
 		if line == "" {
 			continue
@@ -166,6 +275,8 @@ func (c *Client) processStreamingResponse(body io.Reader, handler llm.StreamHand
 
 		// Check for the end of stream
 		if line == "data: [DONE]" {
+			slog.Debug("Azure ChatCompletionStream complete",
+				slog.String("component", "azure_llm"))
 			break
 		}
 
@@ -175,17 +286,32 @@ func (c *Client) processStreamingResponse(body io.Reader, handler llm.StreamHand
 
 			var chunk llm.CompletionResponse
 			if err := json.Unmarshal([]byte(jsonData), &chunk); err != nil {
+				slog.Warn("Azure ChatCompletionStream decode failed",
+					slog.String("component", "azure_llm"),
+					slog.String("raw", jsonData),
+					slog.Any("error", err))
 				// Log the error but continue processing
 				continue
 			}
 
+			slog.Debug("Azure ChatCompletionStream chunk",
+				slog.String("component", "azure_llm"),
+				slog.Int("choices", len(chunk.Choices)),
+				slog.Any("chunk", chunk))
+
 			if err := handler(chunk); err != nil {
+				slog.Error("Azure ChatCompletionStream handler error",
+					slog.String("component", "azure_llm"),
+					slog.Any("error", err))
 				return fmt.Errorf("handler error: %w", err)
 			}
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
+		slog.Error("Azure ChatCompletionStream scanner error",
+			slog.String("component", "azure_llm"),
+			slog.Any("error", err))
 		return fmt.Errorf("error reading stream: %w", err)
 	}
 
