@@ -122,10 +122,10 @@ func TestIntegration_ConflictManagement(t *testing.T) {
 
 	// Start conflict
 	participants := []scene.ConflictParticipant{
-		{CharacterID: hero.ID, Initiative: 3, Active: true},
-		{CharacterID: villain.ID, Initiative: 1, Active: true},
+		{CharacterID: hero.ID, Initiative: 3},
+		{CharacterID: villain.ID, Initiative: 1},
 	}
-	battleScene.StartConflict(participants)
+	battleScene.StartConflict(scene.PhysicalConflict, participants)
 
 	// Verify conflict state
 	assert.True(t, battleScene.IsConflict)

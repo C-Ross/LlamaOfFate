@@ -34,29 +34,41 @@ type SituationAspect struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+// ConflictType distinguishes physical from mental conflicts
+// Physical conflicts use Notice for initiative and target physical stress
+// Mental conflicts use Empathy for initiative and target mental stress
+type ConflictType string
+
+const (
+	PhysicalConflict ConflictType = "physical"
+	MentalConflict   ConflictType = "mental"
+)
+
+// ParticipantStatus tracks a participant's state in a conflict
+type ParticipantStatus string
+
+const (
+	StatusActive   ParticipantStatus = "active"    // Still fighting
+	StatusConceded ParticipantStatus = "conceded"  // Voluntarily withdrew
+	StatusTakenOut ParticipantStatus = "taken_out" // Removed by opponent
+)
+
 // ConflictState manages conflict mechanics
 type ConflictState struct {
+	Type            ConflictType          `json:"type"` // physical or mental
 	Participants    []ConflictParticipant `json:"participants"`
 	InitiativeOrder []string              `json:"initiative_order"`
 	CurrentTurn     int                   `json:"current_turn"`
 	Round           int                   `json:"round"`
-	Zones           []Zone                `json:"zones,omitempty"`
 }
 
 // ConflictParticipant represents a character in conflict
 type ConflictParticipant struct {
-	CharacterID string `json:"character_id"`
-	Initiative  int    `json:"initiative"`
-	Active      bool   `json:"active"`
-}
-
-// Zone represents spatial positioning in conflicts
-type Zone struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Characters  []string `json:"character_ids"`
-	Aspects     []string `json:"aspect_ids"`
+	CharacterID string            `json:"character_id"`
+	Initiative  int               `json:"initiative"`
+	Status      ParticipantStatus `json:"status"`
+	FullDefense bool              `json:"full_defense"` // Forgoes action for +2 to all defense rolls
+	HasActed    bool              `json:"has_acted"`    // Whether they've taken their action this exchange
 }
 
 // NewScene creates a new scene
@@ -130,19 +142,28 @@ func (s *Scene) GetSituationAspect(aspectID string) *SituationAspect {
 }
 
 // StartConflict begins a conflict in this scene
-func (s *Scene) StartConflict(participants []ConflictParticipant) {
+func (s *Scene) StartConflict(conflictType ConflictType, participants []ConflictParticipant) {
 	s.IsConflict = true
 	s.ConflictState = &ConflictState{
+		Type:            conflictType,
 		Participants:    participants,
 		InitiativeOrder: make([]string, 0),
 		CurrentTurn:     0,
 		Round:           1,
-		Zones:           make([]Zone, 0),
 	}
 
-	// TODO: Sort participants by initiative
-	for _, participant := range participants {
-		s.ConflictState.InitiativeOrder = append(s.ConflictState.InitiativeOrder, participant.CharacterID)
+	// Ensure all participants have active status if not set
+	for i := range s.ConflictState.Participants {
+		if s.ConflictState.Participants[i].Status == "" {
+			s.ConflictState.Participants[i].Status = StatusActive
+		}
+	}
+
+	// TODO: Sort participants by initiative (Notice for physical, Empathy for mental)
+	for _, participant := range s.ConflictState.Participants {
+		if participant.Status == StatusActive {
+			s.ConflictState.InitiativeOrder = append(s.ConflictState.InitiativeOrder, participant.CharacterID)
+		}
 	}
 
 	s.UpdatedAt = time.Now()
@@ -165,18 +186,133 @@ func (s *Scene) GetCurrentActor() string {
 }
 
 // NextTurn advances to the next turn in conflict
+// Skips participants who are no longer active (conceded or taken out)
 func (s *Scene) NextTurn() {
 	if !s.IsConflict || s.ConflictState == nil {
 		return
 	}
 
-	s.ConflictState.CurrentTurn++
-	if s.ConflictState.CurrentTurn >= len(s.ConflictState.InitiativeOrder) {
-		s.ConflictState.CurrentTurn = 0
-		s.ConflictState.Round++
+	// Mark current actor as having acted
+	currentActor := s.GetCurrentActor()
+	for i := range s.ConflictState.Participants {
+		if s.ConflictState.Participants[i].CharacterID == currentActor {
+			s.ConflictState.Participants[i].HasActed = true
+			break
+		}
+	}
+
+	// Find next active participant
+	for {
+		s.ConflictState.CurrentTurn++
+		if s.ConflictState.CurrentTurn >= len(s.ConflictState.InitiativeOrder) {
+			s.ConflictState.CurrentTurn = 0
+			s.ConflictState.Round++
+			s.resetExchangeState()
+		}
+
+		// Check if current actor is still active
+		actorID := s.ConflictState.InitiativeOrder[s.ConflictState.CurrentTurn]
+		if s.isParticipantActive(actorID) {
+			break
+		}
+
+		// Safety check to prevent infinite loop if no active participants
+		if s.CountActiveParticipants() == 0 {
+			break
+		}
 	}
 
 	s.UpdatedAt = time.Now()
+}
+
+// resetExchangeState resets per-exchange state at the start of a new round
+func (s *Scene) resetExchangeState() {
+	for i := range s.ConflictState.Participants {
+		s.ConflictState.Participants[i].HasActed = false
+		s.ConflictState.Participants[i].FullDefense = false
+	}
+}
+
+// isParticipantActive returns true if the participant is still active in the conflict
+func (s *Scene) isParticipantActive(characterID string) bool {
+	for _, p := range s.ConflictState.Participants {
+		if p.CharacterID == characterID {
+			return p.Status == StatusActive
+		}
+	}
+	return false
+}
+
+// CountActiveParticipants returns the number of active participants
+func (s *Scene) CountActiveParticipants() int {
+	count := 0
+	for _, p := range s.ConflictState.Participants {
+		if p.Status == StatusActive {
+			count++
+		}
+	}
+	return count
+}
+
+// SetParticipantStatus updates a participant's status (conceded, taken out)
+func (s *Scene) SetParticipantStatus(characterID string, status ParticipantStatus) bool {
+	if !s.IsConflict || s.ConflictState == nil {
+		return false
+	}
+
+	for i := range s.ConflictState.Participants {
+		if s.ConflictState.Participants[i].CharacterID == characterID {
+			s.ConflictState.Participants[i].Status = status
+			s.UpdatedAt = time.Now()
+			return true
+		}
+	}
+	return false
+}
+
+// SetFullDefense sets a participant to full defense mode for this exchange
+func (s *Scene) SetFullDefense(characterID string) bool {
+	if !s.IsConflict || s.ConflictState == nil {
+		return false
+	}
+
+	for i := range s.ConflictState.Participants {
+		if s.ConflictState.Participants[i].CharacterID == characterID {
+			s.ConflictState.Participants[i].FullDefense = true
+			s.ConflictState.Participants[i].HasActed = true // Full defense uses your action
+			s.UpdatedAt = time.Now()
+			return true
+		}
+	}
+	return false
+}
+
+// IsFullDefense returns true if the participant is in full defense mode
+func (s *Scene) IsFullDefense(characterID string) bool {
+	if !s.IsConflict || s.ConflictState == nil {
+		return false
+	}
+
+	for _, p := range s.ConflictState.Participants {
+		if p.CharacterID == characterID {
+			return p.FullDefense
+		}
+	}
+	return false
+}
+
+// GetParticipant returns a pointer to a participant by character ID
+func (s *Scene) GetParticipant(characterID string) *ConflictParticipant {
+	if !s.IsConflict || s.ConflictState == nil {
+		return nil
+	}
+
+	for i := range s.ConflictState.Participants {
+		if s.ConflictState.Participants[i].CharacterID == characterID {
+			return &s.ConflictState.Participants[i]
+		}
+	}
+	return nil
 }
 
 // NewSituationAspect creates a new situation aspect
