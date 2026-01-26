@@ -148,19 +148,42 @@ func (ap *ActionParser) buildUserPrompt(req ActionParseRequest) (string, error) 
 }
 
 // parseActionType converts string action type to enum
+// Also handles common LLM mistakes like returning skill names instead of action types
 func parseActionType(actionTypeStr string) (action.ActionType, error) {
-	switch actionTypeStr {
-	case "Overcome":
+	// Normalize to lower case for more flexible matching
+	normalized := strings.ToLower(strings.TrimSpace(actionTypeStr))
+
+	switch normalized {
+	case "overcome":
 		return action.Overcome, nil
-	case "Create an Advantage":
+	case "create an advantage", "create advantage", "createadvantage":
 		return action.CreateAdvantage, nil
-	case "Attack":
+	case "attack":
 		return action.Attack, nil
-	case "Defend":
+	case "defend", "defense":
 		return action.Defend, nil
-	default:
-		return action.Overcome, fmt.Errorf("unknown action type: %s", actionTypeStr)
 	}
+
+	// Check if LLM returned a skill name instead of action type
+	// Map aggressive/confrontational skills to Attack
+	attackSkills := map[string]bool{
+		"fight": true, "shoot": true, "provoke": true,
+	}
+	if attackSkills[normalized] {
+		return action.Attack, nil
+	}
+
+	// Map defensive skills to Defend
+	defendSkills := map[string]bool{
+		"athletics": true, "will": true, "physique": true,
+	}
+	if defendSkills[normalized] {
+		return action.Defend, nil
+	}
+
+	// Default to Overcome for any other skill names
+	// CreateAdvantage should only be used when explicitly requested
+	return action.Overcome, nil
 }
 
 // generateActionID creates a unique action ID

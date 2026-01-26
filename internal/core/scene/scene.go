@@ -55,11 +55,13 @@ const (
 
 // ConflictState manages conflict mechanics
 type ConflictState struct {
-	Type            ConflictType          `json:"type"` // physical or mental
-	Participants    []ConflictParticipant `json:"participants"`
-	InitiativeOrder []string              `json:"initiative_order"`
-	CurrentTurn     int                   `json:"current_turn"`
-	Round           int                   `json:"round"`
+	Type               ConflictType          `json:"type"`                          // Current conflict type (physical or mental)
+	OriginalType       ConflictType          `json:"original_type,omitempty"`       // Original type if escalated
+	InitiatingCharacter string               `json:"initiating_character,omitempty"` // Who started the conflict
+	Participants       []ConflictParticipant `json:"participants"`
+	InitiativeOrder    []string              `json:"initiative_order"`
+	CurrentTurn        int                   `json:"current_turn"`
+	Round              int                   `json:"round"`
 }
 
 // ConflictParticipant represents a character in conflict
@@ -143,13 +145,19 @@ func (s *Scene) GetSituationAspect(aspectID string) *SituationAspect {
 
 // StartConflict begins a conflict in this scene
 func (s *Scene) StartConflict(conflictType ConflictType, participants []ConflictParticipant) {
+	s.StartConflictWithInitiator(conflictType, participants, "")
+}
+
+// StartConflictWithInitiator begins a conflict with a specified initiating character
+func (s *Scene) StartConflictWithInitiator(conflictType ConflictType, participants []ConflictParticipant, initiator string) {
 	s.IsConflict = true
 	s.ConflictState = &ConflictState{
-		Type:            conflictType,
-		Participants:    participants,
-		InitiativeOrder: make([]string, 0),
-		CurrentTurn:     0,
-		Round:           1,
+		Type:                conflictType,
+		InitiatingCharacter: initiator,
+		Participants:        participants,
+		InitiativeOrder:     make([]string, 0),
+		CurrentTurn:         0,
+		Round:               1,
 	}
 
 	// Ensure all participants have active status if not set
@@ -167,6 +175,26 @@ func (s *Scene) StartConflict(conflictType ConflictType, participants []Conflict
 	}
 
 	s.UpdatedAt = time.Now()
+}
+
+// EscalateConflict changes the conflict type (e.g., mental to physical)
+func (s *Scene) EscalateConflict(newType ConflictType) bool {
+	if !s.IsConflict || s.ConflictState == nil {
+		return false
+	}
+
+	if s.ConflictState.Type == newType {
+		return false // Already this type
+	}
+
+	// Store original type if this is the first escalation
+	if s.ConflictState.OriginalType == "" {
+		s.ConflictState.OriginalType = s.ConflictState.Type
+	}
+
+	s.ConflictState.Type = newType
+	s.UpdatedAt = time.Now()
+	return true
 }
 
 // EndConflict ends the conflict in this scene

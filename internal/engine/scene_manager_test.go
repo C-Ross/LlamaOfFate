@@ -14,10 +14,14 @@ import (
 
 // MockUI implements the UI interface for testing
 type MockUI struct {
-	displayedMessages []string
-	lastInput         string
-	lastExit          bool
-	lastError         error
+	displayedMessages     []string
+	lastInput             string
+	lastExit              bool
+	lastError             error
+	conflictStartCalls    []string
+	conflictEscalateCalls []string
+	turnAnnouncementCalls []string
+	conflictEndCalls      []string
 }
 
 func (m *MockUI) ReadInput() (input string, isExit bool, err error) {
@@ -42,6 +46,30 @@ func (m *MockUI) DisplayDialog(playerInput, gmResponse string) {
 
 func (m *MockUI) DisplaySystemMessage(message string) {
 	m.displayedMessages = append(m.displayedMessages, "System: "+message)
+}
+
+func (m *MockUI) DisplayConflictStart(conflictType string, initiatorName string, participants []ConflictParticipantInfo) {
+	m.conflictStartCalls = append(m.conflictStartCalls, conflictType+":"+initiatorName)
+}
+
+func (m *MockUI) DisplayConflictEscalation(fromType, toType, triggerCharName string) {
+	m.conflictEscalateCalls = append(m.conflictEscalateCalls, fromType+"->"+toType+":"+triggerCharName)
+}
+
+func (m *MockUI) DisplayTurnAnnouncement(characterName string, turnNumber int, isPlayer bool) {
+	m.turnAnnouncementCalls = append(m.turnAnnouncementCalls, characterName)
+}
+
+func (m *MockUI) DisplayConflictEnd(reason string) {
+	m.conflictEndCalls = append(m.conflictEndCalls, reason)
+}
+
+func (m *MockUI) DisplayGameOver(reason string) {
+	m.displayedMessages = append(m.displayedMessages, "GAME OVER: "+reason)
+}
+
+func (m *MockUI) DisplaySceneTransition(narrative string, newSceneHint string) {
+	m.displayedMessages = append(m.displayedMessages, "SCENE TRANSITION: "+narrative)
 }
 
 func TestNewSceneManager(t *testing.T) {
@@ -381,3 +409,273 @@ func TestSceneManager_GenerateActionNarrativeWithoutTarget(t *testing.T) {
 	// The function completing without error means the template executed successfully
 	// even when the Target field is empty (conditional {{- if .Action.Target}} works)
 }
+
+func TestSceneManager_ParseConflictMarker_Physical(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	response := "The orc swings his axe at you! [CONFLICT:physical:orc-1] Roll for initiative!"
+	trigger, cleanedResponse := sm.parseConflictMarker(response)
+
+	require.NotNil(t, trigger)
+	assert.Equal(t, scene.PhysicalConflict, trigger.Type)
+	assert.Equal(t, "orc-1", trigger.InitiatorID)
+	assert.Equal(t, "The orc swings his axe at you! Roll for initiative!", cleanedResponse)
+}
+
+func TestSceneManager_ParseConflictMarker_Mental(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	response := "The sorcerer locks eyes with you, attempting to dominate your mind. [CONFLICT:mental:sorcerer-1]"
+	trigger, cleanedResponse := sm.parseConflictMarker(response)
+
+	require.NotNil(t, trigger)
+	assert.Equal(t, scene.MentalConflict, trigger.Type)
+	assert.Equal(t, "sorcerer-1", trigger.InitiatorID)
+	assert.Equal(t, "The sorcerer locks eyes with you, attempting to dominate your mind.", cleanedResponse)
+}
+
+func TestSceneManager_ParseConflictMarker_NoMarker(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	response := "The merchant smiles and offers you a deal."
+	trigger, cleanedResponse := sm.parseConflictMarker(response)
+
+	assert.Nil(t, trigger)
+	assert.Equal(t, "The merchant smiles and offers you a deal.", cleanedResponse)
+}
+
+func TestSceneManager_CalculateInitiative_Physical(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	char := character.NewCharacter("char1", "Fighter")
+	char.SetSkill("Notice", 3)
+	char.SetSkill("Athletics", 2)
+
+	// Should use Notice for physical conflicts
+	initiative := sm.calculateInitiative(char, scene.PhysicalConflict)
+	assert.Equal(t, 3, initiative)
+}
+
+func TestSceneManager_CalculateInitiative_Physical_NoNotice(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	char := character.NewCharacter("char1", "Fighter")
+	char.SetSkill("Athletics", 2)
+
+	// Should fall back to Athletics when Notice is 0
+	initiative := sm.calculateInitiative(char, scene.PhysicalConflict)
+	assert.Equal(t, 2, initiative)
+}
+
+func TestSceneManager_CalculateInitiative_Mental(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	char := character.NewCharacter("char1", "Wizard")
+	char.SetSkill("Empathy", 4)
+	char.SetSkill("Rapport", 2)
+
+	// Should use Empathy for mental conflicts
+	initiative := sm.calculateInitiative(char, scene.MentalConflict)
+	assert.Equal(t, 4, initiative)
+}
+
+func TestSceneManager_CalculateInitiative_Mental_NoEmpathy(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	char := character.NewCharacter("char1", "Diplomat")
+	char.SetSkill("Rapport", 3)
+
+	// Should fall back to Rapport when Empathy is 0
+	initiative := sm.calculateInitiative(char, scene.MentalConflict)
+	assert.Equal(t, 3, initiative)
+}
+
+func TestSceneManager_InitiateConflict(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	mockUI := &MockUI{}
+	sm := NewSceneManager(engine)
+	sm.SetUI(mockUI)
+
+	// Create player and enemy
+	player := character.NewCharacter("player1", "Hero")
+	player.SetSkill("Notice", 3)
+	enemy := character.NewCharacter("enemy1", "Goblin")
+	enemy.SetSkill("Notice", 1)
+
+	engine.AddCharacter(player)
+	engine.AddCharacter(enemy)
+
+	// Create scene with both characters
+	testScene := scene.NewScene("scene1", "Test Scene", "A dangerous encounter")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(enemy.ID)
+
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	// Initiate conflict
+	err = sm.initiateConflict(scene.PhysicalConflict, enemy.ID)
+	require.NoError(t, err)
+
+	// Verify conflict state
+	assert.True(t, sm.currentScene.IsConflict)
+	require.NotNil(t, sm.currentScene.ConflictState)
+	assert.Equal(t, scene.PhysicalConflict, sm.currentScene.ConflictState.Type)
+	assert.Equal(t, enemy.ID, sm.currentScene.ConflictState.InitiatingCharacter)
+	assert.Len(t, sm.currentScene.ConflictState.Participants, 2)
+
+	// Verify UI was called
+	require.Len(t, mockUI.conflictStartCalls, 1)
+	assert.Contains(t, mockUI.conflictStartCalls[0], "physical")
+}
+
+func TestSceneManager_InitiateConflict_AlreadyInConflict(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	mockUI := &MockUI{}
+	sm := NewSceneManager(engine)
+	sm.SetUI(mockUI)
+
+	// Create characters
+	player := character.NewCharacter("player1", "Hero")
+	enemy := character.NewCharacter("enemy1", "Goblin")
+	engine.AddCharacter(player)
+	engine.AddCharacter(enemy)
+
+	// Create scene
+	testScene := scene.NewScene("scene1", "Test Scene", "A dangerous encounter")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(enemy.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	// Start first conflict
+	err = sm.initiateConflict(scene.PhysicalConflict, enemy.ID)
+	require.NoError(t, err)
+
+	// Try to start another conflict
+	err = sm.initiateConflict(scene.MentalConflict, player.ID)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "already in a conflict")
+}
+
+func TestSceneManager_InitiateConflict_NotEnoughParticipants(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	mockUI := &MockUI{}
+	sm := NewSceneManager(engine)
+	sm.SetUI(mockUI)
+
+	// Create only one character
+	player := character.NewCharacter("player1", "Hero")
+	engine.AddCharacter(player)
+
+	// Create scene with only player
+	testScene := scene.NewScene("scene1", "Test Scene", "Alone")
+	testScene.AddCharacter(player.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	// Try to initiate conflict with only one participant
+	err = sm.initiateConflict(scene.PhysicalConflict, player.ID)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "at least 2 participants")
+}
+
+func TestSceneManager_GetConflictTypeForSkill(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	// Physical skills
+	assert.Equal(t, scene.PhysicalConflict, sm.getConflictTypeForSkill("Fight"))
+	assert.Equal(t, scene.PhysicalConflict, sm.getConflictTypeForSkill("Shoot"))
+	assert.Equal(t, scene.PhysicalConflict, sm.getConflictTypeForSkill("Athletics"))
+	assert.Equal(t, scene.PhysicalConflict, sm.getConflictTypeForSkill("Physique"))
+
+	// Mental skills
+	assert.Equal(t, scene.MentalConflict, sm.getConflictTypeForSkill("Provoke"))
+	assert.Equal(t, scene.MentalConflict, sm.getConflictTypeForSkill("Deceive"))
+	assert.Equal(t, scene.MentalConflict, sm.getConflictTypeForSkill("Rapport"))
+	assert.Equal(t, scene.MentalConflict, sm.getConflictTypeForSkill("Will"))
+
+	// Default to physical for unknown skills
+	assert.Equal(t, scene.PhysicalConflict, sm.getConflictTypeForSkill("UnknownSkill"))
+}
+
+func TestSceneManager_HandleConflictEscalation(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	mockUI := &MockUI{}
+	sm := NewSceneManager(engine)
+	sm.SetUI(mockUI)
+
+	// Create characters
+	player := character.NewCharacter("player1", "Hero")
+	player.SetSkill("Notice", 2)
+	player.SetSkill("Empathy", 4)
+	enemy := character.NewCharacter("enemy1", "Antagonist")
+	enemy.SetSkill("Notice", 3)
+	enemy.SetSkill("Empathy", 1)
+	engine.AddCharacter(player)
+	engine.AddCharacter(enemy)
+
+	// Create scene
+	testScene := scene.NewScene("scene1", "Test Scene", "Tense negotiation")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(enemy.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	// Start a mental conflict
+	err = sm.initiateConflict(scene.MentalConflict, enemy.ID)
+	require.NoError(t, err)
+
+	// Verify initial mental initiative (player with Empathy 4 should be first)
+	assert.Equal(t, scene.MentalConflict, sm.currentScene.ConflictState.Type)
+	// Player has Empathy 4, enemy has Empathy 1
+	firstParticipant := sm.currentScene.ConflictState.Participants[0]
+	assert.Equal(t, player.ID, firstParticipant.CharacterID)
+	assert.Equal(t, 4, firstParticipant.Initiative)
+
+	// Escalate to physical
+	sm.handleConflictEscalation(scene.PhysicalConflict)
+
+	// Verify escalation
+	assert.Equal(t, scene.PhysicalConflict, sm.currentScene.ConflictState.Type)
+	assert.Equal(t, scene.MentalConflict, sm.currentScene.ConflictState.OriginalType)
+
+	// Initiative should be recalculated - enemy has Notice 3, player has Notice 2
+	// So enemy should now be first
+	firstParticipant = sm.currentScene.ConflictState.Participants[0]
+	assert.Equal(t, enemy.ID, firstParticipant.CharacterID)
+	assert.Equal(t, 3, firstParticipant.Initiative)
+}
+

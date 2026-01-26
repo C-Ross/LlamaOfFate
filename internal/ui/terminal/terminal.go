@@ -232,6 +232,77 @@ func (ui *TerminalUI) displayAspects() {
 	}
 }
 
+// DisplayConflictStart displays the start of a conflict with initiative order
+func (ui *TerminalUI) DisplayConflictStart(conflictType string, initiatorName string, participants []engine.ConflictParticipantInfo) {
+	fmt.Println("\n╔══════════════════════════════════════════╗")
+	fmt.Printf("║         CONFLICT BEGINS!                 ║\n")
+	fmt.Printf("║         Type: %-25s  ║\n", conflictType)
+	fmt.Println("╚══════════════════════════════════════════╝")
+	fmt.Printf("\n%s initiates hostilities!\n", initiatorName)
+
+	fmt.Println("\n--- Initiative Order ---")
+	for i, p := range participants {
+		marker := "  "
+		if p.IsPlayer {
+			marker = "► "
+		}
+		fmt.Printf("%s%d. %s (Initiative: %d)\n", marker, i+1, p.CharacterName, p.Initiative)
+	}
+	fmt.Println("------------------------")
+}
+
+// DisplayConflictEscalation displays when a conflict escalates to a different type
+func (ui *TerminalUI) DisplayConflictEscalation(fromType, toType, triggerCharName string) {
+	fmt.Println("\n┌──────────────────────────────────────────┐")
+	fmt.Printf("│  CONFLICT ESCALATES!                     │\n")
+	fmt.Printf("│  %s → %s\n", fromType, toType)
+	fmt.Printf("│  Triggered by: %s\n", triggerCharName)
+	fmt.Println("└──────────────────────────────────────────┘")
+	fmt.Println("\nInitiative is being recalculated...")
+}
+
+// DisplayTurnAnnouncement displays whose turn it is in the conflict
+func (ui *TerminalUI) DisplayTurnAnnouncement(characterName string, turnNumber int, isPlayer bool) {
+	if isPlayer {
+		fmt.Printf("\n=== Turn %d: Your turn, %s! ===\n", turnNumber, characterName)
+	} else {
+		fmt.Printf("\n=== Turn %d: %s's turn ===\n", turnNumber, characterName)
+	}
+}
+
+// DisplayConflictEnd displays the end of a conflict
+func (ui *TerminalUI) DisplayConflictEnd(reason string) {
+	fmt.Println("\n╔══════════════════════════════════════════╗")
+	fmt.Printf("║         CONFLICT ENDS                    ║\n")
+	fmt.Println("╚══════════════════════════════════════════╝")
+	fmt.Printf("\n%s\n", reason)
+}
+
+// DisplayGameOver displays the game over screen
+func (ui *TerminalUI) DisplayGameOver(reason string) {
+	fmt.Println()
+	fmt.Println("╔══════════════════════════════════════════╗")
+	fmt.Println("║              GAME OVER                   ║")
+	fmt.Println("╚══════════════════════════════════════════╝")
+	fmt.Printf("\n%s\n", reason)
+	fmt.Println("\nYour adventure has come to an end.")
+	fmt.Println("Thank you for playing!")
+}
+
+// DisplaySceneTransition displays a transition to a new scene
+func (ui *TerminalUI) DisplaySceneTransition(narrative string, newSceneHint string) {
+	fmt.Println()
+	fmt.Println("════════════════════════════════════════════")
+	fmt.Println("              Scene Transition              ")
+	fmt.Println("════════════════════════════════════════════")
+	fmt.Printf("\n%s\n", narrative)
+	if newSceneHint != "" {
+		fmt.Printf("\n[%s]\n", newSceneHint)
+	}
+	fmt.Println()
+	fmt.Println("════════════════════════════════════════════")
+}
+
 func (ui *TerminalUI) showHelp() {
 	fmt.Println("\n=== Scene Commands ===")
 	fmt.Println("  help           - Show this help")

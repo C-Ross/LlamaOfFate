@@ -357,3 +357,86 @@ func TestSituationAspect_UseFreeInvoke(t *testing.T) {
 	// Test using when no free invokes available
 	assert.False(t, aspect.UseFreeInvoke())
 }
+
+func TestScene_StartConflictWithInitiator(t *testing.T) {
+	scene := NewScene("test", "Test Scene", "Test")
+
+	participants := []ConflictParticipant{
+		{CharacterID: "char-1", Initiative: 3},
+		{CharacterID: "char-2", Initiative: 1},
+	}
+
+	scene.StartConflictWithInitiator(PhysicalConflict, participants, "char-1")
+
+	assert.True(t, scene.IsConflict)
+	require.NotNil(t, scene.ConflictState)
+	assert.Equal(t, PhysicalConflict, scene.ConflictState.Type)
+	assert.Equal(t, "char-1", scene.ConflictState.InitiatingCharacter)
+	assert.Len(t, scene.ConflictState.Participants, 2)
+}
+
+func TestScene_StartConflictWithInitiator_EmptyInitiator(t *testing.T) {
+	scene := NewScene("test", "Test Scene", "Test")
+
+	participants := []ConflictParticipant{
+		{CharacterID: "char-1", Initiative: 3},
+	}
+
+	scene.StartConflictWithInitiator(MentalConflict, participants, "")
+
+	assert.True(t, scene.IsConflict)
+	require.NotNil(t, scene.ConflictState)
+	assert.Equal(t, MentalConflict, scene.ConflictState.Type)
+	assert.Empty(t, scene.ConflictState.InitiatingCharacter)
+}
+
+func TestScene_EscalateConflict(t *testing.T) {
+	scene := NewScene("test", "Test Scene", "Test")
+
+	// Test escalation with no active conflict
+	assert.False(t, scene.EscalateConflict(PhysicalConflict))
+
+	// Start a mental conflict
+	participants := []ConflictParticipant{
+		{CharacterID: "char-1", Initiative: 3},
+		{CharacterID: "char-2", Initiative: 1},
+	}
+	scene.StartConflict(MentalConflict, participants)
+
+	// Escalate to physical
+	assert.True(t, scene.EscalateConflict(PhysicalConflict))
+	assert.Equal(t, PhysicalConflict, scene.ConflictState.Type)
+	assert.Equal(t, MentalConflict, scene.ConflictState.OriginalType)
+}
+
+func TestScene_EscalateConflict_SameType(t *testing.T) {
+	scene := NewScene("test", "Test Scene", "Test")
+
+	participants := []ConflictParticipant{
+		{CharacterID: "char-1", Initiative: 3},
+	}
+	scene.StartConflict(PhysicalConflict, participants)
+
+	// Try to escalate to same type
+	assert.False(t, scene.EscalateConflict(PhysicalConflict))
+	// OriginalType should still be empty since no escalation occurred
+	assert.Empty(t, scene.ConflictState.OriginalType)
+}
+
+func TestScene_EscalateConflict_PreservesOriginalType(t *testing.T) {
+	scene := NewScene("test", "Test Scene", "Test")
+
+	participants := []ConflictParticipant{
+		{CharacterID: "char-1", Initiative: 3},
+	}
+	scene.StartConflict(MentalConflict, participants)
+
+	// First escalation
+	scene.EscalateConflict(PhysicalConflict)
+	assert.Equal(t, MentalConflict, scene.ConflictState.OriginalType)
+
+	// Simulate another escalation back (should preserve original)
+	scene.EscalateConflict(MentalConflict)
+	assert.Equal(t, MentalConflict, scene.ConflictState.OriginalType)
+}
+

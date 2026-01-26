@@ -194,7 +194,8 @@ func TestActionParser_ParseAction_InvalidJSON(t *testing.T) {
 }
 
 func TestActionParser_ParseAction_InvalidActionType(t *testing.T) {
-	// Setup mock LLM response with invalid action type
+	// Setup mock LLM response with an unrecognized action type
+	// Now the parser defaults to Overcome for unknown types instead of erroring
 	mockResponse := `{
 		"action_type": "InvalidType",
 		"skill": "Athletics",
@@ -216,12 +217,11 @@ func TestActionParser_ParseAction_InvalidActionType(t *testing.T) {
 		RawInput:  "I want to do something",
 	}
 
-	// Parse the action
-	_, err := parser.ParseAction(context.Background(), req)
+	// Parse the action - now defaults to Overcome instead of erroring
+	result, err := parser.ParseAction(context.Background(), req)
 
-	// Should return error
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid action type")
+	assert.NoError(t, err)
+	assert.Equal(t, action.Overcome, result.Type)
 }
 
 func TestBuildPrompts(t *testing.T) {
@@ -274,8 +274,16 @@ func TestParseActionType(t *testing.T) {
 		{"Create an Advantage", action.CreateAdvantage, false},
 		{"Attack", action.Attack, false},
 		{"Defend", action.Defend, false},
-		{"Invalid", action.Overcome, true},
-		{"", action.Overcome, true},
+		// Unknown types now default to Overcome instead of erroring
+		{"Invalid", action.Overcome, false},
+		{"", action.Overcome, false},
+		// Skill names map to appropriate actions
+		{"fight", action.Attack, false},
+		{"provoke", action.Attack, false},
+		{"athletics", action.Defend, false},
+		{"will", action.Defend, false},
+		{"investigation", action.Overcome, false},
+		{"stealth", action.Overcome, false},
 	}
 
 	for _, test := range tests {

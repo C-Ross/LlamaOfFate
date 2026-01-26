@@ -10,6 +10,9 @@ FATE CORE GM PRINCIPLES:
 SCENE CONTEXT:
 Scene: {{.Scene.Name}}
 Description: {{.Scene.Description}}
+{{- if .Scene.IsConflict}}
+ACTIVE CONFLICT: {{.Scene.ConflictState.Type}} conflict (Round {{.Scene.ConflictState.Round}})
+{{- end}}
 
 CHARACTER:
 {{.CharacterContext}}
@@ -41,5 +44,19 @@ As the GM, respond naturally and helpfully. Since this is {{.InteractionType}} (
 - Answer questions about the setting and situation
 - Suggest possible courses of action when asked
 - Create atmosphere and immersion
+
+CONFLICT ESCALATION:
+If an NPC in the scene initiates violence or hostile action against the player character during this interaction, 
+end your response with the appropriate marker on its own line:
+[CONFLICT:physical:character_id] - for physical violence (attacks, combat)
+[CONFLICT:mental:character_id] - for social/mental attacks (intimidation, manipulation, psychic assault)
+
+Use the character's ID (shown in parentheses above) in the marker. Only include this marker if:
+- An NPC takes the FIRST hostile action that would start a conflict
+- The player did NOT initiate the violence first
+- Not already in an active conflict
+
+Example: The guard snarls and swings his halberd at your head!
+[CONFLICT:physical:guard-1]
 
 Keep responses engaging but concise (2-4 sentences). Focus on what the character can perceive and interact with. Provide useful information that helps the player understand their options and the scene.

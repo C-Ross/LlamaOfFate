@@ -22,6 +22,14 @@ type SceneInfo interface {
 	GetConversationHistory() []ConversationEntry
 }
 
+// ConflictParticipantInfo provides display information about a conflict participant
+type ConflictParticipantInfo struct {
+	CharacterID   string
+	CharacterName string
+	Initiative    int
+	IsPlayer      bool
+}
+
 // UI defines the interface for user interaction during scene management
 type UI interface {
 	// Input methods - returns the cleaned input and whether it's an exit command
@@ -33,4 +41,14 @@ type UI interface {
 	DisplayNarrative(narrative string)
 	DisplayDialog(playerInput, gmResponse string)
 	DisplaySystemMessage(message string)
+
+	// Conflict display methods
+	DisplayConflictStart(conflictType string, initiatorName string, participants []ConflictParticipantInfo)
+	DisplayConflictEscalation(fromType, toType, triggerCharName string)
+	DisplayTurnAnnouncement(characterName string, turnNumber int, isPlayer bool)
+	DisplayConflictEnd(reason string)
+
+	// Game flow methods
+	DisplayGameOver(reason string)
+	DisplaySceneTransition(narrative string, newSceneHint string)
 }
