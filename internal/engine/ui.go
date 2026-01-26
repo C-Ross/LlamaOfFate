@@ -51,4 +51,5 @@ type UI interface {
 	// Game flow methods
 	DisplayGameOver(reason string)
 	DisplaySceneTransition(narrative string, newSceneHint string)
+	DisplayCharacter()
 }

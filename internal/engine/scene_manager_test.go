@@ -72,6 +72,10 @@ func (m *MockUI) DisplaySceneTransition(narrative string, newSceneHint string) {
 	m.displayedMessages = append(m.displayedMessages, "SCENE TRANSITION: "+narrative)
 }
 
+func (m *MockUI) DisplayCharacter() {
+	m.displayedMessages = append(m.displayedMessages, "CHARACTER")
+}
+
 func TestNewSceneManager(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)

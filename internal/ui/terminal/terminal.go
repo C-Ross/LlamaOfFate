@@ -104,7 +104,7 @@ func (ui *TerminalUI) handleSpecialCommands(input string) bool {
 		ui.displayScene()
 		return true
 	case "character", "char":
-		ui.displayCharacter()
+		ui.DisplayCharacter()
 		return true
 	case "status":
 		ui.displayStatus()
@@ -148,7 +148,7 @@ func (ui *TerminalUI) displayScene() {
 	}
 }
 
-func (ui *TerminalUI) displayCharacter() {
+func (ui *TerminalUI) DisplayCharacter() {
 	if ui.sceneInfo == nil {
 		fmt.Println("No scene information available.")
 		return

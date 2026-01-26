@@ -18,9 +18,7 @@ import (
 func main() {
 	logging.SetupDefaultLogging()
 
-	fmt.Println("=== LlamaOfFate Enhanced Scene Demo with LLM ===")
-	fmt.Println("This demonstrates the LLM-driven scene loop with intelligent")
-	fmt.Println("classification of dialog, clarification, and actions.")
+	fmt.Println("=== LlamaOfFate Scene Demo ===")
 	fmt.Println()
 
 	// Check if Azure config exists
@@ -51,11 +49,6 @@ func main() {
 	if err := gameEngine.Start(); err != nil {
 		log.Fatalf("Failed to start engine: %v", err)
 	}
-
-	// Display LLM information
-	modelInfo := azureClient.GetModelInfo()
-	fmt.Printf("Using LLM: %s (%s)\n", modelInfo.Name, modelInfo.Provider)
-	fmt.Println()
 
 	// Create a sample character
 	player := createSampleCharacter()
@@ -94,25 +87,15 @@ func main() {
 		log.Fatalf("Failed to start scene: %v", err)
 	}
 
-	fmt.Println()
-	fmt.Println("=== Enhanced Features ===")
-	fmt.Println("• The LLM will classify your input as dialog, clarification, or action")
-	fmt.Println("• Conversation history is maintained for context")
-	fmt.Println("• Rich narrative responses based on scene context")
-	fmt.Println("• Intelligent action parsing and resolution")
-	fmt.Println()
-	fmt.Println("Try saying:")
-	fmt.Println(`  "What do I see in more detail?"`)
-	fmt.Println(`  "I call out 'Hello, is anyone there?'"`)
-	fmt.Println(`  "Carefully examine the runes"`)
-	fmt.Println(`  "Sneak through the doorway"`)
-	fmt.Println()
-
 	// Run the scene loop
 	ctx := context.Background()
 	terminal := terminal.NewTerminalUI()
 	sceneManager.SetUI(terminal)
+	sceneManager.SetExitOnSceneTransition(true)
 	terminal.SetSceneInfo(sceneManager)
+
+	// Display initial character info
+	terminal.DisplayCharacter()
 
 	if err := sceneManager.RunSceneLoop(ctx); err != nil {
 		log.Fatalf("Scene loop error: %v", err)
@@ -123,7 +106,9 @@ func main() {
 		log.Printf("Warning: Failed to stop engine: %v", err)
 	}
 
-	fmt.Println("Thanks for exploring the tower!")
+	// Display final character state
+	terminal.DisplayCharacter()
+	fmt.Println("\nThanks for exploring the tower!")
 }
 
 func createSampleCharacter() *character.Character {

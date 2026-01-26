@@ -44,14 +44,15 @@ type ConflictTrigger struct {
 
 // SceneManager handles the main scene loop and player interactions
 type SceneManager struct {
-	engine              *Engine
-	currentScene        *scene.Scene
-	player              *character.Character
-	reader              *bufio.Reader
-	roller              *dice.Roller
-	conversationHistory []ConversationEntry
-	ui                  UI
-	shouldExit          bool // Set to true when the game should end
+	engine               *Engine
+	currentScene         *scene.Scene
+	player               *character.Character
+	reader               *bufio.Reader
+	roller               *dice.Roller
+	conversationHistory  []ConversationEntry
+	ui                   UI
+	shouldExit           bool // Set to true when the game should end
+	exitOnSceneTransition bool // Set to true to exit the loop on scene transition
 }
 
 // InputClassificationData holds the data for input classification template
@@ -96,6 +97,11 @@ func (sm *SceneManager) SetUI(ui UI) {
 	sm.ui = ui
 }
 
+// SetExitOnSceneTransition configures whether the scene loop should exit on scene transition
+func (sm *SceneManager) SetExitOnSceneTransition(exit bool) {
+	sm.exitOnSceneTransition = exit
+}
+
 // StartScene begins a new scene with the given pre-configured scene
 func (sm *SceneManager) StartScene(scene *scene.Scene, player *character.Character) error {
 	sm.currentScene = scene
@@ -128,8 +134,10 @@ func (sm *SceneManager) RunSceneLoop(ctx context.Context) error {
 		return fmt.Errorf("UI is required for scene loop functionality")
 	}
 
-	sm.ui.DisplaySystemMessage("--- Scene Loop Started ---")
-	sm.ui.DisplaySystemMessage("Type 'help' for commands, 'exit' to end the scene, or describe what you want to do.")
+	// Display the initial scene
+	sm.ui.DisplaySystemMessage(fmt.Sprintf("=== %s ===", sm.currentScene.Name))
+	sm.ui.DisplayNarrative(sm.currentScene.Description)
+	sm.ui.DisplaySystemMessage("Type 'help' for commands, 'exit' to end.")
 
 	for {
 		// Check if game should end (e.g., game over from being taken out)
@@ -1226,6 +1234,9 @@ func (sm *SceneManager) handleTakenOut(ctx context.Context, attacker *character.
 	case TakenOutTransition:
 		sm.ui.DisplaySceneTransition(narrative, newSceneHint)
 		sm.ui.DisplaySystemMessage("\nThe scene shifts around you...")
+		if sm.exitOnSceneTransition {
+			sm.shouldExit = true
+		}
 		// Scene continues but context has changed
 
 	default: // TakenOutContinue
