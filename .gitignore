@@ -27,7 +27,6 @@ fate-guided-scene
 main
 
 # Configuration files with sensitive information
-configs/azure-llm.yaml
 *.local.yaml
 
 

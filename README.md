@@ -44,6 +44,38 @@ Fate™ is a trademark of Evil Hat Productions, LLC.
 - **Conflict System**: Handle conflicts with initiative, zones, and positioning
 - **Narrative Continuity**: Maintain story context across scenes and sessions
 
+## Configuration
+
+### Azure ML Setup
+
+LlamaOfFate uses Azure ML for LLM integration. Configuration is stored in `configs/azure-llm.yaml`.
+
+**Recommended Setup (Environment Variables):**
+
+```bash
+# Set your Azure ML credentials via environment variables
+export AZURE_API_ENDPOINT="https://your-resource.cognitiveservices.azure.com/openai/deployments/your-deployment/chat/completions?api-version=2024-05-01-preview"
+export AZURE_API_KEY="your-api-key-here"
+```
+
+Environment variables take precedence over values in the configuration file, making it safe to commit your config to version control.
+
+**Configuration File:**
+
+Edit `configs/azure-llm.yaml` to set your preferred model and timeout:
+
+```yaml
+# api_endpoint and api_key can be left empty if using environment variables
+api_endpoint: ""
+api_key: ""
+
+# Choose your Llama model
+model_name: "Llama-4-Maverick-17B-128E-Instruct-FP8"
+
+# Request timeout in seconds
+timeout: 300
+```
+
 ## Package Structure
 
 ```

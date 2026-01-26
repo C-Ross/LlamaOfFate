@@ -7,7 +7,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// LoadConfig loads Azure ML configuration from a YAML file
+// LoadConfig loads Azure ML configuration from a YAML file and applies environment variable overrides.
+// Environment variables take precedence over values in the YAML file:
+// - AZURE_API_ENDPOINT: Overrides api_endpoint
+// - AZURE_API_KEY: Overrides api_key
 func LoadConfig(configPath string) (*Config, error) {
 	// Expand relative paths
 	if !filepath.IsAbs(configPath) {
@@ -28,6 +31,14 @@ func LoadConfig(configPath string) (*Config, error) {
 		return nil, err
 	}
 
+	// Override with environment variables if present
+	if endpoint := os.Getenv("AZURE_API_ENDPOINT"); endpoint != "" {
+		config.APIEndpoint = endpoint
+	}
+	if apiKey := os.Getenv("AZURE_API_KEY"); apiKey != "" {
+		config.APIKey = apiKey
+	}
+
 	// Set defaults
 	if config.Timeout == 0 {
 		config.Timeout = 30
@@ -37,29 +48,4 @@ func LoadConfig(configPath string) (*Config, error) {
 	}
 
 	return &config, nil
-}
-
-// SaveConfig saves Azure ML configuration to a YAML file
-func SaveConfig(config Config, configPath string) error {
-	// Expand relative paths
-	if !filepath.IsAbs(configPath) {
-		wd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		configPath = filepath.Join(wd, configPath)
-	}
-
-	// Create directory if it doesn't exist
-	dir := filepath.Dir(configPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
-
-	data, err := yaml.Marshal(&config)
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(configPath, data, 0600) // Restrictive permissions for API keys
 }

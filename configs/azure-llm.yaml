@@ -1,0 +1,23 @@
+# Azure ML Configuration for LlamaOfFate
+# 
+# RECOMMENDED: Set sensitive values via environment variables:
+#   export AZURE_API_ENDPOINT="https://your-resource.cognitiveservices.azure.com/openai/deployments/your-deployment/chat/completions?api-version=2024-05-01-preview"
+#   export AZURE_API_KEY="your-api-key-here"
+#
+# Environment variables will override any values set in this file.
+
+# Azure ML API endpoint (can be overridden by AZURE_API_ENDPOINT env var)
+# Example: "https://your-resource.cognitiveservices.azure.com/openai/deployments/your-deployment/chat/completions?api-version=2024-05-01-preview"
+api_endpoint: ""
+
+# Azure ML API key (can be overridden by AZURE_API_KEY env var)
+# Keep this secret - prefer using the environment variable instead
+api_key: ""
+
+# The Llama model to use
+# Options: Meta-Llama-3.1-405B-Instruct, Meta-Llama-3.1-70B-Instruct, Meta-Llama-3.1-8B-Instruct, 
+#          Llama-4-Maverick-17B-128E-Instruct-FP8
+model_name: "Llama-4-Maverick-17B-128E-Instruct-FP8"
+
+# Request timeout in seconds (default: 30)
+timeout: 300

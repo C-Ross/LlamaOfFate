@@ -9,7 +9,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// clearAzureEnvVars temporarily clears Azure environment variables and returns a cleanup function
+func clearAzureEnvVars(t *testing.T) func() {
+	t.Helper()
+	originalEndpoint := os.Getenv("AZURE_API_ENDPOINT")
+	originalKey := os.Getenv("AZURE_API_KEY")
+
+	os.Unsetenv("AZURE_API_ENDPOINT")
+	os.Unsetenv("AZURE_API_KEY")
+
+	return func() {
+		if originalEndpoint != "" {
+			os.Setenv("AZURE_API_ENDPOINT", originalEndpoint)
+		}
+		if originalKey != "" {
+			os.Setenv("AZURE_API_KEY", originalKey)
+		}
+	}
+}
+
 func TestLoadConfig(t *testing.T) {
+	// Clear any environment variables that might interfere
+	cleanup := clearAzureEnvVars(t)
+	defer cleanup()
+
 	// Create a temporary config file
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "azure-config.yaml")
@@ -35,6 +58,10 @@ timeout: 45
 }
 
 func TestLoadConfigWithDefaults(t *testing.T) {
+	// Clear any environment variables that might interfere
+	cleanup := clearAzureEnvVars(t)
+	defer cleanup()
+
 	// Create a minimal config file
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "azure-config.yaml")
@@ -55,6 +82,83 @@ api_key: "test-api-key-12345"
 	assert.Equal(t, "test-api-key-12345", config.APIKey)
 	assert.Equal(t, "Meta-Llama-3.1-405B-Instruct", config.ModelName) // Default
 	assert.Equal(t, 30, config.Timeout)                               // Default
+}
+
+func TestLoadConfigWithEnvironmentVariables(t *testing.T) {
+	// Create a temporary config file
+	tempDir := t.TempDir()
+	configPath := filepath.Join(tempDir, "azure-config.yaml")
+
+	configContent := `api_endpoint: "https://file-endpoint.inference.ai.azure.com"
+api_key: "file-api-key"
+model_name: "Meta-Llama-3.1-70B-Instruct"
+timeout: 45
+`
+
+	err := os.WriteFile(configPath, []byte(configContent), 0600)
+	require.NoError(t, err)
+
+	// Set environment variables
+	originalEndpoint := os.Getenv("AZURE_API_ENDPOINT")
+	originalKey := os.Getenv("AZURE_API_KEY")
+	defer func() {
+		if originalEndpoint != "" {
+			os.Setenv("AZURE_API_ENDPOINT", originalEndpoint)
+		} else {
+			os.Unsetenv("AZURE_API_ENDPOINT")
+		}
+		if originalKey != "" {
+			os.Setenv("AZURE_API_KEY", originalKey)
+		} else {
+			os.Unsetenv("AZURE_API_KEY")
+		}
+	}()
+
+	os.Setenv("AZURE_API_ENDPOINT", "https://env-endpoint.inference.ai.azure.com")
+	os.Setenv("AZURE_API_KEY", "env-api-key")
+
+	// Load the config
+	config, err := LoadConfig(configPath)
+	require.NoError(t, err)
+	require.NotNil(t, config)
+
+	// Environment variables should override file values
+	assert.Equal(t, "https://env-endpoint.inference.ai.azure.com", config.APIEndpoint)
+	assert.Equal(t, "env-api-key", config.APIKey)
+	// Other values should remain from file
+	assert.Equal(t, "Meta-Llama-3.1-70B-Instruct", config.ModelName)
+	assert.Equal(t, 45, config.Timeout)
+}
+
+func TestLoadConfigWithPartialEnvironmentVariables(t *testing.T) {
+	// Clear any existing environment variables first
+	cleanup := clearAzureEnvVars(t)
+	defer cleanup()
+
+	// Create a temporary config file
+	tempDir := t.TempDir()
+	configPath := filepath.Join(tempDir, "azure-config.yaml")
+
+	configContent := `api_endpoint: "https://file-endpoint.inference.ai.azure.com"
+api_key: "file-api-key"
+model_name: "Meta-Llama-3.1-70B-Instruct"
+`
+
+	err := os.WriteFile(configPath, []byte(configContent), 0600)
+	require.NoError(t, err)
+
+	// Set only API_KEY environment variable (endpoint should come from file)
+	os.Setenv("AZURE_API_KEY", "env-api-key")
+
+	// Load the config
+	config, err := LoadConfig(configPath)
+	require.NoError(t, err)
+	require.NotNil(t, config)
+
+	// Only API key should be overridden
+	assert.Equal(t, "https://file-endpoint.inference.ai.azure.com", config.APIEndpoint)
+	assert.Equal(t, "env-api-key", config.APIKey)
+	assert.Equal(t, "Meta-Llama-3.1-70B-Instruct", config.ModelName)
 }
 
 func TestLoadConfigFileNotFound(t *testing.T) {
@@ -83,62 +187,11 @@ model_name: Meta-Llama-3.1-70B-Instruct # Missing closing quote above
 	assert.Nil(t, config)
 }
 
-func TestSaveConfig(t *testing.T) {
-	tempDir := t.TempDir()
-	configPath := filepath.Join(tempDir, "azure-config.yaml")
-
-	config := Config{
-		APIEndpoint: "https://my-endpoint.inference.ai.azure.com",
-		APIKey:      "my-secret-api-key",
-		ModelName:   "Meta-Llama-3.1-8B-Instruct",
-		Timeout:     60,
-	}
-
-	// Save the config
-	err := SaveConfig(config, configPath)
-	require.NoError(t, err)
-
-	// Verify the file was created
-	assert.FileExists(t, configPath)
-
-	// Verify file permissions are restrictive
-	info, err := os.Stat(configPath)
-	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
-
-	// Load the config back and verify
-	loadedConfig, err := LoadConfig(configPath)
-	require.NoError(t, err)
-
-	assert.Equal(t, config.APIEndpoint, loadedConfig.APIEndpoint)
-	assert.Equal(t, config.APIKey, loadedConfig.APIKey)
-	assert.Equal(t, config.ModelName, loadedConfig.ModelName)
-	assert.Equal(t, config.Timeout, loadedConfig.Timeout)
-}
-
-func TestSaveConfigCreatesDirectory(t *testing.T) {
-	tempDir := t.TempDir()
-	configPath := filepath.Join(tempDir, "subdir", "azure-config.yaml")
-
-	config := Config{
-		APIEndpoint: "https://test.inference.ai.azure.com",
-		APIKey:      "test-key",
-		ModelName:   "Meta-Llama-3.1-405B-Instruct",
-		Timeout:     30,
-	}
-
-	// Save the config (should create the subdirectory)
-	err := SaveConfig(config, configPath)
-	require.NoError(t, err)
-
-	// Verify the file was created
-	assert.FileExists(t, configPath)
-
-	// Verify the directory was created
-	assert.DirExists(t, filepath.Dir(configPath))
-}
-
 func TestLoadConfigRelativePath(t *testing.T) {
+	// Clear any environment variables that might interfere
+	cleanup := clearAzureEnvVars(t)
+	defer cleanup()
+
 	// Change to temp directory
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
