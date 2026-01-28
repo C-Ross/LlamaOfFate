@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
@@ -212,7 +213,7 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage(t *testing.T) {
 	testAction.Outcome = result.CompareAgainst(dice.Fair)
 
 	initialAspectCount := len(sm.currentScene.SituationAspects)
-	sm.applyActionEffects(testAction)
+	sm.applyActionEffects(testAction, nil) // nil target for create advantage
 
 	assert.Equal(t, initialAspectCount+1, len(sm.currentScene.SituationAspects))
 
@@ -681,5 +682,330 @@ func TestSceneManager_HandleConflictEscalation(t *testing.T) {
 	firstParticipant = sm.currentScene.ConflictState.Participants[0]
 	assert.Equal(t, enemy.ID, firstParticipant.CharacterID)
 	assert.Equal(t, 3, firstParticipant.Initiative)
+}
+
+func TestSceneManager_ParseConflictEndMarker_Surrender(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	response := "The goblin drops his spear and raises his hands. \"I yield!\" [CONFLICT:end:surrender]"
+	resolution, cleanedResponse := sm.parseConflictEndMarker(response)
+
+	require.NotNil(t, resolution)
+	assert.Equal(t, "surrender", resolution.Reason)
+	assert.Equal(t, "The goblin drops his spear and raises his hands. \"I yield!\"", cleanedResponse)
+}
+
+func TestSceneManager_ParseConflictEndMarker_Agreement(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	response := "The merchant nods slowly. \"Very well, we have a deal.\" [CONFLICT:end:agreement]"
+	resolution, cleanedResponse := sm.parseConflictEndMarker(response)
+
+	require.NotNil(t, resolution)
+	assert.Equal(t, "agreement", resolution.Reason)
+	assert.Equal(t, "The merchant nods slowly. \"Very well, we have a deal.\"", cleanedResponse)
+}
+
+func TestSceneManager_ParseConflictEndMarker_Retreat(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	response := "The orc looks at his fallen comrades and flees into the forest. [CONFLICT:end:retreat]"
+	resolution, cleanedResponse := sm.parseConflictEndMarker(response)
+
+	require.NotNil(t, resolution)
+	assert.Equal(t, "retreat", resolution.Reason)
+	assert.Equal(t, "The orc looks at his fallen comrades and flees into the forest.", cleanedResponse)
+}
+
+func TestSceneManager_ParseConflictEndMarker_NoMarker(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	response := "The guard eyes you suspiciously but does not attack."
+	resolution, cleanedResponse := sm.parseConflictEndMarker(response)
+
+	assert.Nil(t, resolution)
+	assert.Equal(t, "The guard eyes you suspiciously but does not attack.", cleanedResponse)
+}
+
+func TestSceneManager_ResolveConflictPeacefully(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	// Create test characters
+	player := character.NewCharacter("player-1", "Hero")
+	player.SetSkill("Notice", 2)
+	enemy := character.NewCharacter("enemy-1", "Goblin Guard")
+	enemy.SetSkill("Notice", 1)
+
+	engine.AddCharacter(player)
+	engine.AddCharacter(enemy)
+
+	// Setup scene
+	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(enemy.ID)
+	sm.currentScene = testScene
+	sm.player = player
+
+	// Start a conflict
+	err = sm.initiateConflict(scene.PhysicalConflict, enemy.ID)
+	require.NoError(t, err)
+	assert.True(t, sm.currentScene.IsConflict)
+
+	// Resolve peacefully
+	sm.resolveConflictPeacefully("surrender")
+
+	// Verify conflict ended
+	assert.False(t, sm.currentScene.IsConflict)
+}
+
+func TestSceneManager_ResolveConflictPeacefully_NotInConflict(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	// Setup scene (no conflict)
+	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
+	sm.currentScene = testScene
+
+	// Attempting to resolve should not panic
+	sm.resolveConflictPeacefully("surrender")
+
+	// Still not in conflict
+	assert.False(t, sm.currentScene.IsConflict)
+}
+
+func TestSceneManager_RollTargetDefense(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	sm.roller = dice.NewSeededRoller(12345) // Predictable rolls
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	target := character.NewCharacter("target-1", "Goblin")
+	target.SetSkill("Athletics", 2)
+	target.SetSkill("Will", 1)
+
+	// Test physical attack defense (uses Athletics)
+	defenseResult := sm.rollTargetDefense(target, "Fight")
+	assert.NotNil(t, defenseResult)
+	// With seeded roller and Athletics +2, we get a predictable result
+
+	// Test mental attack defense (uses Will)
+	defenseResult = sm.rollTargetDefense(target, "Provoke")
+	assert.NotNil(t, defenseResult)
+}
+
+func TestSceneManager_GetDefenseSkillForAttack(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	// Physical attacks -> Athletics
+	assert.Equal(t, "Athletics", sm.getDefenseSkillForAttack("Fight"))
+	assert.Equal(t, "Athletics", sm.getDefenseSkillForAttack("Shoot"))
+	assert.Equal(t, "Athletics", sm.getDefenseSkillForAttack("Physique"))
+
+	// Mental attacks -> Will
+	assert.Equal(t, "Will", sm.getDefenseSkillForAttack("Provoke"))
+	assert.Equal(t, "Will", sm.getDefenseSkillForAttack("Deceive"))
+	assert.Equal(t, "Will", sm.getDefenseSkillForAttack("Lore"))
+
+	// Unknown defaults to Athletics
+	assert.Equal(t, "Athletics", sm.getDefenseSkillForAttack("UnknownSkill"))
+}
+
+func TestSceneManager_GetStressTypeForAttack(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	// Physical attacks -> Physical stress
+	assert.Equal(t, character.PhysicalStress, sm.getStressTypeForAttack("Fight"))
+	assert.Equal(t, character.PhysicalStress, sm.getStressTypeForAttack("Shoot"))
+
+	// Mental attacks -> Mental stress
+	assert.Equal(t, character.MentalStress, sm.getStressTypeForAttack("Provoke"))
+	assert.Equal(t, character.MentalStress, sm.getStressTypeForAttack("Deceive"))
+	assert.Equal(t, character.MentalStress, sm.getStressTypeForAttack("Lore"))
+}
+
+func TestSceneManager_ApplyDamageToTarget_StressAbsorbed(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	target := character.NewCharacter("target-1", "Goblin")
+	// Default stress track should be able to absorb small hits
+
+	sm.applyDamageToTarget(target, 1, character.PhysicalStress)
+
+	// Check that stress was absorbed message was displayed
+	found := false
+	for _, msg := range mockUI.displayedMessages {
+		if strings.Contains(msg, "absorbs the damage") {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "Expected stress absorption message")
+}
+
+func TestSceneManager_HandleTargetTakenOut(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	player := character.NewCharacter("player-1", "Hero")
+	target := character.NewCharacter("target-1", "Goblin")
+	otherEnemy := character.NewCharacter("enemy-2", "Orc") // Another enemy so conflict doesn't auto-end
+
+	engine.AddCharacter(player)
+	engine.AddCharacter(target)
+	engine.AddCharacter(otherEnemy)
+
+	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(target.ID)
+	testScene.AddCharacter(otherEnemy.ID)
+	sm.currentScene = testScene
+	sm.player = player
+
+	// Start a conflict
+	err = sm.initiateConflict(scene.PhysicalConflict, target.ID)
+	require.NoError(t, err)
+
+	// Take out the target
+	sm.handleTargetTakenOut(target)
+
+	// Check that target is marked as taken out (conflict still active because of otherEnemy)
+	participant := sm.currentScene.GetParticipant(target.ID)
+	require.NotNil(t, participant)
+	assert.Equal(t, scene.StatusTakenOut, participant.Status)
+
+	// Conflict should still be active since otherEnemy remains
+	assert.True(t, sm.currentScene.IsConflict)
+}
+
+func TestSceneManager_HandleTargetTakenOut_ConflictEnds(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	player := character.NewCharacter("player-1", "Hero")
+	target := character.NewCharacter("target-1", "Goblin")
+
+	engine.AddCharacter(player)
+	engine.AddCharacter(target)
+
+	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(target.ID)
+	sm.currentScene = testScene
+	sm.player = player
+
+	// Start a conflict
+	err = sm.initiateConflict(scene.PhysicalConflict, target.ID)
+	require.NoError(t, err)
+
+	// Take out the only target
+	sm.handleTargetTakenOut(target)
+
+	// Conflict should end since no active opponents remain
+	assert.False(t, sm.currentScene.IsConflict)
+
+	// Check victory message was displayed
+	found := false
+	for _, msg := range mockUI.displayedMessages {
+		if strings.Contains(msg, "Victory") {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "Expected victory message")
+}
+
+func TestSceneManager_ApplyActionEffects_Attack(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	player := character.NewCharacter("player-1", "Hero")
+	target := character.NewCharacter("target-1", "Goblin")
+
+	engine.AddCharacter(player)
+	engine.AddCharacter(target)
+
+	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(target.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	// Create a successful attack action
+	testAction := action.NewActionWithTarget(
+		"action-1",
+		player.ID,
+		action.Attack,
+		"Fight",
+		"Strike the goblin",
+		target.ID,
+	)
+
+	// Simulate a successful attack with 3 shifts
+	roller := dice.NewSeededRoller(12345)
+	result := roller.RollWithModifier(dice.Good, 2)
+	testAction.CheckResult = result
+	testAction.Outcome = &dice.Outcome{
+		Type:   dice.Success,
+		Shifts: 3,
+	}
+
+	sm.applyActionEffects(testAction, target)
+
+	// Check that damage message was displayed
+	found := false
+	for _, msg := range mockUI.displayedMessages {
+		if strings.Contains(msg, "deals") && strings.Contains(msg, "shifts") {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "Expected damage message")
 }
 

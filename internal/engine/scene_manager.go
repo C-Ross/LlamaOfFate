@@ -33,13 +33,21 @@ const (
 	msgLLMUnavailable = "[The mists of fate obscure my vision...]"
 )
 
-// conflictMarkerRegex matches [CONFLICT:type:character_id] markers
+// conflictMarkerRegex matches [CONFLICT:type:character_id] markers for escalation
 var conflictMarkerRegex = regexp.MustCompile(`\[CONFLICT:(physical|mental):([^\]]+)\]`)
+
+// conflictEndMarkerRegex matches [CONFLICT:end:reason] markers for de-escalation
+var conflictEndMarkerRegex = regexp.MustCompile(`\[CONFLICT:end:(surrender|agreement|retreat|resolved)\]`)
 
 // ConflictTrigger represents a detected conflict initiation
 type ConflictTrigger struct {
 	Type        scene.ConflictType
 	InitiatorID string
+}
+
+// ConflictResolution represents a detected conflict de-escalation
+type ConflictResolution struct {
+	Reason string
 }
 
 // SceneManager handles the main scene loop and player interactions
@@ -262,8 +270,9 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) {
 		return
 	}
 
-	// Check for conflict markers in the response
+	// Check for conflict markers in the response (both escalation and de-escalation)
 	conflictTrigger, cleanedResponse := sm.parseConflictMarker(response)
+	conflictResolution, cleanedResponse := sm.parseConflictEndMarker(cleanedResponse)
 
 	sm.ui.DisplayDialog(input, cleanedResponse)
 	// Record this exchange in conversation history
@@ -276,6 +285,11 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) {
 				"component", componentSceneManager,
 				"error", err)
 		}
+	}
+
+	// Handle conflict de-escalation if detected
+	if conflictResolution != nil && sm.currentScene.IsConflict {
+		sm.resolveConflictPeacefully(conflictResolution.Reason)
 	}
 }
 
@@ -344,13 +358,30 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 	result := sm.roller.RollWithModifier(dice.Mediocre, totalBonus)
 	parsedAction.CheckResult = result
 
+	// For attacks against characters, use active defense instead of static difficulty
+	var defenseResult *dice.CheckResult
+	var targetChar *character.Character
+	if parsedAction.Type == action.Attack && parsedAction.Target != "" {
+		targetChar = sm.engine.GetCharacter(parsedAction.Target)
+		if targetChar != nil {
+			defenseResult = sm.rollTargetDefense(targetChar, parsedAction.Skill)
+			parsedAction.Difficulty = defenseResult.FinalValue
+		}
+	}
+
 	// Determine outcome
 	outcome := result.CompareAgainst(parsedAction.Difficulty)
 	parsedAction.Outcome = outcome
 
 	// Display result using UI
-	resultString := fmt.Sprintf("%s (Total: %s vs Difficulty %s)",
-		result.String(), result.FinalValue.String(), parsedAction.Difficulty.String())
+	var resultString string
+	if defenseResult != nil && targetChar != nil {
+		resultString = fmt.Sprintf("%s (Total: %s vs %s's Defense %s)",
+			result.String(), result.FinalValue.String(), targetChar.Name, defenseResult.FinalValue.String())
+	} else {
+		resultString = fmt.Sprintf("%s (Total: %s vs Difficulty %s)",
+			result.String(), result.FinalValue.String(), parsedAction.Difficulty.String())
+	}
 	sm.ui.DisplayActionResult(parsedAction.Skill,
 		fmt.Sprintf("%s (%+d)", skillLevel.String(), int(skillLevel)),
 		parsedAction.CalculateBonus(),
@@ -370,12 +401,55 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 	sm.ui.DisplayNarrative(narrative)
 
 	// Apply mechanical effects based on action type and outcome
-	sm.applyActionEffects(parsedAction)
+	sm.applyActionEffects(parsedAction, targetChar)
 
 	// If we're in a conflict, advance turn and process NPC turns
 	if sm.currentScene.IsConflict {
 		sm.advanceConflictTurns(ctx)
 	}
+}
+
+// rollTargetDefense rolls an active defense for a target character
+func (sm *SceneManager) rollTargetDefense(target *character.Character, attackSkill string) *dice.CheckResult {
+	// Determine defense skill based on attack skill type
+	defenseSkill := sm.getDefenseSkillForAttack(attackSkill)
+	defenseLevel := target.GetSkill(defenseSkill)
+
+	// Roll defense
+	defenseRoll := sm.roller.RollWithModifier(dice.Mediocre, int(defenseLevel))
+
+	sm.ui.DisplaySystemMessage(fmt.Sprintf(
+		"%s defends with %s (%s)",
+		target.Name, defenseSkill, defenseRoll.FinalValue.String()))
+
+	return defenseRoll
+}
+
+// getDefenseSkillForAttack returns the appropriate defense skill for an attack skill
+func (sm *SceneManager) getDefenseSkillForAttack(attackSkill string) string {
+	// Physical attack skills -> Athletics defense
+	physicalAttacks := map[string]bool{
+		"Fight": true, "Shoot": true, "Physique": true,
+	}
+	if physicalAttacks[attackSkill] {
+		return "Athletics"
+	}
+
+	// Mental/social attack skills -> Will defense
+	mentalAttacks := map[string]bool{
+		"Provoke": true, "Deceive": true, "Rapport": true,
+	}
+	if mentalAttacks[attackSkill] {
+		return "Will"
+	}
+
+	// Magic/lore attacks could be either - default to Will for supernatural
+	if attackSkill == "Lore" {
+		return "Will"
+	}
+
+	// Default to Athletics for unknown attack types
+	return "Athletics"
 }
 
 // generateSceneResponse generates an LLM response for dialog/clarification
@@ -502,7 +576,7 @@ func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedActio
 }
 
 // applyActionEffects applies mechanical effects based on action results
-func (sm *SceneManager) applyActionEffects(parsedAction *action.Action) {
+func (sm *SceneManager) applyActionEffects(parsedAction *action.Action, target *character.Character) {
 	if parsedAction.Outcome == nil {
 		return
 	}
@@ -527,9 +601,180 @@ func (sm *SceneManager) applyActionEffects(parsedAction *action.Action) {
 			sm.ui.DisplaySystemMessage(fmt.Sprintf("Created situation aspect: '%s' with %d free invoke(s)",
 				aspectName, freeInvokes))
 		}
+
+	case action.Attack:
+		if target == nil {
+			slog.Debug("Attack has no valid target, skipping damage application",
+				"component", componentSceneManager)
+			return
+		}
+
+		if parsedAction.IsSuccess() {
+			shifts := parsedAction.Outcome.Shifts
+			if shifts < 1 {
+				shifts = 1 // Minimum 1 shift on success
+			}
+
+			// Determine stress type based on attack skill
+			stressType := sm.getStressTypeForAttack(parsedAction.Skill)
+
+			sm.ui.DisplaySystemMessage(fmt.Sprintf(
+				"Your attack deals %d shifts to %s!",
+				shifts, target.Name))
+
+			// Apply stress to target
+			sm.applyDamageToTarget(target, shifts, stressType)
+		} else if parsedAction.Outcome.Type == dice.Tie {
+			// On a tie, attacker gets a boost
+			sm.ui.DisplaySystemMessage("Tie! You gain a boost against your opponent.")
+		}
+	}
+}
+
+// getStressTypeForAttack determines the stress type based on attack skill
+func (sm *SceneManager) getStressTypeForAttack(attackSkill string) character.StressTrackType {
+	mentalAttacks := map[string]bool{
+		"Provoke": true, "Deceive": true, "Rapport": true, "Lore": true,
+	}
+	if mentalAttacks[attackSkill] {
+		return character.MentalStress
+	}
+	return character.PhysicalStress
+}
+
+// applyDamageToTarget applies shifts as stress/consequences to a target
+func (sm *SceneManager) applyDamageToTarget(target *character.Character, shifts int, stressType character.StressTrackType) {
+	// Try to absorb with stress track
+	absorbed := target.TakeStress(stressType, shifts)
+	if absorbed {
+		sm.ui.DisplaySystemMessage(fmt.Sprintf(
+			"%s absorbs the damage with their %s stress track.",
+			target.Name, stressType))
+		return
 	}
 
-	// TODO: Add more action type effects (Attack, Defend, etc.)
+	// Target couldn't absorb all stress - check for consequences or taken out
+	sm.handleTargetStressOverflow(target, shifts, stressType)
+}
+
+// handleTargetStressOverflow handles when a target can't absorb stress
+func (sm *SceneManager) handleTargetStressOverflow(target *character.Character, shifts int, stressType character.StressTrackType) {
+	// Check if target has available consequences
+	availableConseq := sm.getTargetAvailableConsequences(target, shifts)
+
+	if len(availableConseq) == 0 {
+		// No way to absorb - target is taken out!
+		sm.handleTargetTakenOut(target)
+		return
+	}
+
+	// NPC takes the most appropriate consequence automatically
+	// (In a more sophisticated system, NPC AI could choose strategically)
+	bestConseq := availableConseq[0]
+	for _, c := range availableConseq {
+		if c.Value >= shifts && c.Value < bestConseq.Value {
+			bestConseq = c
+		}
+	}
+
+	// Apply consequence to target
+	consequence := character.Consequence{
+		ID:        fmt.Sprintf("conseq-%d", time.Now().UnixNano()),
+		Type:      bestConseq.Type,
+		Aspect:    fmt.Sprintf("Wounded by %s", sm.player.Name),
+		Duration:  string(bestConseq.Type),
+		CreatedAt: time.Now(),
+	}
+	target.AddConsequence(consequence)
+
+	absorbed := bestConseq.Value
+	remaining := shifts - absorbed
+
+	sm.ui.DisplaySystemMessage(fmt.Sprintf(
+		"%s takes a %s consequence: \"%s\" (absorbs %d shifts)",
+		target.Name, bestConseq.Type, consequence.Aspect, absorbed))
+
+	// If there's remaining damage, try stress again or take out
+	if remaining > 0 {
+		if target.TakeStress(stressType, remaining) {
+			sm.ui.DisplaySystemMessage(fmt.Sprintf(
+				"%s absorbs remaining %d shifts with stress.",
+				target.Name, remaining))
+		} else {
+			sm.handleTargetTakenOut(target)
+		}
+	}
+}
+
+// getTargetAvailableConsequences returns available consequence slots for a target
+func (sm *SceneManager) getTargetAvailableConsequences(target *character.Character, shifts int) []ConsequenceOption {
+	available := []ConsequenceOption{}
+
+	hasMild := false
+	hasModerate := false
+	hasSevere := false
+
+	for _, c := range target.Consequences {
+		switch c.Type {
+		case character.MildConsequence:
+			hasMild = true
+		case character.ModerateConsequence:
+			hasModerate = true
+		case character.SevereConsequence:
+			hasSevere = true
+		}
+	}
+
+	if !hasMild {
+		available = append(available, ConsequenceOption{
+			Type:  character.MildConsequence,
+			Value: character.MildConsequence.Value(),
+		})
+	}
+	if !hasModerate {
+		available = append(available, ConsequenceOption{
+			Type:  character.ModerateConsequence,
+			Value: character.ModerateConsequence.Value(),
+		})
+	}
+	if !hasSevere {
+		available = append(available, ConsequenceOption{
+			Type:  character.SevereConsequence,
+			Value: character.SevereConsequence.Value(),
+		})
+	}
+
+	return available
+}
+
+// handleTargetTakenOut handles when a target is taken out of the conflict
+func (sm *SceneManager) handleTargetTakenOut(target *character.Character) {
+	sm.ui.DisplaySystemMessage(fmt.Sprintf(
+		"\n=== %s is Taken Out! ===", target.Name))
+	sm.ui.DisplaySystemMessage("You decide their fate!")
+
+	// Mark the target as taken out in the conflict
+	if sm.currentScene.IsConflict && sm.currentScene.ConflictState != nil {
+		sm.currentScene.SetParticipantStatus(target.ID, scene.StatusTakenOut)
+
+		// Check if conflict should end (all opponents taken out)
+		activeOpponents := 0
+		for _, p := range sm.currentScene.ConflictState.Participants {
+			if p.CharacterID != sm.player.ID && p.Status == scene.StatusActive {
+				activeOpponents++
+			}
+		}
+
+		if activeOpponents == 0 {
+			sm.ui.DisplaySystemMessage("\n=== Victory! All opponents defeated! ===")
+			sm.currentScene.EndConflict()
+		}
+	}
+
+	slog.Info("Target taken out",
+		"component", componentSceneManager,
+		"target", target.ID,
+		"target_name", target.Name)
 }
 
 // GetCurrentScene returns the current scene
@@ -699,6 +944,25 @@ func (sm *SceneManager) parseConflictMarker(response string) (*ConflictTrigger, 
 	return trigger, cleanedResponse
 }
 
+// parseConflictEndMarker extracts a conflict resolution from LLM response and returns cleaned text
+func (sm *SceneManager) parseConflictEndMarker(response string) (*ConflictResolution, string) {
+	matches := conflictEndMarkerRegex.FindStringSubmatch(response)
+	if matches == nil {
+		return nil, response
+	}
+
+	resolution := &ConflictResolution{
+		Reason: matches[1],
+	}
+
+	// Remove the marker from the response and clean up
+	cleanedResponse := conflictEndMarkerRegex.ReplaceAllString(response, "")
+	cleanedResponse = strings.Join(strings.Fields(cleanedResponse), " ")
+	cleanedResponse = strings.TrimSpace(cleanedResponse)
+
+	return resolution, cleanedResponse
+}
+
 // initiateConflict starts a conflict with all characters in the scene
 func (sm *SceneManager) initiateConflict(conflictType scene.ConflictType, initiatorID string) error {
 	if sm.currentScene.IsConflict {
@@ -753,6 +1017,37 @@ func (sm *SceneManager) initiateConflict(conflictType scene.ConflictType, initia
 		"participants", len(participants))
 
 	return nil
+}
+
+// resolveConflictPeacefully ends a conflict through non-violent means
+func (sm *SceneManager) resolveConflictPeacefully(reason string) {
+	if !sm.currentScene.IsConflict {
+		return
+	}
+
+	// Format reason for display
+	reasonMessage := ""
+	switch reason {
+	case "surrender":
+		reasonMessage = "Your opponent surrenders!"
+	case "agreement":
+		reasonMessage = "You've reached an agreement!"
+	case "retreat":
+		reasonMessage = "Your opponent retreats!"
+	case "resolved":
+		reasonMessage = "The conflict has been resolved!"
+	default:
+		reasonMessage = "The conflict ends!"
+	}
+
+	sm.ui.DisplaySystemMessage("\n=== Conflict Resolved ===")
+	sm.ui.DisplaySystemMessage(reasonMessage)
+
+	sm.currentScene.EndConflict()
+
+	slog.Info("Conflict resolved peacefully",
+		"component", componentSceneManager,
+		"reason", reason)
 }
 
 // calculateInitiative returns the initiative value for a character based on conflict type
