@@ -1,0 +1,34 @@
+Generate a brief, visceral description of this attack in a Fate Core RPG conflict.
+
+CONFLICT:
+Type: {{.ConflictType}} conflict (Round {{.Round}})
+Scene: {{.SceneName}}
+
+ATTACKER:
+{{.NPCName}} - {{.NPCHighConcept}}
+{{- if .NPCAspects}}
+Aspects: {{range $i, $a := .NPCAspects}}{{if $i}}, {{end}}{{$a}}{{end}}
+{{- end}}
+Skill: {{.Skill}}
+
+TARGET:
+{{.TargetName}} - {{.TargetHighConcept}}
+
+{{- if .SituationAspects}}
+
+ENVIRONMENT:
+{{- range .SituationAspects}}
+- {{.Aspect}}
+{{- end}}
+{{- end}}
+
+RESULT: {{.OutcomeDescription}}
+
+GUIDELINES:
+- 1-2 punchy sentences maximum
+- Lead with action verbs
+- Show the attack's impact or near-miss cinematically
+- Reference the environment or aspects when it fits naturally
+- No dice, shifts, or mechanical terms
+- Match the tone to the conflict type (brutal for physical, cutting for mental)
+

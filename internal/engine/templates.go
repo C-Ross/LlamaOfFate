@@ -28,6 +28,15 @@ var sceneResponsePromptTemplate string
 //go:embed templates/action_narrative_prompt.tmpl
 var actionNarrativePromptTemplate string
 
+//go:embed templates/conflict_response_prompt.tmpl
+var conflictResponsePromptTemplate string
+
+//go:embed templates/npc_attack_prompt.tmpl
+var npcAttackPromptTemplate string
+
+//go:embed templates/npc_action_decision_prompt.tmpl
+var npcActionDecisionPromptTemplate string
+
 // Template instances
 var (
 	AspectGenerationPrompt       *template.Template
@@ -37,6 +46,9 @@ var (
 	InputClassificationPrompt    *template.Template
 	SceneResponsePrompt          *template.Template
 	ActionNarrativePrompt        *template.Template
+	ConflictResponsePrompt       *template.Template
+	NPCAttackPrompt              *template.Template
+	NPCActionDecisionPrompt      *template.Template
 )
 
 func init() {
@@ -82,5 +94,23 @@ func init() {
 	ActionNarrativePrompt, err = template.New("action_narrative").Parse(actionNarrativePromptTemplate)
 	if err != nil {
 		panic("failed to parse action narrative prompt template: " + err.Error())
+	}
+
+	// Parse the conflict response prompt template
+	ConflictResponsePrompt, err = template.New("conflict_response").Parse(conflictResponsePromptTemplate)
+	if err != nil {
+		panic("failed to parse conflict response prompt template: " + err.Error())
+	}
+
+	// Parse the NPC attack prompt template
+	NPCAttackPrompt, err = template.New("npc_attack").Parse(npcAttackPromptTemplate)
+	if err != nil {
+		panic("failed to parse NPC attack prompt template: " + err.Error())
+	}
+
+	// Parse the NPC action decision prompt template
+	NPCActionDecisionPrompt, err = template.New("npc_action_decision").Parse(npcActionDecisionPromptTemplate)
+	if err != nil {
+		panic("failed to parse NPC action decision prompt template: " + err.Error())
 	}
 }

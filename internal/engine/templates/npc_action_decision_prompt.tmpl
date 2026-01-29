@@ -1,0 +1,62 @@
+Decide what action this NPC should take on their turn in a Fate Core RPG conflict.
+
+CONFLICT STATUS:
+Type: {{.ConflictType}} conflict (Round {{.Round}})
+Scene: {{.SceneName}}
+{{.SceneDescription}}
+
+THIS NPC:
+{{.NPCName}} - {{.NPCHighConcept}}
+{{- if .NPCTrouble}}
+Trouble: {{.NPCTrouble}}
+{{- end}}
+{{- if .NPCAspects}}
+Aspects: {{range $i, $a := .NPCAspects}}{{if $i}}, {{end}}{{$a}}{{end}}
+{{- end}}
+
+Skills:
+{{- range $skill, $level := .NPCSkills}}
+- {{$skill}}: {{$level}}
+{{- end}}
+
+Current Stress:
+- Physical: {{range $i, $box := .NPCPhysicalStress}}[{{if $box}}X{{else}}_{{end}}]{{end}}
+- Mental: {{range $i, $box := .NPCMentalStress}}[{{if $box}}X{{else}}_{{end}}]{{end}}
+
+POTENTIAL TARGETS:
+{{- range .Targets}}
+- {{.Name}} ({{.ID}}): {{.HighConcept}}
+  Physical: {{range $i, $box := .PhysicalStress}}[{{if $box}}X{{else}}_{{end}}]{{end}} | Mental: {{range $i, $box := .MentalStress}}[{{if $box}}X{{else}}_{{end}}]{{end}}
+{{- end}}
+
+{{- if .SituationAspects}}
+
+SITUATION ASPECTS:
+{{- range .SituationAspects}}
+- {{.Aspect}}{{if gt .FreeInvokes 0}} ({{.FreeInvokes}} free invoke{{if gt .FreeInvokes 1}}s{{end}}){{end}}
+{{- end}}
+{{- end}}
+
+FATE CORE ACTION OPTIONS:
+1. ATTACK - Deal stress to a target. Use Fight (physical) or Provoke/other social skills (mental). THIS IS THE DEFAULT.
+2. CREATE_ADVANTAGE - Create or discover an aspect. Only use if the NPC has no good attack skills or a specific tactical reason.
+3. OVERCOME - Remove an obstacle or aspect blocking the NPC.
+4. DEFEND - Go full defense. Only use if badly wounded and desperate.
+
+TACTICAL GUIDELINES:
+- DEFAULT TO ATTACK. Most NPCs should attack on most turns.
+- Only create advantages if the NPC's attack skills are significantly worse than their other skills
+- Attack wounded targets to take them out quickly
+- Use full defense only as a last resort when near defeat
+- Choose skills the NPC is actually good at
+- For physical conflicts, use Fight or Shoot for attacks
+- For mental conflicts, use Provoke, Deceive, or Intimidate for attacks
+
+Respond with ONLY a JSON object (no markdown, no explanation):
+{
+  "action_type": "ATTACK" | "CREATE_ADVANTAGE" | "OVERCOME" | "DEFEND",
+  "skill": "skill name to use",
+  "target_id": "target character ID (required for ATTACK, optional for others)",
+  "description": "brief description of what the NPC does"
+}
+

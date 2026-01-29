@@ -16,6 +16,8 @@ test/integration/  - Integration tests
 
 Prefer early returns to reduce nesting.
 
+Don't store llm prompts as raw strings in code; use Go templates instead.
+
 ### Testing (REQUIRED)
 - Use testify for ALL tests: `assert.Equal(t, expected, actual)`, `require.NotNil(t, object)`
 - Maintain high coverage: Unit tests per package + integration tests
