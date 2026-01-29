@@ -1,0 +1,21 @@
+{
+    "name": "LlamaOfFate",
+    "image": "mcr.microsoft.com/devcontainers/go:1-1.24-bookworm",
+    "features": {
+        "ghcr.io/guiyomh/features/golangci-lint:0": {
+            "version": "latest"
+        }
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "golang.go"
+            ],
+            "settings": {
+                "go.lintTool": "golangci-lint",
+                "go.lintFlags": ["--fast"]
+            }
+        }
+    },
+    "postCreateCommand": "go mod download"
+}

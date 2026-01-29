@@ -9,13 +9,14 @@ GOGET=$(GOCMD) get
 GOMOD=$(GOCMD) mod
 GOVET=$(GOCMD) vet
 GOFMT=gofmt
+GOLINT=golangci-lint
 
 # Build parameters
 BINARY_NAME=llamaoffate
 BINARY_PATH=./bin/$(BINARY_NAME)
 MAIN_PATH=./cmd/cli
 
-.PHONY: all build clean test vet fmt deps help
+.PHONY: all build clean test vet fmt lint deps help
 
 # Default target
 all: clean deps vet fmt build
@@ -49,6 +50,11 @@ fmt:
 	@echo "Formatting code..."
 	$(GOFMT) -s -w .
 
+# Run golangci-lint
+lint:
+	@echo "Running golangci-lint..."
+	$(GOLINT) run ./...
+
 # Download dependencies
 deps:
 	@echo "Downloading dependencies..."
@@ -69,6 +75,7 @@ help:
 	@echo "  test    - Run tests"
 	@echo "  vet     - Run go vet"
 	@echo "  fmt     - Format code"
+	@echo "  lint    - Run golangci-lint"
 	@echo "  deps    - Download and tidy dependencies"
 	@echo "  run     - Build and run the application"
 	@echo "  help    - Show this help message"
