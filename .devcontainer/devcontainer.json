@@ -4,7 +4,8 @@
     "features": {
         "ghcr.io/guiyomh/features/golangci-lint:0": {
             "version": "latest"
-        }
+        },
+        "ghcr.io/devcontainers/features/git-lfs:1": {}
     },
     "customizations": {
         "vscode": {
