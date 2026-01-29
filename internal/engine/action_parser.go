@@ -226,9 +226,7 @@ func cleanJSONResponse(content string) string {
 		content = strings.TrimPrefix(content, "```")
 	}
 
-	if strings.HasSuffix(content, "```") {
-		content = strings.TrimSuffix(content, "```")
-	}
+	content = strings.TrimSuffix(content, "```")
 
 	// Trim any remaining whitespace
 	content = strings.TrimSpace(content)

@@ -13,6 +13,9 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
@@ -52,14 +55,14 @@ type ConflictResolution struct {
 
 // SceneManager handles the main scene loop and player interactions
 type SceneManager struct {
-	engine               *Engine
-	currentScene         *scene.Scene
-	player               *character.Character
-	reader               *bufio.Reader
-	roller               *dice.Roller
-	conversationHistory  []ConversationEntry
-	ui                   UI
-	shouldExit           bool // Set to true when the game should end
+	engine                *Engine
+	currentScene          *scene.Scene
+	player                *character.Character
+	reader                *bufio.Reader
+	roller                *dice.Roller
+	conversationHistory   []ConversationEntry
+	ui                    UI
+	shouldExit            bool // Set to true when the game should end
 	exitOnSceneTransition bool // Set to true to exit the loop on scene transition
 }
 
@@ -209,12 +212,7 @@ func (sm *SceneManager) RunSceneLoop(ctx context.Context) error {
 	sm.ui.DisplayNarrative(sm.currentScene.Description)
 	sm.ui.DisplaySystemMessage("Type 'help' for commands, 'exit' to end.")
 
-	for {
-		// Check if game should end (e.g., game over from being taken out)
-		if sm.shouldExit {
-			break
-		}
-
+	for !sm.shouldExit {
 		input, isExit, err := sm.ui.ReadInput()
 		if err != nil {
 			return fmt.Errorf("failed to read input: %w", err)
@@ -1465,7 +1463,8 @@ func (sm *SceneManager) processNPCCreateAdvantage(ctx context.Context, npc *char
 		npcRoll.FinalValue.String(),
 	))
 
-	if outcome.Type == dice.Success || outcome.Type == dice.SuccessWithStyle {
+	switch outcome.Type {
+	case dice.Success, dice.SuccessWithStyle:
 		// Create situation aspect
 		aspectName := fmt.Sprintf("%s's Advantage", npc.Name)
 		if decision.Description != "" {
@@ -1490,10 +1489,10 @@ func (sm *SceneManager) processNPCCreateAdvantage(ctx context.Context, npc *char
 			freeInvokes,
 		))
 		sm.ui.DisplayNarrative(fmt.Sprintf("%s gains a tactical advantage!", npc.Name))
-	} else if outcome.Type == dice.Tie {
+	case dice.Tie:
 		sm.ui.DisplaySystemMessage("The attempt succeeds but grants a boost to opponents!")
 		sm.ui.DisplayNarrative(fmt.Sprintf("%s's maneuver is partially successful.", npc.Name))
-	} else {
+	default:
 		sm.ui.DisplaySystemMessage("The attempt fails!")
 		sm.ui.DisplayNarrative(fmt.Sprintf("%s's gambit doesn't pay off.", npc.Name))
 	}
@@ -1521,17 +1520,18 @@ func (sm *SceneManager) processNPCOvercome(ctx context.Context, npc *character.C
 		npcRoll.FinalValue.String(),
 	))
 
-	if outcome.Type == dice.Success || outcome.Type == dice.SuccessWithStyle {
+	switch outcome.Type {
+	case dice.Success, dice.SuccessWithStyle:
 		sm.ui.DisplaySystemMessage("The obstacle is overcome!")
 		narrative := decision.Description
 		if narrative == "" {
 			narrative = fmt.Sprintf("%s successfully overcomes the challenge.", npc.Name)
 		}
 		sm.ui.DisplayNarrative(narrative)
-	} else if outcome.Type == dice.Tie {
+	case dice.Tie:
 		sm.ui.DisplaySystemMessage("Success, but at a minor cost.")
 		sm.ui.DisplayNarrative(fmt.Sprintf("%s manages to push through, but not without difficulty.", npc.Name))
-	} else {
+	default:
 		sm.ui.DisplaySystemMessage("The attempt fails!")
 		sm.ui.DisplayNarrative(fmt.Sprintf("%s is unable to overcome the obstacle.", npc.Name))
 	}
@@ -1619,7 +1619,8 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 // applyAttackDamageToPlayer applies attack damage to the player
 func (sm *SceneManager) applyAttackDamageToPlayer(ctx context.Context, outcome *dice.Outcome, attacker *character.Character) {
 	// Apply stress if the attack hit
-	if outcome.Type == dice.Success || outcome.Type == dice.SuccessWithStyle {
+	switch outcome.Type {
+	case dice.Success, dice.SuccessWithStyle:
 		shifts := outcome.Shifts
 		if shifts < 1 {
 			shifts = 1
@@ -1642,9 +1643,9 @@ func (sm *SceneManager) applyAttackDamageToPlayer(ctx context.Context, outcome *
 			// Cannot absorb - need consequence or taken out
 			sm.handleStressOverflow(ctx, shifts, stressType, attacker)
 		}
-	} else if outcome.Type == dice.Tie {
+	case dice.Tie:
 		sm.ui.DisplaySystemMessage("The attack is deflected, but grants a boost!")
-	} else {
+	default:
 		sm.ui.DisplaySystemMessage("You successfully defend!")
 	}
 }
@@ -1771,7 +1772,8 @@ func (sm *SceneManager) applyConsequence(ctx context.Context, conseqType charact
 	aspectName, err := sm.generateConsequenceAspect(ctx, conseqType, attacker)
 	if err != nil {
 		slog.Error("Failed to generate consequence aspect", "error", err)
-		aspectName = fmt.Sprintf("%s Wound", strings.Title(string(conseqType)))
+		caser := cases.Title(language.English)
+		aspectName = fmt.Sprintf("%s Wound", caser.String(string(conseqType)))
 	}
 
 	consequence := character.Consequence{

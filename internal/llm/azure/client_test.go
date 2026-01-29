@@ -101,7 +101,7 @@ func TestChatCompletion(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{
+		_, _ = fmt.Fprintf(w, `{
 			"id": "%s",
 			"object": "%s",
 			"created": %d,
@@ -161,7 +161,7 @@ func TestChatCompletionError(t *testing.T) {
 	// Create a test server that returns an error
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"error": "unauthorized"}`))
+		_, _ = w.Write([]byte(`{"error": "unauthorized"}`))
 	}))
 	defer server.Close()
 
@@ -205,7 +205,7 @@ func TestChatCompletionStream(t *testing.T) {
 		}
 
 		for _, data := range streamData {
-			fmt.Fprintf(w, "%s\n", data)
+			_, _ = fmt.Fprintf(w, "%s\n", data)
 			if f, ok := w.(http.Flusher); ok {
 				f.Flush()
 			}

@@ -98,7 +98,7 @@ func (c *Client) ChatCompletion(ctx context.Context, req llm.CompletionRequest) 
 			slog.Any("error", err))
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // error on close is not actionable
 
 	headers := resp.Header.Clone()
 
@@ -204,7 +204,7 @@ func (c *Client) ChatCompletionStream(ctx context.Context, req llm.CompletionReq
 			slog.Any("error", err))
 		return fmt.Errorf("failed to send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck // error on close is not actionable
 
 	headers := resp.Header.Clone()
 

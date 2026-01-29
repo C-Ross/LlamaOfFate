@@ -142,11 +142,12 @@ func main() {
 
 		// Add other characters for combat scenarios
 		var otherCharacters []*character.Character
-		if test.name == "Combat Attack with Target" {
+		switch test.name {
+		case "Combat Attack with Target":
 			otherCharacters = []*character.Character{bandit}
-		} else if test.name == "Ranged Attack with Target" {
+		case "Ranged Attack with Target":
 			otherCharacters = []*character.Character{orcCaptain}
-		} else if test.name == "Create Advantage on Enemy" {
+		case "Create Advantage on Enemy":
 			otherCharacters = []*character.Character{guard}
 		}
 

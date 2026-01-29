@@ -15,15 +15,15 @@ func clearAzureEnvVars(t *testing.T) func() {
 	originalEndpoint := os.Getenv("AZURE_API_ENDPOINT")
 	originalKey := os.Getenv("AZURE_API_KEY")
 
-	os.Unsetenv("AZURE_API_ENDPOINT")
-	os.Unsetenv("AZURE_API_KEY")
+	_ = os.Unsetenv("AZURE_API_ENDPOINT")
+	_ = os.Unsetenv("AZURE_API_KEY")
 
 	return func() {
 		if originalEndpoint != "" {
-			os.Setenv("AZURE_API_ENDPOINT", originalEndpoint)
+			_ = os.Setenv("AZURE_API_ENDPOINT", originalEndpoint)
 		}
 		if originalKey != "" {
-			os.Setenv("AZURE_API_KEY", originalKey)
+			_ = os.Setenv("AZURE_API_KEY", originalKey)
 		}
 	}
 }
@@ -103,19 +103,19 @@ timeout: 45
 	originalKey := os.Getenv("AZURE_API_KEY")
 	defer func() {
 		if originalEndpoint != "" {
-			os.Setenv("AZURE_API_ENDPOINT", originalEndpoint)
+			_ = os.Setenv("AZURE_API_ENDPOINT", originalEndpoint)
 		} else {
-			os.Unsetenv("AZURE_API_ENDPOINT")
+			_ = os.Unsetenv("AZURE_API_ENDPOINT")
 		}
 		if originalKey != "" {
-			os.Setenv("AZURE_API_KEY", originalKey)
+			_ = os.Setenv("AZURE_API_KEY", originalKey)
 		} else {
-			os.Unsetenv("AZURE_API_KEY")
+			_ = os.Unsetenv("AZURE_API_KEY")
 		}
 	}()
 
-	os.Setenv("AZURE_API_ENDPOINT", "https://env-endpoint.inference.ai.azure.com")
-	os.Setenv("AZURE_API_KEY", "env-api-key")
+	_ = os.Setenv("AZURE_API_ENDPOINT", "https://env-endpoint.inference.ai.azure.com")
+	_ = os.Setenv("AZURE_API_KEY", "env-api-key")
 
 	// Load the config
 	config, err := LoadConfig(configPath)
@@ -148,7 +148,7 @@ model_name: "Meta-Llama-3.1-70B-Instruct"
 	require.NoError(t, err)
 
 	// Set only API_KEY environment variable (endpoint should come from file)
-	os.Setenv("AZURE_API_KEY", "env-api-key")
+	_ = os.Setenv("AZURE_API_KEY", "env-api-key")
 
 	// Load the config
 	config, err := LoadConfig(configPath)
@@ -196,7 +196,7 @@ func TestLoadConfigRelativePath(t *testing.T) {
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
 	defer func() {
-		os.Chdir(originalWd)
+		_ = os.Chdir(originalWd)
 	}()
 
 	tempDir := t.TempDir()

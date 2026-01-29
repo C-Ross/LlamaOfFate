@@ -151,7 +151,7 @@ func (ag *AspectGenerator) buildPromptFallback(req AspectGenerationRequest) stri
 	}
 
 	// Action details
-	prompt.WriteString(fmt.Sprintf("\nACTION ATTEMPT:\n"))
+	prompt.WriteString("\nACTION ATTEMPT:\n")
 	prompt.WriteString(fmt.Sprintf("Skill Used: %s (%s)\n", req.Action.Skill, req.Character.GetSkill(req.Action.Skill).String()))
 	prompt.WriteString(fmt.Sprintf("Description: %s\n", req.Action.Description))
 	if req.Action.RawInput != "" {
@@ -159,7 +159,7 @@ func (ag *AspectGenerator) buildPromptFallback(req AspectGenerationRequest) stri
 	}
 
 	// Roll outcome
-	prompt.WriteString(fmt.Sprintf("\nROLL OUTCOME:\n"))
+	prompt.WriteString("\nROLL OUTCOME:\n")
 	prompt.WriteString(fmt.Sprintf("Result: %s (%+d shifts)\n", req.Outcome.Type.String(), req.Outcome.Shifts))
 	if req.Outcome.Result != nil && req.Outcome.Result.Roll != nil {
 		prompt.WriteString(fmt.Sprintf("Dice Roll: %s (Total: %+d)\n", req.Outcome.Result.Roll.String(), req.Outcome.Result.Roll.Total))
@@ -175,7 +175,7 @@ func (ag *AspectGenerator) buildPromptFallback(req AspectGenerationRequest) stri
 	}
 
 	if len(req.ExistingAspects) > 0 {
-		prompt.WriteString(fmt.Sprintf("\nEXISTING ASPECTS IN PLAY:\n"))
+		prompt.WriteString("\nEXISTING ASPECTS IN PLAY:\n")
 		for _, aspect := range req.ExistingAspects {
 			prompt.WriteString(fmt.Sprintf("- %s\n", aspect))
 		}
