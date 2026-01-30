@@ -5,6 +5,7 @@ package core
 
 import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 )
 
@@ -25,10 +26,10 @@ var mentalAttackSkills = map[string]bool{
 
 // physicalConflictSkills trigger or indicate physical conflicts
 var physicalConflictSkills = map[string]bool{
-	"Fight":    true,
-	"Shoot":    true,
+	"Fight":     true,
+	"Shoot":     true,
 	"Athletics": true,
-	"Physique": true,
+	"Physique":  true,
 }
 
 // mentalConflictSkills trigger or indicate mental conflicts
@@ -89,4 +90,43 @@ func IsPhysicalAttackSkill(skill string) bool {
 // IsMentalAttackSkill returns true if the skill deals mental damage
 func IsMentalAttackSkill(skill string) bool {
 	return mentalAttackSkills[skill]
+}
+
+// InitiativeSkillsForConflict returns the ordered list of skills to check for initiative.
+// Per Fate Core rules:
+// - Physical conflicts: Notice, then Athletics as fallback
+// - Mental conflicts: Empathy, then Rapport as fallback
+func InitiativeSkillsForConflict(conflictType scene.ConflictType) []string {
+	if conflictType == scene.PhysicalConflict {
+		return []string{"Notice", "Athletics"}
+	}
+	return []string{"Empathy", "Rapport"}
+}
+
+// SkillGetter is an interface for types that can retrieve skill values.
+// This allows CalculateInitiative to work with Character without creating import cycles.
+type SkillGetter interface {
+	GetSkill(name string) dice.Ladder
+}
+
+// CalculateInitiative returns the initiative value for a character based on conflict type.
+// It checks skills in priority order and returns the first non-zero value.
+func CalculateInitiative(char SkillGetter, conflictType scene.ConflictType) int {
+	for _, skill := range InitiativeSkillsForConflict(conflictType) {
+		if initiative := int(char.GetSkill(skill)); initiative > 0 {
+			return initiative
+		}
+	}
+	return 0
+}
+
+// DefaultAttackSkillForConflict returns the default attack skill for a conflict type.
+// Per Fate Core rules:
+// - Physical conflicts default to Fight
+// - Mental conflicts default to Provoke
+func DefaultAttackSkillForConflict(conflictType scene.ConflictType) string {
+	if conflictType == scene.MentalConflict {
+		return "Provoke"
+	}
+	return "Fight"
 }

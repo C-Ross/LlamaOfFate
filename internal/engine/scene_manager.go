@@ -1278,22 +1278,7 @@ func (sm *SceneManager) resolveConflictPeacefully(reason string) {
 
 // calculateInitiative returns the initiative value for a character based on conflict type
 func (sm *SceneManager) calculateInitiative(char *character.Character, conflictType scene.ConflictType) int {
-	// Physical: Notice, then Athletics, then Physique
-	// Mental: Empathy, then Rapport, then Will
-	if conflictType == scene.PhysicalConflict {
-		initiative := int(char.GetSkill("Notice"))
-		if initiative == 0 {
-			initiative = int(char.GetSkill("Athletics"))
-		}
-		return initiative
-	}
-
-	// Mental conflict
-	initiative := int(char.GetSkill("Empathy"))
-	if initiative == 0 {
-		initiative = int(char.GetSkill("Rapport"))
-	}
-	return initiative
+	return core.CalculateInitiative(char, conflictType)
 }
 
 // sortInitiativeOrder sorts the initiative order by participant initiative values
@@ -1534,10 +1519,7 @@ func (sm *SceneManager) processNPCTurn(ctx context.Context, npcID string) {
 
 // getDefaultAttackSkill returns the default attack skill based on conflict type
 func (sm *SceneManager) getDefaultAttackSkill() string {
-	if sm.currentScene.ConflictState.Type == scene.MentalConflict {
-		return "Provoke"
-	}
-	return "Fight"
+	return core.DefaultAttackSkillForConflict(sm.currentScene.ConflictState.Type)
 }
 
 // processNPCDefend handles an NPC choosing full defense
