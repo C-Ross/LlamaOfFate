@@ -8,6 +8,7 @@ Implements the fundamental Fate Core game mechanics.
 - **`character/`** - Characters with aspects, skills, stress, consequences  
 - **`action/`** - Four action types and resolution
 - **`scene/`** - Scene management and conflict system
+- **`skills.go`** - Skill classification (attack/defense mappings, stress types, initiative)
 
 ## Usage
 
