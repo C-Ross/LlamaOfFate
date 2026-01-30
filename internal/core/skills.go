@@ -1,0 +1,92 @@
+// Package core provides Fate Core skill classification utilities.
+// These functions encode the Fate Core rules for skill categorization
+// as described in the Fate SRD at https://fate-srd.com/fate-core
+package core
+
+import (
+	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
+)
+
+// physicalAttackSkills are skills that deal physical stress when used to attack
+var physicalAttackSkills = map[string]bool{
+	"Fight":    true,
+	"Shoot":    true,
+	"Physique": true,
+}
+
+// mentalAttackSkills are skills that deal mental stress when used to attack
+var mentalAttackSkills = map[string]bool{
+	"Provoke": true,
+	"Deceive": true,
+	"Rapport": true,
+	"Lore":    true, // Supernatural/magic attacks target mental stress
+}
+
+// physicalConflictSkills trigger or indicate physical conflicts
+var physicalConflictSkills = map[string]bool{
+	"Fight":    true,
+	"Shoot":    true,
+	"Athletics": true,
+	"Physique": true,
+}
+
+// mentalConflictSkills trigger or indicate mental conflicts
+var mentalConflictSkills = map[string]bool{
+	"Provoke": true,
+	"Deceive": true,
+	"Rapport": true,
+	"Will":    true,
+	"Empathy": true,
+}
+
+// DefenseSkillForAttack returns the appropriate defense skill for an attack skill.
+// Per Fate Core rules:
+// - Physical attacks (Fight, Shoot, Physique) are defended with Athletics
+// - Mental/social attacks (Provoke, Deceive, Rapport, Lore) are defended with Will
+func DefenseSkillForAttack(attackSkill string) string {
+	if physicalAttackSkills[attackSkill] {
+		return "Athletics"
+	}
+	if mentalAttackSkills[attackSkill] {
+		return "Will"
+	}
+	// Default to Athletics for unknown attack types
+	return "Athletics"
+}
+
+// StressTypeForAttack determines which stress track an attack skill targets.
+// Per Fate Core rules:
+// - Physical attacks target physical stress
+// - Mental/social attacks target mental stress
+func StressTypeForAttack(attackSkill string) character.StressTrackType {
+	if mentalAttackSkills[attackSkill] {
+		return character.MentalStress
+	}
+	return character.PhysicalStress
+}
+
+// ConflictTypeForSkill determines the conflict type based on the skill used.
+// Per Fate Core rules:
+// - Physical skills (Fight, Shoot, Athletics, Physique) indicate physical conflict
+// - Mental skills (Provoke, Deceive, Rapport, Will, Empathy) indicate mental conflict
+func ConflictTypeForSkill(skill string) scene.ConflictType {
+	if physicalConflictSkills[skill] {
+		return scene.PhysicalConflict
+	}
+	if mentalConflictSkills[skill] {
+		return scene.MentalConflict
+	}
+	// Default to physical for unknown skills
+	return scene.PhysicalConflict
+}
+
+// IsPhysicalAttackSkill returns true if the skill deals physical damage
+func IsPhysicalAttackSkill(skill string) bool {
+	return physicalAttackSkills[skill]
+}
+
+// IsMentalAttackSkill returns true if the skill deals mental damage
+func IsMentalAttackSkill(skill string) bool {
+	return mentalAttackSkills[skill]
+}

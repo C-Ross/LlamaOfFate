@@ -15,6 +15,7 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
@@ -403,7 +404,7 @@ func (sm *SceneManager) handleAction(ctx context.Context, input string) {
 func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.Action) {
 	// Check if this action should initiate or escalate a conflict
 	if parsedAction.Type == action.Attack {
-		actionConflictType := sm.getConflictTypeForSkill(parsedAction.Skill)
+		actionConflictType := core.ConflictTypeForSkill(parsedAction.Skill)
 
 		if !sm.currentScene.IsConflict {
 			// Auto-initiate conflict for attack actions
@@ -491,7 +492,7 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 // rollTargetDefense rolls an active defense for a target character
 func (sm *SceneManager) rollTargetDefense(target *character.Character, attackSkill string) *dice.CheckResult {
 	// Determine defense skill based on attack skill type
-	defenseSkill := sm.getDefenseSkillForAttack(attackSkill)
+	defenseSkill := core.DefenseSkillForAttack(attackSkill)
 	defenseLevel := target.GetSkill(defenseSkill)
 
 	// Roll defense
@@ -665,33 +666,6 @@ func (sm *SceneManager) handlePostRollInvokes(result *dice.CheckResult, difficul
 	}
 
 	return result
-}
-
-// getDefenseSkillForAttack returns the appropriate defense skill for an attack skill
-func (sm *SceneManager) getDefenseSkillForAttack(attackSkill string) string {
-	// Physical attack skills -> Athletics defense
-	physicalAttacks := map[string]bool{
-		"Fight": true, "Shoot": true, "Physique": true,
-	}
-	if physicalAttacks[attackSkill] {
-		return "Athletics"
-	}
-
-	// Mental/social attack skills -> Will defense
-	mentalAttacks := map[string]bool{
-		"Provoke": true, "Deceive": true, "Rapport": true,
-	}
-	if mentalAttacks[attackSkill] {
-		return "Will"
-	}
-
-	// Magic/lore attacks could be either - default to Will for supernatural
-	if attackSkill == "Lore" {
-		return "Will"
-	}
-
-	// Default to Athletics for unknown attack types
-	return "Athletics"
 }
 
 // generateSceneResponse generates an LLM response for dialog/clarification
@@ -879,7 +853,7 @@ func (sm *SceneManager) applyActionEffects(parsedAction *action.Action, target *
 			}
 
 			// Determine stress type based on attack skill
-			stressType := sm.getStressTypeForAttack(parsedAction.Skill)
+			stressType := core.StressTypeForAttack(parsedAction.Skill)
 
 			sm.ui.DisplaySystemMessage(fmt.Sprintf(
 				"Your attack deals %d shifts to %s!",
@@ -892,17 +866,6 @@ func (sm *SceneManager) applyActionEffects(parsedAction *action.Action, target *
 			sm.ui.DisplaySystemMessage("Tie! You gain a boost against your opponent.")
 		}
 	}
-}
-
-// getStressTypeForAttack determines the stress type based on attack skill
-func (sm *SceneManager) getStressTypeForAttack(attackSkill string) character.StressTrackType {
-	mentalAttacks := map[string]bool{
-		"Provoke": true, "Deceive": true, "Rapport": true, "Lore": true,
-	}
-	if mentalAttacks[attackSkill] {
-		return character.MentalStress
-	}
-	return character.PhysicalStress
 }
 
 // applyDamageToTarget applies shifts as stress/consequences to a target
@@ -1709,7 +1672,7 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 	}
 
 	// Determine defense skill based on attack skill
-	defenseSkill := sm.getDefenseSkillForAttack(attackSkill)
+	defenseSkill := core.DefenseSkillForAttack(attackSkill)
 
 	// Get NPC's skill level
 	npcSkillLevel := npc.GetSkill(attackSkill)
@@ -2275,29 +2238,6 @@ func (sm *SceneManager) generateNPCAttackNarrative(ctx context.Context, npc *cha
 	}
 
 	return strings.TrimSpace(resp.Choices[0].Message.Content), nil
-}
-
-// getConflictTypeForSkill determines the conflict type based on the skill used
-func (sm *SceneManager) getConflictTypeForSkill(skill string) scene.ConflictType {
-	// Physical skills
-	physicalSkills := map[string]bool{
-		"Fight": true, "Shoot": true, "Athletics": true, "Physique": true,
-	}
-
-	// Mental skills
-	mentalSkills := map[string]bool{
-		"Provoke": true, "Deceive": true, "Rapport": true, "Will": true, "Empathy": true,
-	}
-
-	if physicalSkills[skill] {
-		return scene.PhysicalConflict
-	}
-	if mentalSkills[skill] {
-		return scene.MentalConflict
-	}
-
-	// Default to physical for unknown skills
-	return scene.PhysicalConflict
 }
 
 // getParticipantInfo returns information about all conflict participants for display

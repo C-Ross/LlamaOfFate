@@ -621,28 +621,6 @@ func TestSceneManager_InitiateConflict_NotEnoughParticipants(t *testing.T) {
 	assert.Contains(t, err.Error(), "at least 2 participants")
 }
 
-func TestSceneManager_GetConflictTypeForSkill(t *testing.T) {
-	engine, err := New()
-	require.NoError(t, err)
-
-	sm := NewSceneManager(engine)
-
-	// Physical skills
-	assert.Equal(t, scene.PhysicalConflict, sm.getConflictTypeForSkill("Fight"))
-	assert.Equal(t, scene.PhysicalConflict, sm.getConflictTypeForSkill("Shoot"))
-	assert.Equal(t, scene.PhysicalConflict, sm.getConflictTypeForSkill("Athletics"))
-	assert.Equal(t, scene.PhysicalConflict, sm.getConflictTypeForSkill("Physique"))
-
-	// Mental skills
-	assert.Equal(t, scene.MentalConflict, sm.getConflictTypeForSkill("Provoke"))
-	assert.Equal(t, scene.MentalConflict, sm.getConflictTypeForSkill("Deceive"))
-	assert.Equal(t, scene.MentalConflict, sm.getConflictTypeForSkill("Rapport"))
-	assert.Equal(t, scene.MentalConflict, sm.getConflictTypeForSkill("Will"))
-
-	// Default to physical for unknown skills
-	assert.Equal(t, scene.PhysicalConflict, sm.getConflictTypeForSkill("UnknownSkill"))
-}
-
 func TestSceneManager_HandleConflictEscalation(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
@@ -824,42 +802,6 @@ func TestSceneManager_RollTargetDefense(t *testing.T) {
 	// Test mental attack defense (uses Will)
 	defenseResult = sm.rollTargetDefense(target, "Provoke")
 	assert.NotNil(t, defenseResult)
-}
-
-func TestSceneManager_GetDefenseSkillForAttack(t *testing.T) {
-	engine, err := New()
-	require.NoError(t, err)
-
-	sm := NewSceneManager(engine)
-
-	// Physical attacks -> Athletics
-	assert.Equal(t, "Athletics", sm.getDefenseSkillForAttack("Fight"))
-	assert.Equal(t, "Athletics", sm.getDefenseSkillForAttack("Shoot"))
-	assert.Equal(t, "Athletics", sm.getDefenseSkillForAttack("Physique"))
-
-	// Mental attacks -> Will
-	assert.Equal(t, "Will", sm.getDefenseSkillForAttack("Provoke"))
-	assert.Equal(t, "Will", sm.getDefenseSkillForAttack("Deceive"))
-	assert.Equal(t, "Will", sm.getDefenseSkillForAttack("Lore"))
-
-	// Unknown defaults to Athletics
-	assert.Equal(t, "Athletics", sm.getDefenseSkillForAttack("UnknownSkill"))
-}
-
-func TestSceneManager_GetStressTypeForAttack(t *testing.T) {
-	engine, err := New()
-	require.NoError(t, err)
-
-	sm := NewSceneManager(engine)
-
-	// Physical attacks -> Physical stress
-	assert.Equal(t, character.PhysicalStress, sm.getStressTypeForAttack("Fight"))
-	assert.Equal(t, character.PhysicalStress, sm.getStressTypeForAttack("Shoot"))
-
-	// Mental attacks -> Mental stress
-	assert.Equal(t, character.MentalStress, sm.getStressTypeForAttack("Provoke"))
-	assert.Equal(t, character.MentalStress, sm.getStressTypeForAttack("Deceive"))
-	assert.Equal(t, character.MentalStress, sm.getStressTypeForAttack("Lore"))
 }
 
 func TestSceneManager_ApplyDamageToTarget_StressAbsorbed(t *testing.T) {
