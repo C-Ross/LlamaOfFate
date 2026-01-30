@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -131,20 +130,12 @@ func (ap *ActionParser) ParseAction(ctx context.Context, req ActionParseRequest)
 
 // buildSystemPrompt creates the system prompt using templates
 func (ap *ActionParser) buildSystemPrompt() (string, error) {
-	var buf bytes.Buffer
-	if err := ActionParseSystemPrompt.Execute(&buf, nil); err != nil {
-		return "", fmt.Errorf("failed to execute system prompt template: %w", err)
-	}
-	return buf.String(), nil
+	return RenderActionParseSystem()
 }
 
 // buildUserPrompt creates the user prompt using templates
 func (ap *ActionParser) buildUserPrompt(req ActionParseRequest) (string, error) {
-	var buf bytes.Buffer
-	if err := ActionParsePrompt.Execute(&buf, req); err != nil {
-		return "", fmt.Errorf("failed to execute user prompt template: %w", err)
-	}
-	return buf.String(), nil
+	return RenderActionParse(req)
 }
 
 // parseActionType converts string action type to enum

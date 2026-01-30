@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"strings"
@@ -81,8 +80,7 @@ func (ag *AspectGenerator) GenerateAspect(ctx context.Context, req AspectGenerat
 
 // getSystemPrompt returns the system prompt for aspect generation
 func (ag *AspectGenerator) getSystemPrompt() string {
-	var buf bytes.Buffer
-	err := AspectGenerationSystemPrompt.Execute(&buf, nil)
+	prompt, err := RenderAspectGenerationSystem()
 	if err != nil {
 		// Fallback to hardcoded prompt if template fails
 		return `You are an expert Game Master for the Fate Core RPG system. Your job is to generate appropriate aspects based on a character's "Create an Advantage" action and the outcome of their dice roll.
@@ -110,18 +108,17 @@ Your response must be in JSON format with these fields:
   "reasoning": "Brief explanation of why this aspect fits the situation"
 }`
 	}
-	return buf.String()
+	return prompt
 }
 
 // buildPrompt constructs the detailed prompt for aspect generation
 func (ag *AspectGenerator) buildPrompt(req AspectGenerationRequest) string {
-	var buf bytes.Buffer
-	err := AspectGenerationPrompt.Execute(&buf, req)
+	prompt, err := RenderAspectGeneration(req)
 	if err != nil {
 		// Fallback to the old string building method if template fails
 		return ag.buildPromptFallback(req)
 	}
-	return buf.String()
+	return prompt
 }
 
 // buildPromptFallback is the original string building method as a fallback

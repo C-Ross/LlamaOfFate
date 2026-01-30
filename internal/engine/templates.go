@@ -1,7 +1,9 @@
 package engine
 
 import (
+	"bytes"
 	_ "embed"
+	"fmt"
 	"text/template"
 )
 
@@ -133,4 +135,73 @@ func init() {
 	if err != nil {
 		panic("failed to parse taken out prompt template: " + err.Error())
 	}
+}
+
+// executeTemplate is a helper that executes a template and returns the result as a string
+func executeTemplate(tmpl *template.Template, data any) (string, error) {
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("template execution failed: %w", err)
+	}
+	return buf.String(), nil
+}
+
+// RenderInputClassification renders the input classification prompt
+func RenderInputClassification(data InputClassificationData) (string, error) {
+	return executeTemplate(InputClassificationPrompt, data)
+}
+
+// RenderSceneResponse renders the scene response prompt
+func RenderSceneResponse(data SceneResponseData) (string, error) {
+	return executeTemplate(SceneResponsePrompt, data)
+}
+
+// RenderConflictResponse renders the conflict response prompt
+func RenderConflictResponse(data ConflictResponseData) (string, error) {
+	return executeTemplate(ConflictResponsePrompt, data)
+}
+
+// RenderActionNarrative renders the action narrative prompt
+func RenderActionNarrative(data ActionNarrativeData) (string, error) {
+	return executeTemplate(ActionNarrativePrompt, data)
+}
+
+// RenderConsequenceAspect renders the consequence aspect prompt
+func RenderConsequenceAspect(data ConsequenceAspectData) (string, error) {
+	return executeTemplate(ConsequenceAspectPrompt, data)
+}
+
+// RenderTakenOut renders the taken out narrative prompt
+func RenderTakenOut(data TakenOutData) (string, error) {
+	return executeTemplate(TakenOutPrompt, data)
+}
+
+// RenderNPCActionDecision renders the NPC action decision prompt
+func RenderNPCActionDecision(data NPCActionDecisionData) (string, error) {
+	return executeTemplate(NPCActionDecisionPrompt, data)
+}
+
+// RenderNPCAttack renders the NPC attack narrative prompt
+func RenderNPCAttack(data NPCAttackData) (string, error) {
+	return executeTemplate(NPCAttackPrompt, data)
+}
+
+// RenderActionParse renders the action parse prompt
+func RenderActionParse(data ActionParseRequest) (string, error) {
+	return executeTemplate(ActionParsePrompt, data)
+}
+
+// RenderActionParseSystem renders the action parse system prompt
+func RenderActionParseSystem() (string, error) {
+	return executeTemplate(ActionParseSystemPrompt, nil)
+}
+
+// RenderAspectGeneration renders the aspect generation prompt
+func RenderAspectGeneration(data AspectGenerationRequest) (string, error) {
+	return executeTemplate(AspectGenerationPrompt, data)
+}
+
+// RenderAspectGenerationSystem renders the aspect generation system prompt
+func RenderAspectGenerationSystem() (string, error) {
+	return executeTemplate(AspectGenerationSystemPrompt, nil)
 }

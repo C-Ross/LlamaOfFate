@@ -2,7 +2,6 @@ package engine
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -290,34 +289,22 @@ func (sm *SceneManager) classifyInput(ctx context.Context, input string) (string
 		return "", fmt.Errorf("classifyInput: %w", ErrLLMUnavailable)
 	}
 
-	// Prepare template data
+	// Prepare template data and render
 	data := InputClassificationData{
 		Scene:       sm.currentScene,
 		PlayerInput: input,
 	}
 
-	// Execute the template
-	var buf bytes.Buffer
-	if err := InputClassificationPrompt.Execute(&buf, data); err != nil {
+	prompt, err := RenderInputClassification(data)
+	if err != nil {
 		return "", fmt.Errorf("classifyInput: %w: %v", ErrLLMInvalidResponse, err)
 	}
 
-	prompt := buf.String()
-
-	req := llm.CompletionRequest{
-		Messages: []llm.Message{
-			{Role: "user", Content: prompt},
-		},
+	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
+		Messages:    []llm.Message{{Role: "user", Content: prompt}},
 		MaxTokens:   10,
 		Temperature: 0.1, // Low temperature for consistent classification
-	}
-
-	// Debug output
-	slog.Debug("Scene manager input classification LLM request",
-		"component", componentSceneManager,
-		"prompt", prompt)
-
-	resp, err := sm.engine.llmClient.ChatCompletion(ctx, req)
+	})
 	if err != nil {
 		return "", fmt.Errorf("classifyInput: %w: %v", ErrLLMUnavailable, err)
 	}
@@ -722,7 +709,8 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 		otherCharacters = append(otherCharacters, char)
 	}
 
-	var buf bytes.Buffer
+	var prompt string
+	var renderErr error
 
 	// Use conflict-specific template when in conflict
 	if sm.currentScene.IsConflict && sm.currentScene.ConflictState != nil {
@@ -760,9 +748,7 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 			CharacterMap:         characterMap,
 		}
 
-		if err := ConflictResponsePrompt.Execute(&buf, conflictData); err != nil {
-			return "", fmt.Errorf("generateSceneResponse: %w: %v", ErrLLMInvalidResponse, err)
-		}
+		prompt, renderErr = RenderConflictResponse(conflictData)
 	} else {
 		// Use standard scene response template
 		data := SceneResponseData{
@@ -775,27 +761,20 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 			OtherCharacters:     otherCharacters,
 		}
 
-		if err := SceneResponsePrompt.Execute(&buf, data); err != nil {
-			return "", fmt.Errorf("generateSceneResponse: %w: %v", ErrLLMInvalidResponse, err)
-		}
+		prompt, renderErr = RenderSceneResponse(data)
 	}
 
-	prompt := buf.String()
+	if renderErr != nil {
+		return "", fmt.Errorf("generateSceneResponse: %w: %v", ErrLLMInvalidResponse, renderErr)
+	}
 
-	req := llm.CompletionRequest{
+	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
 		Messages: []llm.Message{
 			{Role: "user", Content: prompt},
 		},
 		MaxTokens:   300,
 		Temperature: 0.7,
-	}
-
-	// Debug output
-	slog.Debug("Scene manager scene response LLM request",
-		"component", componentSceneManager,
-		"prompt", prompt)
-
-	resp, err := sm.engine.llmClient.ChatCompletion(ctx, req)
+	})
 	if err != nil {
 		return "", fmt.Errorf("generateSceneResponse: %w: %v", ErrLLMUnavailable, err)
 	}
@@ -822,7 +801,7 @@ func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedActio
 		otherCharacters = append(otherCharacters, char)
 	}
 
-	// Prepare template data
+	// Prepare template data and render
 	data := ActionNarrativeData{
 		Scene:               sm.currentScene,
 		CharacterContext:    sm.buildCharacterContext(),
@@ -832,28 +811,16 @@ func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedActio
 		OtherCharacters:     otherCharacters,
 	}
 
-	// Execute the template
-	var buf bytes.Buffer
-	if err := ActionNarrativePrompt.Execute(&buf, data); err != nil {
+	prompt, err := RenderActionNarrative(data)
+	if err != nil {
 		return "", fmt.Errorf("generateActionNarrative: %w: %v", ErrLLMInvalidResponse, err)
 	}
 
-	prompt := buf.String()
-
-	req := llm.CompletionRequest{
-		Messages: []llm.Message{
-			{Role: "user", Content: prompt},
-		},
+	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
+		Messages:    []llm.Message{{Role: "user", Content: prompt}},
 		MaxTokens:   200,
 		Temperature: 0.8,
-	}
-
-	// Debug output
-	slog.Debug("Scene manager action narrative LLM request",
-		"component", componentSceneManager,
-		"prompt", prompt)
-
-	resp, err := sm.engine.llmClient.ChatCompletion(ctx, req)
+	})
 	if err != nil {
 		return "", fmt.Errorf("generateActionNarrative: %w: %v", ErrLLMUnavailable, err)
 	}
@@ -1520,24 +1487,16 @@ func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character
 		SituationAspects:  sm.currentScene.SituationAspects,
 	}
 
-	var buf bytes.Buffer
-	if err := NPCActionDecisionPrompt.Execute(&buf, data); err != nil {
-		return nil, fmt.Errorf("failed to execute NPC action decision template: %w", err)
+	prompt, err := RenderNPCActionDecision(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to render NPC action decision template: %w", err)
 	}
 
-	req := llm.CompletionRequest{
-		Messages: []llm.Message{
-			{Role: "user", Content: buf.String()},
-		},
+	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
+		Messages:    []llm.Message{{Role: "user", Content: prompt}},
 		MaxTokens:   150,
 		Temperature: 0.7,
-	}
-
-	slog.Debug("NPC action decision LLM request",
-		"component", componentSceneManager,
-		"npc", npc.Name)
-
-	resp, err := sm.engine.llmClient.ChatCompletion(ctx, req)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("LLM request failed: %w", err)
 	}
@@ -2052,20 +2011,16 @@ func (sm *SceneManager) generateConsequenceAspect(ctx context.Context, conseqTyp
 		ConflictType:  conflictType,
 	}
 
-	var buf bytes.Buffer
-	if err := ConsequenceAspectPrompt.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("failed to execute consequence aspect template: %w", err)
+	prompt, err := RenderConsequenceAspect(data)
+	if err != nil {
+		return "", fmt.Errorf("failed to render consequence aspect template: %w", err)
 	}
 
-	req := llm.CompletionRequest{
-		Messages: []llm.Message{
-			{Role: "user", Content: buf.String()},
-		},
+	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
+		Messages:    []llm.Message{{Role: "user", Content: prompt}},
 		MaxTokens:   20,
 		Temperature: 0.8,
-	}
-
-	resp, err := sm.engine.llmClient.ChatCompletion(ctx, req)
+	})
 	if err != nil {
 		return "", err
 	}
@@ -2206,20 +2161,16 @@ func (sm *SceneManager) generateTakenOutNarrativeAndOutcome(ctx context.Context,
 		SceneDescription:    sm.currentScene.Description,
 	}
 
-	var buf bytes.Buffer
-	if err := TakenOutPrompt.Execute(&buf, data); err != nil {
-		return "", TakenOutTransition, "", fmt.Errorf("failed to execute taken out template: %w", err)
+	prompt, err := RenderTakenOut(data)
+	if err != nil {
+		return "", TakenOutTransition, "", fmt.Errorf("failed to render taken out template: %w", err)
 	}
 
-	req := llm.CompletionRequest{
-		Messages: []llm.Message{
-			{Role: "user", Content: buf.String()},
-		},
+	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
+		Messages:    []llm.Message{{Role: "user", Content: prompt}},
 		MaxTokens:   200,
 		Temperature: 0.7,
-	}
-
-	resp, err := sm.engine.llmClient.ChatCompletion(ctx, req)
+	})
 	if err != nil {
 		return "", TakenOutTransition, "", err
 	}
@@ -2305,27 +2256,16 @@ func (sm *SceneManager) generateNPCAttackNarrative(ctx context.Context, npc *cha
 		OutcomeDescription: outcomeDesc,
 	}
 
-	// Execute template
-	var buf bytes.Buffer
-	if err := NPCAttackPrompt.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("failed to execute NPC attack template: %w", err)
+	prompt, err := RenderNPCAttack(data)
+	if err != nil {
+		return "", fmt.Errorf("failed to render NPC attack template: %w", err)
 	}
 
-	req := llm.CompletionRequest{
-		Messages: []llm.Message{
-			{Role: "user", Content: buf.String()},
-		},
+	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
+		Messages:    []llm.Message{{Role: "user", Content: prompt}},
 		MaxTokens:   100,
 		Temperature: 0.8,
-	}
-
-	slog.Debug("NPC attack narrative LLM request",
-		"component", componentSceneManager,
-		"npc", npc.Name,
-		"skill", skill,
-		"outcome", outcome.Type.String())
-
-	resp, err := sm.engine.llmClient.ChatCompletion(ctx, req)
+	})
 	if err != nil {
 		return "", err
 	}
