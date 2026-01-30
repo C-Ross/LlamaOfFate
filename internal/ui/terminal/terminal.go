@@ -87,6 +87,80 @@ func (ui *TerminalUI) DisplaySystemMessage(message string) {
 	fmt.Printf("\n%s\n", message)
 }
 
+// PromptForInvoke prompts the player to invoke an aspect after a roll
+func (ui *TerminalUI) PromptForInvoke(available []engine.InvokableAspect, fatePoints int, currentResult string, shiftsNeeded int) *engine.InvokeChoice {
+	// Filter to only show usable aspects (has free invokes OR player has FP)
+	var usable []engine.InvokableAspect
+	for _, aspect := range available {
+		if aspect.AlreadyUsed {
+			continue
+		}
+		if aspect.FreeInvokes > 0 || fatePoints > 0 {
+			usable = append(usable, aspect)
+		}
+	}
+
+	if len(usable) == 0 {
+		return &engine.InvokeChoice{Aspect: nil}
+	}
+
+	// Build prompt showing available aspects with numbers
+	fmt.Printf("\nInvoke? [%d FP]", fatePoints)
+	if shiftsNeeded > 0 {
+		fmt.Printf(" (need +%d)", shiftsNeeded)
+	}
+	fmt.Println()
+
+	for i, aspect := range usable {
+		marker := ""
+		if aspect.FreeInvokes > 0 {
+			marker = "★"
+		}
+		fmt.Printf("  [%d] %s%s\n", i+1, aspect.Name, marker)
+	}
+	fmt.Print("  [Enter] skip: ")
+
+	// Read choice
+	input, err := ui.reader.ReadString('\n')
+	if err != nil {
+		return &engine.InvokeChoice{Aspect: nil}
+	}
+	input = strings.TrimSpace(input)
+
+	if input == "" {
+		return &engine.InvokeChoice{Aspect: nil}
+	}
+
+	// Parse number
+	var choice int
+	_, err = fmt.Sscanf(input, "%d", &choice)
+	if err != nil || choice < 1 || choice > len(usable) {
+		fmt.Println("Invalid choice.")
+		return &engine.InvokeChoice{Aspect: nil}
+	}
+
+	selectedAspect := &usable[choice-1]
+
+	// Determine if using free invoke or fate point
+	useFree := selectedAspect.FreeInvokes > 0
+
+	// Ask +2 or reroll
+	fmt.Print("+2 or Reroll? (b/r): ")
+	input, err = ui.reader.ReadString('\n')
+	if err != nil {
+		return &engine.InvokeChoice{Aspect: nil}
+	}
+	input = strings.TrimSpace(strings.ToLower(input))
+
+	isReroll := input == "r" || input == "reroll"
+
+	return &engine.InvokeChoice{
+		Aspect:   selectedAspect,
+		UseFree:  useFree,
+		IsReroll: isReroll,
+	}
+}
+
 // handleSpecialCommands processes special scene commands and returns true if handled
 func (ui *TerminalUI) handleSpecialCommands(input string) bool {
 	parts := strings.Fields(strings.ToLower(input))

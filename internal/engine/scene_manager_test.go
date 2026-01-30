@@ -23,6 +23,7 @@ type MockUI struct {
 	conflictEscalateCalls []string
 	turnAnnouncementCalls []string
 	conflictEndCalls      []string
+	invokeChoice          *InvokeChoice // Pre-configured invoke response
 }
 
 func (m *MockUI) ReadInput() (input string, isExit bool, err error) {
@@ -47,6 +48,14 @@ func (m *MockUI) DisplayDialog(playerInput, gmResponse string) {
 
 func (m *MockUI) DisplaySystemMessage(message string) {
 	m.displayedMessages = append(m.displayedMessages, "System: "+message)
+}
+
+func (m *MockUI) PromptForInvoke(available []InvokableAspect, fatePoints int, currentResult string, shiftsNeeded int) *InvokeChoice {
+	if m.invokeChoice != nil {
+		return m.invokeChoice
+	}
+	// Default: skip invokes
+	return &InvokeChoice{Aspect: nil}
 }
 
 func (m *MockUI) DisplayConflictStart(conflictType string, initiatorName string, participants []ConflictParticipantInfo) {

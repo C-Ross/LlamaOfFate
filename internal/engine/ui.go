@@ -30,6 +30,22 @@ type ConflictParticipantInfo struct {
 	IsPlayer      bool
 }
 
+// InvokableAspect represents an aspect available for invocation
+type InvokableAspect struct {
+	Name        string // The aspect text
+	Source      string // "character", "situation", "consequence"
+	SourceID    string // ID of the source (character ID, aspect ID, etc.)
+	FreeInvokes int    // Number of free invokes available (0 = requires fate point)
+	AlreadyUsed bool   // True if already invoked on this roll
+}
+
+// InvokeChoice represents the player's invoke decision
+type InvokeChoice struct {
+	Aspect   *InvokableAspect // nil if player chose to skip
+	UseFree  bool             // true = use free invoke, false = spend fate point
+	IsReroll bool             // true = reroll dice, false = +2 bonus
+}
+
 // UI defines the interface for user interaction during scene management
 type UI interface {
 	// Input methods - returns the cleaned input and whether it's an exit command
@@ -41,6 +57,9 @@ type UI interface {
 	DisplayNarrative(narrative string)
 	DisplayDialog(playerInput, gmResponse string)
 	DisplaySystemMessage(message string)
+
+	// Invoke methods
+	PromptForInvoke(available []InvokableAspect, fatePoints int, currentResult string, shiftsNeeded int) *InvokeChoice
 
 	// Conflict display methods
 	DisplayConflictStart(conflictType string, initiatorName string, participants []ConflictParticipantInfo)

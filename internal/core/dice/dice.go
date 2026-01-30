@@ -91,6 +91,22 @@ func (r *Roller) RollWithModifier(skill Ladder, modifier int) *CheckResult {
 	}
 }
 
+// Reroll performs a reroll on an existing CheckResult, preserving the original roll
+func (r *Roller) Reroll(original *CheckResult) *CheckResult {
+	newRoll := r.Roll4dF()
+	finalValue := Ladder(int(original.BaseSkill) + newRoll.Total + original.Modifier)
+
+	return &CheckResult{
+		Roll:         newRoll,
+		BaseSkill:    original.BaseSkill,
+		Modifier:     original.Modifier,
+		FinalValue:   finalValue,
+		CalculatedAt: time.Now(),
+		Rerolled:     true,
+		OriginalRoll: original.Roll,
+	}
+}
+
 // CheckResult represents the result of a skill check
 type CheckResult struct {
 	Roll         *Roll     `json:"roll"`
@@ -98,11 +114,21 @@ type CheckResult struct {
 	Modifier     int       `json:"modifier"`
 	FinalValue   Ladder    `json:"final_value"`
 	CalculatedAt time.Time `json:"calculated_at"`
+
+	// Reroll tracking
+	Rerolled     bool  `json:"rerolled,omitempty"`
+	OriginalRoll *Roll `json:"original_roll,omitempty"`
 }
 
 // String returns a formatted representation of the check result
 func (cr *CheckResult) String() string {
 	return cr.Roll.String()
+}
+
+// ApplyInvokeBonus adds a post-roll invoke bonus and recalculates FinalValue
+func (cr *CheckResult) ApplyInvokeBonus(bonus int) {
+	cr.Modifier += bonus
+	cr.FinalValue = Ladder(int(cr.BaseSkill) + cr.Roll.Total + cr.Modifier)
 }
 
 // CompareAgainst compares this result against a difficulty and returns the outcome

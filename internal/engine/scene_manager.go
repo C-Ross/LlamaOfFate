@@ -416,7 +416,6 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 
 	// Roll dice
 	result := sm.roller.RollWithModifier(dice.Mediocre, totalBonus)
-	parsedAction.CheckResult = result
 
 	// For attacks against characters, use active defense instead of static difficulty
 	var defenseResult *dice.CheckResult
@@ -429,11 +428,7 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 		}
 	}
 
-	// Determine outcome
-	outcome := result.CompareAgainst(parsedAction.Difficulty)
-	parsedAction.Outcome = outcome
-
-	// Display result using UI
+	// Display initial result
 	var resultString string
 	if defenseResult != nil && targetChar != nil {
 		resultString = fmt.Sprintf("%s (Total: %s vs %s's Defense %s)",
@@ -442,11 +437,25 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 		resultString = fmt.Sprintf("%s (Total: %s vs Difficulty %s)",
 			result.String(), result.FinalValue.String(), parsedAction.Difficulty.String())
 	}
+	initialOutcome := result.CompareAgainst(parsedAction.Difficulty)
 	sm.ui.DisplayActionResult(parsedAction.Skill,
 		fmt.Sprintf("%s (%+d)", skillLevel.String(), int(skillLevel)),
 		parsedAction.CalculateBonus(),
 		resultString,
-		outcome.Type.String())
+		initialOutcome.Type.String())
+
+	// Post-roll invoke opportunity
+	result = sm.handlePostRollInvokes(result, parsedAction.Difficulty, parsedAction, false)
+	parsedAction.CheckResult = result
+
+	// Determine final outcome after invokes
+	outcome := result.CompareAgainst(parsedAction.Difficulty)
+	parsedAction.Outcome = outcome
+
+	// Display updated outcome if it changed
+	if outcome.Type != initialOutcome.Type {
+		sm.ui.DisplaySystemMessage(fmt.Sprintf("Final outcome: %s", outcome.Type.String()))
+	}
 
 	// Generate narrative with error handling
 	narrative, err := sm.generateActionNarrative(ctx, parsedAction)
@@ -483,6 +492,159 @@ func (sm *SceneManager) rollTargetDefense(target *character.Character, attackSki
 		target.Name, defenseSkill, defenseRoll.FinalValue.String()))
 
 	return defenseRoll
+}
+
+// gatherInvokableAspects collects all aspects available for the player to invoke
+func (sm *SceneManager) gatherInvokableAspects(usedAspects map[string]bool) []InvokableAspect {
+	var aspects []InvokableAspect
+
+	// Character aspects (High Concept, Trouble, Other)
+	for _, aspectText := range sm.player.Aspects.GetAll() {
+		if aspectText == "" {
+			continue
+		}
+		aspects = append(aspects, InvokableAspect{
+			Name:        aspectText,
+			Source:      "character",
+			SourceID:    sm.player.ID,
+			FreeInvokes: 0, // Character aspects don't have free invokes
+			AlreadyUsed: usedAspects[aspectText],
+		})
+	}
+
+	// Player's consequences (can be invoked against self for +2)
+	for _, consequence := range sm.player.Consequences {
+		if consequence.Aspect == "" {
+			continue
+		}
+		aspects = append(aspects, InvokableAspect{
+			Name:        consequence.Aspect,
+			Source:      "consequence",
+			SourceID:    consequence.ID,
+			FreeInvokes: 0,
+			AlreadyUsed: usedAspects[consequence.Aspect],
+		})
+	}
+
+	// Situation aspects
+	for _, sitAspect := range sm.currentScene.SituationAspects {
+		if sitAspect.Aspect == "" {
+			continue
+		}
+		aspects = append(aspects, InvokableAspect{
+			Name:        sitAspect.Aspect,
+			Source:      "situation",
+			SourceID:    sitAspect.ID,
+			FreeInvokes: sitAspect.FreeInvokes,
+			AlreadyUsed: usedAspects[sitAspect.Aspect],
+		})
+	}
+
+	return aspects
+}
+
+// handlePostRollInvokes prompts the player to invoke aspects after seeing their roll result.
+// Returns the final CheckResult after any invokes/rerolls.
+// For attacks: skips if already success with style.
+// For defense: skips if attack already fails (defender wins).
+// Always skips if no fate points AND no free invokes available.
+func (sm *SceneManager) handlePostRollInvokes(result *dice.CheckResult, difficulty dice.Ladder, parsedAction *action.Action, isDefense bool) *dice.CheckResult {
+	usedAspects := make(map[string]bool)
+
+	for {
+		// Calculate outcome and shifts needed
+		outcome := result.CompareAgainst(difficulty)
+		shiftsNeeded := 0
+
+		if isDefense {
+			// For defense: positive shifts = attack fails (good for player)
+			// Skip if attack already fails (shifts >= 0)
+			if outcome.Shifts >= 0 {
+				break
+			}
+			// Need enough to at least tie (make shifts = 0)
+			shiftsNeeded = -outcome.Shifts
+		} else {
+			// For attacks/overcome: skip if already success with style
+			if outcome.Type == dice.SuccessWithStyle {
+				break
+			}
+			if outcome.Shifts < 0 {
+				shiftsNeeded = -outcome.Shifts // Need this many to tie
+			} else if outcome.Shifts < 3 {
+				shiftsNeeded = 3 - outcome.Shifts // Need this many for success with style
+			}
+		}
+
+		// Gather available aspects
+		available := sm.gatherInvokableAspects(usedAspects)
+
+		// Check if player has any way to invoke
+		canInvoke := false
+		for _, aspect := range available {
+			if aspect.AlreadyUsed {
+				continue
+			}
+			if aspect.FreeInvokes > 0 || sm.player.FatePoints > 0 {
+				canInvoke = true
+				break
+			}
+		}
+		if !canInvoke {
+			break
+		}
+
+		// Prompt player
+		choice := sm.ui.PromptForInvoke(available, sm.player.FatePoints, result.FinalValue.String(), shiftsNeeded)
+
+		// Player chose to skip
+		if choice.Aspect == nil {
+			break
+		}
+
+		// Spend fate point or use free invoke
+		if choice.UseFree {
+			// Find and decrement free invoke on situation aspect
+			for i := range sm.currentScene.SituationAspects {
+				if sm.currentScene.SituationAspects[i].Aspect == choice.Aspect.Name {
+					sm.currentScene.SituationAspects[i].UseFreeInvoke()
+					break
+				}
+			}
+			sm.ui.DisplaySystemMessage(fmt.Sprintf("Using free invoke on \"%s\"!", choice.Aspect.Name))
+		} else {
+			if !sm.player.SpendFatePoint() {
+				sm.ui.DisplaySystemMessage("Not enough Fate Points!")
+				continue
+			}
+			sm.ui.DisplaySystemMessage(fmt.Sprintf("Invoking \"%s\"! (%d FP remaining)", choice.Aspect.Name, sm.player.FatePoints))
+		}
+
+		// Mark aspect as used for this roll
+		usedAspects[choice.Aspect.Name] = true
+
+		// Apply the invoke
+		if choice.IsReroll {
+			result = sm.roller.Reroll(result)
+			sm.ui.DisplaySystemMessage(fmt.Sprintf("Rerolled: %s (Total: %s)", result.Roll.String(), result.FinalValue.String()))
+		} else {
+			result.ApplyInvokeBonus(2)
+			sm.ui.DisplaySystemMessage(fmt.Sprintf("+2! New total: %s", result.FinalValue.String()))
+		}
+
+		// Track invoke on the action
+		parsedAction.AddAspectInvoke(action.AspectInvoke{
+			AspectText:    choice.Aspect.Name,
+			Source:        choice.Aspect.Source,
+			SourceID:      choice.Aspect.SourceID,
+			IsFree:        choice.UseFree,
+			FatePointCost: func() int { if choice.UseFree { return 0 }; return 1 }(),
+			Bonus:         func() int { if choice.IsReroll { return 0 }; return 2 }(),
+			IsReroll:      choice.IsReroll,
+		})
+	}
+
+	return result
 }
 
 // getDefenseSkillForAttack returns the appropriate defense skill for an attack skill
@@ -1571,9 +1733,6 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 	}
 	targetDefense := sm.roller.RollWithModifier(dice.Mediocre, int(targetDefenseLevel)+defenseBonus)
 
-	// Compare results
-	outcome := npcRoll.CompareAgainst(targetDefense.FinalValue)
-
 	// Display the mechanical result
 	defenseDisplay := defenseSkill
 	if defenseBonus > 0 {
@@ -1588,6 +1747,32 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 		defenseDisplay,
 		targetDefense.FinalValue.String(),
 	))
+
+	// Initial outcome (before player invokes)
+	initialOutcome := npcRoll.CompareAgainst(targetDefense.FinalValue)
+	sm.ui.DisplaySystemMessage(fmt.Sprintf("Initial outcome: %s", initialOutcome.Type.String()))
+
+	// If target is the player, allow them to invoke aspects to improve defense
+	if target.ID == sm.player.ID {
+		// Create a temporary action to track invokes for defense
+		defenseAction := action.NewAction("defense-invoke", sm.player.ID, action.Defend, defenseSkill, "Defending against attack")
+
+		// Player can invoke to improve their defense
+		// isDefense=true means skip prompt if attack already fails
+		targetDefense = sm.handlePostRollInvokes(targetDefense, npcRoll.FinalValue, defenseAction, true)
+
+		// Recalculate outcome with potentially improved defense
+		// Note: For defense, we compare attacker vs defender, so we still use npcRoll.CompareAgainst
+		// but the targetDefense.FinalValue may have increased
+	}
+
+	// Compare results (final)
+	outcome := npcRoll.CompareAgainst(targetDefense.FinalValue)
+
+	// Display updated outcome if it changed
+	if outcome.Type != initialOutcome.Type {
+		sm.ui.DisplaySystemMessage(fmt.Sprintf("Final outcome: %s", outcome.Type.String()))
+	}
 
 	// Generate narrative for the attack
 	npcNarrative, err := sm.generateNPCAttackNarrative(ctx, npc, attackSkill, outcome)

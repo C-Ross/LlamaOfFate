@@ -238,3 +238,50 @@ func TestNewSeededRoller(t *testing.T) {
 	assert.Equal(t, roll1.Total, roll2.Total,
 		"Seeded rollers with same seed should produce same results")
 }
+
+func TestReroll(t *testing.T) {
+	roller := NewSeededRoller(12345)
+
+	// Get initial roll
+	original := roller.RollWithModifier(Good, 1)
+	originalTotal := original.Roll.Total
+	originalFinal := original.FinalValue
+
+	// Reroll
+	rerolled := roller.Reroll(original)
+
+	// Check reroll tracking
+	assert.True(t, rerolled.Rerolled, "Rerolled flag should be true")
+	assert.NotNil(t, rerolled.OriginalRoll, "OriginalRoll should be preserved")
+	assert.Equal(t, originalTotal, rerolled.OriginalRoll.Total, "Original roll should be preserved")
+
+	// Check that base skill and modifier are preserved
+	assert.Equal(t, original.BaseSkill, rerolled.BaseSkill)
+	assert.Equal(t, original.Modifier, rerolled.Modifier)
+
+	// Final value should be recalculated with new roll
+	expectedFinal := Ladder(int(rerolled.BaseSkill) + rerolled.Roll.Total + rerolled.Modifier)
+	assert.Equal(t, expectedFinal, rerolled.FinalValue)
+
+	// The new roll should be different (with this seed)
+	assert.NotEqual(t, originalFinal, rerolled.FinalValue, "Reroll should produce different result")
+}
+
+func TestApplyInvokeBonus(t *testing.T) {
+	roller := NewSeededRoller(12345)
+	result := roller.RollWithModifier(Good, 0) // Good (+3) + roll + 0
+
+	initialFinal := result.FinalValue
+	initialModifier := result.Modifier
+
+	// Apply +2 invoke bonus
+	result.ApplyInvokeBonus(2)
+
+	assert.Equal(t, initialModifier+2, result.Modifier, "Modifier should increase by bonus")
+	assert.Equal(t, Ladder(int(initialFinal)+2), result.FinalValue, "FinalValue should increase by bonus")
+
+	// Apply another +2
+	result.ApplyInvokeBonus(2)
+	assert.Equal(t, initialModifier+4, result.Modifier, "Bonuses should stack")
+	assert.Equal(t, Ladder(int(initialFinal)+4), result.FinalValue, "FinalValue should reflect stacked bonuses")
+}

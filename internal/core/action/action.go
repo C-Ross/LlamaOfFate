@@ -65,7 +65,8 @@ type AspectInvoke struct {
 	SourceID      string `json:"source_id"`
 	IsFree        bool   `json:"is_free"`
 	FatePointCost int    `json:"fate_point_cost"`
-	Bonus         int    `json:"bonus"` // Usually +2
+	Bonus         int    `json:"bonus"`    // Usually +2
+	IsReroll      bool   `json:"is_reroll"` // true = used for reroll instead of +2
 }
 
 // Effect represents a mechanical effect of an action
