@@ -235,6 +235,12 @@ func (sm *SceneManager) RunSceneLoop(ctx context.Context) error {
 
 // processInput handles player input
 func (sm *SceneManager) processInput(ctx context.Context, input string) {
+	// Check for concession command during conflict (before any roll per Fate Core rules)
+	if sm.currentScene.IsConflict && sm.isConcedeCommand(input) {
+		sm.handleConcession(ctx)
+		return
+	}
+
 	// Use LLM to determine the type of input
 	inputType, err := sm.classifyInput(ctx, input)
 	if err != nil {
@@ -634,13 +640,23 @@ func (sm *SceneManager) handlePostRollInvokes(result *dice.CheckResult, difficul
 
 		// Track invoke on the action
 		parsedAction.AddAspectInvoke(action.AspectInvoke{
-			AspectText:    choice.Aspect.Name,
-			Source:        choice.Aspect.Source,
-			SourceID:      choice.Aspect.SourceID,
-			IsFree:        choice.UseFree,
-			FatePointCost: func() int { if choice.UseFree { return 0 }; return 1 }(),
-			Bonus:         func() int { if choice.IsReroll { return 0 }; return 2 }(),
-			IsReroll:      choice.IsReroll,
+			AspectText: choice.Aspect.Name,
+			Source:     choice.Aspect.Source,
+			SourceID:   choice.Aspect.SourceID,
+			IsFree:     choice.UseFree,
+			FatePointCost: func() int {
+				if choice.UseFree {
+					return 0
+				}
+				return 1
+			}(),
+			Bonus: func() int {
+				if choice.IsReroll {
+					return 0
+				}
+				return 2
+			}(),
+			IsReroll: choice.IsReroll,
 		})
 	}
 
@@ -1846,51 +1862,45 @@ func (sm *SceneManager) handleStressOverflow(ctx context.Context, shifts int, st
 	availableConsequences := sm.getAvailableConsequences(shifts)
 
 	if len(availableConsequences) == 0 {
-		// No consequences available - must concede or be taken out
-		sm.ui.DisplaySystemMessage("You have no available consequences!")
-		sm.handleTakenOutOrConcede(ctx, attacker)
+		// No consequences available - taken out
+		sm.ui.DisplaySystemMessage("You have no available consequences! You are taken out!")
+		sm.handleTakenOut(ctx, attacker)
 		return
 	}
 
-	// Display options
+	// Display options (concession is not available here - per Fate Core rules,
+	// you must concede BEFORE the roll, not after taking shifts)
 	sm.ui.DisplaySystemMessage("\nYou must choose how to handle this:")
-	sm.ui.DisplaySystemMessage("  1. Concede - You choose to lose on your terms")
 
 	for i, conseq := range availableConsequences {
 		sm.ui.DisplaySystemMessage(fmt.Sprintf(
 			"  %d. Take a %s consequence (absorbs %d shifts)",
-			i+2, conseq.Type, conseq.Value,
+			i+1, conseq.Type, conseq.Value,
 		))
 	}
-	sm.ui.DisplaySystemMessage(fmt.Sprintf("  %d. Be Taken Out - Your opponent decides your fate", len(availableConsequences)+2))
+	sm.ui.DisplaySystemMessage(fmt.Sprintf("  %d. Be Taken Out - Your opponent decides your fate", len(availableConsequences)+1))
 
 	// Read player choice
 	sm.ui.DisplaySystemMessage("\nEnter your choice (number):")
 	input, _, err := sm.ui.ReadInput()
 	if err != nil {
 		slog.Error("Failed to read consequence choice", "error", err)
-		sm.handleTakenOutOrConcede(ctx, attacker)
+		sm.handleTakenOut(ctx, attacker)
 		return
 	}
 
 	choice := strings.TrimSpace(input)
 
-	// Parse choice
-	if choice == "1" {
-		sm.handleConcession(ctx)
-		return
-	}
-
 	// Check for consequence choices
 	for i, conseq := range availableConsequences {
-		if choice == fmt.Sprintf("%d", i+2) {
+		if choice == fmt.Sprintf("%d", i+1) {
 			sm.applyConsequence(ctx, conseq.Type, shifts, attacker)
 			return
 		}
 	}
 
 	// Check for taken out choice
-	if choice == fmt.Sprintf("%d", len(availableConsequences)+2) {
+	if choice == fmt.Sprintf("%d", len(availableConsequences)+1) {
 		sm.handleTakenOut(ctx, attacker)
 		return
 	}
@@ -2060,15 +2070,44 @@ Response should be ONLY the aspect name, nothing else.`,
 	return strings.TrimSpace(resp.Choices[0].Message.Content), nil
 }
 
+// isConcedeCommand checks if the input is a concession command
+// Per Fate Core rules, concession must happen before a roll is made
+func (sm *SceneManager) isConcedeCommand(input string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(input))
+	concedeCommands := []string{"concede", "i concede", "concession", "i give up", "give up"}
+	for _, cmd := range concedeCommands {
+		if normalized == cmd {
+			return true
+		}
+	}
+	return false
+}
+
 // handleConcession handles when the player concedes the conflict
 func (sm *SceneManager) handleConcession(ctx context.Context) {
 	sm.ui.DisplaySystemMessage("\n=== You Concede! ===")
 	sm.ui.DisplaySystemMessage("You choose to lose the conflict on your own terms.")
 	sm.ui.DisplaySystemMessage("You get to narrate how you exit the scene and avoid the worst consequences.")
 
-	// Award a fate point for conceding
-	sm.player.GainFatePoint()
-	sm.ui.DisplaySystemMessage(fmt.Sprintf("You gain a Fate Point for conceding! (Now: %d)", sm.player.FatePoints))
+	// Award fate points: 1 for conceding + 1 for each consequence taken in this conflict
+	// Per Fate Core: "you get a fate point for choosing to concede.
+	// On top of that, if you've sustained any consequences in this conflict,
+	// you get an additional fate point for each consequence."
+	fatePointsGained := 1 // Base for conceding
+	consequenceCount := len(sm.player.Consequences)
+	fatePointsGained += consequenceCount
+
+	for i := 0; i < fatePointsGained; i++ {
+		sm.player.GainFatePoint()
+	}
+
+	if consequenceCount > 0 {
+		sm.ui.DisplaySystemMessage(fmt.Sprintf(
+			"You gain %d Fate Points (1 for conceding + %d for consequences)! (Now: %d)",
+			fatePointsGained, consequenceCount, sm.player.FatePoints))
+	} else {
+		sm.ui.DisplaySystemMessage(fmt.Sprintf("You gain a Fate Point for conceding! (Now: %d)", sm.player.FatePoints))
+	}
 
 	// Mark player as conceded and end the conflict
 	if sm.currentScene.ConflictState != nil {
@@ -2077,7 +2116,19 @@ func (sm *SceneManager) handleConcession(ctx context.Context) {
 		sm.ui.DisplayConflictEnd("You have conceded the conflict.")
 	}
 
+	// Read and display the concession narrative (no roll required - this is pure narration)
 	sm.ui.DisplaySystemMessage("\nDescribe how you concede and exit the conflict:")
+	input, _, err := sm.ui.ReadInput()
+	if err != nil {
+		slog.Error("Failed to read concession description", "error", err)
+		return
+	}
+
+	if input != "" {
+		// Display the player's narration and acknowledge it without any mechanical resolution
+		sm.ui.DisplayNarrative(fmt.Sprintf("%s %s", sm.player.Name, input))
+		sm.addToConversationHistory(input, "You exit the conflict on your own terms.", inputTypeDialog)
+	}
 }
 
 // TakenOutResult represents the outcome classification of being taken out
@@ -2127,22 +2178,6 @@ func (sm *SceneManager) handleTakenOut(ctx context.Context, attacker *character.
 		sm.ui.DisplayNarrative(narrative)
 		sm.ui.DisplayConflictEnd(fmt.Sprintf("%s has won the conflict.", attacker.Name))
 	}
-}
-
-// handleTakenOutOrConcede when there are no options left
-func (sm *SceneManager) handleTakenOutOrConcede(ctx context.Context, attacker *character.Character) {
-	sm.ui.DisplaySystemMessage("\nYou have no way to absorb this damage!")
-	sm.ui.DisplaySystemMessage("  1. Concede (you choose how you lose)")
-	sm.ui.DisplaySystemMessage("  2. Be Taken Out (opponent chooses)")
-	sm.ui.DisplaySystemMessage("\nEnter your choice:")
-
-	input, _, err := sm.ui.ReadInput()
-	if err != nil || strings.TrimSpace(input) != "1" {
-		sm.handleTakenOut(ctx, attacker)
-		return
-	}
-
-	sm.handleConcession(ctx)
 }
 
 // generateTakenOutNarrativeAndOutcome generates narrative and classifies the outcome

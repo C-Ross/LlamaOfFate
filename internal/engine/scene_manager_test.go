@@ -1018,3 +1018,140 @@ func TestSceneManager_ApplyActionEffects_Attack(t *testing.T) {
 	assert.True(t, found, "Expected damage message")
 }
 
+func TestSceneManager_IsConcedeCommand(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{"concede lowercase", "concede", true},
+		{"concede uppercase", "CONCEDE", true},
+		{"concede mixed case", "Concede", true},
+		{"i concede", "i concede", true},
+		{"I concede", "I Concede", true},
+		{"concession", "concession", true},
+		{"i give up", "i give up", true},
+		{"give up", "give up", true},
+		{"with whitespace", "  concede  ", true},
+		{"partial match attack", "I concede to attack", false},
+		{"regular action", "I attack the goblin", false},
+		{"empty string", "", false},
+		{"random input", "hello world", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := sm.isConcedeCommand(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestSceneManager_HandleConcession(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	player := character.NewCharacter("player-1", "Hero")
+	enemy := character.NewCharacter("enemy-1", "Goblin")
+	player.FatePoints = 1 // Start with 1 fate point
+
+	engine.AddCharacter(player)
+	engine.AddCharacter(enemy)
+
+	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(enemy.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	// Start a conflict
+	err = sm.initiateConflict(scene.PhysicalConflict, enemy.ID)
+	require.NoError(t, err)
+	require.True(t, sm.currentScene.IsConflict)
+
+	// Handle concession
+	ctx := context.Background()
+	sm.handleConcession(ctx)
+
+	// Check fate point was awarded (1 base + 1 for conceding = 2)
+	assert.Equal(t, 2, player.FatePoints, "Expected fate point for conceding")
+
+	// Check conflict ended
+	assert.False(t, sm.currentScene.IsConflict, "Expected conflict to end")
+
+	// Check appropriate messages were displayed
+	foundConcedeMsg := false
+	foundFatePointMsg := false
+	for _, msg := range mockUI.displayedMessages {
+		if strings.Contains(msg, "Concede") {
+			foundConcedeMsg = true
+		}
+		if strings.Contains(msg, "Fate Point") {
+			foundFatePointMsg = true
+		}
+	}
+	assert.True(t, foundConcedeMsg, "Expected concede message")
+	assert.True(t, foundFatePointMsg, "Expected fate point message")
+}
+
+func TestSceneManager_HandleConcession_WithConsequences(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	player := character.NewCharacter("player-1", "Hero")
+	enemy := character.NewCharacter("enemy-1", "Goblin")
+	player.FatePoints = 1 // Start with 1 fate point
+
+	// Add a consequence to the player
+	player.AddConsequence(character.Consequence{
+		ID:   "conseq-1",
+		Type: character.MildConsequence,
+	})
+	player.AddConsequence(character.Consequence{
+		ID:   "conseq-2",
+		Type: character.ModerateConsequence,
+	})
+
+	engine.AddCharacter(player)
+	engine.AddCharacter(enemy)
+
+	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(enemy.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	// Start a conflict
+	err = sm.initiateConflict(scene.PhysicalConflict, enemy.ID)
+	require.NoError(t, err)
+
+	// Handle concession
+	ctx := context.Background()
+	sm.handleConcession(ctx)
+
+	// Check fate points: 1 base + 1 for conceding + 2 for consequences = 4
+	assert.Equal(t, 4, player.FatePoints, "Expected fate points for conceding with consequences")
+
+	// Check message mentions consequences
+	foundConsequenceBonus := false
+	for _, msg := range mockUI.displayedMessages {
+		if strings.Contains(msg, "consequences") {
+			foundConsequenceBonus = true
+			break
+		}
+	}
+	assert.True(t, foundConsequenceBonus, "Expected message about bonus fate points for consequences")
+}
