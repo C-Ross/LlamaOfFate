@@ -37,6 +37,12 @@ var npcAttackPromptTemplate string
 //go:embed templates/npc_action_decision_prompt.tmpl
 var npcActionDecisionPromptTemplate string
 
+//go:embed templates/consequence_aspect_prompt.tmpl
+var consequenceAspectPromptTemplate string
+
+//go:embed templates/taken_out_prompt.tmpl
+var takenOutPromptTemplate string
+
 // Template instances
 var (
 	AspectGenerationPrompt       *template.Template
@@ -49,6 +55,8 @@ var (
 	ConflictResponsePrompt       *template.Template
 	NPCAttackPrompt              *template.Template
 	NPCActionDecisionPrompt      *template.Template
+	ConsequenceAspectPrompt      *template.Template
+	TakenOutPrompt               *template.Template
 )
 
 func init() {
@@ -112,5 +120,17 @@ func init() {
 	NPCActionDecisionPrompt, err = template.New("npc_action_decision").Parse(npcActionDecisionPromptTemplate)
 	if err != nil {
 		panic("failed to parse NPC action decision prompt template: " + err.Error())
+	}
+
+	// Parse the consequence aspect prompt template
+	ConsequenceAspectPrompt, err = template.New("consequence_aspect").Parse(consequenceAspectPromptTemplate)
+	if err != nil {
+		panic("failed to parse consequence aspect prompt template: " + err.Error())
+	}
+
+	// Parse the taken out prompt template
+	TakenOutPrompt, err = template.New("taken_out").Parse(takenOutPromptTemplate)
+	if err != nil {
+		panic("failed to parse taken out prompt template: " + err.Error())
 	}
 }

@@ -1,0 +1,22 @@
+The player character {{.CharacterName}} has been taken out in a {{.ConflictType}} conflict by {{.AttackerName}}.
+
+As the GM, decide their fate and provide a narrative. The attacker gets to decide what happens.
+
+Consider the context:
+- Scene: {{.SceneDescription}}
+- Attacker: {{.AttackerName}} ({{.AttackerHighConcept}})
+- Conflict type: {{.ConflictType}}
+
+Respond in JSON format:
+{
+  "narrative": "A 2-3 sentence dramatic narrative describing what happens to the defeated character",
+  "outcome": "one of: game_over, scene_transition, continue",
+  "new_scene_hint": "If scene_transition, a brief hint about the new situation (e.g., 'You awaken in a dungeon cell...'). Empty string otherwise."
+}
+
+Outcome guidelines:
+- "game_over": Only for truly fatal or permanently ending situations (death, soul destruction, etc.). Use sparingly!
+- "scene_transition": Character is captured, driven off, knocked unconscious and moved, etc. Most common outcome.
+- "continue": Character is knocked down but scene continues (rare, usually for dramatic moments).
+
+Prefer scene_transition for most defeats. Reserve game_over only when death/permanent end is truly appropriate to the story.

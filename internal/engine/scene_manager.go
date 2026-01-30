@@ -155,6 +155,23 @@ type NPCActionDecision struct {
 	Description string `json:"description"`
 }
 
+// ConsequenceAspectData holds the data for consequence aspect generation template
+type ConsequenceAspectData struct {
+	CharacterName string
+	AttackerName  string
+	Severity      string
+	ConflictType  string
+}
+
+// TakenOutData holds the data for taken out narrative template
+type TakenOutData struct {
+	CharacterName       string
+	AttackerName        string
+	AttackerHighConcept string
+	ConflictType        string
+	SceneDescription    string
+}
+
 // NewSceneManager creates a new scene manager
 func NewSceneManager(engine *Engine) *SceneManager {
 	return &SceneManager{
@@ -2028,31 +2045,21 @@ func (sm *SceneManager) generateConsequenceAspect(ctx context.Context, conseqTyp
 		conflictType = "mental"
 	}
 
-	prompt := fmt.Sprintf(`Generate a short Fate Core consequence aspect for this situation:
+	data := ConsequenceAspectData{
+		CharacterName: sm.player.Name,
+		AttackerName:  attacker.Name,
+		Severity:      string(conseqType),
+		ConflictType:  conflictType,
+	}
 
-Character: %s
-Attacker: %s
-Consequence Severity: %s
-Conflict Type: %s
-
-Generate ONLY the aspect name (2-4 words), something that represents lasting harm appropriate to the severity. Examples:
-- Mild physical: "Bruised Ribs", "Sprained Ankle", "Rattled"
-- Moderate physical: "Broken Arm", "Deep Gash", "Concussed"  
-- Severe physical: "Crushed Leg", "Internal Bleeding", "Near Death"
-- Mild mental: "Shaken Confidence", "Momentary Doubt", "Rattled Nerves"
-- Moderate mental: "Crisis of Faith", "Deep Shame", "Paranoid"
-- Severe mental: "Broken Spirit", "Traumatized", "Lost All Hope"
-
-Response should be ONLY the aspect name, nothing else.`,
-		sm.player.Name,
-		attacker.Name,
-		conseqType,
-		conflictType,
-	)
+	var buf bytes.Buffer
+	if err := ConsequenceAspectPrompt.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("failed to execute consequence aspect template: %w", err)
+	}
 
 	req := llm.CompletionRequest{
 		Messages: []llm.Message{
-			{Role: "user", Content: prompt},
+			{Role: "user", Content: buf.String()},
 		},
 		MaxTokens:   20,
 		Temperature: 0.8,
@@ -2191,40 +2198,22 @@ func (sm *SceneManager) generateTakenOutNarrativeAndOutcome(ctx context.Context,
 		conflictType = "mental"
 	}
 
-	prompt := fmt.Sprintf(`The player character %s has been taken out in a %s conflict by %s.
+	data := TakenOutData{
+		CharacterName:       sm.player.Name,
+		AttackerName:        attacker.Name,
+		AttackerHighConcept: attacker.Aspects.HighConcept,
+		ConflictType:        conflictType,
+		SceneDescription:    sm.currentScene.Description,
+	}
 
-As the GM, decide their fate and provide a narrative. The attacker gets to decide what happens.
-
-Consider the context:
-- Scene: %s
-- Attacker: %s (%s)
-- Conflict type: %s
-
-Respond in JSON format:
-{
-  "narrative": "A 2-3 sentence dramatic narrative describing what happens to the defeated character",
-  "outcome": "one of: game_over, scene_transition, continue",
-  "new_scene_hint": "If scene_transition, a brief hint about the new situation (e.g., 'You awaken in a dungeon cell...'). Empty string otherwise."
-}
-
-Outcome guidelines:
-- "game_over": Only for truly fatal or permanently ending situations (death, soul destruction, etc.). Use sparingly!
-- "scene_transition": Character is captured, driven off, knocked unconscious and moved, etc. Most common outcome.
-- "continue": Character is knocked down but scene continues (rare, usually for dramatic moments).
-
-Prefer scene_transition for most defeats. Reserve game_over only when death/permanent end is truly appropriate to the story.`,
-		sm.player.Name,
-		conflictType,
-		attacker.Name,
-		sm.currentScene.Description,
-		attacker.Name,
-		attacker.Aspects.HighConcept,
-		conflictType,
-	)
+	var buf bytes.Buffer
+	if err := TakenOutPrompt.Execute(&buf, data); err != nil {
+		return "", TakenOutTransition, "", fmt.Errorf("failed to execute taken out template: %w", err)
+	}
 
 	req := llm.CompletionRequest{
 		Messages: []llm.Message{
-			{Role: "user", Content: prompt},
+			{Role: "user", Content: buf.String()},
 		},
 		MaxTokens:   200,
 		Temperature: 0.7,
