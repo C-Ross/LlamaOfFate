@@ -55,13 +55,13 @@ const (
 
 // ConflictState manages conflict mechanics
 type ConflictState struct {
-	Type               ConflictType          `json:"type"`                          // Current conflict type (physical or mental)
-	OriginalType       ConflictType          `json:"original_type,omitempty"`       // Original type if escalated
-	InitiatingCharacter string               `json:"initiating_character,omitempty"` // Who started the conflict
-	Participants       []ConflictParticipant `json:"participants"`
-	InitiativeOrder    []string              `json:"initiative_order"`
-	CurrentTurn        int                   `json:"current_turn"`
-	Round              int                   `json:"round"`
+	Type                ConflictType          `json:"type"`                           // Current conflict type (physical or mental)
+	OriginalType        ConflictType          `json:"original_type,omitempty"`        // Original type if escalated
+	InitiatingCharacter string                `json:"initiating_character,omitempty"` // Who started the conflict
+	Participants        []ConflictParticipant `json:"participants"`
+	InitiativeOrder     []string              `json:"initiative_order"`
+	CurrentTurn         int                   `json:"current_turn"`
+	Round               int                   `json:"round"`
 }
 
 // ConflictParticipant represents a character in conflict

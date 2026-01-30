@@ -439,4 +439,3 @@ func TestScene_EscalateConflict_PreservesOriginalType(t *testing.T) {
 	scene.EscalateConflict(MentalConflict)
 	assert.Equal(t, MentalConflict, scene.ConflictState.OriginalType)
 }
-
