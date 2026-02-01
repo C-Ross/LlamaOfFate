@@ -868,34 +868,20 @@ func (sm *SceneManager) handleTargetStressOverflow(target *character.Character, 
 func (sm *SceneManager) getTargetAvailableConsequences(target *character.Character, shifts int) []ConsequenceOption {
 	available := []ConsequenceOption{}
 
-	hasMild := false
-	hasModerate := false
-	hasSevere := false
-
-	for _, c := range target.Consequences {
-		switch c.Type {
-		case character.MildConsequence:
-			hasMild = true
-		case character.ModerateConsequence:
-			hasModerate = true
-		case character.SevereConsequence:
-			hasSevere = true
-		}
-	}
-
-	if !hasMild {
+	// Use the character's CanTakeConsequence method which respects NPC type
+	if target.CanTakeConsequence(character.MildConsequence) {
 		available = append(available, ConsequenceOption{
 			Type:  character.MildConsequence,
 			Value: character.MildConsequence.Value(),
 		})
 	}
-	if !hasModerate {
+	if target.CanTakeConsequence(character.ModerateConsequence) {
 		available = append(available, ConsequenceOption{
 			Type:  character.ModerateConsequence,
 			Value: character.ModerateConsequence.Value(),
 		})
 	}
-	if !hasSevere {
+	if target.CanTakeConsequence(character.SevereConsequence) {
 		available = append(available, ConsequenceOption{
 			Type:  character.SevereConsequence,
 			Value: character.SevereConsequence.Value(),
@@ -1179,38 +1165,20 @@ type ConsequenceOption struct {
 func (sm *SceneManager) getAvailableConsequences(shifts int) []ConsequenceOption {
 	available := []ConsequenceOption{}
 
-	// Check which consequence slots are available
-	hasMild := false
-	hasModerate := false
-	hasSevere := false
-
-	for _, c := range sm.player.Consequences {
-		switch c.Type {
-		case character.MildConsequence:
-			hasMild = true
-		case character.ModerateConsequence:
-			hasModerate = true
-		case character.SevereConsequence:
-			hasSevere = true
-		}
-	}
-
-	// Add available consequences that can help absorb damage
-	// In Fate, you can take a consequence even if it doesn't fully absorb the damage
-	// (you'd also need to use stress boxes for the remainder)
-	if !hasMild {
+	// Use the character's CanTakeConsequence method which respects NPC type
+	if sm.player.CanTakeConsequence(character.MildConsequence) {
 		available = append(available, ConsequenceOption{
 			Type:  character.MildConsequence,
 			Value: character.MildConsequence.Value(),
 		})
 	}
-	if !hasModerate {
+	if sm.player.CanTakeConsequence(character.ModerateConsequence) {
 		available = append(available, ConsequenceOption{
 			Type:  character.ModerateConsequence,
 			Value: character.ModerateConsequence.Value(),
 		})
 	}
-	if !hasSevere {
+	if sm.player.CanTakeConsequence(character.SevereConsequence) {
 		available = append(available, ConsequenceOption{
 			Type:  character.SevereConsequence,
 			Value: character.SevereConsequence.Value(),

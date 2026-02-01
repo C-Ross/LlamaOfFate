@@ -9,9 +9,10 @@ import (
 
 // Character represents a player character or NPC
 type Character struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	ID            string        `json:"id"`
+	Name          string        `json:"name"`
+	Description   string        `json:"description"`
+	CharacterType CharacterType `json:"character_type,omitempty"` // PC or NPC type (0 = PC)
 
 	// Core Character Elements
 	Aspects Aspects                `json:"aspects"`

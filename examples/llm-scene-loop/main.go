@@ -146,28 +146,17 @@ func createSampleCharacter() *character.Character {
 }
 
 func createSampleOpponent() *character.Character {
-	opponent := character.NewCharacter("goblin-guard", "Goblin Guard")
+	// Create a nameless (Good) NPC - has 2 stress boxes, no consequences
+	// Per Fate Core SRD: https://fate-srd.com/fate-core/creating-and-playing-opposition#good-nameless-npcs
+	opponent := character.NewNamelessNPC("goblin-guard", "Goblin Guard", character.CharacterTypeNamelessGood, "Fight")
 
-	// Set aspects
+	// Nameless NPCs get a single aspect (their high concept)
 	opponent.Aspects.HighConcept = "Sneaky Tower Guardian"
-	opponent.Aspects.Trouble = "Greedy and Cowardly"
-	opponent.Aspects.AddAspect("Sharp-Eared")
-	opponent.Aspects.AddAspect("Knows the Tower's Secrets")
 
-	// Set skills focused on stealth and combat
-	opponent.SetSkill("Stealth", dice.Great)    // +4 - Primary skill
-	opponent.SetSkill("Notice", dice.Good)      // +3
-	opponent.SetSkill("Fight", dice.Good)       // +3
-	opponent.SetSkill("Athletics", dice.Fair)   // +2
-	opponent.SetSkill("Burglary", dice.Fair)    // +2
-	opponent.SetSkill("Will", dice.Fair)        // +2
-	opponent.SetSkill("Deceive", dice.Average)  // +1
-	opponent.SetSkill("Physique", dice.Average) // +1
-	opponent.SetSkill("Provoke", dice.Average)  // +1
-
-	// Set fate points and refresh
-	opponent.FatePoints = 2
-	opponent.Refresh = 2
+	// Good nameless NPCs have one skill at Good (+3) - already set by factory
+	// Add a couple more skills at lower levels for variety
+	opponent.SetSkill("Stealth", dice.Fair)   // +2
+	opponent.SetSkill("Notice", dice.Average) // +1
 
 	return opponent
 }
