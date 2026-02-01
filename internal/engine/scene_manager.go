@@ -45,6 +45,7 @@ type SceneManager struct {
 	ui                    UI
 	shouldExit            bool // Set to true when the game should end
 	exitOnSceneTransition bool // Set to true to exit the loop on scene transition
+	aspectGenerator       *AspectGenerator
 }
 
 // InputClassificationData holds the data for input classification template
@@ -106,12 +107,17 @@ type TakenOutData struct {
 
 // NewSceneManager creates a new scene manager
 func NewSceneManager(engine *Engine) *SceneManager {
-	return &SceneManager{
+	sm := &SceneManager{
 		engine:              engine,
 		reader:              bufio.NewReader(os.Stdin),
 		roller:              dice.NewRoller(),
 		conversationHistory: make([]ConversationEntry, 0),
 	}
+	// Initialize aspect generator if LLM client is available
+	if engine.llmClient != nil {
+		sm.aspectGenerator = NewAspectGenerator(engine.llmClient)
+	}
+	return sm
 }
 
 // SetUI sets the UI for the scene manager
@@ -753,11 +759,7 @@ func (sm *SceneManager) applyActionEffects(parsedAction *action.Action, target *
 	switch parsedAction.Type {
 	case action.CreateAdvantage:
 		if parsedAction.IsSuccess() {
-			aspectName := fmt.Sprintf("Advantage from %s", parsedAction.Description)
-			freeInvokes := 1
-			if parsedAction.IsSuccessWithStyle() {
-				freeInvokes = 2
-			}
+			aspectName, freeInvokes := sm.generateAspectName(parsedAction)
 
 			situationAspect := scene.NewSituationAspect(
 				fmt.Sprintf("aspect-%d", time.Now().UnixNano()),
@@ -798,6 +800,72 @@ func (sm *SceneManager) applyActionEffects(parsedAction *action.Action, target *
 			sm.ui.DisplaySystemMessage("Tie! You gain a boost against your opponent.")
 		}
 	}
+}
+
+// generateAspectName uses the LLM to generate a creative aspect name for Create an Advantage
+// Falls back to a simple description-based name if the LLM is unavailable or fails
+func (sm *SceneManager) generateAspectName(parsedAction *action.Action) (string, int) {
+	// Determine free invokes based on outcome
+	freeInvokes := 1
+	if parsedAction.IsSuccessWithStyle() {
+		freeInvokes = 2
+	}
+
+	// Fallback name if LLM generation fails
+	fallbackName := fmt.Sprintf("Advantage from %s", parsedAction.Description)
+
+	// If no aspect generator available, use fallback
+	if sm.aspectGenerator == nil {
+		slog.Debug("No aspect generator available, using fallback name",
+			"component", componentSceneManager)
+		return fallbackName, freeInvokes
+	}
+
+	// Gather existing aspects for context
+	existingAspects := make([]string, 0)
+	for _, sa := range sm.currentScene.SituationAspects {
+		existingAspects = append(existingAspects, sa.Aspect)
+	}
+
+	// Build the request
+	req := AspectGenerationRequest{
+		Character:       sm.player,
+		Action:          parsedAction,
+		Outcome:         parsedAction.Outcome,
+		Context:         sm.currentScene.Description,
+		TargetType:      "situation",
+		ExistingAspects: existingAspects,
+	}
+
+	// Generate aspect via LLM
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	response, err := sm.aspectGenerator.GenerateAspect(ctx, req)
+	if err != nil {
+		slog.Warn("Failed to generate aspect via LLM, using fallback",
+			"component", componentSceneManager,
+			"error", err)
+		return fallbackName, freeInvokes
+	}
+
+	// Use generated aspect text, or fallback if empty
+	if response.AspectText == "" {
+		return fallbackName, freeInvokes
+	}
+
+	// Override free invokes from LLM response if it makes sense
+	if response.FreeInvokes > 0 {
+		freeInvokes = response.FreeInvokes
+	}
+
+	slog.Debug("Generated aspect via LLM",
+		"component", componentSceneManager,
+		"aspect", response.AspectText,
+		"freeInvokes", freeInvokes,
+		"reasoning", response.Reasoning)
+
+	return response.AspectText, freeInvokes
 }
 
 // applyDamageToTarget applies shifts as stress/consequences to a target

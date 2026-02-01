@@ -236,6 +236,57 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage(t *testing.T) {
 	assert.Contains(t, mockUI.displayedMessages[0], "Created situation aspect")
 }
 
+func TestSceneManager_ApplyActionEffects_CreateAdvantage_WithLLM(t *testing.T) {
+	// Create a mock LLM client that returns a creative aspect name
+	mockLLM := &MockLLMClient{
+		response: `{
+			"aspect_text": "Perfect Vantage Point",
+			"description": "The character has found an excellent position",
+			"duration": "scene",
+			"free_invokes": 1,
+			"is_boost": false,
+			"reasoning": "The jump gave them a tactical advantage"
+		}`,
+	}
+
+	engine, err := NewWithLLM(mockLLM)
+	require.NoError(t, err)
+
+	sm := engine.GetSceneManager()
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	player := character.NewCharacter("player1", "Test Character")
+	player.SetSkill("Athletics", dice.Good)
+	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	// Create a successful Create Advantage action
+	testAction := createTestAction(t, "Create an Advantage", "Athletics", "Jump over the obstacle")
+
+	// Simulate success
+	roller := dice.NewSeededRoller(12345)
+	result := roller.RollWithModifier(dice.Good, 2)
+	testAction.CheckResult = result
+	testAction.Outcome = result.CompareAgainst(dice.Fair)
+
+	initialAspectCount := len(sm.currentScene.SituationAspects)
+	sm.applyActionEffects(testAction, nil)
+
+	assert.Equal(t, initialAspectCount+1, len(sm.currentScene.SituationAspects))
+
+	newAspect := sm.currentScene.SituationAspects[len(sm.currentScene.SituationAspects)-1]
+	// With LLM, it should have the creative aspect name instead of the fallback
+	assert.Equal(t, "Perfect Vantage Point", newAspect.Aspect)
+	assert.Equal(t, player.ID, newAspect.CreatedBy)
+	assert.True(t, newAspect.FreeInvokes > 0)
+
+	// Verify UI was called with the creative name
+	assert.True(t, len(mockUI.displayedMessages) > 0)
+	assert.Contains(t, mockUI.displayedMessages[0], "Perfect Vantage Point")
+}
+
 func TestSceneManager_GetCurrentScene(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
