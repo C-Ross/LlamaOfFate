@@ -96,13 +96,11 @@ type AttackContext struct {
 
 // ConsequenceAspectData holds the data for consequence aspect generation template
 type ConsequenceAspectData struct {
-	CharacterName     string
-	AttackerName      string
-	Severity          string
-	ConflictType      string
-	AttackSkill       string // Skill used in the attack
-	AttackDescription string // Narrative of the attack
-	AttackShifts      int    // Shifts of damage
+	CharacterName string
+	AttackerName  string
+	Severity      string
+	ConflictType  string
+	AttackContext
 }
 
 // TakenOutData holds the data for taken out narrative template
@@ -112,9 +110,7 @@ type TakenOutData struct {
 	AttackerHighConcept string
 	ConflictType        string
 	SceneDescription    string
-	AttackSkill         string // Skill used in the attack
-	AttackDescription   string // Narrative of the attack
-	AttackShifts        int    // Shifts of damage
+	AttackContext
 }
 
 // NewSceneManager creates a new scene manager
@@ -1269,13 +1265,11 @@ func (sm *SceneManager) generateConsequenceAspect(ctx context.Context, conseqTyp
 	}
 
 	data := ConsequenceAspectData{
-		CharacterName:     sm.player.Name,
-		AttackerName:      attacker.Name,
-		Severity:          string(conseqType),
-		ConflictType:      conflictType,
-		AttackSkill:       attackCtx.Skill,
-		AttackDescription: attackCtx.Description,
-		AttackShifts:      attackCtx.Shifts,
+		CharacterName: sm.player.Name,
+		AttackerName:  attacker.Name,
+		Severity:      string(conseqType),
+		ConflictType:  conflictType,
+		AttackContext: attackCtx,
 	}
 
 	prompt, err := RenderConsequenceAspect(data)
@@ -1426,9 +1420,7 @@ func (sm *SceneManager) generateTakenOutNarrativeAndOutcome(ctx context.Context,
 		AttackerHighConcept: attacker.Aspects.HighConcept,
 		ConflictType:        conflictType,
 		SceneDescription:    sm.currentScene.Description,
-		AttackSkill:         attackCtx.Skill,
-		AttackDescription:   attackCtx.Description,
-		AttackShifts:        attackCtx.Shifts,
+		AttackContext:       attackCtx,
 	}
 
 	prompt, err := RenderTakenOut(data)

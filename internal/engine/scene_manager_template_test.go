@@ -61,13 +61,15 @@ func TestSceneResponseTemplate(t *testing.T) {
 func TestConsequenceAspectTemplate(t *testing.T) {
 	// Create test data
 	data := ConsequenceAspectData{
-		CharacterName:     "Hero",
-		AttackerName:      "Dark Knight",
-		Severity:          "moderate",
-		ConflictType:      "physical",
-		AttackSkill:       "Fight",
-		AttackDescription: "The Dark Knight's sword crashes down on your shield",
-		AttackShifts:      4,
+		CharacterName: "Hero",
+		AttackerName:  "Dark Knight",
+		Severity:      "moderate",
+		ConflictType:  "physical",
+		AttackContext: AttackContext{
+			Skill:       "Fight",
+			Description: "The Dark Knight's sword crashes down on your shield",
+			Shifts:      4,
+		},
 	}
 
 	// Execute the template
@@ -118,9 +120,11 @@ func TestTakenOutTemplate(t *testing.T) {
 		AttackerHighConcept: "Corrupted Champion of Darkness",
 		ConflictType:        "physical",
 		SceneDescription:    "A dark throne room with shadowy pillars",
-		AttackSkill:         "Fight",
-		AttackDescription:   "The Dark Knight's final blow strikes true",
-		AttackShifts:        6,
+		AttackContext: AttackContext{
+			Skill:       "Fight",
+			Description: "The Dark Knight's final blow strikes true",
+			Shifts:      6,
+		},
 	}
 
 	// Execute the template
