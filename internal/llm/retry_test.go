@@ -404,9 +404,9 @@ func TestRetryingClient_GetModelInfo(t *testing.T) {
 
 func TestIsRetryableError(t *testing.T) {
 	tests := []struct {
-		name       string
-		err        error
-		retryable  bool
+		name      string
+		err       error
+		retryable bool
 	}{
 		{
 			name:      "nil error",
