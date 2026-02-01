@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
-	"math/rand"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"strings"
@@ -180,7 +180,7 @@ func (r *RetryingClient) calculateBackoff(attempt int) time.Duration {
 		backoff = float64(r.config.MaxBackoff)
 	}
 
-	// Add jitter (±25%)
+	// Add jitter (±25%) - using math/rand/v2 which is safe for concurrent use
 	jitter := backoff * 0.25 * (rand.Float64()*2 - 1)
 	backoff += jitter
 

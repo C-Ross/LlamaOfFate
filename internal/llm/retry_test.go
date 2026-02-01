@@ -536,7 +536,7 @@ func TestCalculateBackoff(t *testing.T) {
 	// Third attempt should be roughly 2x second (with jitter)
 	assert.Greater(t, backoff3, backoff2)
 
-	// Test that max backoff is respected
+	// Test that max backoff is respected (with jitter up to 25%)
 	backoff10 := retryClient.calculateBackoff(10)
-	assert.LessOrEqual(t, backoff10, config.MaxBackoff*11/10) // Allow 10% margin for jitter
+	assert.LessOrEqual(t, backoff10, config.MaxBackoff*5/4) // Allow 25% margin for jitter
 }
