@@ -96,13 +96,13 @@ type AttackContext struct {
 
 // ConsequenceAspectData holds the data for consequence aspect generation template
 type ConsequenceAspectData struct {
-	CharacterName      string
-	AttackerName       string
-	Severity           string
-	ConflictType       string
-	AttackSkill        string // New: skill used in the attack
-	AttackDescription  string // New: narrative of the attack
-	AttackShifts       int    // New: shifts of damage
+	CharacterName     string
+	AttackerName      string
+	Severity          string
+	ConflictType      string
+	AttackSkill       string // Skill used in the attack
+	AttackDescription string // Narrative of the attack
+	AttackShifts      int    // Shifts of damage
 }
 
 // TakenOutData holds the data for taken out narrative template
@@ -112,9 +112,9 @@ type TakenOutData struct {
 	AttackerHighConcept string
 	ConflictType        string
 	SceneDescription    string
-	AttackSkill         string // New: skill used in the attack
-	AttackDescription   string // New: narrative of the attack
-	AttackShifts        int    // New: shifts of damage
+	AttackSkill         string // Skill used in the attack
+	AttackDescription   string // Narrative of the attack
+	AttackShifts        int    // Shifts of damage
 }
 
 // NewSceneManager creates a new scene manager
