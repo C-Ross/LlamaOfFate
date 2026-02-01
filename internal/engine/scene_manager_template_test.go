@@ -57,3 +57,111 @@ func TestSceneResponseTemplate(t *testing.T) {
 	assert.Contains(t, result, "clarification", "Interaction type should be included")
 	assert.Contains(t, result, "FATE CORE GM PRINCIPLES", "Template should contain GM guidance")
 }
+
+func TestConsequenceAspectTemplate(t *testing.T) {
+	// Create test data
+	data := ConsequenceAspectData{
+		CharacterName:     "Hero",
+		AttackerName:      "Dark Knight",
+		Severity:          "moderate",
+		ConflictType:      "physical",
+		AttackSkill:       "Fight",
+		AttackDescription: "The Dark Knight's sword crashes down on your shield",
+		AttackShifts:      4,
+	}
+
+	// Execute the template
+	var buf bytes.Buffer
+	err := ConsequenceAspectPrompt.Execute(&buf, data)
+	require.NoError(t, err, "Template execution should not fail")
+
+	result := buf.String()
+
+	// Verify the template was populated correctly
+	assert.Contains(t, result, "Hero", "Character name should be included")
+	assert.Contains(t, result, "Dark Knight", "Attacker name should be included")
+	assert.Contains(t, result, "moderate", "Severity should be included")
+	assert.Contains(t, result, "physical", "Conflict type should be included")
+	assert.Contains(t, result, "Fight", "Attack skill should be included")
+	assert.Contains(t, result, "The Dark Knight's sword crashes down on your shield", "Attack description should be included")
+	assert.Contains(t, result, "4", "Attack shifts should be included")
+}
+
+func TestConsequenceAspectTemplateWithoutAttackContext(t *testing.T) {
+	// Create test data without attack context (optional fields)
+	data := ConsequenceAspectData{
+		CharacterName: "Hero",
+		AttackerName:  "Dark Knight",
+		Severity:      "mild",
+		ConflictType:  "mental",
+	}
+
+	// Execute the template
+	var buf bytes.Buffer
+	err := ConsequenceAspectPrompt.Execute(&buf, data)
+	require.NoError(t, err, "Template execution should not fail even without attack context")
+
+	result := buf.String()
+
+	// Verify the template was populated with basic fields
+	assert.Contains(t, result, "Hero", "Character name should be included")
+	assert.Contains(t, result, "Dark Knight", "Attacker name should be included")
+	assert.Contains(t, result, "mild", "Severity should be included")
+	assert.Contains(t, result, "mental", "Conflict type should be included")
+}
+
+func TestTakenOutTemplate(t *testing.T) {
+	// Create test data
+	data := TakenOutData{
+		CharacterName:       "Hero",
+		AttackerName:        "Dark Knight",
+		AttackerHighConcept: "Corrupted Champion of Darkness",
+		ConflictType:        "physical",
+		SceneDescription:    "A dark throne room with shadowy pillars",
+		AttackSkill:         "Fight",
+		AttackDescription:   "The Dark Knight's final blow strikes true",
+		AttackShifts:        6,
+	}
+
+	// Execute the template
+	var buf bytes.Buffer
+	err := TakenOutPrompt.Execute(&buf, data)
+	require.NoError(t, err, "Template execution should not fail")
+
+	result := buf.String()
+
+	// Verify the template was populated correctly
+	assert.Contains(t, result, "Hero", "Character name should be included")
+	assert.Contains(t, result, "Dark Knight", "Attacker name should be included")
+	assert.Contains(t, result, "Corrupted Champion of Darkness", "Attacker high concept should be included")
+	assert.Contains(t, result, "physical", "Conflict type should be included")
+	assert.Contains(t, result, "A dark throne room with shadowy pillars", "Scene description should be included")
+	assert.Contains(t, result, "Fight", "Attack skill should be included")
+	assert.Contains(t, result, "The Dark Knight's final blow strikes true", "Attack description should be included")
+	assert.Contains(t, result, "6", "Attack shifts should be included")
+}
+
+func TestTakenOutTemplateWithoutAttackContext(t *testing.T) {
+	// Create test data without attack context (optional fields)
+	data := TakenOutData{
+		CharacterName:       "Hero",
+		AttackerName:        "Dark Knight",
+		AttackerHighConcept: "Corrupted Champion of Darkness",
+		ConflictType:        "mental",
+		SceneDescription:    "A dark throne room",
+	}
+
+	// Execute the template
+	var buf bytes.Buffer
+	err := TakenOutPrompt.Execute(&buf, data)
+	require.NoError(t, err, "Template execution should not fail even without attack context")
+
+	result := buf.String()
+
+	// Verify the template was populated with basic fields
+	assert.Contains(t, result, "Hero", "Character name should be included")
+	assert.Contains(t, result, "Dark Knight", "Attacker name should be included")
+	assert.Contains(t, result, "Corrupted Champion of Darkness", "Attacker high concept should be included")
+	assert.Contains(t, result, "mental", "Conflict type should be included")
+	assert.Contains(t, result, "A dark throne room", "Scene description should be included")
+}
