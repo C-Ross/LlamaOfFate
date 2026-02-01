@@ -187,7 +187,7 @@ func RenderNPCAttack(data NPCAttackData) (string, error) {
 }
 
 // RenderActionParse renders the action parse prompt
-func RenderActionParse(data ActionParseRequest) (string, error) {
+func RenderActionParse(data ActionParseTemplateData) (string, error) {
 	return executeTemplate(ActionParsePrompt, data)
 }
 

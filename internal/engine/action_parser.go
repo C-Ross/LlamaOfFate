@@ -10,6 +10,7 @@ import (
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 )
 
@@ -22,12 +23,23 @@ type ActionParseRequest struct {
 	OtherCharacters []*character.Character `json:"other_characters,omitempty"` // Other characters in the scene
 }
 
+// ActionParseTemplateData is the data passed to the action parse template
+// It includes pre-computed difficulty guidance based on character skills
+type ActionParseTemplateData struct {
+	ActionParseRequest
+	DifficultyMin     int    // Recommended minimum difficulty
+	DifficultyMax     int    // Recommended maximum difficulty
+	DifficultyDefault int    // Suggested default difficulty
+	DifficultyGuide   string // Human-readable difficulty guidance
+}
+
 // ActionParseResponse represents the LLM's response for action parsing
 type ActionParseResponse struct {
 	ActionType  string `json:"action_type"` // "Overcome", "Create an Advantage", "Attack", "Defend"
 	Skill       string `json:"skill"`       // The Fate Core skill to use
 	Description string `json:"description"` // Clean description of what they're trying to do
 	Target      string `json:"target"`      // The target of the action (if any)
+	Difficulty  int    `json:"difficulty"`  // Passive opposition rating on the Fate ladder (-2 to +8)
 	Reasoning   string `json:"reasoning"`   // Explanation of the choice
 	Confidence  int    `json:"confidence"`  // 1-10 scale of how confident the LLM is
 }
@@ -125,6 +137,9 @@ func (ap *ActionParser) ParseAction(ctx context.Context, req ActionParseRequest)
 	}
 	parsedAction.RawInput = req.RawInput
 
+	// Set difficulty from LLM response (attacks will override with active defense later)
+	parsedAction.Difficulty = dice.Ladder(parseResp.Difficulty)
+
 	return parsedAction, nil
 }
 
@@ -133,9 +148,40 @@ func (ap *ActionParser) buildSystemPrompt() (string, error) {
 	return RenderActionParseSystem()
 }
 
-// buildUserPrompt creates the user prompt using templates
+// buildUserPrompt creates the user prompt using templates with pre-computed difficulty guidance
 func (ap *ActionParser) buildUserPrompt(req ActionParseRequest) (string, error) {
-	return RenderActionParse(req)
+	// Compute difficulty range based on character's highest skill
+	highestSkill := dice.Mediocre
+	for _, level := range req.Character.Skills {
+		if level > highestSkill {
+			highestSkill = level
+		}
+	}
+
+	// Fate guidance: 2 below skill = easy, at skill = moderate, 2 above = hard
+	// Typical range: Fair (+2) for routine to skill+2 for challenging
+	minDiff := int(dice.Average)                       // Floor at Average (+1) for meaningful rolls
+	defaultDiff := int(dice.Fair)                      // Fair (+2) is the standard default
+	maxDiff := int(highestSkill) + 2                   // Up to 2 above their best skill
+	if maxDiff < int(dice.Good) {
+		maxDiff = int(dice.Good) // At least Good (+3) as upper bound
+	}
+	if maxDiff > int(dice.Fantastic) {
+		maxDiff = int(dice.Fantastic) // Cap at Fantastic (+6) for normal play
+	}
+
+	// Build human-readable guide
+	guide := fmt.Sprintf("%d=easy, %d=moderate, %d=hard", minDiff, defaultDiff, maxDiff)
+
+	templateData := ActionParseTemplateData{
+		ActionParseRequest: req,
+		DifficultyMin:      minDiff,
+		DifficultyMax:      maxDiff,
+		DifficultyDefault:  defaultDiff,
+		DifficultyGuide:    guide,
+	}
+
+	return RenderActionParse(templateData)
 }
 
 // parseActionType converts string action type to enum
