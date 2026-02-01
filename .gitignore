@@ -21,10 +21,10 @@ go.work
 bin/
 
 # Action binaries and executables
-action-parser
-llm-scene-loop
-fate-guided-scene
-main
+/action-parser
+/llm-scene-loop
+/fate-guided-scene
+/main
 
 # Configuration files with sensitive information
 *.local.yaml

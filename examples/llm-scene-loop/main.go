@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
-	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
@@ -15,8 +16,40 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/ui/terminal"
 )
 
+// SceneConfig holds all the data needed to set up a scene
+type SceneConfig struct {
+	Name        string
+	Description string
+	Player      *character.Character
+	NPCs        []*character.Character
+	Scene       *scene.Scene
+	Farewell    string
+}
+
 func main() {
 	logging.SetupDefaultLogging()
+
+	// Parse command-line arguments
+	sceneFlag := flag.String("scene", "", "Scene to play: tower, heist, saloon (default: random)")
+	listFlag := flag.Bool("list", false, "List available scenes and exit")
+	flag.Parse()
+
+	availableScenes := []string{"tower", "heist", "saloon"}
+
+	if *listFlag {
+		fmt.Println("Available scenes:")
+		fmt.Println("  tower  - Fantasy: The Abandoned Wizard's Tower")
+		fmt.Println("  heist  - Cyberpunk: Megacorp Data Vault (multiple enemies, dangerous aspect)")
+		fmt.Println("  saloon - Western: The Dusty Spur Saloon (non-hostile NPC, two aspects)")
+		return
+	}
+
+	// Determine which scene to play
+	selectedScene := *sceneFlag
+	if selectedScene == "" {
+		selectedScene = availableScenes[rand.Intn(len(availableScenes))]
+		fmt.Printf("Randomly selected scene: %s\n\n", selectedScene)
+	}
 
 	fmt.Println("=== LlamaOfFate Scene Demo ===")
 	fmt.Println()
@@ -50,30 +83,30 @@ func main() {
 		log.Fatalf("Failed to start engine: %v", err)
 	}
 
-	// Create a sample character
-	player := createSampleCharacter()
+	// Build the selected scene configuration
+	var sceneConfig SceneConfig
+	switch selectedScene {
+	case "tower":
+		sceneConfig = buildTowerScene()
+	case "heist":
+		sceneConfig = buildHeistScene()
+	case "saloon":
+		sceneConfig = buildSaloonScene()
+	default:
+		log.Fatalf("Unknown scene: %s. Use -list to see available scenes.", selectedScene)
+	}
 
-	// Create an opponent character
-	opponent := createSampleOpponent()
+	// Register all characters with the engine
+	gameEngine.AddCharacter(sceneConfig.Player)
+	for _, npc := range sceneConfig.NPCs {
+		gameEngine.AddCharacter(npc)
+	}
 
-	// Register characters with the engine
-	gameEngine.AddCharacter(player)
-	gameEngine.AddCharacter(opponent)
-
-	// Create a pre-configured scene with multiple characters
-	sampleScene := scene.NewScene(
-		"abandoned-tower",
-		"The Abandoned Wizard's Tower",
-		"You stand before a crumbling stone tower that stretches high into the mist. "+
-			"Strange blue lights flicker through broken windows near the top. "+
-			"The heavy wooden door hangs ajar, revealing darkness within. "+
-			"Ancient runes are carved deep into the stone archway, still glowing faintly with magical energy. "+
-			"The air hums with residual magic, and you hear the distant sound of something large moving inside.",
-	)
-
-	// Add characters to the scene
-	sampleScene.AddCharacter(player.ID)
-	sampleScene.AddCharacter(opponent.ID)
+	// Add all characters to the scene
+	sceneConfig.Scene.AddCharacter(sceneConfig.Player.ID)
+	for _, npc := range sceneConfig.NPCs {
+		sceneConfig.Scene.AddCharacter(npc.ID)
+	}
 
 	// Get the scene manager
 	sceneManager := gameEngine.GetSceneManager()
@@ -82,7 +115,7 @@ func main() {
 	}
 
 	// Start the scene with the pre-configured scene
-	err = sceneManager.StartScene(sampleScene, player)
+	err = sceneManager.StartScene(sceneConfig.Scene, sceneConfig.Player)
 	if err != nil {
 		log.Fatalf("Failed to start scene: %v", err)
 	}
@@ -108,55 +141,5 @@ func main() {
 
 	// Display final character state
 	terminal.DisplayCharacter()
-	fmt.Println("\nThanks for exploring the tower!")
-}
-
-func createSampleCharacter() *character.Character {
-	player := character.NewCharacter("player1", "Lyra Moonwhisper")
-
-	// Set aspects
-	player.Aspects.HighConcept = "Scholarly Arcane Investigator"
-	player.Aspects.Trouble = "Curiosity About Forbidden Knowledge"
-	player.Aspects.AddAspect("Trained by the College of Mages")
-	player.Aspects.AddAspect("Sees Magic in Everything")
-	player.Aspects.AddAspect("Protective Ward Tattoos")
-
-	// Set skills focused on investigation and magic
-	player.SetSkill("Lore", dice.Superb)       // +5 - Primary skill
-	player.SetSkill("Investigate", dice.Great) // +4
-	player.SetSkill("Notice", dice.Great)      // +4
-	player.SetSkill("Will", dice.Good)         // +3
-	player.SetSkill("Empathy", dice.Good)      // +3
-	player.SetSkill("Rapport", dice.Good)      // +3
-	player.SetSkill("Athletics", dice.Fair)    // +2
-	player.SetSkill("Burglary", dice.Fair)     // +2
-	player.SetSkill("Stealth", dice.Fair)      // +2
-	player.SetSkill("Crafts", dice.Fair)       // +2
-	player.SetSkill("Deceive", dice.Average)   // +1
-	player.SetSkill("Drive", dice.Average)     // +1
-	player.SetSkill("Fight", dice.Average)     // +1
-	player.SetSkill("Physique", dice.Average)  // +1
-	player.SetSkill("Provoke", dice.Average)   // +1
-
-	// Set fate points and refresh
-	player.FatePoints = 3
-	player.Refresh = 3
-
-	return player
-}
-
-func createSampleOpponent() *character.Character {
-	// Create a nameless (Good) NPC - has 2 stress boxes, no consequences
-	// Per Fate Core SRD: https://fate-srd.com/fate-core/creating-and-playing-opposition#good-nameless-npcs
-	opponent := character.NewNamelessNPC("goblin-guard", "Goblin Guard", character.CharacterTypeNamelessGood, "Fight")
-
-	// Nameless NPCs get a single aspect (their high concept)
-	opponent.Aspects.HighConcept = "Sneaky Tower Guardian"
-
-	// Good nameless NPCs have one skill at Good (+3) - already set by factory
-	// Add a couple more skills at lower levels for variety
-	opponent.SetSkill("Stealth", dice.Fair)   // +2
-	opponent.SetSkill("Notice", dice.Average) // +1
-
-	return opponent
+	fmt.Printf("\n%s\n", sceneConfig.Farewell)
 }
