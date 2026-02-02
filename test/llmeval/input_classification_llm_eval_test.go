@@ -245,6 +245,104 @@ func getActionTestCases() []InputClassificationTestCase {
 	}
 }
 
+// getThirdPersonClassificationTestCases returns inputs using third-person language (character names/pronouns)
+// Players often describe their character's actions in third person
+func getThirdPersonClassificationTestCases() []InputClassificationTestCase {
+	return []InputClassificationTestCase{
+		// Dialog - third person
+		{
+			Name:             "Third person - character greets",
+			RawInput:         "Magnus greets the innkeeper warmly",
+			SceneName:        "The Rusty Anchor Tavern",
+			SceneDescription: "A cozy tavern with a friendly atmosphere",
+			ExpectedType:     "dialog",
+			Description:      "Third person greeting NPC - dialog",
+		},
+		{
+			Name:             "Third person - she asks",
+			RawInput:         "She asks the merchant about his wares",
+			SceneName:        "Market Square",
+			SceneDescription: "A bustling marketplace with various vendors",
+			ExpectedType:     "dialog",
+			Description:      "Third person question to NPC - dialog",
+		},
+		{
+			Name:             "Third person - character says",
+			RawInput:         "Magnus says 'I'm looking for work, friend'",
+			SceneName:        "Guild Hall",
+			SceneDescription: "The local adventurer's guild, job postings on the wall",
+			ExpectedType:     "dialog",
+			Description:      "Third person direct speech - dialog",
+		},
+		// Clarification - third person
+		{
+			Name:             "Third person - character looks around",
+			RawInput:         "Magnus looks around the room",
+			SceneName:        "Study Chamber",
+			SceneDescription: "A quiet study filled with books and papers",
+			ExpectedType:     "clarification",
+			Description:      "Third person basic observation - clarification",
+		},
+		{
+			Name:             "Third person - she examines",
+			RawInput:         "She examines the strange markings on the wall",
+			SceneName:        "Ancient Ruins",
+			SceneDescription: "Crumbling stone walls covered in mysterious symbols",
+			ExpectedType:     "clarification",
+			Description:      "Third person examining without opposition - clarification",
+		},
+		{
+			Name:             "Third person - character thinks",
+			RawInput:         "Magnus thinks about the old wizard's warning",
+			SceneName:        "Forest Path",
+			SceneDescription: "A quiet trail through peaceful woods",
+			ExpectedType:     "clarification",
+			Description:      "Third person internal reflection - clarification",
+		},
+		// Action - third person
+		{
+			Name:             "Third person - character attacks",
+			RawInput:         "Magnus attacks the goblin with his sword",
+			SceneName:        "Forest Clearing",
+			SceneDescription: "A clearing where goblins have ambushed you",
+			ExpectedType:     "action",
+			Description:      "Third person combat attack - action",
+		},
+		{
+			Name:             "Third person - she sneaks",
+			RawInput:         "She sneaks past the sleeping guard",
+			SceneName:        "Castle Corridor",
+			SceneDescription: "A dimly lit corridor with a guard dozing at his post",
+			ExpectedType:     "action",
+			Description:      "Third person stealth with opposition - action",
+		},
+		{
+			Name:             "Third person - character climbs",
+			RawInput:         "Magnus climbs the wall to escape the pursuers",
+			SceneName:        "City Alley",
+			SceneDescription: "A narrow alley, angry guards closing in behind",
+			ExpectedType:     "action",
+			Description:      "Third person physical challenge - action",
+		},
+		{
+			Name:             "Third person - he jumps",
+			RawInput:         "He leaps across the chasm",
+			SceneName:        "Mountain Pass",
+			SceneDescription: "A deep ravine blocks the mountain path",
+			ExpectedType:     "action",
+			Description:      "Third person overcoming obstacle - action",
+		},
+		{
+			Name:             "Third person - character persuades",
+			RawInput:         "Magnus tries to convince the guard to let him pass",
+			SceneName:        "City Gate",
+			SceneDescription: "A stern guard blocking entry to the noble quarter",
+			ExpectedType:     "action",
+			Description:      "Third person social challenge with opposition - action",
+		},
+	}
+}
+
 // InputClassificationResult stores the result of classification evaluation
 type InputClassificationResult struct {
 	TestCase   InputClassificationTestCase
@@ -288,6 +386,7 @@ func TestInputClassification_LLMEvaluation(t *testing.T) {
 		{"Dialog", getDialogTestCases()},
 		{"Clarification", getClarificationTestCases()},
 		{"Action", getActionTestCases()},
+		{"ThirdPerson", getThirdPersonClassificationTestCases()},
 	}
 
 	var results []InputClassificationResult

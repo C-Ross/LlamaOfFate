@@ -394,6 +394,97 @@ func getCreateAdvantageTestCases() []ActionParserTestCase {
 	}
 }
 
+// getThirdPersonTestCases returns test cases using third-person language (character names/pronouns)
+// Players often describe their character's actions in third person rather than first person
+func getThirdPersonTestCases() []ActionParserTestCase {
+	return []ActionParserTestCase{
+		// Overcome - third person
+		{
+			Name:               "Third person - character name climbing",
+			RawInput:           "Magnus climbs over the wall",
+			Context:            "A stone wall blocks the path forward",
+			ExpectedType:       action.Overcome,
+			ExpectedSkills:     []string{"Athletics"},
+			ExpectedDifficulty: 3,
+			Description:        "Third person with character name - Overcome obstacle",
+		},
+		{
+			Name:               "Third person - pronoun swimming",
+			RawInput:           "He swims across the river to reach the other side",
+			Context:            "A fast-flowing river separates Magnus from his destination",
+			ExpectedType:       action.Overcome,
+			ExpectedSkills:     []string{"Athletics", "Physique"},
+			ExpectedDifficulty: 3,
+			Description:        "Third person with pronoun - Overcome obstacle",
+		},
+		{
+			Name:               "Third person - picks lock",
+			RawInput:           "Magnus picks the lock on the chest",
+			Context:            "A locked treasure chest sits in the corner of the room",
+			ExpectedType:       action.Overcome,
+			ExpectedSkills:     []string{"Burglary"},
+			ExpectedDifficulty: 2,
+			Description:        "Third person lock picking - Overcome",
+		},
+		// Attack - third person
+		{
+			Name:               "Third person - character attacks",
+			RawInput:           "Magnus swings his sword at the orc",
+			Context:            "In combat with an orc warrior",
+			ExpectedType:       action.Attack,
+			ExpectedSkills:     []string{"Fight"},
+			ExpectedDifficulty: 0,
+			Description:        "Third person melee attack",
+		},
+		{
+			Name:               "Third person - she shoots",
+			RawInput:           "She fires an arrow at the fleeing bandit",
+			Context:            "Chasing bandits through the forest, one is trying to escape",
+			ExpectedType:       action.Attack,
+			ExpectedSkills:     []string{"Shoot"},
+			ExpectedDifficulty: 0,
+			Description:        "Third person ranged attack with pronoun",
+		},
+		{
+			Name:               "Third person - punches thug",
+			RawInput:           "Magnus punches the thug in the gut",
+			Context:            "Bar fight with local ruffians",
+			ExpectedType:       action.Attack,
+			ExpectedSkills:     []string{"Fight"},
+			ExpectedDifficulty: 0,
+			Description:        "Third person unarmed attack",
+		},
+		// Create Advantage - third person
+		{
+			Name:               "Third person - scouts ahead",
+			RawInput:           "Magnus scouts ahead to find a good ambush position",
+			Context:            "Planning to ambush a supply wagon on the road",
+			ExpectedType:       action.CreateAdvantage,
+			ExpectedSkills:     []string{"Stealth", "Notice"},
+			ExpectedDifficulty: 2,
+			Description:        "Third person scouting - Create Advantage",
+		},
+		{
+			Name:               "Third person - studies opponent",
+			RawInput:           "She studies the knight's fighting stance for weaknesses",
+			Context:            "About to duel a knight, watching him prepare",
+			ExpectedType:       action.CreateAdvantage,
+			ExpectedSkills:     []string{"Notice", "Fight"},
+			ExpectedDifficulty: 3,
+			Description:        "Third person tactical analysis - Create Advantage",
+		},
+		{
+			Name:               "Third person - creates distraction",
+			RawInput:           "Magnus throws a rock to distract the guards",
+			Context:            "Sneaking into the fortress, guards patrol nearby",
+			ExpectedType:       action.CreateAdvantage,
+			ExpectedSkills:     []string{"Deceive", "Stealth", "Shoot"},
+			ExpectedDifficulty: 2,
+			Description:        "Third person distraction - Create Advantage",
+		},
+	}
+}
+
 // EvaluationResult stores the result of a single test case evaluation
 type EvaluationResult struct {
 	TestCase         ActionParserTestCase
@@ -456,6 +547,7 @@ func TestActionParser_LLMEvaluation(t *testing.T) {
 		{"Overcome", getOvercomeTestCases()},
 		{"Attack", getAttackTestCases()},
 		{"CreateAdvantage", getCreateAdvantageTestCases()},
+		{"ThirdPerson", getThirdPersonTestCases()},
 	}
 
 	var results []EvaluationResult
