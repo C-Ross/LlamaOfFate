@@ -8,6 +8,7 @@ These tests evaluate how well the LLM performs specific tasks:
 
 - **Action Parser Tests** (`action_parser_llm_eval_test.go`): Verify that player inputs are correctly classified as Overcome, Attack, or Create Advantage actions with appropriate skills and difficulty ratings.
 - **Input Classification Tests** (`input_classification_llm_eval_test.go`): Verify that player inputs are correctly categorized as dialog, clarification requests, or game actions.
+- **Aspect Generator Tests** (`aspect_generator_llm_eval_test.go`): Verify that Create Advantage outcomes produce valid aspects with correct free invokes, appropriate length (2-10 words), and no duplicates of existing aspects.
 
 Use these tests to:
 - Validate LLM configuration changes
