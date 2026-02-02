@@ -1,0 +1,79 @@
+# LLM Evaluation Tests
+
+This package contains evaluation tests for LLM-powered components. These tests call real LLM APIs to validate classification accuracy and behavior.
+
+## Purpose
+
+These tests evaluate how well the LLM performs specific tasks:
+
+- **Action Parser Tests** (`action_parser_llm_eval_test.go`): Verify that player inputs are correctly classified as Overcome, Attack, or Create Advantage actions with appropriate skills and difficulty ratings.
+- **Input Classification Tests** (`input_classification_llm_eval_test.go`): Verify that player inputs are correctly categorized as dialog, clarification requests, or game actions.
+
+Use these tests to:
+- Validate LLM configuration changes
+- Detect regressions after prompt template modifications
+- Diagnose classification biases (e.g., over-selecting Create Advantage vs Overcome)
+- Evaluate different LLM models or parameters
+
+## Requirements
+
+### Connectivity
+
+These tests require a live connection to the Azure OpenAI API. You must set the following environment variables:
+
+```bash
+export AZURE_API_ENDPOINT="https://your-resource.openai.azure.com/"
+export AZURE_API_KEY="your-api-key"
+```
+
+Tests will be skipped if these credentials are not configured.
+
+### Build Tag
+
+Tests are gated behind the `llmeval` build tag to prevent them from running during normal test cycles (they are slow and require API access).
+
+Run with:
+```bash
+make test-llm
+```
+
+Or directly:
+```bash
+go test -v -tags=llmeval ./test/llmeval/...
+```
+
+### Verbose Output
+
+By default, tests only output a summary. To see per-test details (useful for debugging failures), set:
+
+```bash
+VERBOSE_TESTS=1 make test-llm
+```
+
+This enables detailed logging showing:
+- Each test case name and input
+- Expected vs actual classifications
+- Skill and difficulty comparisons
+
+## Test Structure
+
+Each test file follows a consistent pattern:
+
+1. **Test cases** are defined as structs with inputs and expected outputs
+2. **Acceptable alternatives** allow flexibility (e.g., multiple valid skills)
+3. **Difficulty tolerance** of ±1 accounts for reasonable LLM variance
+4. **Summary reports** show pass/fail rates by category
+
+## Known Issues
+
+- Intimidation inputs can be ambiguously classified as Attack or Create Advantage depending on context. See [Issue #9](https://github.com/C-Ross/LlamaOfFate/issues/9).
+
+## Adding New Tests
+
+When adding test cases:
+
+1. Group by expected classification type
+2. Include clear, unambiguous inputs when possible
+3. Document any known ambiguities
+4. Use `AcceptableSkills` for inputs where multiple skills are valid
+5. Set `SkipDifficultyCheck: true` for attacks (difficulty comes from active defense)

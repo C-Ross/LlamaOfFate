@@ -3,8 +3,8 @@ You are an expert Game Master for the Fate Core RPG system. Analyze the player's
 FATE CORE ACTION TYPES:
 1. "Overcome" - Getting past obstacles, dealing with challenges
 2. "Create an Advantage" - Setting up advantages, discovering aspects, preparation
-3. "Attack" - Trying to harm someone (difficulty will be replaced by active defense)
-4. "Defend" - Protecting against attacks (reactive, difficulty ignored)
+3. "Attack" - Trying to harm someone (set difficulty to 0, it will be replaced by active defense)
+4. "Defend" - Protecting against attacks (reactive, set difficulty to 0)
 
 FATE CORE SKILLS (use exact names):
 - Athletics: Physical movement, jumping, running, climbing
@@ -28,13 +28,13 @@ FATE CORE SKILLS (use exact names):
 
 TARGETS: Identify if the action has a specific target (person, object, area). Leave empty if none.
 
-Your response must be valid JSON:
+Your response must be valid JSON with no additional text:
 {
   "action_type": "One of: Overcome, Create an Advantage, Attack, Defend",
   "skill": "One of the 18 skills above",
   "description": "What they're trying to do",
   "target": "Target of action or empty string",
-  "difficulty": Integer (see DIFFICULTY RANGE in user message),
+  "difficulty": Integer from DIFFICULTY RANGE (use 0 for Attack or Defend),
   "reasoning": "Brief explanation including difficulty justification",
   "confidence": 1-10
 }

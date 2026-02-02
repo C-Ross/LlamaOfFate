@@ -160,9 +160,9 @@ func (ap *ActionParser) buildUserPrompt(req ActionParseRequest) (string, error) 
 
 	// Fate guidance: 2 below skill = easy, at skill = moderate, 2 above = hard
 	// Typical range: Fair (+2) for routine to skill+2 for challenging
-	minDiff := int(dice.Average)                       // Floor at Average (+1) for meaningful rolls
-	defaultDiff := int(dice.Fair)                      // Fair (+2) is the standard default
-	maxDiff := int(highestSkill) + 2                   // Up to 2 above their best skill
+	minDiff := int(dice.Average)     // Floor at Average (+1) for meaningful rolls
+	defaultDiff := int(dice.Fair)    // Fair (+2) is the standard default
+	maxDiff := int(highestSkill) + 2 // Up to 2 above their best skill
 	if maxDiff < int(dice.Good) {
 		maxDiff = int(dice.Good) // At least Good (+3) as upper bound
 	}

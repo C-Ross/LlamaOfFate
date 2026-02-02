@@ -16,7 +16,7 @@ BINARY_NAME=llamaoffate
 BINARY_PATH=./bin/$(BINARY_NAME)
 MAIN_PATH=./cmd/cli
 
-.PHONY: all build clean test vet fmt lint deps help
+.PHONY: all build clean test test-llm vet fmt lint deps help
 
 # Default target
 all: clean deps vet fmt build
@@ -39,6 +39,12 @@ clean:
 test:
 	@echo "Running tests..."
 	$(GOTEST) -v ./...
+
+# Run LLM evaluation tests (requires AZURE_API_ENDPOINT and AZURE_API_KEY)
+test-llm:
+	@echo "Running LLM evaluation tests..."
+	@echo "Requires AZURE_API_ENDPOINT and AZURE_API_KEY environment variables"
+	$(GOTEST) -v -tags=llmeval ./test/llmeval/...
 
 # Run go vet
 vet:
@@ -69,13 +75,14 @@ run: build
 # Show help
 help:
 	@echo "Available targets:"
-	@echo "  all     - Clean, get deps, vet, format, and build"
-	@echo "  build   - Build the application"
-	@echo "  clean   - Remove build artifacts"
-	@echo "  test    - Run tests"
-	@echo "  vet     - Run go vet"
-	@echo "  fmt     - Format code"
-	@echo "  lint    - Run golangci-lint"
-	@echo "  deps    - Download and tidy dependencies"
-	@echo "  run     - Build and run the application"
-	@echo "  help    - Show this help message"
+	@echo "  all      - Clean, get deps, vet, format, and build"
+	@echo "  build    - Build the application"
+	@echo "  clean    - Remove build artifacts"
+	@echo "  test     - Run tests"
+	@echo "  test-llm - Run LLM evaluation tests (requires Azure credentials)"
+	@echo "  vet      - Run go vet"
+	@echo "  fmt      - Format code"
+	@echo "  lint     - Run golangci-lint"
+	@echo "  deps     - Download and tidy dependencies"
+	@echo "  run      - Build and run the application"
+	@echo "  help     - Show this help message"
