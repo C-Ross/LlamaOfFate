@@ -11,6 +11,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
+	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
 	"github.com/C-Ross/LlamaOfFate/internal/ui/terminal"
@@ -37,7 +38,11 @@ func initializeEngine() *engine.Engine {
 
 	// Try to create engine with LLM
 	azureClient := azure.NewClient(*config)
-	gameEngine, err := engine.NewWithLLM(azureClient)
+
+	// Wrap the Azure client with retry logic for resilience
+	retryClient := llm.NewRetryingClient(azureClient, llm.DefaultRetryConfig())
+
+	gameEngine, err := engine.NewWithLLM(retryClient)
 	if err != nil {
 		log.Fatalf("Failed to create engine with LLM: %v", err)
 	}

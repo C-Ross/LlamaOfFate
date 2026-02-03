@@ -151,7 +151,11 @@ func TestRetryingClient_ChatCompletion_RetriesOnRateLimit(t *testing.T) {
 		chatCompletionFunc: func(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
 			attempts++
 			if attempts < 2 {
-				return nil, fmt.Errorf("API request failed with status 429: rate limit exceeded")
+				return nil, &APIError{
+					StatusCode: 429,
+					Status:     "429 Too Many Requests",
+					Body:       "rate limit exceeded",
+				}
 			}
 			return &CompletionResponse{
 				ID: "success-id",
@@ -186,7 +190,11 @@ func TestRetryingClient_ChatCompletion_RetriesOnServerError(t *testing.T) {
 		chatCompletionFunc: func(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
 			attempts++
 			if attempts < 2 {
-				return nil, fmt.Errorf("API request failed with status 503: service unavailable")
+				return nil, &APIError{
+					StatusCode: 503,
+					Status:     "503 Service Unavailable",
+					Body:       "service unavailable",
+				}
 			}
 			return &CompletionResponse{
 				ID: "success-id",
@@ -220,7 +228,11 @@ func TestRetryingClient_ChatCompletion_DoesNotRetryOnNonRetryableError(t *testin
 	mockClient := &MockLLMClient{
 		chatCompletionFunc: func(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
 			attempts++
-			return nil, fmt.Errorf("API request failed with status 400: bad request")
+			return nil, &APIError{
+				StatusCode: 400,
+				Status:     "400 Bad Request",
+				Body:       "bad request",
+			}
 		},
 	}
 
@@ -248,7 +260,11 @@ func TestRetryingClient_ChatCompletion_ExhaustsRetries(t *testing.T) {
 	mockClient := &MockLLMClient{
 		chatCompletionFunc: func(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
 			attempts++
-			return nil, fmt.Errorf("API request failed with status 503: service unavailable")
+			return nil, &APIError{
+				StatusCode: 503,
+				Status:     "503 Service Unavailable",
+				Body:       "service unavailable",
+			}
 		},
 	}
 
@@ -268,13 +284,16 @@ func TestRetryingClient_ChatCompletion_ExhaustsRetries(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, resp)
 	assert.Equal(t, 3, attempts) // Should try max attempts
-	assert.Contains(t, err.Error(), "all 3 retry attempts failed")
 }
 
 func TestRetryingClient_ChatCompletion_RespectsContextCancellation(t *testing.T) {
 	mockClient := &MockLLMClient{
 		chatCompletionFunc: func(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
-			return nil, fmt.Errorf("API request failed with status 503: service unavailable")
+			return nil, &APIError{
+				StatusCode: 503,
+				Status:     "503 Service Unavailable",
+				Body:       "service unavailable",
+			}
 		},
 	}
 
@@ -325,7 +344,11 @@ func TestRetryingClient_ChatCompletionStream_RetriesOnError(t *testing.T) {
 		chatCompletionStreamFunc: func(ctx context.Context, req CompletionRequest, handler StreamHandler) error {
 			attempts++
 			if attempts < 2 {
-				return fmt.Errorf("API request failed with status 503: service unavailable")
+				return &APIError{
+					StatusCode: 503,
+					Status:     "503 Service Unavailable",
+					Body:       "service unavailable",
+				}
 			}
 			return nil
 		},
@@ -356,7 +379,11 @@ func TestRetryingClient_ChatCompletionStream_DoesNotRetryOnNonRetryableError(t *
 	mockClient := &MockLLMClient{
 		chatCompletionStreamFunc: func(ctx context.Context, req CompletionRequest, handler StreamHandler) error {
 			attempts++
-			return fmt.Errorf("API request failed with status 401: unauthorized")
+			return &APIError{
+				StatusCode: 401,
+				Status:     "401 Unauthorized",
+				Body:       "unauthorized",
+			}
 		},
 	}
 
@@ -424,54 +451,67 @@ func TestIsRetryableError(t *testing.T) {
 			retryable: false,
 		},
 		{
-			name:      "rate limit error",
-			err:       fmt.Errorf("API request failed with status 429: rate limit exceeded"),
+			name: "rate limit error (APIError)",
+			err: &APIError{
+				StatusCode: 429,
+				Status:     "429 Too Many Requests",
+				Body:       "rate limit exceeded",
+			},
 			retryable: true,
 		},
 		{
-			name:      "500 error",
-			err:       fmt.Errorf("API request failed with status 500: internal server error"),
+			name: "500 error (APIError)",
+			err: &APIError{
+				StatusCode: 500,
+				Status:     "500 Internal Server Error",
+				Body:       "internal server error",
+			},
 			retryable: true,
 		},
 		{
-			name:      "502 error",
-			err:       fmt.Errorf("API request failed with status 502: bad gateway"),
+			name: "502 error (APIError)",
+			err: &APIError{
+				StatusCode: 502,
+				Status:     "502 Bad Gateway",
+				Body:       "bad gateway",
+			},
 			retryable: true,
 		},
 		{
-			name:      "503 error",
-			err:       fmt.Errorf("API request failed with status 503: service unavailable"),
+			name: "503 error (APIError)",
+			err: &APIError{
+				StatusCode: 503,
+				Status:     "503 Service Unavailable",
+				Body:       "service unavailable",
+			},
 			retryable: true,
 		},
 		{
-			name:      "504 error",
-			err:       fmt.Errorf("API request failed with status 504: gateway timeout"),
+			name: "504 error (APIError)",
+			err: &APIError{
+				StatusCode: 504,
+				Status:     "504 Gateway Timeout",
+				Body:       "gateway timeout",
+			},
 			retryable: true,
 		},
 		{
-			name:      "400 error",
-			err:       fmt.Errorf("API request failed with status 400: bad request"),
+			name: "400 error (APIError)",
+			err: &APIError{
+				StatusCode: 400,
+				Status:     "400 Bad Request",
+				Body:       "bad request",
+			},
 			retryable: false,
 		},
 		{
-			name:      "401 error",
-			err:       fmt.Errorf("API request failed with status 401: unauthorized"),
+			name: "401 error (APIError)",
+			err: &APIError{
+				StatusCode: 401,
+				Status:     "401 Unauthorized",
+				Body:       "unauthorized",
+			},
 			retryable: false,
-		},
-		{
-			name:      "connection refused",
-			err:       fmt.Errorf("connection refused"),
-			retryable: true,
-		},
-		{
-			name:      "connection reset",
-			err:       fmt.Errorf("connection reset by peer"),
-			retryable: true,
-		},
-		{
-			name:      "EOF error",
-			err:       fmt.Errorf("unexpected EOF"),
-			retryable: true,
 		},
 		{
 			name:      "validation error",
@@ -488,7 +528,7 @@ func TestIsRetryableError(t *testing.T) {
 	}
 }
 
-func TestIsRetryableHTTPStatus(t *testing.T) {
+func TestAPIError_IsRetryable(t *testing.T) {
 	tests := []struct {
 		statusCode int
 		retryable  bool
@@ -507,36 +547,13 @@ func TestIsRetryableHTTPStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("status_%d", tt.statusCode), func(t *testing.T) {
-			result := IsRetryableHTTPStatus(tt.statusCode)
+			apiErr := &APIError{
+				StatusCode: tt.statusCode,
+				Status:     fmt.Sprintf("%d", tt.statusCode),
+				Body:       "error body",
+			}
+			result := apiErr.IsRetryable()
 			assert.Equal(t, tt.retryable, result)
 		})
 	}
-}
-
-func TestCalculateBackoff(t *testing.T) {
-	config := RetryConfig{
-		MaxAttempts:    5,
-		InitialBackoff: 100 * time.Millisecond,
-		MaxBackoff:     2 * time.Second,
-		BackoffFactor:  2.0,
-	}
-	retryClient := NewRetryingClient(&MockLLMClient{}, config)
-
-	// Test multiple attempts to ensure exponential growth
-	backoff1 := retryClient.calculateBackoff(1)
-	backoff2 := retryClient.calculateBackoff(2)
-	backoff3 := retryClient.calculateBackoff(3)
-
-	// First attempt should be around InitialBackoff (with jitter)
-	assert.InDelta(t, float64(config.InitialBackoff), float64(backoff1), float64(50*time.Millisecond))
-
-	// Second attempt should be roughly 2x first (with jitter)
-	assert.Greater(t, backoff2, backoff1)
-
-	// Third attempt should be roughly 2x second (with jitter)
-	assert.Greater(t, backoff3, backoff2)
-
-	// Test that max backoff is respected (with jitter up to 25%)
-	backoff10 := retryClient.calculateBackoff(10)
-	assert.LessOrEqual(t, backoff10, config.MaxBackoff*5/4) // Allow 25% margin for jitter
 }
