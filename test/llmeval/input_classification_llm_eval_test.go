@@ -296,8 +296,8 @@ func getThirdPersonClassificationTestCases() []InputClassificationTestCase {
 			RawInput:         "Magnus thinks about the old wizard's warning",
 			SceneName:        "Forest Path",
 			SceneDescription: "A quiet trail through peaceful woods",
-			ExpectedType:     "clarification",
-			Description:      "Third person internal reflection - clarification",
+			ExpectedType:     "narrative",
+			Description:      "Third person internal reflection - narrative (no roll)",
 		},
 		// Action - third person
 		{
@@ -395,7 +395,7 @@ func TestInputClassification_LLMEvaluation(t *testing.T) {
 		MisclassifiedAs: make(map[string]int),
 	}
 
-	for _, expectedType := range []string{"dialog", "clarification", "action"} {
+	for _, expectedType := range []string{"dialog", "clarification", "narrative", "action"} {
 		summary.ByExpectedType[expectedType] = &ClassificationTypeSummary{}
 	}
 
@@ -556,8 +556,8 @@ func TestInputClassification_EdgeCases(t *testing.T) {
 			RawInput:         "I open the door",
 			SceneName:        "Inn Hallway",
 			SceneDescription: "The hallway outside your room at the inn",
-			ExpectedType:     "clarification",
-			Description:      "Simple mundane action - clarification/narrative",
+			ExpectedType:     "narrative",
+			Description:      "Simple mundane action - narrative (no roll)",
 		},
 		{
 			Name:             "Open door - obstacle",
