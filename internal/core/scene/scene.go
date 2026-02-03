@@ -16,8 +16,9 @@ type Scene struct {
 	ActiveCharacter  string            `json:"active_character_id,omitempty"`
 
 	// Scene State
-	IsConflict    bool           `json:"is_conflict"`
-	ConflictState *ConflictState `json:"conflict_state,omitempty"`
+	IsConflict         bool              `json:"is_conflict"`
+	ConflictState      *ConflictState    `json:"conflict_state,omitempty"`
+	TakenOutCharacters map[string]bool   `json:"taken_out_characters,omitempty"` // Characters taken out this scene
 
 	// Metadata
 	CreatedAt time.Time `json:"created_at"`
@@ -76,14 +77,15 @@ type ConflictParticipant struct {
 // NewScene creates a new scene
 func NewScene(id, name, description string) *Scene {
 	return &Scene{
-		ID:               id,
-		Name:             name,
-		Description:      description,
-		SituationAspects: make([]SituationAspect, 0),
-		Characters:       make([]string, 0),
-		IsConflict:       false,
-		CreatedAt:        time.Now(),
-		UpdatedAt:        time.Now(),
+		ID:                 id,
+		Name:               name,
+		Description:        description,
+		SituationAspects:   make([]SituationAspect, 0),
+		Characters:         make([]string, 0),
+		TakenOutCharacters: make(map[string]bool),
+		IsConflict:         false,
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
 	}
 }
 
@@ -114,6 +116,23 @@ func (s *Scene) RemoveCharacter(characterID string) {
 	if s.ActiveCharacter == characterID {
 		s.ActiveCharacter = ""
 	}
+}
+
+// MarkCharacterTakenOut marks a character as taken out for the duration of this scene
+func (s *Scene) MarkCharacterTakenOut(characterID string) {
+	if s.TakenOutCharacters == nil {
+		s.TakenOutCharacters = make(map[string]bool)
+	}
+	s.TakenOutCharacters[characterID] = true
+	s.UpdatedAt = time.Now()
+}
+
+// IsCharacterTakenOut returns true if the character has been taken out this scene
+func (s *Scene) IsCharacterTakenOut(characterID string) bool {
+	if s.TakenOutCharacters == nil {
+		return false
+	}
+	return s.TakenOutCharacters[characterID]
 }
 
 // AddSituationAspect adds a situation aspect to the scene

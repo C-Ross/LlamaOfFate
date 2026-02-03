@@ -63,6 +63,7 @@ type SceneResponseData struct {
 	PlayerInput         string
 	InteractionType     string
 	OtherCharacters     []*character.Character
+	TakenOutCharacters  []*character.Character // Characters defeated earlier in this scene
 }
 
 // ConflictResponseData holds the data for conflict response template
@@ -73,6 +74,7 @@ type ConflictResponseData struct {
 	ConversationContext  string
 	PlayerInput          string
 	OtherCharacters      []*character.Character
+	TakenOutCharacters   []*character.Character // Characters defeated earlier in this scene
 	CurrentCharacterName string
 	ParticipantMap       map[string]*scene.ConflictParticipant
 	CharacterMap         map[string]*character.Character
@@ -616,9 +618,15 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 	otherCharactersMap := sm.engine.GetCharactersByScene(sm.currentScene)
 	delete(otherCharactersMap, sm.player.ID) // Remove the player
 
+	// Separate active characters from taken-out characters
 	var otherCharacters []*character.Character
+	var takenOutCharacters []*character.Character
 	for _, char := range otherCharactersMap {
-		otherCharacters = append(otherCharacters, char)
+		if sm.currentScene.IsCharacterTakenOut(char.ID) {
+			takenOutCharacters = append(takenOutCharacters, char)
+		} else {
+			otherCharacters = append(otherCharacters, char)
+		}
 	}
 
 	var prompt string
@@ -655,6 +663,7 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 			ConversationContext:  sm.buildConversationContext(),
 			PlayerInput:          input,
 			OtherCharacters:      otherCharacters,
+			TakenOutCharacters:   takenOutCharacters,
 			CurrentCharacterName: currentCharName,
 			ParticipantMap:       participantMap,
 			CharacterMap:         characterMap,
@@ -671,6 +680,7 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 			PlayerInput:         input,
 			InteractionType:     interactionType,
 			OtherCharacters:     otherCharacters,
+			TakenOutCharacters:  takenOutCharacters,
 		}
 
 		prompt, renderErr = RenderSceneResponse(data)
@@ -964,6 +974,10 @@ func (sm *SceneManager) handleTargetTakenOut(target *character.Character) {
 	sm.ui.DisplaySystemMessage(fmt.Sprintf(
 		"\n=== %s is Taken Out! ===", target.Name))
 	sm.ui.DisplaySystemMessage("You decide their fate!")
+
+	// Mark the target as taken out for the duration of this scene
+	// This prevents them from rejoining conflicts until a new scene begins
+	sm.currentScene.MarkCharacterTakenOut(target.ID)
 
 	// Mark the target as taken out in the conflict
 	if sm.currentScene.IsConflict && sm.currentScene.ConflictState != nil {

@@ -439,3 +439,33 @@ func TestScene_EscalateConflict_PreservesOriginalType(t *testing.T) {
 	scene.EscalateConflict(MentalConflict)
 	assert.Equal(t, MentalConflict, scene.ConflictState.OriginalType)
 }
+
+func TestScene_MarkCharacterTakenOut(t *testing.T) {
+	s := NewScene("test", "Test Scene", "Test")
+
+	// Initially no characters are taken out
+	assert.False(t, s.IsCharacterTakenOut("char-1"))
+
+	// Mark character as taken out
+	originalTime := s.UpdatedAt
+	time.Sleep(1 * time.Millisecond)
+	s.MarkCharacterTakenOut("char-1")
+
+	// Character should now be marked as taken out
+	assert.True(t, s.IsCharacterTakenOut("char-1"))
+	assert.False(t, s.IsCharacterTakenOut("char-2"))
+	assert.True(t, s.UpdatedAt.After(originalTime))
+}
+
+func TestScene_MarkCharacterTakenOut_NilMap(t *testing.T) {
+	// Create scene and manually nil out the map to test defensive handling
+	s := NewScene("test", "Test Scene", "Test")
+	s.TakenOutCharacters = nil
+
+	// Should not panic and should return false
+	assert.False(t, s.IsCharacterTakenOut("char-1"))
+
+	// Mark should initialize the map
+	s.MarkCharacterTakenOut("char-1")
+	assert.True(t, s.IsCharacterTakenOut("char-1"))
+}

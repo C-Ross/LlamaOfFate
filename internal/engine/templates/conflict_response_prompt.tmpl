@@ -36,6 +36,13 @@ OPPONENTS & ALLIES:
 {{- end}}
 {{- end}}
 
+{{- if .TakenOutCharacters}}
+DEFEATED (cannot act this scene):
+{{- range $char := .TakenOutCharacters}}
+- {{$char.Name}}: TAKEN OUT - unconscious/incapacitated, cannot participate in conflicts
+{{- end}}
+{{- end}}
+
 SITUATION ASPECTS:
 {{.AspectsContext}}
 

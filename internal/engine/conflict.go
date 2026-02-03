@@ -81,12 +81,28 @@ func (sm *SceneManager) initiateConflict(conflictType scene.ConflictType, initia
 		return fmt.Errorf("already in a conflict")
 	}
 
+	// Check if the initiator was taken out earlier in this scene
+	if sm.currentScene.IsCharacterTakenOut(initiatorID) {
+		slog.Debug("Conflict initiator was previously taken out this scene",
+			"component", componentSceneManager,
+			"initiator", initiatorID)
+		return fmt.Errorf("initiator %s was taken out this scene", initiatorID)
+	}
+
 	// Build participants from all characters in the scene
 	participants := make([]scene.ConflictParticipant, 0)
 
 	for _, charID := range sm.currentScene.Characters {
 		char := sm.engine.GetCharacter(charID)
 		if char == nil {
+			continue
+		}
+
+		// Skip characters that have been taken out earlier in this scene
+		if sm.currentScene.IsCharacterTakenOut(charID) {
+			slog.Debug("Skipping taken-out character for conflict",
+				"component", componentSceneManager,
+				"character", charID)
 			continue
 		}
 

@@ -28,6 +28,13 @@ OTHER CHARACTERS IN SCENE:
 {{- end}}
 {{- end}}
 
+{{- if .TakenOutCharacters}}
+DEFEATED CHARACTERS (taken out earlier this scene - unconscious, incapacitated, or otherwise unable to act):
+{{- range $char := .TakenOutCharacters}}
+- {{$char.Name}}: {{if $char.Aspects.HighConcept}}{{$char.Aspects.HighConcept}} - {{end}}DEFEATED and cannot take actions, initiate conflicts, or meaningfully participate until the scene ends
+{{- end}}
+{{- end}}
+
 AVAILABLE ASPECTS:
 {{.AspectsContext}}
 

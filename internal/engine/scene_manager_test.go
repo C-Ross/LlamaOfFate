@@ -959,6 +959,122 @@ func TestSceneManager_HandleTargetTakenOut_ConflictEnds(t *testing.T) {
 	assert.True(t, found, "Expected victory message")
 }
 
+func TestSceneManager_HandleTargetTakenOut_MarksSceneLevelTakenOut(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	player := character.NewCharacter("player-1", "Hero")
+	target := character.NewCharacter("target-1", "Goblin")
+
+	engine.AddCharacter(player)
+	engine.AddCharacter(target)
+
+	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(target.ID)
+	sm.currentScene = testScene
+	sm.player = player
+
+	// Start a conflict
+	err = sm.initiateConflict(scene.PhysicalConflict, target.ID)
+	require.NoError(t, err)
+
+	// Take out the target
+	sm.handleTargetTakenOut(target)
+
+	// Conflict ends, but character should still be marked as taken out at scene level
+	assert.False(t, sm.currentScene.IsConflict)
+	assert.True(t, sm.currentScene.IsCharacterTakenOut(target.ID))
+}
+
+func TestSceneManager_InitiateConflict_ExcludesTakenOutCharacters(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	player := character.NewCharacter("player-1", "Hero")
+	enemy1 := character.NewCharacter("enemy-1", "Goblin")
+	enemy2 := character.NewCharacter("enemy-2", "Orc")
+
+	engine.AddCharacter(player)
+	engine.AddCharacter(enemy1)
+	engine.AddCharacter(enemy2)
+
+	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(enemy1.ID)
+	testScene.AddCharacter(enemy2.ID)
+	sm.currentScene = testScene
+	sm.player = player
+
+	// Start first conflict and take out enemy1
+	err = sm.initiateConflict(scene.PhysicalConflict, enemy1.ID)
+	require.NoError(t, err)
+
+	sm.handleTargetTakenOut(enemy1)
+	// Conflict still ongoing because enemy2 is active
+	assert.True(t, sm.currentScene.IsConflict)
+
+	// End the conflict manually (simulating peaceful resolution)
+	sm.currentScene.EndConflict()
+	assert.False(t, sm.currentScene.IsConflict)
+
+	// Try to initiate a new conflict with enemy2
+	err = sm.initiateConflict(scene.PhysicalConflict, enemy2.ID)
+	require.NoError(t, err)
+
+	// enemy1 should NOT be in the new conflict since they were taken out
+	participant := sm.currentScene.GetParticipant(enemy1.ID)
+	assert.Nil(t, participant, "Taken-out character should not be in new conflict")
+
+	// enemy2 and player should be in the conflict
+	assert.NotNil(t, sm.currentScene.GetParticipant(enemy2.ID))
+	assert.NotNil(t, sm.currentScene.GetParticipant(player.ID))
+}
+
+func TestSceneManager_InitiateConflict_TakenOutInitiatorFails(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	player := character.NewCharacter("player-1", "Hero")
+	enemy := character.NewCharacter("enemy-1", "Goblin")
+
+	engine.AddCharacter(player)
+	engine.AddCharacter(enemy)
+
+	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(enemy.ID)
+	sm.currentScene = testScene
+	sm.player = player
+
+	// Start first conflict and take out enemy
+	err = sm.initiateConflict(scene.PhysicalConflict, enemy.ID)
+	require.NoError(t, err)
+
+	sm.handleTargetTakenOut(enemy)
+	assert.False(t, sm.currentScene.IsConflict) // Conflict ended
+
+	// Enemy is marked as taken out at scene level
+	assert.True(t, sm.currentScene.IsCharacterTakenOut(enemy.ID))
+
+	// Try to have the taken-out enemy initiate a new conflict - should fail
+	err = sm.initiateConflict(scene.PhysicalConflict, enemy.ID)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "taken out")
+}
+
 func TestSceneManager_ApplyActionEffects_Attack(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
