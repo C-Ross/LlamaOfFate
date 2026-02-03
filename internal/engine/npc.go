@@ -426,7 +426,13 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 
 	// Only apply damage if target is the player (for now, NPC vs NPC damage not fully implemented)
 	if target.ID == sm.player.ID {
-		sm.applyAttackDamageToPlayer(ctx, outcome, npc)
+		// Create attack context with the skill, narrative, and shifts
+		attackCtx := AttackContext{
+			Skill:       attackSkill,
+			Description: npcNarrative,
+			Shifts:      outcome.Shifts,
+		}
+		sm.applyAttackDamageToPlayer(ctx, outcome, npc, attackCtx)
 	} else {
 		// For NPC targets, just show the result
 		if outcome.Type == dice.Success || outcome.Type == dice.SuccessWithStyle {

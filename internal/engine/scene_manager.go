@@ -90,12 +90,20 @@ type ActionNarrativeData struct {
 	OtherCharacters     []*character.Character
 }
 
+// AttackContext holds information about the attack that caused damage
+type AttackContext struct {
+	Skill       string // The skill used to attack (e.g., "Fight", "Shoot", "Provoke")
+	Description string // The narrative description of the attack
+	Shifts      int    // The shifts of damage dealt
+}
+
 // ConsequenceAspectData holds the data for consequence aspect generation template
 type ConsequenceAspectData struct {
 	CharacterName string
 	AttackerName  string
 	Severity      string
 	ConflictType  string
+	AttackContext
 }
 
 // TakenOutData holds the data for taken out narrative template
@@ -105,6 +113,7 @@ type TakenOutData struct {
 	AttackerHighConcept string
 	ConflictType        string
 	SceneDescription    string
+	AttackContext
 }
 
 // NewSceneManager creates a new scene manager
@@ -1145,7 +1154,7 @@ func (sm *SceneManager) buildAspectsContext() string {
 }
 
 // applyAttackDamageToPlayer applies attack damage to the player
-func (sm *SceneManager) applyAttackDamageToPlayer(ctx context.Context, outcome *dice.Outcome, attacker *character.Character) {
+func (sm *SceneManager) applyAttackDamageToPlayer(ctx context.Context, outcome *dice.Outcome, attacker *character.Character, attackCtx AttackContext) {
 	// Apply stress if the attack hit
 	switch outcome.Type {
 	case dice.Success, dice.SuccessWithStyle:
@@ -1169,7 +1178,7 @@ func (sm *SceneManager) applyAttackDamageToPlayer(ctx context.Context, outcome *
 			))
 		} else {
 			// Cannot absorb - need consequence or taken out
-			sm.handleStressOverflow(ctx, shifts, stressType, attacker)
+			sm.handleStressOverflow(ctx, shifts, stressType, attacker, attackCtx)
 		}
 	case dice.Tie:
 		sm.ui.DisplaySystemMessage("The attack is deflected, but grants a boost!")
@@ -1179,7 +1188,7 @@ func (sm *SceneManager) applyAttackDamageToPlayer(ctx context.Context, outcome *
 }
 
 // handleStressOverflow handles when the player cannot absorb stress with their stress track
-func (sm *SceneManager) handleStressOverflow(ctx context.Context, shifts int, stressType character.StressTrackType, attacker *character.Character) {
+func (sm *SceneManager) handleStressOverflow(ctx context.Context, shifts int, stressType character.StressTrackType, attacker *character.Character, attackCtx AttackContext) {
 	sm.ui.DisplaySystemMessage(fmt.Sprintf(
 		"You cannot absorb %d shifts with your stress track!",
 		shifts,
@@ -1191,7 +1200,7 @@ func (sm *SceneManager) handleStressOverflow(ctx context.Context, shifts int, st
 	if len(availableConsequences) == 0 {
 		// No consequences available - taken out
 		sm.ui.DisplaySystemMessage("You have no available consequences! You are taken out!")
-		sm.handleTakenOut(ctx, attacker)
+		sm.handleTakenOut(ctx, attacker, attackCtx)
 		return
 	}
 
@@ -1212,7 +1221,7 @@ func (sm *SceneManager) handleStressOverflow(ctx context.Context, shifts int, st
 	input, _, err := sm.ui.ReadInput()
 	if err != nil {
 		slog.Error("Failed to read consequence choice", "error", err)
-		sm.handleTakenOut(ctx, attacker)
+		sm.handleTakenOut(ctx, attacker, attackCtx)
 		return
 	}
 
@@ -1221,20 +1230,20 @@ func (sm *SceneManager) handleStressOverflow(ctx context.Context, shifts int, st
 	// Check for consequence choices
 	for i, conseq := range availableConsequences {
 		if choice == fmt.Sprintf("%d", i+1) {
-			sm.applyConsequence(ctx, conseq.Type, shifts, attacker)
+			sm.applyConsequence(ctx, conseq.Type, shifts, attacker, attackCtx)
 			return
 		}
 	}
 
 	// Check for taken out choice
 	if choice == fmt.Sprintf("%d", len(availableConsequences)+1) {
-		sm.handleTakenOut(ctx, attacker)
+		sm.handleTakenOut(ctx, attacker, attackCtx)
 		return
 	}
 
 	// Invalid choice - default to taken out
 	sm.ui.DisplaySystemMessage("Invalid choice. You are taken out!")
-	sm.handleTakenOut(ctx, attacker)
+	sm.handleTakenOut(ctx, attacker, attackCtx)
 }
 
 // ConsequenceOption represents an available consequence the player can take
@@ -1271,9 +1280,9 @@ func (sm *SceneManager) getAvailableConsequences(shifts int) []ConsequenceOption
 }
 
 // applyConsequence applies a consequence to the player character
-func (sm *SceneManager) applyConsequence(ctx context.Context, conseqType character.ConsequenceType, shifts int, attacker *character.Character) {
+func (sm *SceneManager) applyConsequence(ctx context.Context, conseqType character.ConsequenceType, shifts int, attacker *character.Character, attackCtx AttackContext) {
 	// Generate a consequence aspect via LLM
-	aspectName, err := sm.generateConsequenceAspect(ctx, conseqType, attacker)
+	aspectName, err := sm.generateConsequenceAspect(ctx, conseqType, attacker, attackCtx)
 	if err != nil {
 		slog.Error("Failed to generate consequence aspect", "error", err)
 		caser := cases.Title(language.English)
@@ -1321,13 +1330,13 @@ func (sm *SceneManager) applyConsequence(ctx context.Context, conseqType charact
 				remaining,
 			))
 			// Recursively handle remaining damage
-			sm.handleStressOverflow(ctx, remaining, stressType, attacker)
+			sm.handleStressOverflow(ctx, remaining, stressType, attacker, attackCtx)
 		}
 	}
 }
 
 // generateConsequenceAspect uses LLM to generate a consequence aspect
-func (sm *SceneManager) generateConsequenceAspect(ctx context.Context, conseqType character.ConsequenceType, attacker *character.Character) (string, error) {
+func (sm *SceneManager) generateConsequenceAspect(ctx context.Context, conseqType character.ConsequenceType, attacker *character.Character, attackCtx AttackContext) (string, error) {
 	if sm.engine.llmClient == nil {
 		return "", fmt.Errorf("LLM client required")
 	}
@@ -1342,6 +1351,7 @@ func (sm *SceneManager) generateConsequenceAspect(ctx context.Context, conseqTyp
 		AttackerName:  attacker.Name,
 		Severity:      string(conseqType),
 		ConflictType:  conflictType,
+		AttackContext: attackCtx,
 	}
 
 	prompt, err := RenderConsequenceAspect(data)
@@ -1436,12 +1446,12 @@ const (
 )
 
 // handleTakenOut handles when the player is taken out
-func (sm *SceneManager) handleTakenOut(ctx context.Context, attacker *character.Character) {
+func (sm *SceneManager) handleTakenOut(ctx context.Context, attacker *character.Character, attackCtx AttackContext) {
 	sm.ui.DisplaySystemMessage("\n=== You Are Taken Out! ===")
 	sm.ui.DisplaySystemMessage(fmt.Sprintf("%s decides your fate.", attacker.Name))
 
 	// Generate narrative and outcome classification for being taken out
-	narrative, outcome, newSceneHint, err := sm.generateTakenOutNarrativeAndOutcome(ctx, attacker)
+	narrative, outcome, newSceneHint, err := sm.generateTakenOutNarrativeAndOutcome(ctx, attacker, attackCtx)
 	if err != nil {
 		narrative = fmt.Sprintf("You collapse, defeated by %s.", attacker.Name)
 		outcome = TakenOutTransition
@@ -1476,7 +1486,7 @@ func (sm *SceneManager) handleTakenOut(ctx context.Context, attacker *character.
 }
 
 // generateTakenOutNarrativeAndOutcome generates narrative and classifies the outcome
-func (sm *SceneManager) generateTakenOutNarrativeAndOutcome(ctx context.Context, attacker *character.Character) (narrative string, outcome TakenOutResult, newSceneHint string, err error) {
+func (sm *SceneManager) generateTakenOutNarrativeAndOutcome(ctx context.Context, attacker *character.Character, attackCtx AttackContext) (narrative string, outcome TakenOutResult, newSceneHint string, err error) {
 	if sm.engine.llmClient == nil {
 		return "", TakenOutTransition, "", fmt.Errorf("LLM client required")
 	}
@@ -1492,6 +1502,7 @@ func (sm *SceneManager) generateTakenOutNarrativeAndOutcome(ctx context.Context,
 		AttackerHighConcept: attacker.Aspects.HighConcept,
 		ConflictType:        conflictType,
 		SceneDescription:    sm.currentScene.Description,
+		AttackContext:       attackCtx,
 	}
 
 	prompt, err := RenderTakenOut(data)

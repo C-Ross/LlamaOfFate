@@ -6,6 +6,9 @@ Consider the context:
 - Scene: {{.SceneDescription}}
 - Attacker: {{.AttackerName}} ({{.AttackerHighConcept}})
 - Conflict type: {{.ConflictType}}
+{{if .AttackContext.Skill}}- Final attack skill: {{.AttackContext.Skill}}{{end}}
+{{if .AttackContext.Description}}- Final attack: {{.AttackContext.Description}}{{end}}
+{{if .AttackContext.Shifts}}- Damage shifts: {{.AttackContext.Shifts}}{{end}}
 
 Respond in JSON format:
 {

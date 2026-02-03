@@ -4,6 +4,9 @@ Character: {{.CharacterName}}
 Attacker: {{.AttackerName}}
 Consequence Severity: {{.Severity}}
 Conflict Type: {{.ConflictType}}
+{{if .AttackContext.Skill}}Attack Skill: {{.AttackContext.Skill}}{{end}}
+{{if .AttackContext.Description}}Attack: {{.AttackContext.Description}}{{end}}
+{{if .AttackContext.Shifts}}Damage Shifts: {{.AttackContext.Shifts}}{{end}}
 
 Generate ONLY the aspect name (2-4 words), something that represents lasting harm appropriate to the severity. Examples:
 - Mild physical: "Bruised Ribs", "Sprained Ankle", "Rattled"
