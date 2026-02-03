@@ -731,12 +731,12 @@ func TestInputClassification_MundaneMovement(t *testing.T) {
 			Description:      "Tiptoeing past someone requires a stealth roll",
 		},
 		{
-			Name:             "Disappear into mist",
-			RawInput:         "Lyra disappears into the mist",
+			Name:             "Evade into mist",
+			RawInput:         "Lyra tries to lose her pursuers by slipping into the mist",
 			SceneName:        "Moorland Chase",
-			SceneDescription: "A foggy morning on the moors, pursuers nearby",
+			SceneDescription: "Guards are chasing you across the foggy moors",
 			ExpectedType:     "action",
-			Description:      "Disappearing implies intent to evade - requires roll",
+			Description:      "Actively evading pursuers requires a stealth roll",
 		},
 		{
 			Name:             "Silently enter shadows",
