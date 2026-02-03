@@ -615,3 +615,195 @@ func TestInputClassification_EdgeCases(t *testing.T) {
 		})
 	}
 }
+
+// TestInputClassification_MundaneMovement verifies that ordinary movement
+// is classified as clarification (no roll needed), not action.
+// This addresses over-classification of mundane actions as requiring dice rolls.
+// Run with: go test -v -tags=llmeval -run TestInputClassification_MundaneMovement ./test/llmeval/
+func TestInputClassification_MundaneMovement(t *testing.T) {
+	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
+		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
+	}
+
+	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
+	require.NoError(t, err, "Failed to load Azure config")
+
+	client := azure.NewClient(*config)
+	ctx := context.Background()
+
+	testCases := []InputClassificationTestCase{
+		// === Mundane movement - should be NARRATIVE or CLARIFICATION (no roll) ===
+		{
+			Name:             "Push open door and stride in",
+			RawInput:         "Lyra pushes open the door and strides inside",
+			SceneName:        "Tavern Entrance",
+			SceneDescription: "Standing outside a tavern, ready to enter",
+			ExpectedType:     "narrative",
+			Description:      "Confident entry through a door is mundane - just narrate it",
+		},
+		{
+			Name:             "Walk through doorway",
+			RawInput:         "I walk through the doorway into the next room",
+			SceneName:        "Abandoned Building",
+			SceneDescription: "Exploring an abandoned building, currently alone",
+			ExpectedType:     "narrative",
+			Description:      "Simple walking through a doorway - just narrate it",
+		},
+		{
+			Name:             "Walk down street",
+			RawInput:         "I walk down the street toward the market",
+			SceneName:        "City Street",
+			SceneDescription: "A busy city street during the day",
+			ExpectedType:     "narrative",
+			Description:      "Walking down a public street is mundane - just narrate it",
+		},
+		{
+			Name:             "Enter shop",
+			RawInput:         "I enter the blacksmith's shop",
+			SceneName:        "Market District",
+			SceneDescription: "Visiting the local blacksmith to buy a sword",
+			ExpectedType:     "narrative",
+			Description:      "Entering a shop as a customer - just narrate it",
+		},
+		{
+			Name:             "Walk into mist",
+			RawInput:         "Lyra walks off into the mist",
+			SceneName:        "Moorland",
+			SceneDescription: "A foggy morning on the moors",
+			ExpectedType:     "narrative",
+			Description:      "Walking into atmospheric conditions - just narrate it",
+		},
+		{
+			Name:             "Careful entry",
+			RawInput:         "Lyra carefully opens the door and steps inside",
+			SceneName:        "Unknown Room",
+			SceneDescription: "Entering a room in a dungeon",
+			ExpectedType:     "narrative",
+			Description:      "Being careful is cautious, not stealthy - just narrate it",
+		},
+		{
+			Name:             "Careful movement with traps",
+			RawInput:         "I carefully make my way across the floor",
+			SceneName:        "Trapped Corridor",
+			SceneDescription: "A corridor in the dungeon, pressure plates and tripwires are visible",
+			ExpectedType:     "action",
+			Description:      "Careful movement when traps are present requires Athletics roll",
+		},
+		{
+			Name:             "March into throne room",
+			RawInput:         "Magnus marches into the throne room to address the king",
+			SceneName:        "Royal Palace",
+			SceneDescription: "Arriving at the royal court for an audience",
+			ExpectedType:     "narrative",
+			Description:      "Bold entry for an audience - just narrate it",
+		},
+		// === Stealth movement - should be ACTION (requires roll) ===
+		{
+			Name:             "Sneak through door",
+			RawInput:         "I sneak through the doorway, trying not to be seen",
+			SceneName:        "Guard Barracks",
+			SceneDescription: "Infiltrating the guard barracks at night",
+			ExpectedType:     "action",
+			Description:      "Explicitly sneaking to avoid detection requires a roll",
+		},
+		{
+			Name:             "Slip inside unnoticed",
+			RawInput:         "I slip inside while the guard's back is turned",
+			SceneName:        "Restricted Area",
+			SceneDescription: "Trying to enter the restricted area without being caught",
+			ExpectedType:     "action",
+			Description:      "Slipping past a guard requires a stealth roll",
+		},
+		{
+			Name:             "Creep into room",
+			RawInput:         "I creep into the darkened room",
+			SceneName:        "Sleeping Quarters",
+			SceneDescription: "Entering a room where someone might be sleeping",
+			ExpectedType:     "action",
+			Description:      "Creeping implies stealth intent - requires roll",
+		},
+		{
+			Name:             "Tiptoe past guard",
+			RawInput:         "I tiptoe past the sleeping guard",
+			SceneName:        "Guard Post",
+			SceneDescription: "A guard has fallen asleep at his post",
+			ExpectedType:     "action",
+			Description:      "Tiptoeing past someone requires a stealth roll",
+		},
+		{
+			Name:             "Disappear into mist",
+			RawInput:         "Lyra disappears into the mist",
+			SceneName:        "Moorland Chase",
+			SceneDescription: "A foggy morning on the moors, pursuers nearby",
+			ExpectedType:     "action",
+			Description:      "Disappearing implies intent to evade - requires roll",
+		},
+		{
+			Name:             "Silently enter shadows",
+			RawInput:         "I silently enter the chamber, keeping to the shadows",
+			SceneName:        "Wizard Tower",
+			SceneDescription: "Infiltrating the wizard's tower",
+			ExpectedType:     "action",
+			Description:      "Silent shadow movement is explicit stealth - requires roll",
+		},
+	}
+
+	if verboseLogging {
+		t.Log("Testing mundane movement vs stealth classification")
+		t.Log(strings.Repeat("=", 60))
+	}
+
+	mundaneResults := struct{ total, correct int }{}
+	stealthResults := struct{ total, correct int }{}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			result := evaluateInputClassification(ctx, client, tc)
+
+			if result.Error != nil {
+				t.Errorf("Error: %v", result.Error)
+				return
+			}
+
+			// Track results by expected type
+			if tc.ExpectedType == "narrative" {
+				mundaneResults.total++
+				if result.Matches {
+					mundaneResults.correct++
+				}
+			} else if tc.ExpectedType == "action" {
+				stealthResults.total++
+				if result.Matches {
+					stealthResults.correct++
+				}
+			}
+
+			if verboseLogging {
+				status := "✓ PASS"
+				if !result.Matches {
+					status = "✗ FAIL"
+				}
+				t.Logf("%s: Expected %s, Got %s", status, tc.ExpectedType, result.ActualType)
+				t.Logf("  Input: %s", tc.RawInput)
+				t.Logf("  Scene: %s", tc.SceneDescription)
+				t.Logf("  Why: %s", tc.Description)
+			}
+
+			assert.Equal(t, tc.ExpectedType, result.ActualType,
+				"Classification mismatch for '%s'. %s", tc.RawInput, tc.Description)
+		})
+	}
+
+	// Print summary
+	t.Log("\n========== MUNDANE VS STEALTH CLASSIFICATION SUMMARY ==========")
+	if mundaneResults.total > 0 {
+		t.Logf("Mundane movement (narrative): %d/%d (%.1f%%)",
+			mundaneResults.correct, mundaneResults.total,
+			float64(mundaneResults.correct)*100/float64(mundaneResults.total))
+	}
+	if stealthResults.total > 0 {
+		t.Logf("Stealth movement (action): %d/%d (%.1f%%)",
+			stealthResults.correct, stealthResults.total,
+			float64(stealthResults.correct)*100/float64(stealthResults.total))
+	}
+}
