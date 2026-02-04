@@ -132,7 +132,11 @@ func (c *Client) ChatCompletion(ctx context.Context, req llm.CompletionRequest) 
 			slog.Duration("duration", duration),
 			slog.Any("headers", headers),
 			slog.String("body", string(bodyBytes)))
-		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(bodyBytes))
+		return nil, &llm.APIError{
+			StatusCode: resp.StatusCode,
+			Status:     resp.Status,
+			Body:       string(bodyBytes),
+		}
 	}
 
 	var response llm.CompletionResponse
@@ -225,7 +229,11 @@ func (c *Client) ChatCompletionStream(ctx context.Context, req llm.CompletionReq
 			slog.Duration("duration", time.Since(start)),
 			slog.Any("headers", headers),
 			slog.String("body", string(bodyBytes)))
-		return fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(bodyBytes))
+		return &llm.APIError{
+			StatusCode: resp.StatusCode,
+			Status:     resp.Status,
+			Body:       string(bodyBytes),
+		}
 	}
 
 	slog.Debug("Azure ChatCompletionStream response started",
