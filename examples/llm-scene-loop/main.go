@@ -7,12 +7,14 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"time"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/C-Ross/LlamaOfFate/internal/ui/terminal"
 )
 
@@ -32,6 +34,7 @@ func main() {
 	// Parse command-line arguments
 	sceneFlag := flag.String("scene", "", "Scene to play: tower, heist, saloon (default: random)")
 	listFlag := flag.Bool("list", false, "List available scenes and exit")
+	logFlag := flag.String("log", "auto", "Session log path (default: auto-generated, empty string disables)")
 	flag.Parse()
 
 	availableScenes := []string{"tower", "heist", "saloon"}
@@ -112,6 +115,25 @@ func main() {
 	sceneManager := gameEngine.GetSceneManager()
 	if sceneManager == nil {
 		log.Fatal("Scene manager not available")
+	}
+
+	// Set up session logging (default: enabled with auto-generated filename)
+	logPath := *logFlag
+	if logPath == "auto" {
+		logPath = fmt.Sprintf("session_%s_%s.yaml", selectedScene, time.Now().Format("20060102_150405"))
+	}
+	if logPath != "" {
+		sessionLogger, err := session.NewLogger(logPath)
+		if err != nil {
+			log.Fatalf("Failed to create session logger: %v", err)
+		}
+		defer func() {
+			if err := sessionLogger.Close(); err != nil {
+				log.Printf("Warning: Failed to close session logger: %v", err)
+			}
+		}()
+		sceneManager.SetSessionLogger(sessionLogger)
+		fmt.Printf("Session log: %s\n\n", logPath)
 	}
 
 	// Start the scene with the pre-configured scene

@@ -29,5 +29,5 @@ bin/
 # Configuration files with sensitive information
 *.local.yaml
 
-
-
+# Session log files (auto-generated during gameplay)
+session_*.yaml

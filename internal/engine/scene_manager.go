@@ -19,6 +19,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
 )
 
 const (
@@ -46,6 +47,7 @@ type SceneManager struct {
 	shouldExit            bool // Set to true when the game should end
 	exitOnSceneTransition bool // Set to true to exit the loop on scene transition
 	aspectGenerator       *AspectGenerator
+	sessionLogger         *session.Logger
 }
 
 // InputClassificationData holds the data for input classification template
@@ -136,6 +138,11 @@ func (sm *SceneManager) SetUI(ui UI) {
 	sm.ui = ui
 }
 
+// SetSessionLogger sets the session logger for recording game transcripts
+func (sm *SceneManager) SetSessionLogger(logger *session.Logger) {
+	sm.sessionLogger = logger
+}
+
 // SetExitOnSceneTransition configures whether the scene loop should exit on scene transition
 func (sm *SceneManager) SetExitOnSceneTransition(exit bool) {
 	sm.exitOnSceneTransition = exit
@@ -152,6 +159,16 @@ func (sm *SceneManager) StartScene(scene *scene.Scene, player *character.Charact
 	// Set active character to player if not already set
 	if sm.currentScene.ActiveCharacter == "" {
 		sm.currentScene.ActiveCharacter = player.ID
+	}
+
+	// Log scene start
+	if sm.sessionLogger != nil {
+		sm.sessionLogger.Log("scene_start", map[string]any{
+			"scene_name":        scene.Name,
+			"scene_description": scene.Description,
+			"characters":        scene.Characters,
+			"player_id":         player.ID,
+		})
 	}
 
 	// Scene description will be displayed by the terminal UI when needed
@@ -201,6 +218,11 @@ func (sm *SceneManager) RunSceneLoop(ctx context.Context) error {
 
 // processInput handles player input
 func (sm *SceneManager) processInput(ctx context.Context, input string) {
+	// Log player input
+	if sm.sessionLogger != nil {
+		sm.sessionLogger.Log("player_input", map[string]any{"input": input})
+	}
+
 	// Check for concession command during conflict (before any roll per Fate Core rules)
 	if sm.currentScene.IsConflict && sm.isConcedeCommand(input) {
 		sm.handleConcession(ctx)
@@ -215,6 +237,14 @@ func (sm *SceneManager) processInput(ctx context.Context, input string) {
 			"input", input,
 			"error", err)
 		inputType = inputTypeDialog // Graceful fallback
+	}
+
+	// Log classification result
+	if sm.sessionLogger != nil {
+		sm.sessionLogger.Log("input_classification", map[string]any{
+			"input":          input,
+			"classification": inputType,
+		})
 	}
 
 	slog.Debug("Input classified",
@@ -295,6 +325,15 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) {
 	conflictResolution, cleanedResponse := sm.parseConflictEndMarker(cleanedResponse)
 
 	sm.ui.DisplayDialog(input, cleanedResponse)
+
+	// Log the dialog exchange
+	if sm.sessionLogger != nil {
+		sm.sessionLogger.Log("dialog", map[string]any{
+			"player_input": input,
+			"gm_response":  cleanedResponse,
+		})
+	}
+
 	// Record this exchange in conversation history
 	sm.addToConversationHistory(input, cleanedResponse, inputTypeDialog)
 
@@ -341,6 +380,11 @@ func (sm *SceneManager) handleAction(ctx context.Context, input string) {
 		if err != nil {
 			sm.ui.DisplaySystemMessage(fmt.Sprintf("Failed to parse action: %v", err))
 			return
+		}
+
+		// Log the parsed action
+		if sm.sessionLogger != nil {
+			sm.sessionLogger.Log("action_parse", action)
 		}
 
 		sm.resolveAction(ctx, action)
@@ -404,6 +448,20 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 		resultString,
 		initialOutcome.Type.String())
 
+	// Log the dice roll
+	if sm.sessionLogger != nil {
+		sm.sessionLogger.Log("dice_roll", map[string]any{
+			"skill":        parsedAction.Skill,
+			"skill_level":  int(skillLevel),
+			"bonus":        parsedAction.CalculateBonus(),
+			"roll_result":  result.String(),
+			"final_value":  int(result.FinalValue),
+			"difficulty":   int(parsedAction.Difficulty),
+			"outcome":      initialOutcome.Type.String(),
+			"shifts":       initialOutcome.Shifts,
+		})
+	}
+
 	// Post-roll invoke opportunity
 	result = sm.handlePostRollInvokes(result, parsedAction.Difficulty, parsedAction, false)
 	parsedAction.CheckResult = result
@@ -428,6 +486,15 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 		narrative = sm.buildMechanicalNarrative(parsedAction)
 	}
 	sm.ui.DisplayNarrative(narrative)
+
+	// Log the narrative
+	if sm.sessionLogger != nil {
+		sm.sessionLogger.Log("narrative", map[string]any{
+			"text":    narrative,
+			"action":  parsedAction.Type.String(),
+			"outcome": outcome.Type.String(),
+		})
+	}
 
 	// Apply mechanical effects based on action type and outcome
 	sm.applyActionEffects(parsedAction, targetChar)
@@ -983,6 +1050,15 @@ func (sm *SceneManager) handleTargetTakenOut(target *character.Character) {
 	sm.ui.DisplaySystemMessage(fmt.Sprintf(
 		"\n=== %s is Taken Out! ===", target.Name))
 	sm.ui.DisplaySystemMessage("You decide their fate!")
+
+	// Log the taken out event
+	if sm.sessionLogger != nil {
+		sm.sessionLogger.Log("taken_out", map[string]any{
+			"character_id":   target.ID,
+			"character_name": target.Name,
+			"by_player":      sm.player.ID,
+		})
+	}
 
 	// Mark the target as taken out for the duration of this scene
 	// This prevents them from rejoining conflicts until a new scene begins
