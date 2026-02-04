@@ -16,10 +16,14 @@ BINARY_NAME=llamaoffate
 BINARY_PATH=./bin/$(BINARY_NAME)
 MAIN_PATH=./cmd/cli
 
-.PHONY: all build clean test test-llm vet fmt lint deps help
+.PHONY: all build clean test test-llm vet fmt lint deps validate help
 
 # Default target
 all: clean deps vet fmt build
+
+# Run all validation checks
+validate: vet fmt lint test
+	@echo "All validations passed!"
 
 # Build the application
 build:
@@ -84,5 +88,6 @@ help:
 	@echo "  fmt      - Format code"
 	@echo "  lint     - Run golangci-lint"
 	@echo "  deps     - Download and tidy dependencies"
+	@echo "  validate - Run all validation checks (vet, fmt, lint, test)"
 	@echo "  run      - Build and run the application"
 	@echo "  help     - Show this help message"
