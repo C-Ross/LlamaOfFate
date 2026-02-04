@@ -451,14 +451,14 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 	// Log the dice roll
 	if sm.sessionLogger != nil {
 		sm.sessionLogger.Log("dice_roll", map[string]any{
-			"skill":        parsedAction.Skill,
-			"skill_level":  int(skillLevel),
-			"bonus":        parsedAction.CalculateBonus(),
-			"roll_result":  result.String(),
-			"final_value":  int(result.FinalValue),
-			"difficulty":   int(parsedAction.Difficulty),
-			"outcome":      initialOutcome.Type.String(),
-			"shifts":       initialOutcome.Shifts,
+			"skill":       parsedAction.Skill,
+			"skill_level": int(skillLevel),
+			"bonus":       parsedAction.CalculateBonus(),
+			"roll_result": result.String(),
+			"final_value": int(result.FinalValue),
+			"difficulty":  int(parsedAction.Difficulty),
+			"outcome":     initialOutcome.Type.String(),
+			"shifts":      initialOutcome.Shifts,
 		})
 	}
 

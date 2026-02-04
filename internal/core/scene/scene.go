@@ -16,9 +16,9 @@ type Scene struct {
 	ActiveCharacter  string            `json:"active_character_id,omitempty"`
 
 	// Scene State
-	IsConflict         bool              `json:"is_conflict"`
-	ConflictState      *ConflictState    `json:"conflict_state,omitempty"`
-	TakenOutCharacters map[string]bool   `json:"taken_out_characters,omitempty"` // Characters taken out this scene
+	IsConflict         bool            `json:"is_conflict"`
+	ConflictState      *ConflictState  `json:"conflict_state,omitempty"`
+	TakenOutCharacters map[string]bool `json:"taken_out_characters,omitempty"` // Characters taken out this scene
 
 	// Metadata
 	CreatedAt time.Time `json:"created_at"`

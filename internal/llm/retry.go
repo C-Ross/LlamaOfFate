@@ -189,10 +189,6 @@ func isRetryableError(err error) bool {
 		if netErr.Timeout() {
 			return true
 		}
-		// Temporary network errors are retryable
-		if netErr.Temporary() {
-			return true
-		}
 	}
 
 	// Check for DNS errors
