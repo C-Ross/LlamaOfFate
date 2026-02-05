@@ -518,6 +518,61 @@ func TestSceneManager_ParseConflictMarker_NoMarker(t *testing.T) {
 	assert.Equal(t, "The merchant smiles and offers you a deal.", cleanedResponse)
 }
 
+func TestSceneManager_ParseSceneTransitionMarker_WithLocation(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	response := "The swinging doors creak as you step out into the afternoon sun. [SCENE_TRANSITION:the dusty streets of Redemption Gulch]"
+	transition, cleanedResponse := sm.parseSceneTransitionMarker(response)
+
+	require.NotNil(t, transition)
+	assert.Equal(t, "the dusty streets of Redemption Gulch", transition.Hint)
+	assert.Equal(t, "The swinging doors creak as you step out into the afternoon sun.", cleanedResponse)
+}
+
+func TestSceneManager_ParseSceneTransitionMarker_ShortHint(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	response := "You mount your horse and ride off. [SCENE_TRANSITION:the road ahead]"
+	transition, cleanedResponse := sm.parseSceneTransitionMarker(response)
+
+	require.NotNil(t, transition)
+	assert.Equal(t, "the road ahead", transition.Hint)
+	assert.Equal(t, "You mount your horse and ride off.", cleanedResponse)
+}
+
+func TestSceneManager_ParseSceneTransitionMarker_NoMarker(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	response := "You walk over to the window and look outside."
+	transition, cleanedResponse := sm.parseSceneTransitionMarker(response)
+
+	assert.Nil(t, transition)
+	assert.Equal(t, "You walk over to the window and look outside.", cleanedResponse)
+}
+
+func TestSceneManager_ParseSceneTransitionMarker_MarkerInMiddle(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	response := "With a tip of your hat, you exit the saloon. [SCENE_TRANSITION:outside] The bright sun blinds you momentarily."
+	transition, cleanedResponse := sm.parseSceneTransitionMarker(response)
+
+	require.NotNil(t, transition)
+	assert.Equal(t, "outside", transition.Hint)
+	assert.Equal(t, "With a tip of your hat, you exit the saloon. The bright sun blinds you momentarily.", cleanedResponse)
+}
+
 func TestSceneManager_CalculateInitiative_Physical(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)

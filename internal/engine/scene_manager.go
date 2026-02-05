@@ -320,9 +320,10 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) {
 		return
 	}
 
-	// Check for conflict markers in the response (both escalation and de-escalation)
+	// Check for markers in the response (conflict escalation, de-escalation, and scene transition)
 	conflictTrigger, cleanedResponse := sm.parseConflictMarker(response)
 	conflictResolution, cleanedResponse := sm.parseConflictEndMarker(cleanedResponse)
+	sceneTransition, cleanedResponse := sm.parseSceneTransitionMarker(cleanedResponse)
 
 	sm.ui.DisplayDialog(input, cleanedResponse)
 
@@ -350,6 +351,31 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) {
 	if conflictResolution != nil && sm.currentScene.IsConflict {
 		sm.resolveConflictPeacefully(conflictResolution.Reason)
 	}
+
+	// Handle scene transition if detected
+	if sceneTransition != nil {
+		sm.handleSceneTransition(sceneTransition)
+	}
+}
+
+// handleSceneTransition processes a scene transition marker
+func (sm *SceneManager) handleSceneTransition(transition *SceneTransition) {
+	// Log the scene transition
+	if sm.sessionLogger != nil {
+		sm.sessionLogger.Log("scene_transition", map[string]any{
+			"hint": transition.Hint,
+		})
+	}
+
+	slog.Info("Scene transition detected",
+		"component", componentSceneManager,
+		"hint", transition.Hint)
+
+	// Display the transition to the player
+	sm.ui.DisplaySceneTransition("", transition.Hint)
+
+	// Mark that we should exit the scene loop
+	sm.shouldExit = true
 }
 
 // handleAction processes player actions
