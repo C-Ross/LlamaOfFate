@@ -86,14 +86,6 @@ When you need to consider the rules use the Fate Core SRD at https://fate-srd.co
 
 ## Session Logging
 
-Session logs (`session_*.yaml`) capture gameplay for analysis and test extraction.
-
-### Reading Logs
-- Logs are YAML with `---` separators between entries
-- Each entry has `timestamp`, `type`, and `data`
-- Key types: `player_input`, `input_classification`, `action_parse`, `dice_roll`, `narrative`, `dialog`, `taken_out`
-
-### Adding Log Events
 When adding features that affect gameplay flow, add logging in `scene_manager.go`:
 `sm.sessionLogger.Log("event_type", map[string]any{...})`
 Or log existing structs directly: `sm.sessionLogger.Log("action_parse", parsedAction)`

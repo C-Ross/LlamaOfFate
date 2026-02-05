@@ -1,0 +1,76 @@
+---
+timestamp: 2026-02-04T22:14:00.299151496Z
+type: scene_start
+data:
+    characters:
+        - player1
+        - bartender
+    player_id: player1
+    scene_description: The swinging doors creak as you step into the Dusty Spur, the only watering hole in Redemption Gulch. Dust motes dance in shafts of afternoon light cutting through grimy windows. Behind the bar, a weathered woman with sharp eyes polishes a glass, watching you with guarded curiosity.
+    scene_name: The Dusty Spur Saloon
+---
+timestamp: 2026-02-04T22:15:14.410238791Z
+type: player_input
+data:
+    input: Jesse saunters up to the bar and says "a whiskey" putting down a silver dollar.
+---
+timestamp: 2026-02-04T22:15:15.429787702Z
+type: input_classification
+data:
+    classification: dialog
+    input: Jesse saunters up to the bar and says "a whiskey" putting down a silver dollar.
+---
+timestamp: 2026-02-04T22:15:16.439977951Z
+type: dialog
+data:
+    gm_response: Maggie Two-Rivers raises an eyebrow at the silver dollar, then slides a whiskey glass down the bar to you. "That'll be 50 cents, stranger," she says, her voice husky from years of shouting over rowdy patrons.
+    player_input: Jesse saunters up to the bar and says "a whiskey" putting down a silver dollar.
+---
+timestamp: 2026-02-05T01:34:55.539696175Z
+type: player_input
+data:
+    input: Jesse smirks and lays down another dollar.  "Just a few questions.  Where can I find the Cortez gang."
+---
+timestamp: 2026-02-05T01:34:55.886858299Z
+type: input_classification
+data:
+    classification: action
+    input: Jesse smirks and lays down another dollar.  "Just a few questions.  Where can I find the Cortez gang."
+---
+timestamp: 2026-02-05T01:34:56.863912134Z
+type: action_parse
+data:
+    id: action-1770255296863906503
+    characterid: player1
+    type: 1
+    skill: Rapport
+    description: Jesse tries to build a rapport with Maggie to get information about the Cortez Gang
+    rawinput: Jesse smirks and lays down another dollar.  "Just a few questions.  Where can I find the Cortez gang."
+    target: Maggie Two-Rivers
+    difficulty: 2
+    aspects: []
+    stunts: []
+    checkresult: null
+    outcome: null
+    effects: []
+    resulttext: ""
+    timestamp: 2026-02-05T01:34:56.863910641Z
+---
+timestamp: 2026-02-05T01:34:56.865439603Z
+type: dice_roll
+data:
+    bonus: 0
+    difficulty: 2
+    final_value: 2
+    outcome: Tie
+    roll_result: '[ ][ ][ ][-]'
+    shifts: 0
+    skill: Rapport
+    skill_level: 3
+---
+timestamp: 2026-02-05T01:35:28.872327592Z
+type: narrative
+data:
+    action: Create an Advantage
+    outcome: Success
+    text: As Jesse's charm and charisma wash over Maggie, her initial wariness begins to thaw, and she sets the glass she's been polishing down, her eyes crinkling at the corners as she regards him with a hint of genuine interest.
