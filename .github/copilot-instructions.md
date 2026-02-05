@@ -48,6 +48,11 @@ make clean      # Clean artifacts
 - Format according to `go fmt`
 - Use Go template for all prompts, do not in line prompt text generation
 
+### Data Formats
+- **Prefer YAML over JSON** for configuration, data files, and logs (readability for long text)
+- **Exception: LLM structured responses** use JSON (industry standard, better parsing reliability)
+- Config files use YAML (e.g., `azure-llm.yaml`)
+
 ## Key Patterns
 
 ### Dynamic Character Aspects (NOT traditional 5-aspect)
