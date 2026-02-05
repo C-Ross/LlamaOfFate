@@ -3,13 +3,25 @@
 ## Project Overview
 Text-based RPG implementing Fate Core System with LLM integration. Built in Go with modular architecture.
 
-## Architecture
+## Repository Structure
 ```
-cmd/cli/           - CLI interface and entry point
-internal/core/     - Core Fate mechanics (dice, character, action, scene)
-internal/engine/   - Game engine coordination
-internal/ui/text/  - Text-based UI
-test/integration/  - Integration tests
+cmd/cli/                    - CLI entry point (single hardcoded scene currently)
+examples/llm-scene-loop/    - Example scenes (saloon, heist, tower)
+internal/
+  core/                     - Fate Core mechanics
+    action/                 - Action types (Overcome, Create Advantage, Attack, Defend)
+    character/              - Character, aspects, stress, consequences
+    dice/                   - 4dF dice, ladder, check results
+    scene/                  - Scene state, conflicts, situation aspects
+  engine/                   - Game loop, LLM integration, prompt templates
+  llm/                      - LLM client interface and retry logic
+    azure/                  - Azure OpenAI client implementation
+  session/                  - Session logging for game transcripts
+  ui/terminal/              - Terminal UI implementation
+test/
+  integration/              - Integration tests
+  llmeval/                  - LLM behavior evaluation tests (requires -tags=llmeval)
+configs/                    - Configuration files (azure-llm.yaml)
 ```
 
 ## Development Standards
