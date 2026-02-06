@@ -48,6 +48,9 @@ var takenOutPromptTemplate string
 //go:embed templates/scene_generation_prompt.tmpl
 var sceneGenerationPromptTemplate string
 
+//go:embed templates/scene_summary_prompt.tmpl
+var sceneSummaryPromptTemplate string
+
 // Template instances
 var (
 	AspectGenerationPrompt       *template.Template
@@ -63,6 +66,7 @@ var (
 	ConsequenceAspectPrompt      *template.Template
 	TakenOutPrompt               *template.Template
 	SceneGenerationPrompt        *template.Template
+	SceneSummaryPrompt           *template.Template
 )
 
 func init() {
@@ -145,6 +149,12 @@ func init() {
 	if err != nil {
 		panic("failed to parse scene generation prompt template: " + err.Error())
 	}
+
+	// Parse the scene summary prompt template
+	SceneSummaryPrompt, err = template.New("scene_summary").Parse(sceneSummaryPromptTemplate)
+	if err != nil {
+		panic("failed to parse scene summary prompt template: " + err.Error())
+	}
 }
 
 // executeTemplate is a helper that executes a template and returns the result as a string
@@ -219,4 +229,9 @@ func RenderAspectGenerationSystem() (string, error) {
 // RenderSceneGeneration renders the scene generation prompt
 func RenderSceneGeneration(data SceneGenerationData) (string, error) {
 	return executeTemplate(SceneGenerationPrompt, data)
+}
+
+// RenderSceneSummary renders the scene summary prompt
+func RenderSceneSummary(data SceneSummaryData) (string, error) {
+	return executeTemplate(SceneSummaryPrompt, data)
 }

@@ -1,0 +1,73 @@
+You are a GM for a Fate Core RPG. Generate a structured summary of the scene that just ended.
+
+SCENE INFORMATION:
+Scene Name: {{.SceneName}}
+Description: {{.SceneDescription}}
+
+{{- if .SituationAspects}}
+SITUATION ASPECTS:
+{{- range .SituationAspects}}
+- {{.}}
+{{- end}}
+{{- end}}
+
+{{- if .NPCsInScene}}
+NPCs IN SCENE:
+{{- range .NPCsInScene}}
+- {{.Name}} ({{.Attitude}})
+{{- end}}
+{{- end}}
+
+{{- if .TakenOutChars}}
+CHARACTERS TAKEN OUT:
+{{- range .TakenOutChars}}
+- {{.}}
+{{- end}}
+{{- end}}
+
+HOW THE SCENE ENDED: {{.HowEnded}}
+{{- if .TransitionHint}}
+Transition: {{.TransitionHint}}
+{{- end}}
+
+CONVERSATION HISTORY:
+{{- range .ConversationHistory}}
+Player: {{.PlayerInput}}
+GM: {{.GMResponse}}
+{{- end}}
+
+Generate a summary of this scene in valid JSON format. Focus on what's narratively important for continuity:
+
+```json
+{
+  "scene_description": "One sentence describing the location/situation",
+  "key_events": [
+    "First significant event that happened",
+    "Second significant event (if any)",
+    "Third significant event (if any)"
+  ],
+  "npcs_encountered": [
+    {
+      "name": "NPC name",
+      "attitude": "How they feel about the player now (friendly/hostile/neutral/defeated/dead)"
+    }
+  ],
+  "aspects_discovered": [
+    "Any new aspects learned or created during the scene"
+  ],
+  "unresolved_threads": [
+    "Plot hooks or questions left unanswered",
+    "Things the player mentioned wanting to do later"
+  ],
+  "how_ended": "Brief description of how the scene concluded",
+  "narrative_prose": "A 2-3 sentence narrative summary suitable for 'Previously on...' style recap"
+}
+```
+
+Rules:
+- key_events should be 1-4 items, most important only
+- npcs_encountered only includes NPCs actually interacted with
+- aspects_discovered includes situation aspects and any created during play
+- unresolved_threads captures story hooks for future scenes
+- narrative_prose should read like a story recap, not a list
+- Be concise - this is for context, not a full transcript

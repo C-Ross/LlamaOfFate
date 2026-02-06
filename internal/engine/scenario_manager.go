@@ -25,13 +25,14 @@ type ScenarioSettings struct {
 
 // ScenarioManager orchestrates multi-scene gameplay
 type ScenarioManager struct {
-	engine        *Engine
-	player        *character.Character
-	ui            UI
-	sessionLogger *session.Logger
-	settings      ScenarioSettings
-	initialScene  *scene.Scene     // Optional pre-configured starting scene
-	initialNPCs   []*character.Character // NPCs for initial scene
+	engine         *Engine
+	player         *character.Character
+	ui             UI
+	sessionLogger  *session.Logger
+	settings       ScenarioSettings
+	initialScene   *scene.Scene           // Optional pre-configured starting scene
+	initialNPCs    []*character.Character // NPCs for initial scene
+	sceneSummaries []SceneSummary         // Summaries of recent scenes (sliding window of last 3)
 }
 
 // NewScenarioManager creates a new scenario manager
@@ -145,6 +146,22 @@ func (m *ScenarioManager) Run(ctx context.Context) error {
 			transitionHint = result.TransitionHint
 		}
 
+		// Generate and store scene summary for context continuity
+		summary, err := m.generateSceneSummary(ctx, sceneManager, currentScene, result)
+		if err != nil {
+			slog.Warn("Failed to generate scene summary, continuing without it",
+				"component", componentScenarioManager,
+				"error", err,
+			)
+		} else {
+			m.addSceneSummary(summary)
+
+			// Log the scene summary
+			if m.sessionLogger != nil {
+				m.sessionLogger.Log("scene_summary", summary)
+			}
+		}
+
 		// Generate the next scene
 		currentScene, err = m.generateNextScene(ctx, transitionHint)
 		if err != nil {
@@ -191,6 +208,7 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 		PlayerHighConcept: m.player.Aspects.HighConcept,
 		PlayerTrouble:     m.player.Aspects.Trouble,
 		PlayerAspects:     playerAspects,
+		PreviousSummaries: m.sceneSummaries, // Include recent scene summaries for context
 	}
 
 	prompt, err := RenderSceneGeneration(data)
@@ -302,4 +320,123 @@ func (m *ScenarioManager) parseGeneratedScene(content string) (*GeneratedScene, 
 	}
 
 	return &generated, nil
+}
+
+// addSceneSummary adds a summary to the sliding window (max 3 summaries)
+func (m *ScenarioManager) addSceneSummary(summary *SceneSummary) {
+	if summary == nil {
+		return
+	}
+	m.sceneSummaries = append(m.sceneSummaries, *summary)
+	// Keep only last 3 summaries (sliding window)
+	if len(m.sceneSummaries) > 3 {
+		m.sceneSummaries = m.sceneSummaries[len(m.sceneSummaries)-3:]
+	}
+}
+
+// generateSceneSummary creates a summary of the completed scene using LLM
+func (m *ScenarioManager) generateSceneSummary(ctx context.Context, sceneManager *SceneManager, completedScene *scene.Scene, result *SceneEndResult) (*SceneSummary, error) {
+	// Gather situation aspects
+	var aspects []string
+	for _, sa := range completedScene.SituationAspects {
+		aspects = append(aspects, sa.Aspect)
+	}
+
+	// Gather NPCs in scene
+	var npcsInScene []NPCSummary
+	for _, charID := range completedScene.Characters {
+		if charID == m.player.ID {
+			continue
+		}
+		char := m.engine.GetCharacter(charID)
+		if char != nil {
+			attitude := "neutral"
+			// Check if NPC was taken out
+			for _, takenOutID := range result.TakenOutChars {
+				if takenOutID == charID {
+					attitude = "defeated"
+					break
+				}
+			}
+			npcsInScene = append(npcsInScene, NPCSummary{
+				Name:     char.Name,
+				Attitude: attitude,
+			})
+		}
+	}
+
+	// Determine how ended string
+	howEnded := string(result.Reason)
+
+	data := SceneSummaryData{
+		SceneName:           completedScene.Name,
+		SceneDescription:    completedScene.Description,
+		SituationAspects:    aspects,
+		ConversationHistory: sceneManager.GetConversationHistory(),
+		NPCsInScene:         npcsInScene,
+		TakenOutChars:       result.TakenOutChars,
+		HowEnded:            howEnded,
+		TransitionHint:      result.TransitionHint,
+	}
+
+	prompt, err := RenderSceneSummary(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to render scene summary prompt: %w", err)
+	}
+
+	resp, err := m.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
+		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		MaxTokens:   400,
+		Temperature: 0.5, // More focused for summarization
+	})
+	if err != nil {
+		return nil, fmt.Errorf("LLM request failed: %w", err)
+	}
+
+	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+		return nil, fmt.Errorf("empty LLM response")
+	}
+
+	// Parse the generated summary
+	summary, err := m.parseSceneSummary(resp.Choices[0].Message.Content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse scene summary: %w", err)
+	}
+
+	slog.Info("Generated scene summary",
+		"component", componentScenarioManager,
+		"scene_name", completedScene.Name,
+		"key_events", len(summary.KeyEvents),
+		"npcs", len(summary.NPCsEncountered),
+	)
+
+	return summary, nil
+}
+
+// parseSceneSummary parses the LLM response into a SceneSummary
+func (m *ScenarioManager) parseSceneSummary(content string) (*SceneSummary, error) {
+	// Clean the response - extract JSON from potential markdown code blocks
+	cleaned := cleanJSONResponse(content)
+
+	var summary SceneSummary
+	if err := json.Unmarshal([]byte(cleaned), &summary); err != nil {
+		// Try to extract just the first JSON object if there's extra content
+		start := strings.Index(content, "{")
+		end := strings.LastIndex(content, "}")
+		if start >= 0 && end > start {
+			cleaned = content[start : end+1]
+			if err := json.Unmarshal([]byte(cleaned), &summary); err != nil {
+				return nil, fmt.Errorf("JSON parse error: %w", err)
+			}
+		} else {
+			return nil, fmt.Errorf("no valid JSON found in response")
+		}
+	}
+
+	// Validate required field
+	if summary.NarrativeProse == "" {
+		return nil, fmt.Errorf("missing narrative_prose")
+	}
+
+	return &summary, nil
 }

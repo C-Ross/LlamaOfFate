@@ -231,3 +231,151 @@ func TestGeneratedScene_EmptyNPCs(t *testing.T) {
 	assert.Equal(t, "Empty Scene", generated.SceneName)
 	assert.Len(t, generated.NPCs, 0)
 }
+
+func TestScenarioManager_addSceneSummary(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	// Add first summary
+	summary1 := &SceneSummary{NarrativeProse: "First scene"}
+	sm.addSceneSummary(summary1)
+	assert.Len(t, sm.sceneSummaries, 1)
+
+	// Add second summary
+	summary2 := &SceneSummary{NarrativeProse: "Second scene"}
+	sm.addSceneSummary(summary2)
+	assert.Len(t, sm.sceneSummaries, 2)
+
+	// Add third summary
+	summary3 := &SceneSummary{NarrativeProse: "Third scene"}
+	sm.addSceneSummary(summary3)
+	assert.Len(t, sm.sceneSummaries, 3)
+
+	// Add fourth summary - should maintain sliding window of 3
+	summary4 := &SceneSummary{NarrativeProse: "Fourth scene"}
+	sm.addSceneSummary(summary4)
+	assert.Len(t, sm.sceneSummaries, 3)
+	assert.Equal(t, "Second scene", sm.sceneSummaries[0].NarrativeProse)
+	assert.Equal(t, "Fourth scene", sm.sceneSummaries[2].NarrativeProse)
+}
+
+func TestScenarioManager_addSceneSummary_NilSummary(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	// Adding nil should not panic or add anything
+	sm.addSceneSummary(nil)
+	assert.Len(t, sm.sceneSummaries, 0)
+}
+
+func TestScenarioManager_parseSceneSummary_Valid(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	jsonResponse := `{
+		"scene_description": "A dusty saloon",
+		"key_events": ["Met the bartender", "Learned about the outlaw"],
+		"npcs_encountered": [{"name": "Bartender Bill", "attitude": "friendly"}],
+		"aspects_discovered": ["Wanted Posters Everywhere"],
+		"unresolved_threads": ["Find the outlaw"],
+		"how_ended": "Left through the back door",
+		"narrative_prose": "The stranger walked into the saloon and learned of a dangerous outlaw terrorizing the town."
+	}`
+
+	summary, err := sm.parseSceneSummary(jsonResponse)
+	require.NoError(t, err)
+
+	assert.Equal(t, "A dusty saloon", summary.SceneDescription)
+	assert.Len(t, summary.KeyEvents, 2)
+	assert.Equal(t, "Met the bartender", summary.KeyEvents[0])
+	assert.Len(t, summary.NPCsEncountered, 1)
+	assert.Equal(t, "Bartender Bill", summary.NPCsEncountered[0].Name)
+	assert.Equal(t, "friendly", summary.NPCsEncountered[0].Attitude)
+	assert.Len(t, summary.AspectsDiscovered, 1)
+	assert.Len(t, summary.UnresolvedThreads, 1)
+	assert.Contains(t, summary.NarrativeProse, "stranger walked into")
+}
+
+func TestScenarioManager_parseSceneSummary_WithCodeBlock(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	jsonResponse := "```json\n{\"narrative_prose\": \"A test summary.\"}\n```"
+
+	summary, err := sm.parseSceneSummary(jsonResponse)
+	require.NoError(t, err)
+
+	assert.Equal(t, "A test summary.", summary.NarrativeProse)
+}
+
+func TestScenarioManager_parseSceneSummary_MissingNarrativeProse(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	// Missing narrative_prose
+	jsonResponse := `{"scene_description": "A test scene."}`
+
+	_, err = sm.parseSceneSummary(jsonResponse)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "missing narrative_prose")
+}
+
+func TestSceneSummary_Fields(t *testing.T) {
+	summary := SceneSummary{
+		SceneDescription:  "A dusty saloon",
+		KeyEvents:         []string{"Event 1", "Event 2"},
+		NPCsEncountered:   []NPCSummary{{Name: "Test NPC", Attitude: "friendly"}},
+		AspectsDiscovered: []string{"Test Aspect"},
+		UnresolvedThreads: []string{"Find the treasure"},
+		HowEnded:          "transition",
+		NarrativeProse:    "A test narrative",
+	}
+
+	assert.Equal(t, "A dusty saloon", summary.SceneDescription)
+	assert.Len(t, summary.KeyEvents, 2)
+	assert.Len(t, summary.NPCsEncountered, 1)
+	assert.Equal(t, "Test NPC", summary.NPCsEncountered[0].Name)
+	assert.Equal(t, "A test narrative", summary.NarrativeProse)
+}
+
+func TestNPCSummary_Fields(t *testing.T) {
+	npc := NPCSummary{
+		Name:     "Sheriff Dan",
+		Attitude: "hostile",
+	}
+
+	assert.Equal(t, "Sheriff Dan", npc.Name)
+	assert.Equal(t, "hostile", npc.Attitude)
+}
+
+func TestSceneSummaryData_Fields(t *testing.T) {
+	data := SceneSummaryData{
+		SceneName:        "Test Scene",
+		SceneDescription: "A test scene",
+		SituationAspects: []string{"Aspect 1"},
+		NPCsInScene:      []NPCSummary{{Name: "NPC", Attitude: "neutral"}},
+		TakenOutChars:    []string{"enemy1"},
+		HowEnded:         "transition",
+		TransitionHint:   "the forest",
+	}
+
+	assert.Equal(t, "Test Scene", data.SceneName)
+	assert.Len(t, data.SituationAspects, 1)
+	assert.Len(t, data.NPCsInScene, 1)
+	assert.Len(t, data.TakenOutChars, 1)
+}

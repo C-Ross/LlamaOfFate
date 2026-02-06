@@ -6,6 +6,17 @@ FATE CORE SCENE GUIDELINES:
 - NPCs should be introduced only when dramatically appropriate
 - Keep descriptions evocative but concise
 
+{{- if .PreviousSummaries}}
+STORY SO FAR:
+{{- range $i, $s := .PreviousSummaries}}
+--- Previous Scene ---
+{{$s.NarrativeProse}}
+{{- if $s.UnresolvedThreads}}
+Unresolved: {{range $j, $t := $s.UnresolvedThreads}}{{if $j}}, {{end}}{{$t}}{{end}}
+{{- end}}
+{{- end}}
+{{- end}}
+
 TRANSITION CONTEXT:
 {{- if .TransitionHint}}
 The previous scene ended with the player heading toward: {{.TransitionHint}}
@@ -61,3 +72,7 @@ Rules:
 - situation_aspects should be 2-3 invokable/compellable aspects
 - npcs array can be empty if no NPCs are present; include at most 1-2 NPCs
 - Keep the scene open-ended to allow player agency
+{{- if .PreviousSummaries}}
+- Reference or build upon unresolved threads from previous scenes when appropriate
+- NPCs encountered previously may reappear or be referenced
+{{- end}}

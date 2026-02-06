@@ -128,13 +128,14 @@ type NPCActionDecision struct {
 
 // SceneGenerationData holds the data for scene generation template
 type SceneGenerationData struct {
-	TransitionHint    string   // Hint from previous scene transition
-	SettingContext    string   // Genre/world description
-	PlayerName        string   // Player character name
-	PlayerHighConcept string   // Player high concept
-	PlayerTrouble     string   // Player trouble aspect
-	PlayerAspects     []string // Other player aspects
-	RecentEvents      string   // Summary of recent events (optional)
+	TransitionHint     string         // Hint from previous scene transition
+	SettingContext     string         // Genre/world description
+	PlayerName         string         // Player character name
+	PlayerHighConcept  string         // Player high concept
+	PlayerTrouble      string         // Player trouble aspect
+	PlayerAspects      []string       // Other player aspects
+	RecentEvents       string         // Summary of recent events (optional, deprecated - use PreviousSummaries)
+	PreviousSummaries  []SceneSummary // Summaries of recent scenes (last 3)
 }
 
 // GeneratedScene represents the LLM response for scene generation
@@ -150,4 +151,33 @@ type GeneratedNPC struct {
 	Name        string `json:"name"`
 	HighConcept string `json:"high_concept"`
 	Disposition string `json:"disposition"` // friendly, neutral, hostile
+}
+
+// SceneSummary holds a structured summary of a completed scene for context continuity
+type SceneSummary struct {
+	SceneDescription  string       `json:"scene_description" yaml:"scene_description"`
+	KeyEvents         []string     `json:"key_events" yaml:"key_events"`
+	NPCsEncountered   []NPCSummary `json:"npcs_encountered" yaml:"npcs_encountered"`
+	AspectsDiscovered []string     `json:"aspects_discovered" yaml:"aspects_discovered"`
+	UnresolvedThreads []string     `json:"unresolved_threads" yaml:"unresolved_threads"`
+	HowEnded          string       `json:"how_ended" yaml:"how_ended"`
+	NarrativeProse    string       `json:"narrative_prose" yaml:"narrative_prose"`
+}
+
+// NPCSummary holds brief NPC information for scene summaries
+type NPCSummary struct {
+	Name     string `json:"name" yaml:"name"`
+	Attitude string `json:"attitude" yaml:"attitude"` // friendly, hostile, neutral, defeated, etc.
+}
+
+// SceneSummaryData holds the data for scene summary generation template
+type SceneSummaryData struct {
+	SceneName           string
+	SceneDescription    string
+	SituationAspects    []string
+	ConversationHistory []ConversationEntry
+	NPCsInScene         []NPCSummary
+	TakenOutChars       []string
+	HowEnded            string // "transition", "quit", "player_taken_out"
+	TransitionHint      string
 }
