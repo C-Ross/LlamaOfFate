@@ -185,7 +185,7 @@ func TestSceneManager_RunSceneLoop_RequiresLLM(t *testing.T) {
 	ctx := context.Background()
 
 	// Should fail because no LLM client is configured
-	err = sm.RunSceneLoop(ctx)
+	_, err = sm.RunSceneLoop(ctx)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "LLM client is required")
 
@@ -193,7 +193,7 @@ func TestSceneManager_RunSceneLoop_RequiresLLM(t *testing.T) {
 	mockClient := &MockLLMClient{}
 	engine.llmClient = mockClient
 
-	err = sm.RunSceneLoop(ctx)
+	_, err = sm.RunSceneLoop(ctx)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "UI is required")
 }

@@ -45,6 +45,9 @@ var consequenceAspectPromptTemplate string
 //go:embed templates/taken_out_prompt.tmpl
 var takenOutPromptTemplate string
 
+//go:embed templates/scene_generation_prompt.tmpl
+var sceneGenerationPromptTemplate string
+
 // Template instances
 var (
 	AspectGenerationPrompt       *template.Template
@@ -59,6 +62,7 @@ var (
 	NPCActionDecisionPrompt      *template.Template
 	ConsequenceAspectPrompt      *template.Template
 	TakenOutPrompt               *template.Template
+	SceneGenerationPrompt        *template.Template
 )
 
 func init() {
@@ -135,6 +139,12 @@ func init() {
 	if err != nil {
 		panic("failed to parse taken out prompt template: " + err.Error())
 	}
+
+	// Parse the scene generation prompt template
+	SceneGenerationPrompt, err = template.New("scene_generation").Parse(sceneGenerationPromptTemplate)
+	if err != nil {
+		panic("failed to parse scene generation prompt template: " + err.Error())
+	}
 }
 
 // executeTemplate is a helper that executes a template and returns the result as a string
@@ -204,4 +214,9 @@ func RenderAspectGeneration(data AspectGenerationRequest) (string, error) {
 // RenderAspectGenerationSystem renders the aspect generation system prompt
 func RenderAspectGenerationSystem() (string, error) {
 	return executeTemplate(AspectGenerationSystemPrompt, nil)
+}
+
+// RenderSceneGeneration renders the scene generation prompt
+func RenderSceneGeneration(data SceneGenerationData) (string, error) {
+	return executeTemplate(SceneGenerationPrompt, data)
 }

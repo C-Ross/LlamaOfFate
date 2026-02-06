@@ -35,6 +35,7 @@ func main() {
 	sceneFlag := flag.String("scene", "", "Scene to play: tower, heist, saloon (default: random)")
 	listFlag := flag.Bool("list", false, "List available scenes and exit")
 	logFlag := flag.String("log", "auto", "Session log path (default: auto-generated, empty string disables)")
+	multiFlag := flag.Bool("multi", false, "Enable multi-scene mode (continues to new scenes on transition)")
 	flag.Parse()
 
 	availableScenes := []string{"tower", "heist", "saloon"}
@@ -44,6 +45,9 @@ func main() {
 		fmt.Println("  tower  - Fantasy: The Abandoned Wizard's Tower")
 		fmt.Println("  heist  - Cyberpunk: Megacorp Data Vault (multiple enemies, dangerous aspect)")
 		fmt.Println("  saloon - Western: The Dusty Spur Saloon (non-hostile NPC, two aspects)")
+		fmt.Println()
+		fmt.Println("Flags:")
+		fmt.Println("  -multi   Enable multi-scene mode (generates new scenes on transition)")
 		return
 	}
 
@@ -99,6 +103,49 @@ func main() {
 		log.Fatalf("Unknown scene: %s. Use -list to see available scenes.", selectedScene)
 	}
 
+	// Set up session logging (default: enabled with auto-generated filename)
+	logPath := *logFlag
+	if logPath == "auto" {
+		logPath = fmt.Sprintf("session_%s_%s.yaml", selectedScene, time.Now().Format("20060102_150405"))
+	}
+	var sessionLogger *session.Logger
+	if logPath != "" {
+		var err error
+		sessionLogger, err = session.NewLogger(logPath)
+		if err != nil {
+			log.Fatalf("Failed to create session logger: %v", err)
+		}
+		defer func() {
+			if err := sessionLogger.Close(); err != nil {
+				log.Printf("Warning: Failed to close session logger: %v", err)
+			}
+		}()
+		fmt.Printf("Session log: %s\n\n", logPath)
+	}
+
+	ctx := context.Background()
+	terminalUI := terminal.NewTerminalUI()
+
+	if *multiFlag {
+		// Multi-scene mode: use GameManager for continuous play
+		runMultiSceneMode(ctx, gameEngine, sceneConfig, terminalUI, sessionLogger, selectedScene)
+	} else {
+		// Single-scene mode: original behavior
+		runSingleSceneMode(ctx, gameEngine, sceneConfig, terminalUI, sessionLogger)
+	}
+
+	// Stop the engine
+	if err := gameEngine.Stop(); err != nil {
+		log.Printf("Warning: Failed to stop engine: %v", err)
+	}
+
+	// Display final character state
+	terminalUI.DisplayCharacter()
+	fmt.Printf("\n%s\n", sceneConfig.Farewell)
+}
+
+// runSingleSceneMode runs the original single-scene behavior
+func runSingleSceneMode(ctx context.Context, gameEngine *engine.Engine, sceneConfig SceneConfig, terminalUI *terminal.TerminalUI, sessionLogger *session.Logger) {
 	// Register all characters with the engine
 	gameEngine.AddCharacter(sceneConfig.Player)
 	for _, npc := range sceneConfig.NPCs {
@@ -117,51 +164,84 @@ func main() {
 		log.Fatal("Scene manager not available")
 	}
 
-	// Set up session logging (default: enabled with auto-generated filename)
-	logPath := *logFlag
-	if logPath == "auto" {
-		logPath = fmt.Sprintf("session_%s_%s.yaml", selectedScene, time.Now().Format("20060102_150405"))
-	}
-	if logPath != "" {
-		sessionLogger, err := session.NewLogger(logPath)
-		if err != nil {
-			log.Fatalf("Failed to create session logger: %v", err)
-		}
-		defer func() {
-			if err := sessionLogger.Close(); err != nil {
-				log.Printf("Warning: Failed to close session logger: %v", err)
-			}
-		}()
+	if sessionLogger != nil {
 		sceneManager.SetSessionLogger(sessionLogger)
-		fmt.Printf("Session log: %s\n\n", logPath)
 	}
 
 	// Start the scene with the pre-configured scene
-	err = sceneManager.StartScene(sceneConfig.Scene, sceneConfig.Player)
+	err := sceneManager.StartScene(sceneConfig.Scene, sceneConfig.Player)
 	if err != nil {
 		log.Fatalf("Failed to start scene: %v", err)
 	}
 
 	// Run the scene loop
-	ctx := context.Background()
-	terminal := terminal.NewTerminalUI()
-	sceneManager.SetUI(terminal)
+	sceneManager.SetUI(terminalUI)
 	sceneManager.SetExitOnSceneTransition(true)
-	terminal.SetSceneInfo(sceneManager)
+	terminalUI.SetSceneInfo(sceneManager)
 
 	// Display initial character info
-	terminal.DisplayCharacter()
+	terminalUI.DisplayCharacter()
 
-	if err := sceneManager.RunSceneLoop(ctx); err != nil {
+	if _, err := sceneManager.RunSceneLoop(ctx); err != nil {
 		log.Fatalf("Scene loop error: %v", err)
 	}
+}
 
-	// Stop the engine
-	if err := gameEngine.Stop(); err != nil {
-		log.Printf("Warning: Failed to stop engine: %v", err)
+// runMultiSceneMode uses GameManager for multi-scene continuous play
+func runMultiSceneMode(ctx context.Context, gameEngine *engine.Engine, sceneConfig SceneConfig, terminalUI *terminal.TerminalUI, sessionLogger *session.Logger, sceneName string) {
+	fmt.Println("*** Multi-scene mode enabled - scenes will continue on transition ***")
+	fmt.Println()
+
+	// Create and configure the game manager
+	gameManager := engine.NewGameManager(gameEngine)
+	gameManager.SetPlayer(sceneConfig.Player)
+	gameManager.SetUI(terminalUI)
+	if sessionLogger != nil {
+		gameManager.SetSessionLogger(sessionLogger)
 	}
 
-	// Display final character state
-	terminal.DisplayCharacter()
-	fmt.Printf("\n%s\n", sceneConfig.Farewell)
+	// Set genre-appropriate settings
+	gameManager.SetSettings(getScenarioSettings(sceneName))
+
+	// Set up terminal UI with scene info callback
+	terminalUI.SetSceneInfo(gameEngine.GetSceneManager())
+
+	// Display initial character info
+	terminalUI.DisplayCharacter()
+
+	// Run with the initial scene
+	initialScene := &engine.InitialSceneConfig{
+		Scene: sceneConfig.Scene,
+		NPCs:  sceneConfig.NPCs,
+	}
+
+	if err := gameManager.RunWithInitialScene(ctx, initialScene); err != nil {
+		log.Fatalf("Game error: %v", err)
+	}
+}
+
+// getScenarioSettings returns appropriate settings for each scene type
+func getScenarioSettings(sceneName string) engine.ScenarioSettings {
+	switch sceneName {
+	case "tower":
+		return engine.ScenarioSettings{
+			Genre:          "Fantasy",
+			SettingContext: "A medieval fantasy world of magic and mystery. Wizards study arcane arts in towers, adventurers seek treasure in ancient ruins, and supernatural forces are very real.",
+		}
+	case "heist":
+		return engine.ScenarioSettings{
+			Genre:          "Cyberpunk",
+			SettingContext: "A dark near-future where megacorporations rule, hackers breach digital fortresses, and chrome-enhanced mercenaries sell their skills to the highest bidder. Neon lights flicker over rain-slicked streets.",
+		}
+	case "saloon":
+		return engine.ScenarioSettings{
+			Genre:          "Western",
+			SettingContext: "The American Old West in the late 1800s. Dusty frontier towns, lawless territories, and the struggle between civilization and the wild. Gunslingers, outlaws, and honest folk all seeking their fortune.",
+		}
+	default:
+		return engine.ScenarioSettings{
+			Genre:          "Adventure",
+			SettingContext: "A world of adventure and danger where heroes rise to meet challenges.",
+		}
+	}
 }

@@ -125,3 +125,29 @@ type NPCActionDecision struct {
 	TargetID    string `json:"target_id"`
 	Description string `json:"description"`
 }
+
+// SceneGenerationData holds the data for scene generation template
+type SceneGenerationData struct {
+	TransitionHint    string   // Hint from previous scene transition
+	SettingContext    string   // Genre/world description
+	PlayerName        string   // Player character name
+	PlayerHighConcept string   // Player high concept
+	PlayerTrouble     string   // Player trouble aspect
+	PlayerAspects     []string // Other player aspects
+	RecentEvents      string   // Summary of recent events (optional)
+}
+
+// GeneratedScene represents the LLM response for scene generation
+type GeneratedScene struct {
+	SceneName        string         `json:"scene_name"`
+	Description      string         `json:"description"`
+	SituationAspects []string       `json:"situation_aspects"`
+	NPCs             []GeneratedNPC `json:"npcs"`
+}
+
+// GeneratedNPC represents an NPC generated for a new scene
+type GeneratedNPC struct {
+	Name        string `json:"name"`
+	HighConcept string `json:"high_concept"`
+	Disposition string `json:"disposition"` // friendly, neutral, hostile
+}

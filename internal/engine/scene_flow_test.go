@@ -59,3 +59,41 @@ func TestParseSceneTransitionMarker_MarkerInMiddle(t *testing.T) {
 	assert.Equal(t, "outside", transition.Hint)
 	assert.Equal(t, "With a tip of your hat, you exit the saloon. The bright sun blinds you momentarily.", cleanedResponse)
 }
+
+func TestSceneEndResult_DefaultValues(t *testing.T) {
+	result := SceneEndResult{}
+
+	assert.Equal(t, SceneEndReason(""), result.Reason)
+	assert.Equal(t, "", result.TransitionHint)
+	assert.Nil(t, result.TakenOutChars)
+}
+
+func TestSceneEndResult_WithTakenOutChars(t *testing.T) {
+	result := SceneEndResult{
+		Reason:        SceneEndTransition,
+		TakenOutChars: []string{"npc_guard", "npc_thug"},
+	}
+
+	assert.Len(t, result.TakenOutChars, 2)
+	assert.Contains(t, result.TakenOutChars, "npc_guard")
+	assert.Contains(t, result.TakenOutChars, "npc_thug")
+}
+
+func TestSceneEndResult_PlayerTakenOut(t *testing.T) {
+	result := SceneEndResult{
+		Reason:         SceneEndPlayerTakenOut,
+		TransitionHint: "You awaken in a dark cell...",
+		TakenOutChars:  []string{},
+	}
+
+	assert.Equal(t, SceneEndPlayerTakenOut, result.Reason)
+	assert.Equal(t, "You awaken in a dark cell...", result.TransitionHint)
+}
+
+func TestSceneTransition_HintPreservesWhitespace(t *testing.T) {
+	response := "[SCENE_TRANSITION:  the dark alley  ]"
+	transition, _ := ParseSceneTransitionMarker(response)
+
+	assert.NotNil(t, transition)
+	assert.Equal(t, "the dark alley", transition.Hint) // Should be trimmed
+}

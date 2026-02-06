@@ -46,6 +46,9 @@ type SceneManager struct {
 	lastTransition        *SceneTransition // Captured transition hint when scene ends
 	aspectGenerator       *AspectGenerator
 	sessionLogger         *session.Logger
+	takenOutChars         []string         // Characters taken out during this scene
+	sceneEndReason        SceneEndReason   // Why the scene ended
+	playerTakenOutHint    string           // Transition hint if player was taken out
 }
 
 // NewSceneManager creates a new scene manager
@@ -106,18 +109,25 @@ func (sm *SceneManager) StartScene(scene *scene.Scene, player *character.Charact
 }
 
 // RunSceneLoop starts the interactive scene loop
-func (sm *SceneManager) RunSceneLoop(ctx context.Context) error {
+func (sm *SceneManager) RunSceneLoop(ctx context.Context) (*SceneEndResult, error) {
 	if sm.currentScene == nil {
-		return fmt.Errorf("no active scene")
+		return nil, fmt.Errorf("no active scene")
 	}
 
 	if sm.engine.llmClient == nil {
-		return fmt.Errorf("LLM client is required for scene loop functionality")
+		return nil, fmt.Errorf("LLM client is required for scene loop functionality")
 	}
 
 	if sm.ui == nil {
-		return fmt.Errorf("UI is required for scene loop functionality")
+		return nil, fmt.Errorf("UI is required for scene loop functionality")
 	}
+
+	// Reset scene-specific state
+	sm.takenOutChars = nil
+	sm.sceneEndReason = ""
+	sm.playerTakenOutHint = ""
+	sm.lastTransition = nil
+	sm.shouldExit = false
 
 	// Display the initial scene
 	sm.ui.DisplaySystemMessage(fmt.Sprintf("=== %s ===", sm.currentScene.Name))
@@ -127,7 +137,7 @@ func (sm *SceneManager) RunSceneLoop(ctx context.Context) error {
 	for !sm.shouldExit {
 		input, isExit, err := sm.ui.ReadInput()
 		if err != nil {
-			return fmt.Errorf("failed to read input: %w", err)
+			return nil, fmt.Errorf("failed to read input: %w", err)
 		}
 
 		if input == "" {
@@ -136,13 +146,35 @@ func (sm *SceneManager) RunSceneLoop(ctx context.Context) error {
 
 		// Check for scene exit
 		if isExit {
+			sm.sceneEndReason = SceneEndQuit
 			break
 		}
 
 		sm.processInput(ctx, input)
 	}
 
-	return nil
+	// Build the scene end result
+	result := &SceneEndResult{
+		Reason:        sm.sceneEndReason,
+		TakenOutChars: sm.takenOutChars,
+	}
+
+	// If no reason was set but we exited, default to quit
+	if result.Reason == "" {
+		result.Reason = SceneEndQuit
+	}
+
+	// Add transition hint based on reason
+	switch result.Reason {
+	case SceneEndTransition:
+		if sm.lastTransition != nil {
+			result.TransitionHint = sm.lastTransition.Hint
+		}
+	case SceneEndPlayerTakenOut:
+		result.TransitionHint = sm.playerTakenOutHint
+	}
+
+	return result, nil
 }
 
 // processInput handles player input
@@ -307,6 +339,7 @@ func (sm *SceneManager) handleSceneTransition(transition *SceneTransition) {
 	sm.ui.DisplaySceneTransition("", transition.Hint)
 
 	// Mark that we should exit the scene loop
+	sm.sceneEndReason = SceneEndTransition
 	sm.shouldExit = true
 }
 
@@ -1014,6 +1047,9 @@ func (sm *SceneManager) handleTargetTakenOut(target *character.Character) {
 		"\n=== %s is Taken Out! ===", target.Name))
 	sm.ui.DisplaySystemMessage("You decide their fate!")
 
+	// Track this character as taken out during this scene
+	sm.takenOutChars = append(sm.takenOutChars, target.ID)
+
 	// Log the taken out event
 	if sm.sessionLogger != nil {
 		sm.sessionLogger.Log("taken_out", map[string]any{
@@ -1508,11 +1544,15 @@ func (sm *SceneManager) handleTakenOut(ctx context.Context, attacker *character.
 	case TakenOutGameOver:
 		sm.ui.DisplayNarrative(narrative)
 		sm.ui.DisplayGameOver(fmt.Sprintf("%s has met their end.", sm.player.Name))
+		sm.sceneEndReason = SceneEndPlayerTakenOut
+		sm.playerTakenOutHint = ""
 		sm.shouldExit = true
 
 	case TakenOutTransition:
 		sm.ui.DisplaySceneTransition(narrative, newSceneHint)
 		sm.ui.DisplaySystemMessage("\nThe scene shifts around you...")
+		sm.sceneEndReason = SceneEndPlayerTakenOut
+		sm.playerTakenOutHint = newSceneHint
 		if sm.exitOnSceneTransition {
 			sm.shouldExit = true
 		}
@@ -1521,6 +1561,7 @@ func (sm *SceneManager) handleTakenOut(ctx context.Context, attacker *character.
 	default: // TakenOutContinue
 		sm.ui.DisplayNarrative(narrative)
 		sm.ui.DisplayConflictEnd(fmt.Sprintf("%s has won the conflict.", attacker.Name))
+		// Don't set sceneEndReason - scene continues
 	}
 }
 

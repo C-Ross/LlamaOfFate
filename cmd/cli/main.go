@@ -147,7 +147,7 @@ func startSampleScene(gameEngine *engine.Engine, ui *terminal.TerminalUI) error 
 
 	// Run scene loop
 	ctx := context.Background()
-	if err := sceneManager.RunSceneLoop(ctx); err != nil {
+	if _, err := sceneManager.RunSceneLoop(ctx); err != nil {
 		return fmt.Errorf("scene loop error: %w", err)
 	}
 
