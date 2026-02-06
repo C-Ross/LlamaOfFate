@@ -16,55 +16,6 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 )
 
-// NPCAttackData contains context for NPC attack narrative generation
-type NPCAttackData struct {
-	ConflictType       string
-	Round              int
-	SceneName          string
-	NPCName            string
-	NPCHighConcept     string
-	NPCAspects         []string
-	Skill              string
-	TargetName         string
-	TargetHighConcept  string
-	SituationAspects   []scene.SituationAspect
-	OutcomeDescription string
-}
-
-// NPCActionDecisionData contains context for NPC action decision
-type NPCActionDecisionData struct {
-	ConflictType      string
-	Round             int
-	SceneName         string
-	SceneDescription  string
-	NPCName           string
-	NPCHighConcept    string
-	NPCTrouble        string
-	NPCAspects        []string
-	NPCSkills         map[string]int
-	NPCPhysicalStress []bool
-	NPCMentalStress   []bool
-	Targets           []NPCTargetInfo
-	SituationAspects  []scene.SituationAspect
-}
-
-// NPCTargetInfo contains information about a potential NPC target
-type NPCTargetInfo struct {
-	ID             string
-	Name           string
-	HighConcept    string
-	PhysicalStress []bool
-	MentalStress   []bool
-}
-
-// NPCActionDecision represents the LLM's choice for NPC action
-type NPCActionDecision struct {
-	ActionType  string `json:"action_type"`
-	Skill       string `json:"skill"`
-	TargetID    string `json:"target_id"`
-	Description string `json:"description"`
-}
-
 // getNPCActionDecision uses the LLM to decide what action an NPC should take
 func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character.Character) (*NPCActionDecision, error) {
 	if sm.engine.llmClient == nil {

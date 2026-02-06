@@ -1,12 +1,10 @@
 package engine
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"os"
 	"strings"
 	"time"
 
@@ -40,89 +38,20 @@ type SceneManager struct {
 	engine                *Engine
 	currentScene          *scene.Scene
 	player                *character.Character
-	reader                *bufio.Reader
 	roller                *dice.Roller
 	conversationHistory   []ConversationEntry
 	ui                    UI
-	shouldExit            bool // Set to true when the game should end
-	exitOnSceneTransition bool // Set to true to exit the loop on scene transition
+	shouldExit            bool             // Set to true when the game should end
+	exitOnSceneTransition bool             // Set to true to exit the loop on scene transition
+	lastTransition        *SceneTransition // Captured transition hint when scene ends
 	aspectGenerator       *AspectGenerator
 	sessionLogger         *session.Logger
-}
-
-// InputClassificationData holds the data for input classification template
-type InputClassificationData struct {
-	Scene       *scene.Scene
-	PlayerInput string
-}
-
-// SceneResponseData holds the data for scene response template
-type SceneResponseData struct {
-	Scene               *scene.Scene
-	CharacterContext    string
-	AspectsContext      string
-	ConversationContext string
-	PlayerInput         string
-	InteractionType     string
-	OtherCharacters     []*character.Character
-	TakenOutCharacters  []*character.Character // Characters defeated earlier in this scene
-}
-
-// ConflictResponseData holds the data for conflict response template
-type ConflictResponseData struct {
-	Scene                *scene.Scene
-	CharacterContext     string
-	AspectsContext       string
-	ConversationContext  string
-	PlayerInput          string
-	OtherCharacters      []*character.Character
-	TakenOutCharacters   []*character.Character // Characters defeated earlier in this scene
-	CurrentCharacterName string
-	ParticipantMap       map[string]*scene.ConflictParticipant
-	CharacterMap         map[string]*character.Character
-}
-
-// ActionNarrativeData holds the data for action narrative template
-type ActionNarrativeData struct {
-	Scene               *scene.Scene
-	CharacterContext    string
-	AspectsContext      string
-	ConversationContext string
-	Action              *action.Action
-	OtherCharacters     []*character.Character
-}
-
-// AttackContext holds information about the attack that caused damage
-type AttackContext struct {
-	Skill       string // The skill used to attack (e.g., "Fight", "Shoot", "Provoke")
-	Description string // The narrative description of the attack
-	Shifts      int    // The shifts of damage dealt
-}
-
-// ConsequenceAspectData holds the data for consequence aspect generation template
-type ConsequenceAspectData struct {
-	CharacterName string
-	AttackerName  string
-	Severity      string
-	ConflictType  string
-	AttackContext
-}
-
-// TakenOutData holds the data for taken out narrative template
-type TakenOutData struct {
-	CharacterName       string
-	AttackerName        string
-	AttackerHighConcept string
-	ConflictType        string
-	SceneDescription    string
-	AttackContext
 }
 
 // NewSceneManager creates a new scene manager
 func NewSceneManager(engine *Engine) *SceneManager {
 	sm := &SceneManager{
 		engine:              engine,
-		reader:              bufio.NewReader(os.Stdin),
 		roller:              dice.NewRoller(),
 		conversationHistory: make([]ConversationEntry, 0),
 	}
@@ -323,7 +252,7 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) {
 	// Check for markers in the response (conflict escalation, de-escalation, and scene transition)
 	conflictTrigger, cleanedResponse := sm.parseConflictMarker(response)
 	conflictResolution, cleanedResponse := sm.parseConflictEndMarker(cleanedResponse)
-	sceneTransition, cleanedResponse := sm.parseSceneTransitionMarker(cleanedResponse)
+	sceneTransition, cleanedResponse := ParseSceneTransitionMarker(cleanedResponse)
 
 	sm.ui.DisplayDialog(input, cleanedResponse)
 
@@ -371,11 +300,19 @@ func (sm *SceneManager) handleSceneTransition(transition *SceneTransition) {
 		"component", componentSceneManager,
 		"hint", transition.Hint)
 
+	// Capture the transition for the caller (ScenarioManager)
+	sm.lastTransition = transition
+
 	// Display the transition to the player
 	sm.ui.DisplaySceneTransition("", transition.Hint)
 
 	// Mark that we should exit the scene loop
 	sm.shouldExit = true
+}
+
+// GetLastTransition returns the last scene transition that occurred, if any
+func (sm *SceneManager) GetLastTransition() *SceneTransition {
+	return sm.lastTransition
 }
 
 // handleAction processes player actions

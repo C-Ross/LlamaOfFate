@@ -19,9 +19,6 @@ var conflictMarkerRegex = regexp.MustCompile(`\[CONFLICT:(physical|mental):([^\]
 // conflictEndMarkerRegex matches [CONFLICT:end:reason] markers for de-escalation
 var conflictEndMarkerRegex = regexp.MustCompile(`\[CONFLICT:end:(surrender|agreement|retreat|resolved)\]`)
 
-// sceneTransitionMarkerRegex matches [SCENE_TRANSITION:hint] markers for scene exits
-var sceneTransitionMarkerRegex = regexp.MustCompile(`\[SCENE_TRANSITION:([^\]]+)\]`)
-
 // ConflictTrigger represents a detected conflict initiation
 type ConflictTrigger struct {
 	Type        scene.ConflictType
@@ -31,11 +28,6 @@ type ConflictTrigger struct {
 // ConflictResolution represents a detected conflict de-escalation
 type ConflictResolution struct {
 	Reason string
-}
-
-// SceneTransition represents a detected scene exit/transition
-type SceneTransition struct {
-	Hint string // Where/what comes next (e.g., "streets of Redemption Gulch")
 }
 
 // parseConflictMarker extracts a conflict trigger from LLM response and returns cleaned text
@@ -81,25 +73,6 @@ func (sm *SceneManager) parseConflictEndMarker(response string) (*ConflictResolu
 	cleanedResponse = strings.TrimSpace(cleanedResponse)
 
 	return resolution, cleanedResponse
-}
-
-// parseSceneTransitionMarker extracts a scene transition from LLM response and returns cleaned text
-func (sm *SceneManager) parseSceneTransitionMarker(response string) (*SceneTransition, string) {
-	matches := sceneTransitionMarkerRegex.FindStringSubmatch(response)
-	if matches == nil {
-		return nil, response
-	}
-
-	transition := &SceneTransition{
-		Hint: strings.TrimSpace(matches[1]),
-	}
-
-	// Remove the marker from the response and clean up
-	cleanedResponse := sceneTransitionMarkerRegex.ReplaceAllString(response, "")
-	cleanedResponse = strings.Join(strings.Fields(cleanedResponse), " ")
-	cleanedResponse = strings.TrimSpace(cleanedResponse)
-
-	return transition, cleanedResponse
 }
 
 // initiateConflict starts a conflict with all characters in the scene
