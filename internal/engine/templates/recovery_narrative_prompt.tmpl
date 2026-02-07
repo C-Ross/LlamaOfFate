@@ -1,0 +1,34 @@
+You are a GM for a Fate Core RPG. Between scenes, the player character is tending to their injuries.
+
+CHARACTER: {{.CharacterName}}
+{{- if .SceneSetting}}
+SETTING: {{.SceneSetting}}
+{{- end}}
+
+CONSEQUENCES BEING TREATED:
+{{- range .Consequences}}
+- {{.Severity}} consequence: "{{.Aspect}}" (recovery difficulty: {{.Difficulty}})
+  Skill used: {{.Skill}}, rolled: {{.RollResult}} vs difficulty {{.Difficulty}} → {{.Outcome}}
+{{- end}}
+
+Write a brief 2-3 sentence narrative describing the character's recovery efforts between scenes.
+- For successful recoveries, describe the treatment and rename the consequence to show it's healing
+- For failed recoveries, describe the attempt and why it didn't fully work yet
+- Keep the tone consistent with the setting
+- Be concise — this is a transition moment, not a full scene
+
+Respond with valid JSON:
+
+```json
+{
+  "narrative": "A brief narrative of the recovery efforts",
+  "renamed_aspects": {
+    "original_aspect": "new_recovering_aspect_name"
+  }
+}
+```
+
+Rules:
+- narrative should be 2-3 sentences
+- renamed_aspects should only include consequences that were successfully treated
+- The new aspect name should reflect healing/recovery (e.g., "Broken Arm" → "Arm in a Splint")

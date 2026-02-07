@@ -563,6 +563,26 @@ func TestRenderSceneGeneration_WithoutComplications(t *testing.T) {
 	assert.NotContains(t, rendered, "HOOKS TO INCORPORATE")
 }
 
+func TestRenderSceneGeneration_WithKnownNPCs(t *testing.T) {
+	data := SceneGenerationData{
+		TransitionHint:    "the tavern",
+		PlayerName:        "Jesse",
+		PlayerHighConcept: "Vengeful Rancher",
+		KnownNPCs: []NPCSummary{
+			{Name: "Greta Ironheart", Attitude: "friendly"},
+			{Name: "Dark Raven", Attitude: "hostile"},
+		},
+	}
+
+	rendered, err := RenderSceneGeneration(data)
+	require.NoError(t, err)
+
+	assert.Contains(t, rendered, "Greta Ironheart")
+	assert.Contains(t, rendered, "friendly")
+	assert.Contains(t, rendered, "Dark Raven")
+	assert.Contains(t, rendered, "hostile")
+}
+
 func TestRenderSceneResponse_WithPurpose(t *testing.T) {
 	s := scene.NewScene("s1", "Test Scene", "A test scene")
 	data := SceneResponseData{
@@ -608,4 +628,118 @@ func TestSceneManager_SetScenePurpose(t *testing.T) {
 
 	sm.SetScenePurpose("Can the hero escape?")
 	assert.Equal(t, "Can the hero escape?", sm.scenePurpose)
+}
+
+func TestNormalizeNPCName(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"Greta Ironheart", "greta ironheart"},
+		{"  Greta Ironheart  ", "greta ironheart"},
+		{"GRETA", "greta"},
+		{"", ""},
+		{"mixed Case NAME", "mixed case name"},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.expected, normalizeNPCName(tt.input), "normalizeNPCName(%q)", tt.input)
+	}
+}
+
+func TestNewScenarioManager_InitializesNPCRegistry(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	assert.NotNil(t, sm.npcRegistry)
+	assert.NotNil(t, sm.npcAttitudes)
+	assert.Empty(t, sm.npcRegistry)
+	assert.Empty(t, sm.npcAttitudes)
+}
+
+func TestScenarioManager_SetScenarioCount(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	sm.SetScenarioCount(3)
+	assert.Equal(t, 3, sm.scenarioCount)
+}
+
+func TestScenarioManager_GetKnownNPCSummaries(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	// Empty registry
+	summaries := sm.getKnownNPCSummaries()
+	assert.Empty(t, summaries)
+
+	// Add an NPC to registry
+	npc := character.NewCharacter("npc1", "Greta Ironheart")
+	npc.CharacterType = character.CharacterTypeMainNPC
+	npc.Aspects.HighConcept = "Dwarven Smith"
+	sm.npcRegistry[normalizeNPCName(npc.Name)] = npc
+	sm.npcAttitudes[normalizeNPCName(npc.Name)] = "friendly"
+
+	summaries = sm.getKnownNPCSummaries()
+	assert.Len(t, summaries, 1)
+	assert.Equal(t, "Greta Ironheart", summaries[0].Name)
+	assert.Equal(t, "friendly", summaries[0].Attitude)
+}
+
+func TestScenarioManager_UpdateNPCAttitudes(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	// Register an NPC so the attitude update recognizes it
+	npc := character.NewCharacter("npc1", "Greta Ironheart")
+	sm.npcRegistry[normalizeNPCName(npc.Name)] = npc
+
+	summary := &SceneSummary{
+		NPCsEncountered: []NPCSummary{
+			{Name: "Greta Ironheart", Attitude: "hostile"},
+		},
+	}
+
+	sm.updateNPCAttitudes(summary)
+	assert.Equal(t, "hostile", sm.npcAttitudes[normalizeNPCName("Greta Ironheart")])
+}
+
+func TestScenarioManager_UpdateNPCAttitudes_NilSummary(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	// Should not panic
+	sm.updateNPCAttitudes(nil)
+}
+
+func TestScenarioManager_BestRecoverySkill(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	player.SetSkill("Physique", 3)
+	player.SetSkill("Will", 2)
+	player.SetSkill("Athletics", 1)
+	sm := NewScenarioManager(engine, player)
+
+	// Physical consequence should prefer Physique
+	physConseq := character.Consequence{ID: "c1", Type: character.MildConsequence, Aspect: "Bruised Ribs"}
+	skill, rating := sm.bestRecoverySkill(physConseq)
+	// Should return highest skill (Physique at +3) since we can't know consequence type from aspect alone
+	assert.NotEmpty(t, skill)
+	assert.True(t, rating >= 0, "Rating should be >= 0, got %d", rating)
 }

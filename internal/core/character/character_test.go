@@ -290,3 +290,197 @@ func TestConsequenceType_Value(t *testing.T) {
 			"ConsequenceType(%s).Value() should return %d", test.consequenceType, test.expectedValue)
 	}
 }
+
+func TestStressTrack_ClearAll(t *testing.T) {
+	track := NewStressTrack(PhysicalStress, 3)
+
+	// Fill some boxes
+	track.TakeStress(1)
+	track.TakeStress(3)
+	assert.Equal(t, 1, track.AvailableBoxes())
+
+	// Clear all
+	track.ClearAll()
+	assert.Equal(t, 3, track.AvailableBoxes())
+	for _, box := range track.Boxes {
+		assert.False(t, box, "All boxes should be cleared")
+	}
+}
+
+func TestStressTrack_ClearAll_EmptyTrack(t *testing.T) {
+	track := NewStressTrack(MentalStress, 2)
+	// Nothing filled, should be safe to call
+	track.ClearAll()
+	assert.Equal(t, 2, track.AvailableBoxes())
+}
+
+func TestCharacter_ClearAllStress(t *testing.T) {
+	char := NewCharacter("test", "Test")
+
+	// Fill stress on both tracks
+	char.TakeStress(PhysicalStress, 1)
+	char.TakeStress(PhysicalStress, 2)
+	char.TakeStress(MentalStress, 1)
+
+	assert.Equal(t, 0, char.GetStressTrack(PhysicalStress).AvailableBoxes())
+	assert.Equal(t, 1, char.GetStressTrack(MentalStress).AvailableBoxes())
+
+	char.ClearAllStress()
+
+	assert.Equal(t, 2, char.GetStressTrack(PhysicalStress).AvailableBoxes())
+	assert.Equal(t, 2, char.GetStressTrack(MentalStress).AvailableBoxes())
+}
+
+func TestCharacter_RemoveConsequence(t *testing.T) {
+	char := NewCharacter("test", "Test")
+
+	c1 := Consequence{ID: "c1", Type: MildConsequence, Aspect: "Bruised"}
+	c2 := Consequence{ID: "c2", Type: ModerateConsequence, Aspect: "Deep Cut"}
+	char.AddConsequence(c1)
+	char.AddConsequence(c2)
+	assert.Len(t, char.Consequences, 2)
+
+	assert.True(t, char.RemoveConsequence("c1"))
+	assert.Len(t, char.Consequences, 1)
+	assert.Equal(t, "c2", char.Consequences[0].ID)
+
+	assert.False(t, char.RemoveConsequence("nonexistent"))
+	assert.Len(t, char.Consequences, 1)
+}
+
+func TestCharacter_BeginConsequenceRecovery(t *testing.T) {
+	char := NewCharacter("test", "Test")
+
+	c1 := Consequence{ID: "c1", Type: MildConsequence, Aspect: "Winded"}
+	char.AddConsequence(c1)
+
+	assert.True(t, char.BeginConsequenceRecovery("c1", 3, 1))
+	assert.True(t, char.Consequences[0].Recovering)
+	assert.Equal(t, 3, char.Consequences[0].RecoveryStartScene)
+	assert.Equal(t, 1, char.Consequences[0].RecoveryStartScenario)
+
+	// Non-existent ID
+	assert.False(t, char.BeginConsequenceRecovery("nonexistent", 3, 1))
+}
+
+func TestCharacter_CheckConsequenceRecovery_MildClearsAfterOneScene(t *testing.T) {
+	char := NewCharacter("test", "Test")
+
+	c := Consequence{
+		ID:                 "c1",
+		Type:               MildConsequence,
+		Aspect:             "Bruised Hand",
+		Recovering:         true,
+		RecoveryStartScene: 2,
+	}
+	char.AddConsequence(c)
+
+	// Same scene — not healed yet
+	cleared := char.CheckConsequenceRecovery(2, 0)
+	assert.Empty(t, cleared)
+	assert.Len(t, char.Consequences, 1)
+
+	// Next scene — healed
+	cleared = char.CheckConsequenceRecovery(3, 0)
+	assert.Len(t, cleared, 1)
+	assert.Equal(t, "Bruised Hand", cleared[0].Aspect)
+	assert.Empty(t, char.Consequences)
+}
+
+func TestCharacter_CheckConsequenceRecovery_ModerateClearsAfterOneScenario(t *testing.T) {
+	char := NewCharacter("test", "Test")
+
+	c := Consequence{
+		ID:                    "c2",
+		Type:                  ModerateConsequence,
+		Aspect:                "Deep Cut",
+		Recovering:            true,
+		RecoveryStartScenario: 1,
+	}
+	char.AddConsequence(c)
+
+	// Same scenario — not healed
+	cleared := char.CheckConsequenceRecovery(10, 1)
+	assert.Empty(t, cleared)
+	assert.Len(t, char.Consequences, 1)
+
+	// Next scenario — healed
+	cleared = char.CheckConsequenceRecovery(10, 2)
+	assert.Len(t, cleared, 1)
+	assert.Equal(t, "Deep Cut", cleared[0].Aspect)
+	assert.Empty(t, char.Consequences)
+}
+
+func TestCharacter_CheckConsequenceRecovery_SevereClearsAfterOneScenario(t *testing.T) {
+	char := NewCharacter("test", "Test")
+
+	c := Consequence{
+		ID:                    "c3",
+		Type:                  SevereConsequence,
+		Aspect:                "Broken Leg",
+		Recovering:            true,
+		RecoveryStartScenario: 0,
+	}
+	char.AddConsequence(c)
+
+	// Same scenario — not healed
+	cleared := char.CheckConsequenceRecovery(10, 0)
+	assert.Empty(t, cleared)
+
+	// Next scenario — healed
+	cleared = char.CheckConsequenceRecovery(10, 1)
+	assert.Len(t, cleared, 1)
+	assert.Equal(t, "Broken Leg", cleared[0].Aspect)
+}
+
+func TestCharacter_CheckConsequenceRecovery_NonRecoveringNotCleared(t *testing.T) {
+	char := NewCharacter("test", "Test")
+
+	c := Consequence{
+		ID:         "c1",
+		Type:       MildConsequence,
+		Aspect:     "Winded",
+		Recovering: false,
+	}
+	char.AddConsequence(c)
+
+	// Even many scenes later, non-recovering consequences stay
+	cleared := char.CheckConsequenceRecovery(100, 100)
+	assert.Empty(t, cleared)
+	assert.Len(t, char.Consequences, 1)
+}
+
+func TestCharacter_CheckConsequenceRecovery_MixedConsequences(t *testing.T) {
+	char := NewCharacter("test", "Test")
+
+	// Mild recovering consequence (should clear at scene 4)
+	char.AddConsequence(Consequence{
+		ID: "mild", Type: MildConsequence, Aspect: "Bruised",
+		Recovering: true, RecoveryStartScene: 3,
+	})
+	// Moderate not yet recovering
+	char.AddConsequence(Consequence{
+		ID: "moderate", Type: ModerateConsequence, Aspect: "Deep Cut",
+		Recovering: false,
+	})
+	// Severe recovering (should clear at scenario 2)
+	char.AddConsequence(Consequence{
+		ID: "severe", Type: SevereConsequence, Aspect: "Broken Leg",
+		Recovering: true, RecoveryStartScenario: 1,
+	})
+
+	// At scene 4, scenario 1 — mild clears, severe stays
+	cleared := char.CheckConsequenceRecovery(4, 1)
+	assert.Len(t, cleared, 1)
+	assert.Equal(t, "Bruised", cleared[0].Aspect)
+	assert.Len(t, char.Consequences, 2)
+
+	// At scene 5, scenario 2 — severe clears
+	cleared = char.CheckConsequenceRecovery(5, 2)
+	assert.Len(t, cleared, 1)
+	assert.Equal(t, "Broken Leg", cleared[0].Aspect)
+	assert.Len(t, char.Consequences, 1)
+
+	// Moderate stays because it's not recovering
+	assert.Equal(t, "moderate", char.Consequences[0].ID)
+}

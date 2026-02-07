@@ -65,6 +65,13 @@ Trouble: {{.PlayerTrouble}}
 Other Aspects: {{range $i, $a := .PlayerAspects}}{{if $i}}, {{end}}{{$a}}{{end}}
 {{- end}}
 
+{{- if .KnownNPCs}}
+RECURRING NPCs (from previous scenes — reuse these by EXACT NAME when dramatically appropriate):
+{{- range .KnownNPCs}}
+- {{.Name}} (last known attitude: {{.Attitude}})
+{{- end}}
+{{- end}}
+
 Generate a new scene in valid JSON format:
 
 ```json
@@ -95,6 +102,10 @@ Rules:
 - situation_aspects should be 2-3 invokable/compellable aspects
 - npcs array can be empty if no NPCs are present; include at most 1-2 NPCs
 - Keep the scene open-ended to allow player agency
+{{- if .KnownNPCs}}
+- When including a recurring NPC, use their EXACT NAME as listed above — do not abbreviate, add titles, or vary the name
+- Recurring NPCs retain their identity; update their disposition if the story warrants it
+{{- end}}
 {{- if .Scenario}}
 - Create scenes that advance toward answering the story questions
 - Include elements that relate to the scenario's central problem

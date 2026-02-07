@@ -16,6 +16,7 @@ type GameManager struct {
 	ui            UI
 	sessionLogger *session.Logger
 	scenario      *Scenario // The scenario to run (can be provided or generated)
+	scenarioCount int       // Number of scenarios completed
 }
 
 // NewGameManager creates a new game manager
@@ -61,6 +62,7 @@ func (g *GameManager) Run(ctx context.Context) error {
 	scenarioManager := NewScenarioManager(g.engine, g.player)
 	scenarioManager.SetUI(g.ui)
 	scenarioManager.SetScenario(g.scenario)
+	scenarioManager.SetScenarioCount(g.scenarioCount)
 	if g.sessionLogger != nil {
 		scenarioManager.SetSessionLogger(g.sessionLogger)
 	}
@@ -73,6 +75,7 @@ func (g *GameManager) Run(ctx context.Context) error {
 
 	// Handle milestone if scenario was resolved
 	if result != nil && result.Reason == ScenarioEndResolved {
+		g.scenarioCount++
 		g.handleMilestone()
 	}
 
@@ -99,6 +102,7 @@ func (g *GameManager) RunWithInitialScene(ctx context.Context, initialScene *Ini
 	scenarioManager := NewScenarioManager(g.engine, g.player)
 	scenarioManager.SetUI(g.ui)
 	scenarioManager.SetScenario(g.scenario)
+	scenarioManager.SetScenarioCount(g.scenarioCount)
 	scenarioManager.SetInitialScene(initialScene.Scene, initialScene.NPCs)
 	if g.sessionLogger != nil {
 		scenarioManager.SetSessionLogger(g.sessionLogger)
@@ -112,16 +116,34 @@ func (g *GameManager) RunWithInitialScene(ctx context.Context, initialScene *Ini
 
 	// Handle milestone if scenario was resolved
 	if result != nil && result.Reason == ScenarioEndResolved {
+		g.scenarioCount++
 		g.handleMilestone()
 	}
 
 	return nil
 }
 
-// handleMilestone processes a scenario milestone (fate point refresh, etc.)
+// handleMilestone processes a scenario milestone (fate point refresh, consequence recovery, etc.)
 func (g *GameManager) handleMilestone() {
 	// Refresh fate points per Fate Core rules
 	g.player.RefreshFatePoints()
+
+	// Check for consequence recovery at scenario boundary
+	// Moderate and severe consequences that are recovering clear after a whole scenario
+	cleared := g.player.CheckConsequenceRecovery(0, g.scenarioCount)
+	for _, conseq := range cleared {
+		g.ui.DisplaySystemMessage(fmt.Sprintf(
+			"Your %s consequence \"%s\" has fully healed!",
+			conseq.Type, conseq.Aspect,
+		))
+		if g.sessionLogger != nil {
+			g.sessionLogger.Log("consequence_healed", map[string]any{
+				"type":      conseq.Type,
+				"aspect":    conseq.Aspect,
+				"healed_at": "scenario_milestone",
+			})
+		}
+	}
 
 	// Display milestone message
 	g.ui.DisplaySystemMessage("\n=== MILESTONE: Scenario Complete! ===")

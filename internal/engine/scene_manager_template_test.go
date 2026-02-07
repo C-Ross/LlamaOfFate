@@ -169,3 +169,37 @@ func TestTakenOutTemplateWithoutAttackContext(t *testing.T) {
 	assert.Contains(t, result, "mental", "Conflict type should be included")
 	assert.Contains(t, result, "A dark throne room", "Scene description should be included")
 }
+
+func TestRecoveryNarrativeTemplate(t *testing.T) {
+	data := RecoveryNarrativeData{
+		CharacterName: "Simon Falcon",
+		SceneSetting:  "The crew rests after escaping the orbital station",
+		Consequences: []RecoveryAttempt{
+			{
+				Aspect:     "Bruised Ribs",
+				Severity:   "mild",
+				Skill:      "Physique",
+				RollResult: 3,
+				Difficulty: "2",
+				Outcome:    "success",
+			},
+			{
+				Aspect:     "Shattered Confidence",
+				Severity:   "moderate",
+				Skill:      "Will",
+				RollResult: 1,
+				Difficulty: "4",
+				Outcome:    "failure",
+			},
+		},
+	}
+
+	rendered, err := RenderRecoveryNarrative(data)
+	require.NoError(t, err)
+
+	assert.Contains(t, rendered, "Simon Falcon")
+	assert.Contains(t, rendered, "Bruised Ribs")
+	assert.Contains(t, rendered, "Shattered Confidence")
+	assert.Contains(t, rendered, "success")
+	assert.Contains(t, rendered, "failure")
+}

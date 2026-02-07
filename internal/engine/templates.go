@@ -57,6 +57,9 @@ var scenarioGenerationPromptTemplate string
 //go:embed templates/scenario_resolution_prompt.tmpl
 var scenarioResolutionPromptTemplate string
 
+//go:embed templates/recovery_narrative_prompt.tmpl
+var recoveryNarrativePromptTemplate string
+
 // Template instances
 var (
 	AspectGenerationPrompt       *template.Template
@@ -75,6 +78,7 @@ var (
 	SceneSummaryPrompt           *template.Template
 	ScenarioGenerationPrompt     *template.Template
 	ScenarioResolutionPrompt     *template.Template
+	RecoveryNarrativePrompt      *template.Template
 )
 
 func init() {
@@ -175,6 +179,12 @@ func init() {
 	if err != nil {
 		panic("failed to parse scenario resolution prompt template: " + err.Error())
 	}
+
+	// Parse the recovery narrative prompt template
+	RecoveryNarrativePrompt, err = template.New("recovery_narrative").Parse(recoveryNarrativePromptTemplate)
+	if err != nil {
+		panic("failed to parse recovery narrative prompt template: " + err.Error())
+	}
 }
 
 // executeTemplate is a helper that executes a template and returns the result as a string
@@ -264,4 +274,9 @@ func RenderScenarioGeneration(data ScenarioGenerationData) (string, error) {
 // RenderScenarioResolution renders the scenario resolution prompt
 func RenderScenarioResolution(data ScenarioResolutionData) (string, error) {
 	return executeTemplate(ScenarioResolutionPrompt, data)
+}
+
+// RenderRecoveryNarrative renders the between-scene recovery narrative prompt
+func RenderRecoveryNarrative(data RecoveryNarrativeData) (string, error) {
+	return executeTemplate(RecoveryNarrativePrompt, data)
 }

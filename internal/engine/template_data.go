@@ -138,6 +138,7 @@ type SceneGenerationData struct {
 	PlayerAspects     []string       // Other player aspects
 	PreviousSummaries []SceneSummary // Summaries of recent scenes (last 3)
 	Complications     []string       // Unresolved threads from previous scenes to weave in
+	KnownNPCs         []NPCSummary   // Named NPCs from previous scenes that can recur
 }
 
 // GeneratedScene represents the LLM response for scene generation
@@ -222,4 +223,21 @@ type ScenarioResolutionResult struct {
 	IsResolved        bool     `json:"is_resolved"`
 	AnsweredQuestions []string `json:"answered_questions"` // Questions that have been answered
 	Reasoning         string   `json:"reasoning"`          // Brief explanation
+}
+
+// RecoveryNarrativeData holds the data for between-scene recovery narrative template
+type RecoveryNarrativeData struct {
+	CharacterName string
+	SceneSetting  string
+	Consequences  []RecoveryAttempt
+}
+
+// RecoveryAttempt holds fields for a single consequence recovery attempt
+type RecoveryAttempt struct {
+	Severity   string
+	Aspect     string
+	Difficulty string
+	Skill      string
+	RollResult int
+	Outcome    string // "success" or "failure"
 }

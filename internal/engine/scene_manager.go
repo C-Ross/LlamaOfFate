@@ -1086,6 +1086,7 @@ func (sm *SceneManager) handleTargetTakenOut(target *character.Character) {
 
 		if activeOpponents == 0 {
 			sm.ui.DisplaySystemMessage("\n=== Victory! All opponents defeated! ===")
+			sm.clearConflictStress()
 			sm.currentScene.EndConflict()
 		}
 	}
@@ -1501,6 +1502,7 @@ func (sm *SceneManager) handleConcession(ctx context.Context) {
 	// Mark player as conceded and end the conflict
 	if sm.currentScene.ConflictState != nil {
 		sm.currentScene.SetParticipantStatus(sm.player.ID, scene.StatusConceded)
+		sm.clearConflictStress()
 		sm.currentScene.EndConflict()
 		sm.ui.DisplayConflictEnd("You have conceded the conflict.")
 	}
@@ -1545,6 +1547,7 @@ func (sm *SceneManager) handleTakenOut(ctx context.Context, attacker *character.
 	// Mark player as taken out and end the conflict
 	if sm.currentScene.ConflictState != nil {
 		sm.currentScene.SetParticipantStatus(sm.player.ID, scene.StatusTakenOut)
+		sm.clearConflictStress()
 		sm.currentScene.EndConflict()
 	}
 

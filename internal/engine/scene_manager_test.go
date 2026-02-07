@@ -812,6 +812,51 @@ func TestSceneManager_ResolveConflictPeacefully(t *testing.T) {
 	assert.False(t, sm.currentScene.IsConflict)
 }
 
+func TestSceneManager_ResolveConflictPeacefully_ClearsStress(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	// Create test characters
+	player := character.NewCharacter("player-1", "Hero")
+	player.SetSkill("Notice", 2)
+	enemy := character.NewCharacter("enemy-1", "Goblin Guard")
+	enemy.SetSkill("Notice", 1)
+
+	engine.AddCharacter(player)
+	engine.AddCharacter(enemy)
+
+	// Take stress on both characters
+	player.TakeStress(character.PhysicalStress, 1)
+	player.TakeStress(character.MentalStress, 1)
+	enemy.TakeStress(character.PhysicalStress, 2)
+
+	assert.Equal(t, 1, player.GetStressTrack(character.PhysicalStress).AvailableBoxes())
+	assert.Equal(t, 1, player.GetStressTrack(character.MentalStress).AvailableBoxes())
+
+	// Setup scene
+	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(enemy.ID)
+	sm.currentScene = testScene
+	sm.player = player
+
+	// Start a conflict
+	err = sm.initiateConflict(scene.PhysicalConflict, enemy.ID)
+	require.NoError(t, err)
+
+	// Resolve peacefully (should clear all stress)
+	sm.resolveConflictPeacefully("surrender")
+
+	// Verify stress was cleared for all participants
+	assert.Equal(t, 2, player.GetStressTrack(character.PhysicalStress).AvailableBoxes())
+	assert.Equal(t, 2, player.GetStressTrack(character.MentalStress).AvailableBoxes())
+	assert.Equal(t, 2, enemy.GetStressTrack(character.PhysicalStress).AvailableBoxes())
+}
+
 func TestSceneManager_ResolveConflictPeacefully_NotInConflict(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)

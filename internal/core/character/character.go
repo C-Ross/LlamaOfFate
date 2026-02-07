@@ -189,6 +189,15 @@ func (st *StressTrack) ClearStress(box int) bool {
 	return true
 }
 
+// ClearAll resets all stress boxes to unchecked.
+// Per Fate Core: "After a conflict, when you get a minute to breathe,
+// any stress boxes you checked off become available for your use again."
+func (st *StressTrack) ClearAll() {
+	for i := range st.Boxes {
+		st.Boxes[i] = false
+	}
+}
+
 // String returns a visual representation of the stress track
 func (st *StressTrack) String() string {
 	result := fmt.Sprintf("%s Stress: ", st.Type)
@@ -230,11 +239,14 @@ func (ct ConsequenceType) Value() int {
 
 // Consequence represents character consequences
 type Consequence struct {
-	ID        string          `json:"id"`
-	Type      ConsequenceType `json:"type"`
-	Aspect    string          `json:"aspect"`
-	Duration  string          `json:"duration"`
-	CreatedAt time.Time       `json:"created_at"`
+	ID                    string          `json:"id"`
+	Type                  ConsequenceType `json:"type"`
+	Aspect                string          `json:"aspect"`
+	Duration              string          `json:"duration"`
+	CreatedAt             time.Time       `json:"created_at"`
+	Recovering            bool            `json:"recovering"`              // Whether recovery action has been taken
+	RecoveryStartScene    int             `json:"recovery_start_scene"`    // Scene count when recovery began
+	RecoveryStartScenario int             `json:"recovery_start_scenario"` // Scenario count when recovery began
 }
 
 // NewCharacter creates a new character with default values
@@ -314,10 +326,98 @@ func (c *Character) TakeStress(trackType StressTrackType, amount int) bool {
 	return false
 }
 
+// ClearAllStress resets all stress tracks.
+// Per Fate Core, stress clears after each conflict.
+func (c *Character) ClearAllStress() {
+	for _, track := range c.StressTracks {
+		track.ClearAll()
+	}
+	c.UpdatedAt = time.Now()
+}
+
 // AddConsequence adds a consequence to the character
 func (c *Character) AddConsequence(consequence Consequence) {
 	c.Consequences = append(c.Consequences, consequence)
 	c.UpdatedAt = time.Now()
+}
+
+// RemoveConsequence removes a consequence by ID
+func (c *Character) RemoveConsequence(id string) bool {
+	for i, conseq := range c.Consequences {
+		if conseq.ID == id {
+			c.Consequences = append(c.Consequences[:i], c.Consequences[i+1:]...)
+			c.UpdatedAt = time.Now()
+			return true
+		}
+	}
+	return false
+}
+
+// BeginConsequenceRecovery marks a consequence as recovering and records the
+// current scene and scenario counts so elapsed time can be measured later.
+func (c *Character) BeginConsequenceRecovery(id string, sceneCount, scenarioCount int) bool {
+	for i := range c.Consequences {
+		if c.Consequences[i].ID == id {
+			c.Consequences[i].Recovering = true
+			c.Consequences[i].RecoveryStartScene = sceneCount
+			c.Consequences[i].RecoveryStartScenario = scenarioCount
+			c.UpdatedAt = time.Now()
+			return true
+		}
+	}
+	return false
+}
+
+// CheckConsequenceRecovery checks all recovering consequences and removes those
+// that have healed based on Fate Core timing rules:
+//   - Mild: 1 whole scene after recovery action
+//   - Moderate: 1 whole scenario after recovery action
+//   - Severe: 1 whole scenario after recovery action (mapped to scenario boundary)
+//
+// Returns the list of cleared consequences.
+func (c *Character) CheckConsequenceRecovery(currentScene, currentScenario int) []Consequence {
+	var cleared []Consequence
+	var remaining []Consequence
+
+	for _, conseq := range c.Consequences {
+		if !conseq.Recovering {
+			remaining = append(remaining, conseq)
+			continue
+		}
+
+		healed := false
+		switch conseq.Type {
+		case MildConsequence:
+			// Clears after 1 whole scene post recovery action
+			if currentScene > conseq.RecoveryStartScene {
+				healed = true
+			}
+		case ModerateConsequence:
+			// Clears after 1 whole scenario post recovery action
+			if currentScenario > conseq.RecoveryStartScenario {
+				healed = true
+			}
+		case SevereConsequence:
+			// Clears after 1 whole scenario post recovery action
+			// Note: per Fate Core this should be a longer period; see issue for improvement
+			if currentScenario > conseq.RecoveryStartScenario {
+				healed = true
+			}
+		}
+
+		if healed {
+			cleared = append(cleared, conseq)
+		} else {
+			remaining = append(remaining, conseq)
+		}
+	}
+
+	if len(cleared) > 0 {
+		c.Consequences = remaining
+		c.UpdatedAt = time.Now()
+	}
+
+	return cleared
 }
 
 // HasAspect checks if the character has a specific aspect

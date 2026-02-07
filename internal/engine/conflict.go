@@ -171,11 +171,32 @@ func (sm *SceneManager) resolveConflictPeacefully(reason string) {
 	sm.ui.DisplaySystemMessage("\n=== Conflict Resolved ===")
 	sm.ui.DisplaySystemMessage(reasonMessage)
 
+	sm.clearConflictStress()
 	sm.currentScene.EndConflict()
 
 	slog.Info("Conflict resolved peacefully",
 		"component", componentSceneManager,
 		"reason", reason)
+}
+
+// clearConflictStress clears stress for all conflict participants.
+// Per Fate Core: "After a conflict, when you get a minute to breathe,
+// any stress boxes you checked off become available for your use again."
+func (sm *SceneManager) clearConflictStress() {
+	if sm.currentScene.ConflictState == nil {
+		return
+	}
+
+	for _, p := range sm.currentScene.ConflictState.Participants {
+		char := sm.engine.GetCharacter(p.CharacterID)
+		if char != nil {
+			char.ClearAllStress()
+		}
+	}
+
+	slog.Info("Cleared stress for all conflict participants",
+		"component", componentSceneManager,
+		"participants", len(sm.currentScene.ConflictState.Participants))
 }
 
 // calculateInitiative returns the initiative value for a character based on conflict type

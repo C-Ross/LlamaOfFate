@@ -2,10 +2,13 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
@@ -21,19 +24,25 @@ type ScenarioManager struct {
 	player               *character.Character
 	ui                   UI
 	sessionLogger        *session.Logger
-	scenario             *Scenario              // The current scenario with problem and story questions
-	initialScene         *scene.Scene           // Optional pre-configured starting scene
-	initialNPCs          []*character.Character // NPCs for initial scene
-	sceneSummaries       []SceneSummary         // Summaries of recent scenes (sliding window of last 3)
-	lastGeneratedPurpose string                 // Purpose from the most recently generated scene
-	lastGeneratedHook    string                 // Opening hook from the most recently generated scene
+	scenario             *Scenario                       // The current scenario with problem and story questions
+	initialScene         *scene.Scene                    // Optional pre-configured starting scene
+	initialNPCs          []*character.Character          // NPCs for initial scene
+	sceneSummaries       []SceneSummary                  // Summaries of recent scenes (sliding window of last 3)
+	lastGeneratedPurpose string                          // Purpose from the most recently generated scene
+	lastGeneratedHook    string                          // Opening hook from the most recently generated scene
+	sceneCount           int                             // Total scenes completed in this scenario
+	scenarioCount        int                             // Current scenario number (set by GameManager)
+	npcRegistry          map[string]*character.Character // Named NPCs persisted across scenes, keyed by normalized name
+	npcAttitudes         map[string]string               // Last-known attitude per NPC (keyed by normalized name)
 }
 
 // NewScenarioManager creates a new scenario manager
 func NewScenarioManager(engine *Engine, player *character.Character) *ScenarioManager {
 	return &ScenarioManager{
-		engine: engine,
-		player: player,
+		engine:       engine,
+		player:       player,
+		npcRegistry:  make(map[string]*character.Character),
+		npcAttitudes: make(map[string]string),
 	}
 }
 
@@ -50,6 +59,11 @@ func (m *ScenarioManager) SetSessionLogger(logger *session.Logger) {
 // SetScenario sets the scenario for the manager
 func (m *ScenarioManager) SetScenario(scenario *Scenario) {
 	m.scenario = scenario
+}
+
+// SetScenarioCount sets the current scenario number (for consequence recovery tracking)
+func (m *ScenarioManager) SetScenarioCount(count int) {
+	m.scenarioCount = count
 }
 
 // SetInitialScene sets a pre-configured starting scene
@@ -173,6 +187,9 @@ func (m *ScenarioManager) Run(ctx context.Context) (*ScenarioResult, error) {
 		} else {
 			m.addSceneSummary(summary)
 
+			// Update NPC attitudes from scene summary
+			m.updateNPCAttitudes(summary)
+
 			// Log the scene summary
 			if m.sessionLogger != nil {
 				m.sessionLogger.Log("scene_summary", summary)
@@ -203,6 +220,10 @@ func (m *ScenarioManager) Run(ctx context.Context) (*ScenarioResult, error) {
 			}
 		}
 
+		// Increment scene count and handle between-scene recovery
+		m.sceneCount++
+		m.handleBetweenSceneRecovery(ctx)
+
 		// Generate the next scene
 		currentScene, err = m.generateNextScene(ctx, transitionHint)
 		if err != nil {
@@ -223,6 +244,13 @@ func (m *ScenarioManager) getInitialScene(ctx context.Context) (*scene.Scene, er
 		for _, npc := range m.initialNPCs {
 			m.engine.AddCharacter(npc)
 			m.initialScene.AddCharacter(npc.ID)
+			// Register named NPCs for persistence across scenes
+			if npc.CharacterType != character.CharacterTypeNamelessGood &&
+				npc.CharacterType != character.CharacterTypeNamelessFair &&
+				npc.CharacterType != character.CharacterTypeNamelessAverage {
+				m.npcRegistry[normalizeNPCName(npc.Name)] = npc
+				m.npcAttitudes[normalizeNPCName(npc.Name)] = "neutral"
+			}
 		}
 		m.initialScene.AddCharacter(m.player.ID)
 		return m.initialScene, nil
@@ -251,6 +279,7 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 		PlayerAspects:     playerAspects,
 		PreviousSummaries: m.sceneSummaries, // Include recent scene summaries for context
 		Complications:     m.extractComplications(),
+		KnownNPCs:         m.getKnownNPCSummaries(),
 	}
 
 	prompt, err := RenderSceneGeneration(data)
@@ -292,8 +321,24 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 	// Add player to scene
 	newScene.AddCharacter(m.player.ID)
 
-	// Create and register NPCs
+	// Create and register NPCs, reusing known NPCs from previous scenes
 	for i, npcData := range generated.NPCs {
+		normalizedName := normalizeNPCName(npcData.Name)
+
+		// Check if this NPC already exists in the registry
+		if existingNPC, found := m.npcRegistry[normalizedName]; found {
+			// Reuse existing NPC — they persist across scenes
+			m.engine.AddCharacter(existingNPC) // Re-register in case engine was reset
+			newScene.AddCharacter(existingNPC.ID)
+			slog.Info("Recurring NPC added to scene",
+				"component", componentScenarioManager,
+				"npc_name", existingNPC.Name,
+				"npc_id", existingNPC.ID,
+			)
+			continue
+		}
+
+		// Create new NPC
 		npcID := fmt.Sprintf("%s_npc_%d", sceneID, i)
 		npc := character.NewCharacter(npcID, npcData.Name)
 		npc.Aspects.HighConcept = npcData.HighConcept
@@ -310,6 +355,14 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 
 		m.engine.AddCharacter(npc)
 		newScene.AddCharacter(npc.ID)
+
+		// Register named NPCs (non-nameless) for persistence
+		if npc.CharacterType != character.CharacterTypeNamelessGood &&
+			npc.CharacterType != character.CharacterTypeNamelessFair &&
+			npc.CharacterType != character.CharacterTypeNamelessAverage {
+			m.npcRegistry[normalizedName] = npc
+			m.npcAttitudes[normalizedName] = npcData.Disposition
+		}
 	}
 
 	// Log the generated scene
@@ -366,6 +419,256 @@ func (m *ScenarioManager) extractComplications() []string {
 		}
 	}
 	return complications
+}
+
+// handleBetweenSceneRecovery handles consequence recovery between scenes.
+// Per Fate Core, recovery requires an overcome action, then waiting.
+// This performs automatic rolls and generates LLM narrative.
+func (m *ScenarioManager) handleBetweenSceneRecovery(ctx context.Context) {
+	// First, check if any already-recovering consequences have healed
+	cleared := m.player.CheckConsequenceRecovery(m.sceneCount, m.scenarioCount)
+	for _, conseq := range cleared {
+		m.ui.DisplaySystemMessage(fmt.Sprintf(
+			"Your %s consequence \"%s\" has fully healed!",
+			conseq.Type, conseq.Aspect,
+		))
+		if m.sessionLogger != nil {
+			m.sessionLogger.Log("consequence_healed", map[string]any{
+				"type":        conseq.Type,
+				"aspect":      conseq.Aspect,
+				"scene_count": m.sceneCount,
+			})
+		}
+	}
+
+	// Find consequences that haven't started recovery yet
+	var needsRecovery []int
+	for i, conseq := range m.player.Consequences {
+		if !conseq.Recovering {
+			needsRecovery = append(needsRecovery, i)
+		}
+	}
+	if len(needsRecovery) == 0 {
+		return
+	}
+
+	// Attempt automatic recovery rolls
+	roller := dice.NewRoller()
+	var attempts []RecoveryAttempt
+
+	for _, idx := range needsRecovery {
+		conseq := m.player.Consequences[idx]
+
+		// Determine difficulty per Fate Core:
+		// Mild: Fair (+2), Moderate: Great (+4), Severe: Fantastic (+6)
+		// Self-treatment: +2 difficulty
+		difficulty := conseq.Type.Value() // 2, 4, or 6
+		difficulty += 2                   // Self-treatment penalty
+
+		// Determine recovery skill
+		skill, skillLevel := m.bestRecoverySkill(conseq)
+
+		// Roll 4dF + skill
+		result := roller.RollWithModifier(skillLevel, 0)
+
+		outcome := "failure"
+		if int(result.FinalValue) >= difficulty {
+			outcome = "success"
+			m.player.BeginConsequenceRecovery(conseq.ID, m.sceneCount, m.scenarioCount)
+		}
+
+		difficultyLabel := dice.Ladder(difficulty).String()
+
+		attempts = append(attempts, RecoveryAttempt{
+			Severity:   string(conseq.Type),
+			Aspect:     conseq.Aspect,
+			Difficulty: difficultyLabel,
+			Skill:      skill,
+			RollResult: int(result.FinalValue),
+			Outcome:    outcome,
+		})
+
+		slog.Info("Recovery attempt",
+			"component", componentScenarioManager,
+			"consequence", conseq.Aspect,
+			"severity", conseq.Type,
+			"skill", skill,
+			"roll", int(result.FinalValue),
+			"difficulty", difficulty,
+			"outcome", outcome,
+		)
+	}
+
+	// Generate LLM narrative for recovery
+	m.displayRecoveryNarrative(ctx, attempts)
+}
+
+// bestRecoverySkill determines the best skill and its level for recovery.
+// Physical consequences use Lore (or Will as fallback), mental use Empathy (or Rapport).
+func (m *ScenarioManager) bestRecoverySkill(conseq character.Consequence) (string, dice.Ladder) {
+	// Determine which skills could help based on consequence aspect context
+	// Physical keywords suggest physical recovery, otherwise mental
+	physicalSkills := []string{"Lore", "Crafts", "Will"}
+	mentalSkills := []string{"Empathy", "Rapport", "Will"}
+
+	var candidates []string
+	switch conseq.Duration {
+	case "mild", "moderate", "severe":
+		// Use consequence type to infer physical vs mental
+		// Default to physical skills for now
+		candidates = physicalSkills
+	default:
+		candidates = physicalSkills
+	}
+
+	// Also try mental skills
+	candidates = append(candidates, mentalSkills...)
+
+	bestSkill := "Will"
+	bestLevel := m.player.GetSkill("Will")
+
+	for _, skill := range candidates {
+		level := m.player.GetSkill(skill)
+		if level > bestLevel {
+			bestSkill = skill
+			bestLevel = level
+		}
+	}
+
+	return bestSkill, bestLevel
+}
+
+// displayRecoveryNarrative generates and displays LLM-driven narrative for recovery
+func (m *ScenarioManager) displayRecoveryNarrative(ctx context.Context, attempts []RecoveryAttempt) {
+	if len(attempts) == 0 {
+		return
+	}
+
+	// Display mechanical results
+	m.ui.DisplaySystemMessage("\n--- Between Scenes: Recovery ---")
+	for _, a := range attempts {
+		if a.Outcome == "success" {
+			m.ui.DisplaySystemMessage(fmt.Sprintf(
+				"Recovery roll for \"%s\" (%s): %s +%d vs %s — Success! Recovery begins.",
+				a.Aspect, a.Severity, a.Skill, a.RollResult, a.Difficulty,
+			))
+		} else {
+			m.ui.DisplaySystemMessage(fmt.Sprintf(
+				"Recovery roll for \"%s\" (%s): %s +%d vs %s — Failed. The wound persists.",
+				a.Aspect, a.Severity, a.Skill, a.RollResult, a.Difficulty,
+			))
+		}
+	}
+
+	// Generate LLM narrative
+	if m.engine.llmClient == nil {
+		return
+	}
+
+	setting := ""
+	if m.scenario != nil {
+		setting = m.scenario.Setting
+	}
+
+	data := RecoveryNarrativeData{
+		CharacterName: m.player.Name,
+		SceneSetting:  setting,
+		Consequences:  attempts,
+	}
+
+	prompt, err := RenderRecoveryNarrative(data)
+	if err != nil {
+		slog.Warn("Failed to render recovery narrative prompt",
+			"component", componentScenarioManager,
+			"error", err,
+		)
+		return
+	}
+
+	resp, err := m.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
+		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		MaxTokens:   200,
+		Temperature: 0.6,
+	})
+	if err != nil {
+		slog.Warn("Failed to generate recovery narrative",
+			"component", componentScenarioManager,
+			"error", err,
+		)
+		return
+	}
+
+	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+		return
+	}
+
+	// Try to parse JSON response for narrative and renamed aspects
+	type recoveryResponse struct {
+		Narrative      string            `json:"narrative"`
+		RenamedAspects map[string]string `json:"renamed_aspects"`
+	}
+
+	content := llm.CleanJSONResponse(resp.Choices[0].Message.Content)
+	var parsed recoveryResponse
+	if parseErr := json.Unmarshal([]byte(content), &parsed); parseErr != nil {
+		// If parsing fails, display raw content
+		m.ui.DisplayNarrative(strings.TrimSpace(resp.Choices[0].Message.Content))
+	} else {
+		if parsed.Narrative != "" {
+			m.ui.DisplayNarrative(parsed.Narrative)
+		}
+		// Apply renamed aspects to recovering consequences
+		for oldAspect, newAspect := range parsed.RenamedAspects {
+			for i := range m.player.Consequences {
+				if m.player.Consequences[i].Aspect == oldAspect && m.player.Consequences[i].Recovering {
+					m.player.Consequences[i].Aspect = newAspect
+					slog.Info("Consequence renamed during recovery",
+						"component", componentScenarioManager,
+						"old", oldAspect,
+						"new", newAspect,
+					)
+				}
+			}
+		}
+	}
+
+	if m.sessionLogger != nil {
+		m.sessionLogger.Log("recovery_attempt", map[string]any{
+			"attempts": attempts,
+		})
+	}
+}
+
+// updateNPCAttitudes updates the NPC registry with attitude changes from a scene summary
+func (m *ScenarioManager) updateNPCAttitudes(summary *SceneSummary) {
+	if summary == nil {
+		return
+	}
+	for _, npc := range summary.NPCsEncountered {
+		normalizedName := normalizeNPCName(npc.Name)
+		m.npcAttitudes[normalizedName] = npc.Attitude
+	}
+}
+
+// normalizeNPCName normalizes an NPC name for matching (lowercase, trimmed)
+func normalizeNPCName(name string) string {
+	return strings.ToLower(strings.TrimSpace(name))
+}
+
+// getKnownNPCSummaries returns summaries of known NPCs for scene generation prompts
+func (m *ScenarioManager) getKnownNPCSummaries() []NPCSummary {
+	var summaries []NPCSummary
+	for normalizedName, npc := range m.npcRegistry {
+		attitude := m.npcAttitudes[normalizedName]
+		if attitude == "" {
+			attitude = "neutral"
+		}
+		summaries = append(summaries, NPCSummary{
+			Name:     npc.Name,
+			Attitude: attitude,
+		})
+	}
+	return summaries
 }
 
 // generateSceneSummary creates a summary of the completed scene using LLM
