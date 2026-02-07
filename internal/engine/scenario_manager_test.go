@@ -144,13 +144,7 @@ func TestScenarioManager_SetInitialScene(t *testing.T) {
 	assert.Equal(t, npc, sm.initialNPCs[0])
 }
 
-func TestScenarioManager_parseGeneratedScene_Valid(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
-	require.NoError(t, err)
-
-	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player)
-
+func TestParseGeneratedScene_Valid(t *testing.T) {
 	jsonResponse := `{
 		"scene_name": "The Dusty Trail",
 		"description": "A winding path through the desert, heat waves shimmer in the distance.",
@@ -160,7 +154,7 @@ func TestScenarioManager_parseGeneratedScene_Valid(t *testing.T) {
 		]
 	}`
 
-	generated, err := sm.parseGeneratedScene(jsonResponse)
+	generated, err := ParseGeneratedScene(jsonResponse)
 	require.NoError(t, err)
 
 	assert.Equal(t, "The Dusty Trail", generated.SceneName)
@@ -172,48 +166,30 @@ func TestScenarioManager_parseGeneratedScene_Valid(t *testing.T) {
 	assert.Equal(t, "friendly", generated.NPCs[0].Disposition)
 }
 
-func TestScenarioManager_parseGeneratedScene_WithCodeBlock(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
-	require.NoError(t, err)
-
-	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player)
-
+func TestParseGeneratedScene_WithCodeBlock(t *testing.T) {
 	// LLMs sometimes wrap JSON in markdown code blocks
 	jsonResponse := "```json\n{\"scene_name\": \"Test\", \"description\": \"A test.\", \"situation_aspects\": [], \"npcs\": []}\n```"
 
-	generated, err := sm.parseGeneratedScene(jsonResponse)
+	generated, err := ParseGeneratedScene(jsonResponse)
 	require.NoError(t, err)
 
 	assert.Equal(t, "Test", generated.SceneName)
 }
 
-func TestScenarioManager_parseGeneratedScene_MissingFields(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
-	require.NoError(t, err)
-
-	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player)
-
+func TestParseGeneratedScene_MissingFields(t *testing.T) {
 	// Missing scene_name
 	jsonResponse := `{"description": "A test scene."}`
 
-	_, err = sm.parseGeneratedScene(jsonResponse)
+	_, err := ParseGeneratedScene(jsonResponse)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "missing scene_name")
 }
 
-func TestScenarioManager_parseGeneratedScene_InvalidJSON(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
-	require.NoError(t, err)
-
-	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player)
-
+func TestParseGeneratedScene_InvalidJSON(t *testing.T) {
 	// Invalid JSON
 	jsonResponse := "This is not JSON at all"
 
-	_, err = sm.parseGeneratedScene(jsonResponse)
+	_, err := ParseGeneratedScene(jsonResponse)
 	assert.Error(t, err)
 }
 
@@ -279,13 +255,7 @@ func TestScenarioManager_addSceneSummary_NilSummary(t *testing.T) {
 	assert.Len(t, sm.sceneSummaries, 0)
 }
 
-func TestScenarioManager_parseSceneSummary_Valid(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
-	require.NoError(t, err)
-
-	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player)
-
+func TestParseSceneSummary_Valid(t *testing.T) {
 	jsonResponse := `{
 		"scene_description": "A dusty saloon",
 		"key_events": ["Met the bartender", "Learned about the outlaw"],
@@ -296,7 +266,7 @@ func TestScenarioManager_parseSceneSummary_Valid(t *testing.T) {
 		"narrative_prose": "The stranger walked into the saloon and learned of a dangerous outlaw terrorizing the town."
 	}`
 
-	summary, err := sm.parseSceneSummary(jsonResponse)
+	summary, err := ParseSceneSummary(jsonResponse)
 	require.NoError(t, err)
 
 	assert.Equal(t, "A dusty saloon", summary.SceneDescription)
@@ -310,32 +280,20 @@ func TestScenarioManager_parseSceneSummary_Valid(t *testing.T) {
 	assert.Contains(t, summary.NarrativeProse, "stranger walked into")
 }
 
-func TestScenarioManager_parseSceneSummary_WithCodeBlock(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
-	require.NoError(t, err)
-
-	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player)
-
+func TestParseSceneSummary_WithCodeBlock(t *testing.T) {
 	jsonResponse := "```json\n{\"narrative_prose\": \"A test summary.\"}\n```"
 
-	summary, err := sm.parseSceneSummary(jsonResponse)
+	summary, err := ParseSceneSummary(jsonResponse)
 	require.NoError(t, err)
 
 	assert.Equal(t, "A test summary.", summary.NarrativeProse)
 }
 
-func TestScenarioManager_parseSceneSummary_MissingNarrativeProse(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
-	require.NoError(t, err)
-
-	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player)
-
+func TestParseSceneSummary_MissingNarrativeProse(t *testing.T) {
 	// Missing narrative_prose
 	jsonResponse := `{"scene_description": "A test scene."}`
 
-	_, err = sm.parseSceneSummary(jsonResponse)
+	_, err := ParseSceneSummary(jsonResponse)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "missing narrative_prose")
 }
@@ -448,20 +406,14 @@ func TestScenarioResolutionResult_Fields(t *testing.T) {
 	assert.Equal(t, "The hero defeated the villain", result.Reasoning)
 }
 
-func TestScenarioManager_parseScenarioResolution_Valid(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
-	require.NoError(t, err)
-
-	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player)
-
+func TestParseScenarioResolution_Valid(t *testing.T) {
 	jsonResponse := `{
 		"is_resolved": true,
 		"answered_questions": ["Can the hero win? - YES"],
 		"reasoning": "The hero defeated the villain"
 	}`
 
-	result, err := sm.parseScenarioResolution(jsonResponse)
+	result, err := ParseScenarioResolution(jsonResponse)
 	require.NoError(t, err)
 
 	assert.True(t, result.IsResolved)
@@ -469,32 +421,20 @@ func TestScenarioManager_parseScenarioResolution_Valid(t *testing.T) {
 	assert.Equal(t, "The hero defeated the villain", result.Reasoning)
 }
 
-func TestScenarioManager_parseScenarioResolution_WithCodeBlock(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
-	require.NoError(t, err)
-
-	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player)
-
+func TestParseScenarioResolution_WithCodeBlock(t *testing.T) {
 	jsonResponse := "```json\n{\"is_resolved\": false, \"answered_questions\": [], \"reasoning\": \"Not yet\"}\n```"
 
-	result, err := sm.parseScenarioResolution(jsonResponse)
+	result, err := ParseScenarioResolution(jsonResponse)
 	require.NoError(t, err)
 
 	assert.False(t, result.IsResolved)
 	assert.Len(t, result.AnsweredQuestions, 0)
 }
 
-func TestScenarioManager_parseScenarioResolution_InvalidJSON(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
-	require.NoError(t, err)
-
-	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player)
-
+func TestParseScenarioResolution_InvalidJSON(t *testing.T) {
 	jsonResponse := "This is not JSON"
 
-	_, err = sm.parseScenarioResolution(jsonResponse)
+	_, err := ParseScenarioResolution(jsonResponse)
 	assert.Error(t, err)
 }
 

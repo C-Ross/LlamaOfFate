@@ -14,6 +14,10 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 )
 
+// cleanJSONResponse is kept as a package-level alias for backward compatibility.
+// New code should use llm.CleanJSONResponse directly.
+var cleanJSONResponse = llm.CleanJSONResponse
+
 // ActionParseRequest represents a request to parse user input into an action
 type ActionParseRequest struct {
 	Character       *character.Character   `json:"character"`
@@ -227,46 +231,4 @@ func parseActionType(actionTypeStr string) (action.ActionType, error) {
 func generateActionID() string {
 	// Simple implementation using timestamp
 	return fmt.Sprintf("action-%d", time.Now().UnixNano())
-}
-
-// cleanJSONResponse removes markdown formatting from LLM JSON responses
-func cleanJSONResponse(content string) string {
-	// Remove markdown code block formatting
-	content = strings.TrimSpace(content)
-
-	// If there are multiple JSON blocks, take the last one (the corrected response)
-	blocks := strings.Split(content, "```")
-	var jsonBlocks []string
-
-	for _, block := range blocks {
-		block = strings.TrimSpace(block)
-		if strings.HasPrefix(block, "json\n") {
-			block = strings.TrimPrefix(block, "json\n")
-			block = strings.TrimSpace(block)
-			if strings.HasPrefix(block, "{") && strings.HasSuffix(block, "}") {
-				jsonBlocks = append(jsonBlocks, block)
-			}
-		} else if strings.HasPrefix(block, "{") && strings.HasSuffix(block, "}") {
-			jsonBlocks = append(jsonBlocks, block)
-		}
-	}
-
-	// If we found JSON blocks, use the last one
-	if len(jsonBlocks) > 0 {
-		return jsonBlocks[len(jsonBlocks)-1]
-	}
-
-	// Fallback: simple cleanup
-	if strings.HasPrefix(content, "```json") {
-		content = strings.TrimPrefix(content, "```json")
-	} else if strings.HasPrefix(content, "```") {
-		content = strings.TrimPrefix(content, "```")
-	}
-
-	content = strings.TrimSuffix(content, "```")
-
-	// Trim any remaining whitespace
-	content = strings.TrimSpace(content)
-
-	return content
 }

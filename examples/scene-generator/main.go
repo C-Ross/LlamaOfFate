@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -128,7 +127,7 @@ func main() {
 	// Build scenario context
 	var scenario *engine.Scenario
 	if *scenarioFlag != "" {
-		scenario = getScenario(*scenarioFlag)
+		scenario = engine.PredefinedScenario(*scenarioFlag)
 		if scenario == nil {
 			fmt.Fprintf(os.Stderr, "Unknown scenario: %s (use saloon, heist, or tower)\n", *scenarioFlag)
 			os.Exit(1)
@@ -208,7 +207,7 @@ func main() {
 	}
 
 	// Parse the response
-	generated, err := parseGeneratedScene(rawResponse)
+	generated, err := engine.ParseGeneratedScene(rawResponse)
 	if err != nil {
 		fmt.Println("=== Parse Error ===")
 		fmt.Printf("Error: %v\n\n", err)
@@ -227,61 +226,6 @@ func main() {
 
 	// Display formatted output
 	displayGeneratedScene(generated)
-}
-
-// parseGeneratedScene extracts and parses JSON from the LLM response
-func parseGeneratedScene(content string) (*engine.GeneratedScene, error) {
-	cleaned := cleanJSONResponse(content)
-
-	var generated engine.GeneratedScene
-	if err := json.Unmarshal([]byte(cleaned), &generated); err != nil {
-		start := strings.Index(content, "{")
-		end := strings.LastIndex(content, "}")
-		if start >= 0 && end > start {
-			cleaned = content[start : end+1]
-			if err := json.Unmarshal([]byte(cleaned), &generated); err != nil {
-				return nil, fmt.Errorf("JSON parse error: %w", err)
-			}
-		} else {
-			return nil, fmt.Errorf("no valid JSON found in response")
-		}
-	}
-
-	if generated.SceneName == "" {
-		return nil, fmt.Errorf("missing scene_name")
-	}
-	if generated.Description == "" {
-		return nil, fmt.Errorf("missing description")
-	}
-
-	return &generated, nil
-}
-
-// cleanJSONResponse removes markdown formatting from LLM JSON responses
-func cleanJSONResponse(content string) string {
-	content = strings.TrimSpace(content)
-
-	blocks := strings.Split(content, "```")
-	var jsonBlocks []string
-
-	for _, block := range blocks {
-		block = strings.TrimSpace(block)
-		if strings.HasPrefix(block, "json\n") {
-			block = strings.TrimPrefix(block, "json\n")
-			block = strings.TrimSpace(block)
-			if strings.HasPrefix(block, "{") && strings.HasSuffix(block, "}") {
-				jsonBlocks = append(jsonBlocks, block)
-			}
-		} else if strings.HasPrefix(block, "{") && strings.HasSuffix(block, "}") {
-			jsonBlocks = append(jsonBlocks, block)
-		}
-	}
-
-	if len(jsonBlocks) > 0 {
-		return jsonBlocks[len(jsonBlocks)-1]
-	}
-
-	return content
 }
 
 // loadSummaries loads scene summaries from a YAML file
@@ -346,47 +290,5 @@ func printWrapped(text string, width int, indent string) {
 	}
 	if line != indent {
 		fmt.Println(line)
-	}
-}
-
-// getScenario returns a predefined scenario by name
-func getScenario(name string) *engine.Scenario {
-	switch strings.ToLower(name) {
-	case "tower":
-		return &engine.Scenario{
-			Title:   "The Wizard's Tower",
-			Problem: "A mysterious magical disturbance threatens the tower and its inhabitants",
-			StoryQuestions: []string{
-				"Can the source of the disturbance be discovered?",
-				"Will the tower's secrets be revealed?",
-			},
-			Genre:   "Fantasy",
-			Setting: "A medieval fantasy world of magic and mystery. Wizards study arcane arts in towers, adventurers seek treasure in ancient ruins, and supernatural forces are very real.",
-		}
-	case "heist":
-		return &engine.Scenario{
-			Title:   "The Prometheus Job",
-			Problem: "A high-value data core must be extracted from a heavily guarded corporate facility",
-			StoryQuestions: []string{
-				"Can the team breach the facility's security?",
-				"Will the extraction succeed without casualties?",
-				"What secrets does the data core contain?",
-			},
-			Genre:   "Cyberpunk",
-			Setting: "A dark near-future where megacorporations rule, hackers breach digital fortresses, and chrome-enhanced mercenaries sell their skills to the highest bidder. Neon lights flicker over rain-slicked streets.",
-		}
-	case "saloon":
-		return &engine.Scenario{
-			Title:   "Trouble in Redemption Gulch",
-			Problem: "The town is under threat from outlaws and someone needs to stand up for the innocent",
-			StoryQuestions: []string{
-				"Will the outlaws be brought to justice?",
-				"Can the town be saved?",
-			},
-			Genre:   "Western",
-			Setting: "The American Old West in the late 1800s. Dusty frontier towns, lawless territories, and the struggle between civilization and the wild. Gunslingers, outlaws, and honest folk all seeking their fortune.",
-		}
-	default:
-		return nil
 	}
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -194,7 +193,7 @@ func main() {
 	}
 
 	// Parse the response
-	scenario, err := parseScenario(rawResponse)
+	scenario, err := engine.ParseScenario(rawResponse)
 	if err != nil {
 		fmt.Println("=== Parse Error ===")
 		fmt.Printf("Error: %v\n\n", err)
@@ -213,65 +212,6 @@ func main() {
 
 	// Display formatted output
 	displayScenario(scenario)
-}
-
-// parseScenario extracts and parses JSON from the LLM response
-func parseScenario(content string) (*engine.Scenario, error) {
-	cleaned := cleanJSONResponse(content)
-
-	var scenario engine.Scenario
-	if err := json.Unmarshal([]byte(cleaned), &scenario); err != nil {
-		// Try to find JSON object in response
-		start := strings.Index(content, "{")
-		end := strings.LastIndex(content, "}")
-		if start >= 0 && end > start {
-			cleaned = content[start : end+1]
-			if err := json.Unmarshal([]byte(cleaned), &scenario); err != nil {
-				return nil, fmt.Errorf("JSON parse error: %w", err)
-			}
-		} else {
-			return nil, fmt.Errorf("no valid JSON found in response")
-		}
-	}
-
-	// Validate
-	if scenario.Title == "" {
-		return nil, fmt.Errorf("missing title")
-	}
-	if scenario.Problem == "" {
-		return nil, fmt.Errorf("missing problem")
-	}
-
-	return &scenario, nil
-}
-
-// cleanJSONResponse removes markdown formatting from LLM JSON responses
-func cleanJSONResponse(content string) string {
-	content = strings.TrimSpace(content)
-
-	// Handle markdown code blocks
-	blocks := strings.Split(content, "```")
-	var jsonBlocks []string
-
-	for _, block := range blocks {
-		block = strings.TrimSpace(block)
-		if strings.HasPrefix(block, "json\n") {
-			block = strings.TrimPrefix(block, "json\n")
-			block = strings.TrimSpace(block)
-			if strings.HasPrefix(block, "{") && strings.HasSuffix(block, "}") {
-				jsonBlocks = append(jsonBlocks, block)
-			}
-		} else if strings.HasPrefix(block, "{") && strings.HasSuffix(block, "}") {
-			jsonBlocks = append(jsonBlocks, block)
-		}
-	}
-
-	if len(jsonBlocks) > 0 {
-		return jsonBlocks[len(jsonBlocks)-1]
-	}
-
-	// Fallback: return trimmed content
-	return content
 }
 
 // displayScenario prints the scenario in a readable format

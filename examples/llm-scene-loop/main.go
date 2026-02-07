@@ -222,50 +222,17 @@ func runMultiSceneMode(ctx context.Context, gameEngine *engine.Engine, sceneConf
 
 // getScenario returns appropriate scenario for each scene type
 func getScenario(sceneName string) *engine.Scenario {
-	switch sceneName {
-	case "tower":
-		return &engine.Scenario{
-			Title:   "The Wizard's Tower",
-			Problem: "A mysterious magical disturbance threatens the tower and its inhabitants",
-			StoryQuestions: []string{
-				"Can the source of the disturbance be discovered?",
-				"Will the tower's secrets be revealed?",
-			},
-			Genre:   "Fantasy",
-			Setting: "A medieval fantasy world of magic and mystery. Wizards study arcane arts in towers, adventurers seek treasure in ancient ruins, and supernatural forces are very real.",
-		}
-	case "heist":
-		return &engine.Scenario{
-			Title:   "The Prometheus Job",
-			Problem: "A high-value data core must be extracted from a heavily guarded corporate facility",
-			StoryQuestions: []string{
-				"Can the team breach the facility's security?",
-				"Will the extraction succeed without casualties?",
-				"What secrets does the data core contain?",
-			},
-			Genre:   "Cyberpunk",
-			Setting: "A dark near-future where megacorporations rule, hackers breach digital fortresses, and chrome-enhanced mercenaries sell their skills to the highest bidder. Neon lights flicker over rain-slicked streets.",
-		}
-	case "saloon":
-		return &engine.Scenario{
-			Title:   "Trouble in Redemption Gulch",
-			Problem: "The town is under threat from outlaws and someone needs to stand up for the innocent",
-			StoryQuestions: []string{
-				"Will the outlaws be brought to justice?",
-				"Can the town be saved?",
-			},
-			Genre:   "Western",
-			Setting: "The American Old West in the late 1800s. Dusty frontier towns, lawless territories, and the struggle between civilization and the wild. Gunslingers, outlaws, and honest folk all seeking their fortune.",
-		}
-	default:
-		return &engine.Scenario{
-			Title:   "A New Adventure",
-			Problem: "Danger lurks and heroes are needed",
-			StoryQuestions: []string{
-				"Can the heroes prevail?",
-			},
-			Genre:   "Adventure",
-			Setting: "A world of adventure and danger where heroes rise to meet challenges.",
-		}
+	scenario := engine.PredefinedScenario(sceneName)
+	if scenario != nil {
+		return scenario
+	}
+	return &engine.Scenario{
+		Title:   "A New Adventure",
+		Problem: "Danger lurks and heroes are needed",
+		StoryQuestions: []string{
+			"Can the heroes prevail?",
+		},
+		Genre:   "Adventure",
+		Setting: "A world of adventure and danger where heroes rise to meet challenges.",
 	}
 }

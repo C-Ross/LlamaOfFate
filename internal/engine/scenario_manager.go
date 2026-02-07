@@ -2,10 +2,8 @@ package engine
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
@@ -248,7 +246,7 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 	}
 
 	// Parse the generated scene
-	generated, err := m.parseGeneratedScene(resp.Choices[0].Message.Content)
+	generated, err := ParseGeneratedScene(resp.Choices[0].Message.Content)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse generated scene: %w", err)
 	}
@@ -307,37 +305,6 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 	)
 
 	return newScene, nil
-}
-
-// parseGeneratedScene parses the LLM response into a GeneratedScene
-func (m *ScenarioManager) parseGeneratedScene(content string) (*GeneratedScene, error) {
-	// Clean the response - extract JSON from potential markdown code blocks
-	cleaned := cleanJSONResponse(content)
-
-	var generated GeneratedScene
-	if err := json.Unmarshal([]byte(cleaned), &generated); err != nil {
-		// Try to extract just the first JSON object if there's extra content
-		start := strings.Index(content, "{")
-		end := strings.LastIndex(content, "}")
-		if start >= 0 && end > start {
-			cleaned = content[start : end+1]
-			if err := json.Unmarshal([]byte(cleaned), &generated); err != nil {
-				return nil, fmt.Errorf("JSON parse error: %w", err)
-			}
-		} else {
-			return nil, fmt.Errorf("no valid JSON found in response")
-		}
-	}
-
-	// Validate required fields
-	if generated.SceneName == "" {
-		return nil, fmt.Errorf("missing scene_name")
-	}
-	if generated.Description == "" {
-		return nil, fmt.Errorf("missing description")
-	}
-
-	return &generated, nil
 }
 
 // addSceneSummary adds a summary to the sliding window (max 3 summaries)
@@ -416,7 +383,7 @@ func (m *ScenarioManager) generateSceneSummary(ctx context.Context, sceneManager
 	}
 
 	// Parse the generated summary
-	summary, err := m.parseSceneSummary(resp.Choices[0].Message.Content)
+	summary, err := ParseSceneSummary(resp.Choices[0].Message.Content)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse scene summary: %w", err)
 	}
@@ -429,34 +396,6 @@ func (m *ScenarioManager) generateSceneSummary(ctx context.Context, sceneManager
 	)
 
 	return summary, nil
-}
-
-// parseSceneSummary parses the LLM response into a SceneSummary
-func (m *ScenarioManager) parseSceneSummary(content string) (*SceneSummary, error) {
-	// Clean the response - extract JSON from potential markdown code blocks
-	cleaned := cleanJSONResponse(content)
-
-	var summary SceneSummary
-	if err := json.Unmarshal([]byte(cleaned), &summary); err != nil {
-		// Try to extract just the first JSON object if there's extra content
-		start := strings.Index(content, "{")
-		end := strings.LastIndex(content, "}")
-		if start >= 0 && end > start {
-			cleaned = content[start : end+1]
-			if err := json.Unmarshal([]byte(cleaned), &summary); err != nil {
-				return nil, fmt.Errorf("JSON parse error: %w", err)
-			}
-		} else {
-			return nil, fmt.Errorf("no valid JSON found in response")
-		}
-	}
-
-	// Validate required field
-	if summary.NarrativeProse == "" {
-		return nil, fmt.Errorf("missing narrative_prose")
-	}
-
-	return &summary, nil
 }
 
 // checkScenarioResolution uses the LLM to determine if the scenario's story questions have been answered
@@ -495,7 +434,7 @@ func (m *ScenarioManager) checkScenarioResolution(ctx context.Context, latestSum
 	}
 
 	// Parse the resolution result
-	result, err := m.parseScenarioResolution(resp.Choices[0].Message.Content)
+	result, err := ParseScenarioResolution(resp.Choices[0].Message.Content)
 	if err != nil {
 		return false, fmt.Errorf("failed to parse scenario resolution: %w", err)
 	}
@@ -517,27 +456,4 @@ func (m *ScenarioManager) checkScenarioResolution(ctx context.Context, latestSum
 	}
 
 	return result.IsResolved, nil
-}
-
-// parseScenarioResolution parses the LLM response into a ScenarioResolutionResult
-func (m *ScenarioManager) parseScenarioResolution(content string) (*ScenarioResolutionResult, error) {
-	// Clean the response - extract JSON from potential markdown code blocks
-	cleaned := cleanJSONResponse(content)
-
-	var result ScenarioResolutionResult
-	if err := json.Unmarshal([]byte(cleaned), &result); err != nil {
-		// Try to extract just the first JSON object if there's extra content
-		start := strings.Index(content, "{")
-		end := strings.LastIndex(content, "}")
-		if start >= 0 && end > start {
-			cleaned = content[start : end+1]
-			if err := json.Unmarshal([]byte(cleaned), &result); err != nil {
-				return nil, fmt.Errorf("JSON parse error: %w", err)
-			}
-		} else {
-			return nil, fmt.Errorf("no valid JSON found in response")
-		}
-	}
-
-	return &result, nil
 }
