@@ -18,6 +18,12 @@ CURRENT TURN: {{.CurrentCharacterName}}
 
 SCENE: {{.Scene.Name}}
 {{.Scene.Description}}
+{{- if .ScenePurpose}}
+
+SCENE PURPOSE (dramatic question driving this scene):
+{{.ScenePurpose}}
+Keep the conflict moving toward resolving this question.
+{{- end}}
 
 PLAYER CHARACTER:
 {{.CharacterContext}}

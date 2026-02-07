@@ -26,6 +26,7 @@ type SceneGenTestCase struct {
 	PlayerTrouble     string
 	PlayerAspects     []string
 	PreviousSummaries []engine.SceneSummary
+	Complications     []string // Unresolved threads to weave in as complications
 	Description       string
 }
 
@@ -38,6 +39,8 @@ type SceneGenResult struct {
 	HasSceneName        bool
 	SceneNameLength     int // word count
 	HasDescription      bool
+	HasPurpose          bool
+	HasOpeningHook      bool
 	HasSituationAspects bool
 	SituationAspectCt   int
 	NPCCount            int
@@ -126,6 +129,24 @@ func getSceneGenTestCases() []SceneGenTestCase {
 			PlayerTrouble:     "The Cortez Gang Burned My Life",
 			Description:       "Without a transition hint, should generate an appropriate opening scene",
 		},
+		{
+			Name:              "Complications from unresolved threads",
+			TransitionHint:    "the town square",
+			Scenario:          westernScenario,
+			PlayerName:        "Jesse Calhoun",
+			PlayerHighConcept: "Vengeful Rancher with Nothing Left to Lose",
+			PlayerTrouble:     "The Cortez Gang Burned My Life",
+			PlayerAspects:     []string{"Quick Draw"},
+			PreviousSummaries: []engine.SceneSummary{
+				{
+					NarrativeProse:    "Jesse learned the gang's lieutenant is in town. The sheriff was found dead.",
+					KeyEvents:         []string{"Sheriff found dead", "Lieutenant spotted"},
+					UnresolvedThreads: []string{"The gang lieutenant is still at large", "Who killed the sheriff?"},
+				},
+			},
+			Complications: []string{"The gang lieutenant is still at large", "Who killed the sheriff?"},
+			Description:   "Scene should incorporate unresolved threads as complications",
+		},
 	}
 }
 
@@ -138,6 +159,7 @@ func evaluateSceneGeneration(ctx context.Context, client llm.LLMClient, tc Scene
 		PlayerTrouble:     tc.PlayerTrouble,
 		PlayerAspects:     tc.PlayerAspects,
 		PreviousSummaries: tc.PreviousSummaries,
+		Complications:     tc.Complications,
 	}
 
 	prompt, err := engine.RenderSceneGeneration(data)
@@ -192,6 +214,12 @@ func evaluateSceneGeneration(ctx context.Context, client llm.LLMClient, tc Scene
 	// Validate description: immersive, 2-3 sentences
 	result.HasDescription = generated.Description != "" && len(generated.Description) > 30
 
+	// Validate purpose: required, should be a dramatic question or goal
+	result.HasPurpose = generated.Purpose != "" && len(generated.Purpose) > 10
+
+	// Validate opening_hook: optional but preferred
+	result.HasOpeningHook = generated.OpeningHook != ""
+
 	// Validate situation_aspects: 2-3 per Fate Core and template rules
 	result.SituationAspectCt = len(generated.SituationAspects)
 	result.HasSituationAspects = result.SituationAspectCt >= 2 && result.SituationAspectCt <= 3
@@ -242,6 +270,7 @@ func evaluateSceneGeneration(ctx context.Context, client llm.LLMClient, tc Scene
 	result.Passed = result.ValidJSON &&
 		result.HasSceneName &&
 		result.HasDescription &&
+		result.HasPurpose &&
 		result.HasSituationAspects &&
 		result.NPCsHaveHighConc &&
 		result.NPCsHaveDisp &&
@@ -318,12 +347,17 @@ func TestSceneGeneration_LLMEvaluation(t *testing.T) {
 					status = "✗ FAIL"
 				}
 				t.Logf("%s: %s", status, tc.Name)
-				t.Logf("  ValidJSON=%v Name=%v(%d words) Desc=%v Aspects=%d NPCs=%d",
+				t.Logf("  ValidJSON=%v Name=%v(%d words) Desc=%v Purpose=%v Hook=%v Aspects=%d NPCs=%d",
 					result.ValidJSON, result.HasSceneName, result.SceneNameLength,
-					result.HasDescription, result.SituationAspectCt, result.NPCCount)
+					result.HasDescription, result.HasPurpose, result.HasOpeningHook,
+					result.SituationAspectCt, result.NPCCount)
 				if result.Parsed != nil {
 					t.Logf("  Scene: %s", result.Parsed.SceneName)
+					t.Logf("  Purpose: %s", truncateSceneGenText(result.Parsed.Purpose, 150))
 					t.Logf("  Description: %s", truncateSceneGenText(result.Parsed.Description, 150))
+					if result.Parsed.OpeningHook != "" {
+						t.Logf("  Opening Hook: %s", truncateSceneGenText(result.Parsed.OpeningHook, 150))
+					}
 					for i, a := range result.Parsed.SituationAspects {
 						t.Logf("  Aspect %d: %s", i+1, a)
 					}
@@ -339,6 +373,8 @@ func TestSceneGeneration_LLMEvaluation(t *testing.T) {
 			assert.True(t, result.ValidJSON, "Response should be valid JSON")
 			assert.True(t, result.HasSceneName, "Scene should have a name (2+ words)")
 			assert.True(t, result.HasDescription, "Scene should have a substantive description")
+			assert.True(t, result.HasPurpose,
+				"Scene should have a purpose (dramatic question) per Fate Core scene guidelines")
 			assert.True(t, result.HasSituationAspects,
 				"Scene should have 2-3 situation aspects per Fate Core (got %d)", result.SituationAspectCt)
 			assert.LessOrEqual(t, result.NPCCount, 2,
@@ -363,12 +399,20 @@ func TestSceneGeneration_LLMEvaluation(t *testing.T) {
 	}
 	t.Logf("Scenes advancing scenario story: %d/%d", advancesCount, len(results))
 
+	hookCount := 0
+	for _, r := range results {
+		if r.HasOpeningHook {
+			hookCount++
+		}
+	}
+	t.Logf("Scenes with opening hooks: %d/%d", hookCount, len(results))
+
 	t.Log("\n--- Failed Cases ---")
 	for _, r := range results {
 		if !r.Passed {
-			t.Logf("FAIL: %s — ValidJSON=%v Name=%v Desc=%v Aspects=%d NPCs=%d",
+			t.Logf("FAIL: %s — ValidJSON=%v Name=%v Desc=%v Purpose=%v Aspects=%d NPCs=%d",
 				r.TestCase.Name, r.ValidJSON, r.HasSceneName, r.HasDescription,
-				r.SituationAspectCt, r.NPCCount)
+				r.HasPurpose, r.SituationAspectCt, r.NPCCount)
 		}
 	}
 }

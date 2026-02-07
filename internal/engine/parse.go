@@ -32,6 +32,9 @@ func ParseGeneratedScene(content string) (*GeneratedScene, error) {
 	if generated.Description == "" {
 		return nil, fmt.Errorf("missing description")
 	}
+	if generated.Purpose == "" {
+		return nil, fmt.Errorf("missing purpose")
+	}
 
 	return &generated, nil
 }

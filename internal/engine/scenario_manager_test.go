@@ -19,7 +19,7 @@ type MockLLMClientForScenario struct {
 }
 
 func (m *MockLLMClientForScenario) ChatCompletion(ctx context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
-	response := `{"scene_name": "Test Scene", "description": "A test scene.", "situation_aspects": ["Aspect 1"], "npcs": []}`
+	response := `{"scene_name": "Test Scene", "description": "A test scene.", "purpose": "Can the hero survive?", "situation_aspects": ["Aspect 1"], "npcs": []}`
 	if m.callIndex < len(m.responses) {
 		response = m.responses[m.callIndex]
 		m.callIndex++
@@ -148,6 +148,8 @@ func TestParseGeneratedScene_Valid(t *testing.T) {
 	jsonResponse := `{
 		"scene_name": "The Dusty Trail",
 		"description": "A winding path through the desert, heat waves shimmer in the distance.",
+		"purpose": "Can the traveler survive the scorching desert crossing?",
+		"opening_hook": "A vulture circles overhead as the path narrows between two boulders.",
 		"situation_aspects": ["Blazing Sun", "Rocky Terrain"],
 		"npcs": [
 			{"name": "Old Prospector", "high_concept": "Grizzled Desert Wanderer", "disposition": "friendly"}
@@ -159,6 +161,8 @@ func TestParseGeneratedScene_Valid(t *testing.T) {
 
 	assert.Equal(t, "The Dusty Trail", generated.SceneName)
 	assert.Contains(t, generated.Description, "winding path")
+	assert.Equal(t, "Can the traveler survive the scorching desert crossing?", generated.Purpose)
+	assert.Equal(t, "A vulture circles overhead as the path narrows between two boulders.", generated.OpeningHook)
 	assert.Len(t, generated.SituationAspects, 2)
 	assert.Equal(t, "Blazing Sun", generated.SituationAspects[0])
 	assert.Len(t, generated.NPCs, 1)
@@ -168,21 +172,52 @@ func TestParseGeneratedScene_Valid(t *testing.T) {
 
 func TestParseGeneratedScene_WithCodeBlock(t *testing.T) {
 	// LLMs sometimes wrap JSON in markdown code blocks
-	jsonResponse := "```json\n{\"scene_name\": \"Test\", \"description\": \"A test.\", \"situation_aspects\": [], \"npcs\": []}\n```"
+	jsonResponse := "```json\n{\"scene_name\": \"Test\", \"description\": \"A test.\", \"purpose\": \"Can the hero prevail?\", \"situation_aspects\": [], \"npcs\": []}\n```"
 
 	generated, err := ParseGeneratedScene(jsonResponse)
 	require.NoError(t, err)
 
 	assert.Equal(t, "Test", generated.SceneName)
+	assert.Equal(t, "Can the hero prevail?", generated.Purpose)
 }
 
 func TestParseGeneratedScene_MissingFields(t *testing.T) {
 	// Missing scene_name
-	jsonResponse := `{"description": "A test scene."}`
+	jsonResponse := `{"description": "A test scene.", "purpose": "Can the hero win?"}`
 
 	_, err := ParseGeneratedScene(jsonResponse)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "missing scene_name")
+}
+
+func TestParseGeneratedScene_MissingPurpose(t *testing.T) {
+	jsonResponse := `{
+		"scene_name": "The Dusty Trail",
+		"description": "A winding path through the desert.",
+		"situation_aspects": ["Blazing Sun"],
+		"npcs": []
+	}`
+
+	_, err := ParseGeneratedScene(jsonResponse)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "missing purpose")
+}
+
+func TestParseGeneratedScene_OptionalOpeningHook(t *testing.T) {
+	// opening_hook is optional — parsing should succeed without it
+	jsonResponse := `{
+		"scene_name": "The Dusty Trail",
+		"description": "A winding path through the desert.",
+		"purpose": "Can the traveler survive?",
+		"situation_aspects": ["Blazing Sun"],
+		"npcs": []
+	}`
+
+	generated, err := ParseGeneratedScene(jsonResponse)
+	require.NoError(t, err)
+
+	assert.Equal(t, "Can the traveler survive?", generated.Purpose)
+	assert.Equal(t, "", generated.OpeningHook)
 }
 
 func TestParseGeneratedScene_InvalidJSON(t *testing.T) {
@@ -253,6 +288,47 @@ func TestScenarioManager_addSceneSummary_NilSummary(t *testing.T) {
 	// Adding nil should not panic or add anything
 	sm.addSceneSummary(nil)
 	assert.Len(t, sm.sceneSummaries, 0)
+}
+
+func TestScenarioManager_extractComplications(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	// No summaries — no complications
+	assert.Empty(t, sm.extractComplications())
+
+	// Add summaries with unresolved threads
+	sm.addSceneSummary(&SceneSummary{
+		NarrativeProse:    "First scene",
+		UnresolvedThreads: []string{"Find the treasure", "Mysterious stranger"},
+	})
+	sm.addSceneSummary(&SceneSummary{
+		NarrativeProse:    "Second scene",
+		UnresolvedThreads: []string{"Find the treasure", "Gang hideout location"}, // duplicate thread
+	})
+
+	complications := sm.extractComplications()
+	assert.Len(t, complications, 3, "Should deduplicate threads across summaries")
+	assert.Contains(t, complications, "Find the treasure")
+	assert.Contains(t, complications, "Mysterious stranger")
+	assert.Contains(t, complications, "Gang hideout location")
+}
+
+func TestScenarioManager_extractComplications_NoThreads(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	sm.addSceneSummary(&SceneSummary{
+		NarrativeProse: "A scene with no threads",
+	})
+
+	assert.Empty(t, sm.extractComplications())
 }
 
 func TestParseSceneSummary_Valid(t *testing.T) {
@@ -454,4 +530,82 @@ func TestScenarioEndReason_Constants(t *testing.T) {
 	assert.Equal(t, ScenarioEndReason("resolved"), ScenarioEndResolved)
 	assert.Equal(t, ScenarioEndReason("quit"), ScenarioEndQuit)
 	assert.Equal(t, ScenarioEndReason("player_taken_out"), ScenarioEndPlayerTakenOut)
+}
+
+func TestRenderSceneGeneration_WithComplications(t *testing.T) {
+	data := SceneGenerationData{
+		TransitionHint:    "the old mine",
+		PlayerName:        "Jesse",
+		PlayerHighConcept: "Vengeful Rancher",
+		Complications: []string{
+			"The sheriff is missing",
+			"Gang plans to burn the town",
+		},
+	}
+
+	rendered, err := RenderSceneGeneration(data)
+	require.NoError(t, err)
+
+	assert.Contains(t, rendered, "HOOKS TO INCORPORATE")
+	assert.Contains(t, rendered, "The sheriff is missing")
+	assert.Contains(t, rendered, "Gang plans to burn the town")
+}
+
+func TestRenderSceneGeneration_WithoutComplications(t *testing.T) {
+	data := SceneGenerationData{
+		TransitionHint: "the old mine",
+		PlayerName:     "Jesse",
+	}
+
+	rendered, err := RenderSceneGeneration(data)
+	require.NoError(t, err)
+
+	assert.NotContains(t, rendered, "HOOKS TO INCORPORATE")
+}
+
+func TestRenderSceneResponse_WithPurpose(t *testing.T) {
+	s := scene.NewScene("s1", "Test Scene", "A test scene")
+	data := SceneResponseData{
+		Scene:               s,
+		CharacterContext:    "Test character",
+		AspectsContext:      "Test aspects",
+		ConversationContext: "Test conversation",
+		PlayerInput:         "I look around",
+		InteractionType:     "dialog",
+		ScenePurpose:        "Can the hero find the hidden passage?",
+	}
+
+	rendered, err := RenderSceneResponse(data)
+	require.NoError(t, err)
+
+	assert.Contains(t, rendered, "SCENE PURPOSE")
+	assert.Contains(t, rendered, "Can the hero find the hidden passage?")
+}
+
+func TestRenderSceneResponse_WithoutPurpose(t *testing.T) {
+	s := scene.NewScene("s1", "Test Scene", "A test scene")
+	data := SceneResponseData{
+		Scene:               s,
+		CharacterContext:    "Test character",
+		AspectsContext:      "Test aspects",
+		ConversationContext: "Test conversation",
+		PlayerInput:         "I look around",
+		InteractionType:     "dialog",
+	}
+
+	rendered, err := RenderSceneResponse(data)
+	require.NoError(t, err)
+
+	assert.NotContains(t, rendered, "SCENE PURPOSE")
+}
+
+func TestSceneManager_SetScenePurpose(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	assert.Equal(t, "", sm.scenePurpose)
+
+	sm.SetScenePurpose("Can the hero escape?")
+	assert.Equal(t, "Can the hero escape?", sm.scenePurpose)
 }

@@ -1,7 +1,8 @@
 You are a GM for a Fate Core RPG. Generate a new scene based on the transition from the previous scene.
 
-FATE CORE SCENE GUIDELINES:
-- Scenes should have a clear purpose (dramatic question to answer or action to resolve)
+FATE CORE SCENE GUIDELINES (per Fate SRD "Defining Scenes"):
+- Every scene needs a clear PURPOSE: the dramatic question to answer or goal to pursue
+- Cut in at the most interesting moment — provide an OPENING HOOK (what's about to happen?)
 - Include 2-3 situation aspects that players can interact with
 - NPCs should be introduced only when dramatically appropriate
 - Keep descriptions evocative but concise
@@ -37,6 +38,14 @@ Unresolved: {{range $j, $t := $s.UnresolvedThreads}}{{if $j}}, {{end}}{{$t}}{{en
 {{- end}}
 {{- end}}
 
+{{- if .Complications}}
+HOOKS TO INCORPORATE:
+Weave one or more of these unresolved threads into the new scene as complications or context:
+{{- range .Complications}}
+- {{.}}
+{{- end}}
+{{- end}}
+
 TRANSITION CONTEXT:
 {{- if .TransitionHint}}
 The previous scene ended with the player heading toward: {{.TransitionHint}}
@@ -62,6 +71,8 @@ Generate a new scene in valid JSON format:
 {
   "scene_name": "A short evocative name for the scene",
   "description": "A 2-3 sentence description of what the player sees and senses as they enter this new location. Set the mood and hint at potential interactions.",
+  "purpose": "The dramatic question or goal driving this scene, e.g. 'Can the player find allies before the gang strikes?'",
+  "opening_hook": "What interesting thing is just about to happen as the player enters, e.g. 'A stranger slams through the saloon doors, bloodied and desperate.'",
   "situation_aspects": [
     "First situation aspect (environmental or social feature)",
     "Second situation aspect"
@@ -79,6 +90,8 @@ Generate a new scene in valid JSON format:
 Rules:
 - scene_name should be 2-5 words
 - description should be immersive and set the tone
+- purpose is REQUIRED — every scene needs a dramatic question or goal per Fate Core
+- opening_hook should cut in just before the action (what's about to happen?)
 - situation_aspects should be 2-3 invokable/compellable aspects
 - npcs array can be empty if no NPCs are present; include at most 1-2 NPCs
 - Keep the scene open-ended to allow player agency

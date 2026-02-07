@@ -28,9 +28,72 @@ type ScenarioResTestCase struct {
 	Description    string // Why this should/shouldn't be resolved
 }
 
+// darkValleyScenario returns the scenario from the walkthrough_sword_and_sorcery session
+// where the resolution checker failed to mark scenes 8-9 as resolved despite Malyster being dead.
+func darkValleyScenario() *engine.Scenario {
+	return &engine.Scenario{
+		Title:   "Dark Valley's Burning Vengeance",
+		Problem: "The ruthless sorcerer, Malyster, has returned to the Dark Valley, slaughtering Jon's family and burning his ranch to the ground. Jon must now stop Malyster before he slaughters the nearby village of Brindlemark, seeking revenge for some past injustice.",
+		StoryQuestions: []string{
+			"Will Jon's thirst for vengeance cloud his judgment against Malyster?",
+			"Can Jon gather enough allies in Brindlemark before Malyster's dark magic corrupts the land?",
+			"Will the village elder's secrets about Jon's past hinder or help his quest for justice?",
+			"Can Jon defeat Malyster in a final confrontation?",
+		},
+		Setting: "The Dark Valley, a lawless frontier of rugged ranchlands and mystical energies, lies on the edge of a vast and mysterious forest. The nearby village of Brindlemark is a small settlement of hardy folk, living in the shadow of the valley's dark history and the looming threat of sorcery.",
+		Genre:   "Sword and Sorcery",
+	}
+}
+
 // getResolvedTestCases returns scenarios that SHOULD be marked resolved
 func getResolvedTestCases() []ScenarioResTestCase {
 	return []ScenarioResTestCase{
+		{
+			Name:     "Antagonist killed and village saved — walkthrough scene 8",
+			Scenario: darkValleyScenario(),
+			SceneSummaries: []engine.SceneSummary{
+				{
+					NarrativeProse: "Jon braved the mystical Cliffs of the Fae Witch, overcoming her mental assaults to claim a powerful talisman. The Fae Witch, impressed or defeated, yielded to Jon's determination. With this newfound tool, Jon is one step closer to confronting Malyster.",
+					KeyEvents:      []string{"The Fae Witch engaged Jon in a mental battle with riddles and phantasms.", "Jon resisted her attacks and overcame her, gaining her respect or submission.", "The Fae Witch yielded and granted Jon a magical talisman to counter Malyster's magic."},
+				},
+				{
+					NarrativeProse: "As darkness descended upon Brindlemark, Jon arrived to find the village ablaze and its people in a state of panic. Meeting Elara, he rallied the villagers and steeled himself for a confrontation with the source of the chaos: Malyster. With a newfound sense of determination, Jon prepared to face the darkness head-on.",
+					KeyEvents:      []string{"Jon meets Elara amidst the chaos", "Jon rallies the villagers", "Jon prepares to confront Malyster"},
+				},
+			},
+			LatestSummary: &engine.SceneSummary{
+				NarrativeProse:    "Jon bravely confronted Malyster in the heart of Brindlemark, shattering the dark ritual that had entranced the villagers. With the talisman's power, he freed the villagers, who then turned on Malyster in their rage. In the aftermath, Elara expressed her gratitude to Jon for his heroism.",
+				KeyEvents:         []string{"Jon used a talisman to counter Malyster's magic and freed the villagers from their trance.", "Malyster was disarmed and subsequently torn apart by the freed villagers.", "The dark ritual was disrupted, and the villagers were freed from their spell."},
+				UnresolvedThreads: []string{"The aftermath of the dark ritual and its effects on Brindlemark village", "Elara's personal thanks and potential future interactions"},
+			},
+			PlayerName:     "Jon of the Dark Valley",
+			PlayerAspects:  []string{"Haunted Former Rancher Seeking Justice", "Vengeance Burns Hotter Than Reason"},
+			ExpectResolved: true,
+			Description:    "Extracted from walkthrough_sword_and_sorcery session. Malyster is dead, village saved, all 4 story questions answerable. Resolution checker returned is_resolved=false citing 'village elder secrets unanswered' despite that being answered in scene 5.",
+		},
+		{
+			Name:     "Denouement after antagonist death — walkthrough scene 9",
+			Scenario: darkValleyScenario(),
+			SceneSummaries: []engine.SceneSummary{
+				{
+					NarrativeProse: "As darkness descended upon Brindlemark, Jon arrived to find the village ablaze and its people in a state of panic. Meeting Elara, he rallied the villagers and steeled himself for a confrontation with the source of the chaos: Malyster. With a newfound sense of determination, Jon prepared to face the darkness head-on.",
+					KeyEvents:      []string{"Jon meets Elara amidst the chaos", "Jon rallies the villagers", "Jon prepares to confront Malyster"},
+				},
+				{
+					NarrativeProse: "Jon bravely confronted Malyster in the heart of Brindlemark, shattering the dark ritual that had entranced the villagers. With the talisman's power, he freed the villagers, who then turned on Malyster in their rage. In the aftermath, Elara expressed her gratitude to Jon for his heroism.",
+					KeyEvents:      []string{"Jon used a talisman to counter Malyster's magic and freed the villagers from their trance.", "Malyster was disarmed and subsequently torn apart by the freed villagers.", "The dark ritual was disrupted, and the villagers were freed from their spell."},
+				},
+			},
+			LatestSummary: &engine.SceneSummary{
+				NarrativeProse:    "As the village began to heal from the darkness of Malyster's ritual, Jon found solace in Elara's forgiveness and acceptance. With a newfound sense of belonging, Jon bid farewell to the village and set out to confront the remnants of the evil that had threatened his new home. The journey ahead would be fraught with danger, but Jon was determined to put the past behind him.",
+				KeyEvents:         []string{"Elara thanks Jon and forgives him, sharing a personal connection to his past", "Elara declares Jon one of the village and they share an embrace", "The village starts to rebuild"},
+				UnresolvedThreads: []string{"Finding and dismantling Malyster's tower and any remaining evils", "Understanding the full extent of the village's secrets and Jon's past"},
+			},
+			PlayerName:     "Jon of the Dark Valley",
+			PlayerAspects:  []string{"Haunted Former Rancher Seeking Justice", "Vengeance Burns Hotter Than Reason"},
+			ExpectResolved: true,
+			Description:    "Extracted from walkthrough_sword_and_sorcery session. Malyster dead since scene 8, village rebuilding, denouement complete. Resolution checker returned is_resolved=false citing sequel hooks (Malyster's tower, village secrets) as blockers.",
+		},
 		{
 			Name: "Villain defeated and town saved",
 			Scenario: &engine.Scenario{

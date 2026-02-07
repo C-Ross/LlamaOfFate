@@ -3,6 +3,8 @@
 ## Project Overview
 Text-based RPG implementing Fate Core System with LLM integration. Built in Go with modular architecture.
 
+Core premise is to leverage LLMs for narrative generation and player input parsing while maintaining a robust implementation of Fate mechanics.
+
 ## Repository Structure
 ```
 cmd/cli/                    - CLI entry point (single hardcoded scene currently)

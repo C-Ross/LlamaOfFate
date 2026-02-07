@@ -10,6 +10,12 @@ FATE CORE GM PRINCIPLES:
 SCENE CONTEXT:
 Scene: {{.Scene.Name}}
 Description: {{.Scene.Description}}
+{{- if .ScenePurpose}}
+
+SCENE PURPOSE (dramatic question driving this scene):
+{{.ScenePurpose}}
+Consider whether the player's actions are moving toward resolving this question.
+{{- end}}
 {{- if .Scene.IsConflict}}
 ACTIVE CONFLICT: {{.Scene.ConflictState.Type}} conflict (Round {{.Scene.ConflictState.Round}})
 {{- end}}

@@ -25,6 +25,7 @@ type SceneResponseData struct {
 	InteractionType     string
 	OtherCharacters     []*character.Character
 	TakenOutCharacters  []*character.Character // Characters defeated earlier in this scene
+	ScenePurpose        string                 // Dramatic question driving this scene
 }
 
 // ConflictResponseData holds the data for conflict response template
@@ -39,6 +40,7 @@ type ConflictResponseData struct {
 	CurrentCharacterName string
 	ParticipantMap       map[string]*scene.ConflictParticipant
 	CharacterMap         map[string]*character.Character
+	ScenePurpose         string // Dramatic question driving this scene
 }
 
 // ActionNarrativeData holds the data for action narrative template
@@ -135,12 +137,15 @@ type SceneGenerationData struct {
 	PlayerTrouble     string         // Player trouble aspect
 	PlayerAspects     []string       // Other player aspects
 	PreviousSummaries []SceneSummary // Summaries of recent scenes (last 3)
+	Complications     []string       // Unresolved threads from previous scenes to weave in
 }
 
 // GeneratedScene represents the LLM response for scene generation
 type GeneratedScene struct {
 	SceneName        string         `json:"scene_name"`
 	Description      string         `json:"description"`
+	Purpose          string         `json:"purpose"`                // Dramatic question driving the scene
+	OpeningHook      string         `json:"opening_hook,omitempty"` // What interesting thing is about to happen
 	SituationAspects []string       `json:"situation_aspects"`
 	NPCs             []GeneratedNPC `json:"npcs"`
 }

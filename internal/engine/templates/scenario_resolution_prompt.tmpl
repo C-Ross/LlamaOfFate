@@ -41,7 +41,13 @@ A scenario is resolved when:
 A scenario is NOT resolved if:
 - The problem is still active and urgent
 - Key story questions remain unanswered
-- There are significant unresolved threads that relate to the main problem
+- There are significant unresolved threads that DIRECTLY relate to the main problem as stated above
+
+IMPORTANT: Distinguish between the scenario's central problem and sequel hooks.
+- If the antagonist is dead or the threat is neutralized, the problem IS resolved even if loose ends remain.
+- "Unresolved threads" listed above may be seeds for FUTURE scenarios (e.g., exploring a defeated villain's lair, deepening character relationships). These are sequel hooks, NOT blockers to resolution.
+- A story question is answered if events in the scene history clearly address it, even if not stated explicitly in the most recent scene.
+- If 3 out of 4 (or more) story questions have clear YES/NO answers and the central problem is addressed, the scenario IS resolved.
 
 Respond in valid JSON format:
 
@@ -54,5 +60,3 @@ Respond in valid JSON format:
   "reasoning": "Brief explanation of why the scenario is or is not resolved"
 }
 ```
-
-Be conservative - only mark resolved if there's clear closure. Scenarios can continue even after partial answers.

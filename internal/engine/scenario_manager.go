@@ -17,14 +17,16 @@ const (
 
 // ScenarioManager orchestrates multi-scene gameplay within a scenario
 type ScenarioManager struct {
-	engine         *Engine
-	player         *character.Character
-	ui             UI
-	sessionLogger  *session.Logger
-	scenario       *Scenario              // The current scenario with problem and story questions
-	initialScene   *scene.Scene           // Optional pre-configured starting scene
-	initialNPCs    []*character.Character // NPCs for initial scene
-	sceneSummaries []SceneSummary         // Summaries of recent scenes (sliding window of last 3)
+	engine               *Engine
+	player               *character.Character
+	ui                   UI
+	sessionLogger        *session.Logger
+	scenario             *Scenario              // The current scenario with problem and story questions
+	initialScene         *scene.Scene           // Optional pre-configured starting scene
+	initialNPCs          []*character.Character // NPCs for initial scene
+	sceneSummaries       []SceneSummary         // Summaries of recent scenes (sliding window of last 3)
+	lastGeneratedPurpose string                 // Purpose from the most recently generated scene
+	lastGeneratedHook    string                 // Opening hook from the most recently generated scene
 }
 
 // NewScenarioManager creates a new scenario manager
@@ -91,9 +93,32 @@ func (m *ScenarioManager) Run(ctx context.Context) (*ScenarioResult, error) {
 		}
 		sceneManager.SetExitOnSceneTransition(true)
 
+		// Pass scene purpose so the response LLM is aware of it
+		if m.lastGeneratedPurpose != "" {
+			sceneManager.SetScenePurpose(m.lastGeneratedPurpose)
+		}
+
 		// Start the scene
 		if err := sceneManager.StartScene(currentScene, m.player); err != nil {
 			return nil, fmt.Errorf("failed to start scene: %w", err)
+		}
+
+		// Display scene purpose and opening hook to the player
+		if m.lastGeneratedPurpose != "" {
+			m.ui.DisplaySystemMessage("Scene Purpose: " + m.lastGeneratedPurpose)
+			if m.sessionLogger != nil {
+				m.sessionLogger.Log("scene_purpose", map[string]any{
+					"purpose": m.lastGeneratedPurpose,
+				})
+			}
+		}
+		if m.lastGeneratedHook != "" {
+			m.ui.DisplayNarrative(m.lastGeneratedHook)
+			if m.sessionLogger != nil {
+				m.sessionLogger.Log("opening_hook", map[string]any{
+					"hook": m.lastGeneratedHook,
+				})
+			}
 		}
 
 		// Run the scene loop
@@ -225,6 +250,7 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 		PlayerTrouble:     m.player.Aspects.Trouble,
 		PlayerAspects:     playerAspects,
 		PreviousSummaries: m.sceneSummaries, // Include recent scene summaries for context
+		Complications:     m.extractComplications(),
 	}
 
 	prompt, err := RenderSceneGeneration(data)
@@ -292,6 +318,8 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 			"scene_id":          sceneID,
 			"scene_name":        generated.SceneName,
 			"description":       generated.Description,
+			"purpose":           generated.Purpose,
+			"opening_hook":      generated.OpeningHook,
 			"situation_aspects": generated.SituationAspects,
 			"npc_count":         len(generated.NPCs),
 		})
@@ -300,9 +328,14 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 	slog.Info("Generated new scene",
 		"component", componentScenarioManager,
 		"scene_name", generated.SceneName,
+		"purpose", generated.Purpose,
 		"aspects", len(generated.SituationAspects),
 		"npcs", len(generated.NPCs),
 	)
+
+	// Store generated purpose for the scene manager to use
+	m.lastGeneratedPurpose = generated.Purpose
+	m.lastGeneratedHook = generated.OpeningHook
 
 	return newScene, nil
 }
@@ -317,6 +350,22 @@ func (m *ScenarioManager) addSceneSummary(summary *SceneSummary) {
 	if len(m.sceneSummaries) > 3 {
 		m.sceneSummaries = m.sceneSummaries[len(m.sceneSummaries)-3:]
 	}
+}
+
+// extractComplications gathers unresolved threads from recent scene summaries
+// to pass as explicit complications for the next scene generation.
+func (m *ScenarioManager) extractComplications() []string {
+	seen := make(map[string]bool)
+	var complications []string
+	for _, summary := range m.sceneSummaries {
+		for _, thread := range summary.UnresolvedThreads {
+			if !seen[thread] {
+				seen[thread] = true
+				complications = append(complications, thread)
+			}
+		}
+	}
+	return complications
 }
 
 // generateSceneSummary creates a summary of the completed scene using LLM

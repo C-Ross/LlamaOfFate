@@ -49,6 +49,13 @@ type SceneManager struct {
 	takenOutChars         []string       // Characters taken out during this scene
 	sceneEndReason        SceneEndReason // Why the scene ended
 	playerTakenOutHint    string         // Transition hint if player was taken out
+	scenePurpose          string         // Dramatic question driving the current scene
+}
+
+// SetScenePurpose sets the dramatic question driving the current scene,
+// used to give the response LLM awareness of the scene's goal.
+func (sm *SceneManager) SetScenePurpose(purpose string) {
+	sm.scenePurpose = purpose
 }
 
 // NewSceneManager creates a new scene manager
@@ -739,6 +746,7 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 			CurrentCharacterName: currentCharName,
 			ParticipantMap:       participantMap,
 			CharacterMap:         characterMap,
+			ScenePurpose:         sm.scenePurpose,
 		}
 
 		prompt, renderErr = RenderConflictResponse(conflictData)
@@ -753,6 +761,7 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 			InteractionType:     interactionType,
 			OtherCharacters:     otherCharacters,
 			TakenOutCharacters:  takenOutCharacters,
+			ScenePurpose:        sm.scenePurpose,
 		}
 
 		prompt, renderErr = RenderSceneResponse(data)

@@ -249,9 +249,21 @@ func displayGeneratedScene(s *engine.GeneratedScene) {
 	fmt.Printf("Name: %s\n", s.SceneName)
 	fmt.Println()
 
+	if s.Purpose != "" {
+		fmt.Println("Purpose:")
+		printWrapped(s.Purpose, 75, "  ")
+		fmt.Println()
+	}
+
 	fmt.Println("Description:")
 	printWrapped(s.Description, 75, "  ")
 	fmt.Println()
+
+	if s.OpeningHook != "" {
+		fmt.Println("Opening Hook:")
+		printWrapped(s.OpeningHook, 75, "  ")
+		fmt.Println()
+	}
 
 	if len(s.SituationAspects) > 0 {
 		fmt.Println("Situation Aspects:")

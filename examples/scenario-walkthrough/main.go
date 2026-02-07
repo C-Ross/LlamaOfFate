@@ -550,9 +550,22 @@ func displayScenario(s *engine.Scenario) {
 func displayScene(num int, s *engine.GeneratedScene) {
 	fmt.Printf("\n=== Scene %d: %s ===\n", num, s.SceneName)
 	fmt.Println()
+
+	if s.Purpose != "" {
+		fmt.Println("Purpose:")
+		printWrapped(s.Purpose, 75, "  ")
+		fmt.Println()
+	}
+
 	fmt.Println("Description:")
 	printWrapped(s.Description, 75, "  ")
 	fmt.Println()
+
+	if s.OpeningHook != "" {
+		fmt.Println("Opening Hook:")
+		printWrapped(s.OpeningHook, 75, "  ")
+		fmt.Println()
+	}
 
 	if len(s.SituationAspects) > 0 {
 		fmt.Println("Aspects:")
