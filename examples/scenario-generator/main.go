@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
@@ -215,7 +216,7 @@ func main() {
 }
 
 // displayScenario prints the scenario in a readable format
-func displayScenario(s *prompt.Scenario) {
+func displayScenario(s *scene.Scenario) {
 	fmt.Println("=== Generated Scenario ===")
 	fmt.Printf("Title: %s\n", s.Title)
 	if s.Genre != "" {

@@ -40,7 +40,7 @@ type SceneManager struct {
 	currentScene          *scene.Scene
 	player                *character.Character
 	roller                *dice.Roller
-	conversationHistory   []prompt.ConversationEntry
+	conversationHistory   []ConversationEntry
 	ui                    UI
 	shouldExit            bool                    // Set to true when the game should end
 	exitOnSceneTransition bool                    // Set to true to exit the loop on scene transition
@@ -64,7 +64,7 @@ func NewSceneManager(engine *Engine) *SceneManager {
 	sm := &SceneManager{
 		engine:              engine,
 		roller:              dice.NewRoller(),
-		conversationHistory: make([]prompt.ConversationEntry, 0),
+		conversationHistory: make([]ConversationEntry, 0),
 	}
 	// Initialize aspect generator if LLM client is available
 	if engine.llmClient != nil {
@@ -1172,7 +1172,7 @@ func (sm *SceneManager) GetPlayer() *character.Character {
 }
 
 // GetConversationHistory returns the conversation history
-func (sm *SceneManager) GetConversationHistory() []prompt.ConversationEntry {
+func (sm *SceneManager) GetConversationHistory() []ConversationEntry {
 	return sm.conversationHistory
 }
 
@@ -1181,7 +1181,7 @@ var _ SceneInfo = (*SceneManager)(nil)
 
 // addToConversationHistory adds an exchange to the conversation history
 func (sm *SceneManager) addToConversationHistory(playerInput, gmResponse, interactionType string) {
-	entry := prompt.ConversationEntry{
+	entry := ConversationEntry{
 		PlayerInput: playerInput,
 		GMResponse:  gmResponse,
 		Timestamp:   time.Now(),

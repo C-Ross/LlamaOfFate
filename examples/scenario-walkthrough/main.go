@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
@@ -121,9 +122,9 @@ func main() {
 	ctx := context.Background()
 
 	// Step 1: Get or generate the scenario
-	var scenario *prompt.Scenario
+	var scenario *scene.Scenario
 	if *scenarioFlag != "" {
-		scenario = prompt.PredefinedScenario(*scenarioFlag)
+		scenario = scene.PredefinedScenario(*scenarioFlag)
 		if scenario == nil {
 			fmt.Fprintf(os.Stderr, "Unknown scenario: %s (use saloon, heist, or tower)\n", *scenarioFlag)
 			os.Exit(1)
@@ -261,7 +262,7 @@ func main() {
 }
 
 // generateScenario creates a scenario via LLM from character aspects
-func generateScenario(ctx context.Context, client llm.LLMClient, name, concept, trouble, genre string, debug, raw bool, logger *session.Logger) (*prompt.Scenario, error) {
+func generateScenario(ctx context.Context, client llm.LLMClient, name, concept, trouble, genre string, debug, raw bool, logger *session.Logger) (*scene.Scenario, error) {
 	data := prompt.ScenarioGenerationData{
 		PlayerName:        name,
 		PlayerHighConcept: concept,
@@ -308,7 +309,7 @@ func generateScenario(ctx context.Context, client llm.LLMClient, name, concept, 
 }
 
 // generateScene creates a scene via LLM
-func generateScene(ctx context.Context, client llm.LLMClient, hint string, scenario *prompt.Scenario, name, concept, trouble string, summaries []prompt.SceneSummary, debug, raw bool, logger *session.Logger) (*prompt.GeneratedScene, error) {
+func generateScene(ctx context.Context, client llm.LLMClient, hint string, scenario *scene.Scenario, name, concept, trouble string, summaries []prompt.SceneSummary, debug, raw bool, logger *session.Logger) (*prompt.GeneratedScene, error) {
 	data := prompt.SceneGenerationData{
 		TransitionHint:    hint,
 		Scenario:          scenario,
@@ -423,7 +424,7 @@ func generateSummaryFromNarration(ctx context.Context, client llm.LLMClient, sce
 }
 
 // checkResolution checks if the scenario's story questions have been answered
-func checkResolution(ctx context.Context, client llm.LLMClient, scenario *prompt.Scenario, summaries []prompt.SceneSummary, name, concept, trouble string, debug, raw bool, logger *session.Logger) (*prompt.ScenarioResolutionResult, error) {
+func checkResolution(ctx context.Context, client llm.LLMClient, scenario *scene.Scenario, summaries []prompt.SceneSummary, name, concept, trouble string, debug, raw bool, logger *session.Logger) (*prompt.ScenarioResolutionResult, error) {
 	var playerAspects []string
 	playerAspects = append(playerAspects, concept)
 	if trouble != "" {
@@ -525,7 +526,7 @@ func appendSummary(summaries []prompt.SceneSummary, summary *prompt.SceneSummary
 
 // === Display functions ===
 
-func displayScenario(s *prompt.Scenario) {
+func displayScenario(s *scene.Scenario) {
 	fmt.Printf("Title: %s\n", s.Title)
 	if s.Genre != "" {
 		fmt.Printf("Genre: %s\n", s.Genre)

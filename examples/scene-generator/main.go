@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
@@ -125,15 +126,15 @@ func main() {
 	}
 
 	// Build scenario context
-	var scenario *prompt.Scenario
+	var scenario *scene.Scenario
 	if *scenarioFlag != "" {
-		scenario = prompt.PredefinedScenario(*scenarioFlag)
+		scenario = scene.PredefinedScenario(*scenarioFlag)
 		if scenario == nil {
 			fmt.Fprintf(os.Stderr, "Unknown scenario: %s (use saloon, heist, or tower)\n", *scenarioFlag)
 			os.Exit(1)
 		}
 	} else if *genreFlag != "" {
-		scenario = &prompt.Scenario{
+		scenario = &scene.Scenario{
 			Genre: *genreFlag,
 		}
 	}

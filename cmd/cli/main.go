@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
-	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/C-Ross/LlamaOfFate/internal/ui/terminal"
 )
@@ -121,7 +121,7 @@ func main() {
 }
 
 // setupSessionLogger creates a session logger with an auto-generated filename
-func setupSessionLogger(scenario *prompt.Scenario, playerName string) (*session.Logger, error) {
+func setupSessionLogger(scenario *scene.Scenario, playerName string) (*session.Logger, error) {
 	label := strings.ToLower(scenario.Genre)
 	if label == "" {
 		label = "game"

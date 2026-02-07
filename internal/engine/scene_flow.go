@@ -1,7 +1,7 @@
 package engine
 
 import (
-	"github.com/C-Ross/LlamaOfFate/internal/prompt"
+	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 )
 
 // SceneEndReason indicates why a scene ended
@@ -38,5 +38,5 @@ const (
 // ScenarioResult contains information about how and why a scenario ended
 type ScenarioResult struct {
 	Reason   ScenarioEndReason
-	Scenario *prompt.Scenario // The scenario that was run
+	Scenario *scene.Scenario // The scenario that was run
 }

@@ -6,12 +6,12 @@ package main
 import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
-	"github.com/C-Ross/LlamaOfFate/internal/prompt"
+	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 )
 
 // defaultScenario returns the hardcoded scenario used for testing.
-func defaultScenario() *prompt.Scenario {
-	return &prompt.Scenario{
+func defaultScenario() *scene.Scenario {
+	return &scene.Scenario{
 		Title:   "Trouble in Redemption Gulch",
 		Genre:   "Western",
 		Problem: "The town is under threat from outlaws and someone needs to stand up for the innocent",

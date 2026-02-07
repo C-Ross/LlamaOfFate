@@ -115,8 +115,8 @@ func TestScenarioManager_SetScenario(t *testing.T) {
 	player := character.NewCharacter("player1", "Test Hero")
 	sm := NewScenarioManager(engine, player)
 
-	scenario := &prompt.Scenario{
-		Title:   "Test prompt.Scenario",
+	scenario := &scene.Scenario{
+		Title:   "Test scene.Scenario",
 		Problem: "A test problem",
 		Genre:   "Western",
 		Setting: "The Old West",
@@ -230,7 +230,7 @@ func TestParseGeneratedScene_InvalidJSON(t *testing.T) {
 }
 
 func TestScenario_Defaults(t *testing.T) {
-	scenario := prompt.Scenario{}
+	scenario := scene.Scenario{}
 	assert.Equal(t, "", scenario.Genre)
 	assert.Equal(t, "", scenario.Setting)
 	assert.Equal(t, "", scenario.Problem)
@@ -421,8 +421,8 @@ func TestSceneSummaryData_Fields(t *testing.T) {
 }
 
 func TestScenario_Fields(t *testing.T) {
-	scenario := prompt.Scenario{
-		Title:          "Test prompt.Scenario",
+	scenario := scene.Scenario{
+		Title:          "Test scene.Scenario",
 		Problem:        "A test problem",
 		StoryQuestions: []string{"Can the hero win?", "Will the villain escape?"},
 		Setting:        "A fantasy world",
@@ -430,7 +430,7 @@ func TestScenario_Fields(t *testing.T) {
 		IsResolved:     false,
 	}
 
-	assert.Equal(t, "Test prompt.Scenario", scenario.Title)
+	assert.Equal(t, "Test scene.Scenario", scenario.Title)
 	assert.Equal(t, "A test problem", scenario.Problem)
 	assert.Len(t, scenario.StoryQuestions, 2)
 	assert.Equal(t, "Fantasy", scenario.Genre)
@@ -453,7 +453,7 @@ func TestScenarioGenerationData_Fields(t *testing.T) {
 }
 
 func TestScenarioResolutionData_Fields(t *testing.T) {
-	scenario := &prompt.Scenario{
+	scenario := &scene.Scenario{
 		Title:   "Test",
 		Problem: "Problem",
 	}
@@ -516,7 +516,7 @@ func TestParseScenarioResolution_InvalidJSON(t *testing.T) {
 }
 
 func TestScenarioResult_Fields(t *testing.T) {
-	scenario := &prompt.Scenario{Title: "Test"}
+	scenario := &scene.Scenario{Title: "Test"}
 
 	result := ScenarioResult{
 		Reason:   ScenarioEndResolved,

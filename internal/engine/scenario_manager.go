@@ -25,7 +25,7 @@ type ScenarioManager struct {
 	player               *character.Character
 	ui                   UI
 	sessionLogger        *session.Logger
-	scenario             *prompt.Scenario                // The current scenario with problem and story questions
+	scenario             *scene.Scenario                 // The current scenario with problem and story questions
 	initialScene         *scene.Scene                    // Optional pre-configured starting scene
 	initialNPCs          []*character.Character          // NPCs for initial scene
 	sceneSummaries       []prompt.SceneSummary           // Summaries of recent scenes (sliding window of last 3)
@@ -58,7 +58,7 @@ func (m *ScenarioManager) SetSessionLogger(logger *session.Logger) {
 }
 
 // SetScenario sets the scenario for the manager
-func (m *ScenarioManager) SetScenario(scenario *prompt.Scenario) {
+func (m *ScenarioManager) SetScenario(scenario *scene.Scenario) {
 	m.scenario = scenario
 }
 
@@ -706,11 +706,22 @@ func (m *ScenarioManager) generateSceneSummary(ctx context.Context, sceneManager
 	// Determine how ended string
 	howEnded := string(result.Reason)
 
+	// Convert conversation history to prompt format
+	promptConvHistory := make([]prompt.ConversationEntry, len(sceneManager.GetConversationHistory()))
+	for i, entry := range sceneManager.GetConversationHistory() {
+		promptConvHistory[i] = prompt.ConversationEntry{
+			PlayerInput: entry.PlayerInput,
+			GMResponse:  entry.GMResponse,
+			Timestamp:   entry.Timestamp,
+			Type:        entry.Type,
+		}
+	}
+
 	data := prompt.SceneSummaryData{
 		SceneName:           completedScene.Name,
 		SceneDescription:    completedScene.Description,
 		SituationAspects:    aspects,
-		ConversationHistory: sceneManager.GetConversationHistory(),
+		ConversationHistory: promptConvHistory,
 		NPCsInScene:         npcsInScene,
 		TakenOutChars:       result.TakenOutChars,
 		HowEnded:            howEnded,
