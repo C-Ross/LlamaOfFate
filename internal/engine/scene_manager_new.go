@@ -1,0 +1,499 @@
+package engine
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log/slog"
+	"strings"
+	"time"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
+	"github.com/C-Ross/LlamaOfFate/internal/core"
+	"github.com/C-Ross/LlamaOfFate/internal/core/action"
+	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
+	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
+	"github.com/C-Ross/LlamaOfFate/internal/llm"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
+)
+
+const (
+	// Component identifier for logging
+	componentSceneManager = "scene_manager"
+
+	// Input classification types
+	inputTypeDialog        = "dialog"
+	inputTypeClarification = "clarification"
+	inputTypeAction        = "action"
+
+	// User-facing messages
+	msgLLMUnavailable = "[The mists of fate obscure my vision...]"
+)
+
+// SceneManager handles the main scene loop and player interactions
+type SceneManager struct {
+	engine                *Engine
+	currentScene          *scene.Scene
+	player                *character.Character
+	roller                *dice.Roller
+	conversationHistory   []ConversationEntry
+	ui                    UI
+	shouldExit            bool             // Set to true when the game should end
+	exitOnSceneTransition bool             // Set to true to exit the loop on scene transition
+	lastTransition        *SceneTransition // Captured transition hint when scene ends
+	aspectGenerator       *AspectGenerator
+	sessionLogger         *session.Logger
+	takenOutChars         []string       // Characters taken out during this scene
+	sceneEndReason        SceneEndReason // Why the scene ended
+	playerTakenOutHint    string         // Transition hint if player was taken out
+	scenePurpose          string         // Dramatic question driving the current scene
+}
+
+// SetScenePurpose sets the dramatic question driving the current scene,
+// used to give the response LLM awareness of the scene's goal.
+func (sm *SceneManager) SetScenePurpose(purpose string) {
+	sm.scenePurpose = purpose
+}
+
+// NewSceneManager creates a new scene manager
+func NewSceneManager(engine *Engine) *SceneManager {
+	sm := &SceneManager{
+		engine:              engine,
+		roller:              dice.NewRoller(),
+		conversationHistory: make([]ConversationEntry, 0),
+	}
+	// Initialize aspect generator if LLM client is available
+	if engine.llmClient != nil {
+		sm.aspectGenerator = NewAspectGenerator(engine.llmClient)
+	}
+	return sm
+}
+
+// SetUI sets the UI for the scene manager
+func (sm *SceneManager) SetUI(ui UI) {
+	sm.ui = ui
+}
+
+// SetSessionLogger sets the session logger for recording game transcripts
+func (sm *SceneManager) SetSessionLogger(logger *session.Logger) {
+	sm.sessionLogger = logger
+}
+
+// SetExitOnSceneTransition configures whether the scene loop should exit on scene transition
+func (sm *SceneManager) SetExitOnSceneTransition(exit bool) {
+	sm.exitOnSceneTransition = exit
+}
+
+// StartScene begins a new scene with the given pre-configured scene
+func (sm *SceneManager) StartScene(scene *scene.Scene, player *character.Character) error {
+	sm.currentScene = scene
+	sm.player = player
+
+	// Ensure the player is in the scene
+	sm.currentScene.AddCharacter(player.ID)
+
+	// Set active character to player if not already set
+	if sm.currentScene.ActiveCharacter == "" {
+		sm.currentScene.ActiveCharacter = player.ID
+	}
+
+	// Log scene start
+	if sm.sessionLogger != nil {
+		sm.sessionLogger.Log("scene_start", map[string]any{
+			"scene_name":        scene.Name,
+			"scene_description": scene.Description,
+			"characters":        scene.Characters,
+			"player_id":         player.ID,
+		})
+	}
+
+	// Scene description will be displayed by the terminal UI when needed
+
+	return nil
+}
+
+// RunSceneLoop starts the interactive scene loop
+func (sm *SceneManager) RunSceneLoop(ctx context.Context) (*SceneEndResult, error) {
+	if sm.currentScene == nil {
+		return nil, fmt.Errorf("no active scene")
+	}
+
+	if sm.engine.llmClient == nil {
+		return nil, fmt.Errorf("LLM client is required for scene loop functionality")
+	}
+
+	if sm.ui == nil {
+		return nil, fmt.Errorf("UI is required for scene loop functionality")
+	}
+
+	// Reset scene-specific state
+	sm.takenOutChars = nil
+	sm.sceneEndReason = ""
+	sm.playerTakenOutHint = ""
+	sm.lastTransition = nil
+	sm.shouldExit = false
+
+	// Display the initial scene
+	sm.ui.DisplaySystemMessage(fmt.Sprintf("=== %s ===", sm.currentScene.Name))
+	sm.ui.DisplayNarrative(sm.currentScene.Description)
+	sm.ui.DisplaySystemMessage("Type 'help' for commands, 'exit' to end.")
+
+	for !sm.shouldExit {
+		input, isExit, err := sm.ui.ReadInput()
+		if err != nil {
+			return nil, fmt.Errorf("failed to read input: %w", err)
+		}
+
+		if input == "" {
+			continue
+		}
+
+		// Check for scene exit
+		if isExit {
+			sm.sceneEndReason = SceneEndQuit
+			break
+		}
+
+		sm.processInput(ctx, input)
+	}
+
+	// Build the scene end result
+	result := &SceneEndResult{
+		Reason:        sm.sceneEndReason,
+		TakenOutChars: sm.takenOutChars,
+	}
+
+	// If no reason was set but we exited, default to quit
+	if result.Reason == "" {
+		result.Reason = SceneEndQuit
+	}
+
+	// Add transition hint based on reason
+	switch result.Reason {
+	case SceneEndTransition:
+		if sm.lastTransition != nil {
+			result.TransitionHint = sm.lastTransition.Hint
+		}
+	case SceneEndPlayerTakenOut:
+		result.TransitionHint = sm.playerTakenOutHint
+	}
+
+	return result, nil
+}
+
+// processInput handles player input
+func (sm *SceneManager) processInput(ctx context.Context, input string) {
+	// Log player input
+	if sm.sessionLogger != nil {
+		sm.sessionLogger.Log("player_input", map[string]any{"input": input})
+	}
+
+	// Handle meta-commands locally (no LLM round-trip)
+	if sm.handleMetaCommand(input) {
+		return
+	}
+
+	// Check for concession command during conflict (before any roll per Fate Core rules)
+	if sm.currentScene.IsConflict && sm.isConcedeCommand(input) {
+		sm.handleConcession(ctx)
+		return
+	}
+
+	// Use LLM to determine the type of input
+	inputType, err := sm.classifyInput(ctx, input)
+	if err != nil {
+		slog.Warn("Input classification failed, defaulting to dialog",
+			"component", componentSceneManager,
+			"input", input,
+			"error", err)
+		inputType = inputTypeDialog // Graceful fallback
+	}
+
+	// Log classification result
+	if sm.sessionLogger != nil {
+		sm.sessionLogger.Log("input_classification", map[string]any{
+			"input":          input,
+			"classification": inputType,
+		})
+	}
+
+	slog.Debug("Input classified",
+		"component", componentSceneManager,
+		"input_type", inputType,
+		"input", input)
+
+	switch inputType {
+	case inputTypeDialog, inputTypeClarification:
+		sm.handleDialog(ctx, input)
+	case inputTypeAction:
+		sm.handleAction(ctx, input)
+	default:
+		// Default to dialog if classification is unclear
+		sm.handleDialog(ctx, input)
+	}
+}
+
+// handleMetaCommand checks for local commands that don't need the LLM.
+// Returns true if the input was handled as a meta-command.
+func (sm *SceneManager) handleMetaCommand(input string) bool {
+	lower := strings.ToLower(strings.TrimSpace(input))
+	switch lower {
+	case "help", "?":
+		sm.displayHelp()
+	case "scene":
+		sm.ui.DisplaySystemMessage(fmt.Sprintf("=== %s ===", sm.currentScene.Name))
+		sm.ui.DisplayNarrative(sm.currentScene.Description)
+		if len(sm.currentScene.SituationAspects) > 0 {
+			sm.ui.DisplaySystemMessage("Situation Aspects:")
+			for _, a := range sm.currentScene.SituationAspects {
+				sm.ui.DisplaySystemMessage(fmt.Sprintf("  - \"%s\"", a.Aspect))
+			}
+		}
+	case "character", "char", "me":
+		sm.ui.DisplayCharacter()
+	case "status":
+		sm.ui.DisplayCharacter()
+		if sm.currentScene.IsConflict {
+			sm.ui.DisplaySystemMessage("You are in a conflict.")
+		}
+	default:
+		return false
+	}
+	return true
+}
+
+// displayHelp shows available commands
+func (sm *SceneManager) displayHelp() {
+	sm.ui.DisplaySystemMessage("Commands:")
+	sm.ui.DisplaySystemMessage("  help, ?      - Show this help message")
+	sm.ui.DisplaySystemMessage("  scene        - Redisplay the current scene")
+	sm.ui.DisplaySystemMessage("  character    - Show your character sheet")
+	sm.ui.DisplaySystemMessage("  status       - Show character and scene status")
+	sm.ui.DisplaySystemMessage("  exit, quit   - Leave the game")
+	if sm.currentScene.IsConflict {
+		sm.ui.DisplaySystemMessage("  concede      - Concede the current conflict")
+	}
+	sm.ui.DisplaySystemMessage("")
+	sm.ui.DisplaySystemMessage("Or type naturally to interact with the scene.")
+}
+
+// classifyInput uses LLM to determine if input is dialog, clarification, or action
+func (sm *SceneManager) classifyInput(ctx context.Context, input string) (string, error) {
+	if sm.engine.llmClient == nil {
+		return "", fmt.Errorf("classifyInput: %w", ErrLLMUnavailable)
+	}
+
+	// Prepare template data and render
+	data := InputClassificationData{
+		Scene:       sm.currentScene,
+		PlayerInput: input,
+	}
+
+	prompt, err := RenderInputClassification(data)
+	if err != nil {
+		return "", fmt.Errorf("classifyInput: %w: %v", ErrLLMInvalidResponse, err)
+	}
+
+	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
+		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		MaxTokens:   10,
+		Temperature: 0.1, // Low temperature for consistent classification
+	})
+	if err != nil {
+		return "", fmt.Errorf("classifyInput: %w: %v", ErrLLMUnavailable, err)
+	}
+
+	if len(resp.Choices) == 0 {
+		return "", fmt.Errorf("classifyInput: %w", ErrLLMInvalidResponse)
+	}
+
+	classification := strings.ToLower(strings.TrimSpace(resp.Choices[0].Message.Content))
+
+	// Validate the response is one of our expected types
+	switch classification {
+	case inputTypeDialog, inputTypeClarification, inputTypeAction:
+		return classification, nil
+	default:
+		slog.Warn("Unexpected classification from LLM",
+			"component", componentSceneManager,
+			"classification", classification)
+		return "", fmt.Errorf("unexpected classification: %s", classification)
+	}
+}
+
+// handleDialog processes dialog and clarification requests
+func (sm *SceneManager) handleDialog(ctx context.Context, input string) {
+	// Generate LLM response
+	response, err := sm.generateSceneResponse(ctx, input, inputTypeDialog)
+	if err != nil {
+		slog.Error("Dialog generation failed",
+			"component", componentSceneManager,
+			"input", input,
+			"error", err)
+		sm.ui.DisplayDialog(input, msgLLMUnavailable)
+		return
+	}
+
+	// Check for markers in the response (conflict escalation, de-escalation, and scene transition)
+	conflictTrigger, cleanedResponse := sm.parseConflictMarker(response)
+	conflictResolution, cleanedResponse := sm.parseConflictEndMarker(cleanedResponse)
+	sceneTransition, cleanedResponse := ParseSceneTransitionMarker(cleanedResponse)
+
+	sm.ui.DisplayDialog(input, cleanedResponse)
+
+	// Log the dialog exchange
+	if sm.sessionLogger != nil {
+		sm.sessionLogger.Log("dialog", map[string]any{
+			"player_input": input,
+			"gm_response":  cleanedResponse,
+		})
+	}
+
+	// Record this exchange in conversation history
+	sm.addToConversationHistory(input, cleanedResponse, inputTypeDialog)
+
+	// Handle conflict initiation if triggered by NPC
+	if conflictTrigger != nil && !sm.currentScene.IsConflict {
+		if err := sm.initiateConflict(conflictTrigger.Type, conflictTrigger.InitiatorID); err != nil {
+			slog.Warn("Failed to initiate conflict from dialog",
+				"component", componentSceneManager,
+				"error", err)
+		}
+	}
+
+	// Handle conflict de-escalation if detected
+	if conflictResolution != nil && sm.currentScene.IsConflict {
+		sm.resolveConflictPeacefully(conflictResolution.Reason)
+	}
+
+	// Handle scene transition if detected
+	if sceneTransition != nil {
+		sm.handleSceneTransition(sceneTransition)
+	}
+}
+
+// handleSceneTransition processes a scene transition marker
+func (sm *SceneManager) handleSceneTransition(transition *SceneTransition) {
+	// Log the scene transition
+	if sm.sessionLogger != nil {
+		sm.sessionLogger.Log("scene_transition", map[string]any{
+			"hint": transition.Hint,
+		})
+	}
+
+	slog.Info("Scene transition detected",
+		"component", componentSceneManager,
+		"hint", transition.Hint)
+
+	// Capture the transition for the caller (ScenarioManager)
+	sm.lastTransition = transition
+
+	// Display the transition to the player
+	sm.ui.DisplaySceneTransition("", transition.Hint)
+
+	// Mark that we should exit the scene loop
+	sm.sceneEndReason = SceneEndTransition
+	sm.shouldExit = true
+}
+
+// GetLastTransition returns the last scene transition that occurred, if any
+func (sm *SceneManager) GetLastTransition() *SceneTransition {
+	return sm.lastTransition
+}
+
+// handleAction processes player actions
+func (sm *SceneManager) handleAction(ctx context.Context, input string) {
+	sm.ui.DisplayActionAttempt(input)
+
+	// Parse the action using the action parser
+	if sm.engine.actionParser != nil {
+		// Get other characters in the scene from the engine's registry
+		otherCharactersMap := sm.engine.GetCharactersByScene(sm.currentScene)
+		// Remove the player from other characters (they're already the main character)
+		delete(otherCharactersMap, sm.player.ID)
+
+		// Convert map to slice for ActionParseRequest
+		var otherCharacters []*character.Character
+		for _, char := range otherCharactersMap {
+			otherCharacters = append(otherCharacters, char)
+		}
+
+		action, err := sm.engine.actionParser.ParseAction(ctx, ActionParseRequest{
+			Character:       sm.player,
+			RawInput:        input,
+			Context:         sm.currentScene.Description,
+			Scene:           sm.currentScene,
+			OtherCharacters: otherCharacters,
+		})
+
+		if err != nil {
+			sm.ui.DisplaySystemMessage(fmt.Sprintf("Failed to parse action: %v", err))
+			return
+		}
+
+		// Log the parsed action
+		if sm.sessionLogger != nil {
+			sm.sessionLogger.Log("action_parse", action)
+		}
+
+		sm.resolveAction(ctx, action)
+	} else {
+		sm.ui.DisplaySystemMessage("Action parser not available - LLM client required for action processing.")
+	}
+}
+
+// resolveAction fully resolves a parsed action
+	otherCharactersMap := sm.engine.GetCharactersByScene(sm.currentScene)
+	delete(otherCharactersMap, sm.player.ID) // Remove the player
+	}
+
+	return sm.player
+}
+
+// GetConversationHistory returns the conversation history
+func (sm *SceneManager) GetConversationHistory() []ConversationEntry {
+	return sm.conversationHistory
+		context.WriteString("Situation Aspects: ")
+		var situationAspects []string
+		for _, aspect := range sm.currentScene.SituationAspects {
+			aspectText := aspect.Aspect
+			if aspect.FreeInvokes > 0 {
+				aspectText += fmt.Sprintf(" (%d free invokes)", aspect.FreeInvokes)
+			}
+			situationAspects = append(situationAspects, aspectText)
+		}
+		context.WriteString(strings.Join(situationAspects, ", "))
+		context.WriteString("\n")
+	}
+
+	if context.Len() == 0 {
+		return "No special aspects currently in play."
+	}
+
+	return context.String()
+}
+
+// applyAttackDamageToPlayer applies attack damage to the player
+
+// handleStressOverflow handles when the player cannot absorb stress with their stress track
+
+
+// getAvailableConsequences returns consequences that can absorb the given shifts
+
+// applyConsequence applies a consequence to the player character
+
+// generateConsequenceAspect uses LLM to generate a consequence aspect
+
+// isConcedeCommand checks if the input is a concession command
+// Per Fate Core rules, concession must happen before a roll is made
+
+// handleConcession handles when the player concedes the conflict
+
+// TakenOutResult represents the outcome classification of being taken out
+
+// handleTakenOut handles when the player is taken out
+
+// generateTakenOutNarrativeAndOutcome generates narrative and classifies the outcome
