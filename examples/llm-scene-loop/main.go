@@ -14,6 +14,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/C-Ross/LlamaOfFate/internal/ui/terminal"
 )
@@ -221,12 +222,12 @@ func runMultiSceneMode(ctx context.Context, gameEngine *engine.Engine, sceneConf
 }
 
 // getScenario returns appropriate scenario for each scene type
-func getScenario(sceneName string) *engine.Scenario {
-	scenario := engine.PredefinedScenario(sceneName)
+func getScenario(sceneName string) *prompt.Scenario {
+	scenario := prompt.PredefinedScenario(sceneName)
 	if scenario != nil {
 		return scenario
 	}
-	return &engine.Scenario{
+	return &prompt.Scenario{
 		Title:   "A New Adventure",
 		Problem: "Danger lurks and heroes are needed",
 		StoryQuestions: []string{

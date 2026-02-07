@@ -6,6 +6,7 @@ import (
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -49,7 +50,7 @@ func TestGameManager_SetScenario(t *testing.T) {
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine)
-	scenario := &Scenario{
+	scenario := &prompt.Scenario{
 		Title:   "Test Scenario",
 		Problem: "A test problem",
 		Genre:   "Fantasy",

@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 )
 
@@ -121,9 +121,9 @@ func main() {
 	ctx := context.Background()
 
 	// Step 1: Get or generate the scenario
-	var scenario *engine.Scenario
+	var scenario *prompt.Scenario
 	if *scenarioFlag != "" {
-		scenario = engine.PredefinedScenario(*scenarioFlag)
+		scenario = prompt.PredefinedScenario(*scenarioFlag)
 		if scenario == nil {
 			fmt.Fprintf(os.Stderr, "Unknown scenario: %s (use saloon, heist, or tower)\n", *scenarioFlag)
 			os.Exit(1)
@@ -145,7 +145,7 @@ func main() {
 
 	// Step 2: Walk through scenes
 	reader := bufio.NewReader(os.Stdin)
-	var sceneSummaries []engine.SceneSummary
+	var sceneSummaries []prompt.SceneSummary
 	transitionHint := ""
 	sceneCount := 0
 
@@ -261,31 +261,31 @@ func main() {
 }
 
 // generateScenario creates a scenario via LLM from character aspects
-func generateScenario(ctx context.Context, client llm.LLMClient, name, concept, trouble, genre string, debug, raw bool, logger *session.Logger) (*engine.Scenario, error) {
-	data := engine.ScenarioGenerationData{
+func generateScenario(ctx context.Context, client llm.LLMClient, name, concept, trouble, genre string, debug, raw bool, logger *session.Logger) (*prompt.Scenario, error) {
+	data := prompt.ScenarioGenerationData{
 		PlayerName:        name,
 		PlayerHighConcept: concept,
 		PlayerTrouble:     trouble,
 		Genre:             genre,
 	}
 
-	prompt, err := engine.RenderScenarioGeneration(data)
+	promptText, err := prompt.RenderScenarioGeneration(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to render prompt: %w", err)
 	}
 
 	if logger != nil {
-		logger.Log("scenario_generation_prompt", map[string]any{"prompt": prompt})
+		logger.Log("scenario_generation_prompt", map[string]any{"prompt": promptText})
 	}
 
 	if debug {
 		fmt.Println("--- Scenario Generation Prompt ---")
-		fmt.Println(prompt)
+		fmt.Println(promptText)
 		fmt.Println()
 	}
 
 	resp, err := client.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		Messages:    []llm.Message{{Role: "user", Content: promptText}},
 		MaxTokens:   500,
 		Temperature: 0.8,
 	})
@@ -304,12 +304,12 @@ func generateScenario(ctx context.Context, client llm.LLMClient, name, concept, 
 		fmt.Println()
 	}
 
-	return engine.ParseScenario(rawResponse)
+	return prompt.ParseScenario(rawResponse)
 }
 
 // generateScene creates a scene via LLM
-func generateScene(ctx context.Context, client llm.LLMClient, hint string, scenario *engine.Scenario, name, concept, trouble string, summaries []engine.SceneSummary, debug, raw bool, logger *session.Logger) (*engine.GeneratedScene, error) {
-	data := engine.SceneGenerationData{
+func generateScene(ctx context.Context, client llm.LLMClient, hint string, scenario *prompt.Scenario, name, concept, trouble string, summaries []prompt.SceneSummary, debug, raw bool, logger *session.Logger) (*prompt.GeneratedScene, error) {
+	data := prompt.SceneGenerationData{
 		TransitionHint:    hint,
 		Scenario:          scenario,
 		PlayerName:        name,
@@ -318,23 +318,23 @@ func generateScene(ctx context.Context, client llm.LLMClient, hint string, scena
 		PreviousSummaries: summaries,
 	}
 
-	prompt, err := engine.RenderSceneGeneration(data)
+	promptText, err := prompt.RenderSceneGeneration(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to render prompt: %w", err)
 	}
 
 	if logger != nil {
-		logger.Log("scene_generation_prompt", map[string]any{"prompt": prompt})
+		logger.Log("scene_generation_prompt", map[string]any{"prompt": promptText})
 	}
 
 	if debug {
 		fmt.Println("--- Scene Generation Prompt ---")
-		fmt.Println(prompt)
+		fmt.Println(promptText)
 		fmt.Println()
 	}
 
 	resp, err := client.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		Messages:    []llm.Message{{Role: "user", Content: promptText}},
 		MaxTokens:   500,
 		Temperature: 0.8,
 	})
@@ -353,27 +353,27 @@ func generateScene(ctx context.Context, client llm.LLMClient, hint string, scena
 		fmt.Println()
 	}
 
-	return engine.ParseGeneratedScene(rawResponse)
+	return prompt.ParseGeneratedScene(rawResponse)
 }
 
 // generateSummaryFromNarration creates a scene summary using player narration as the conversation history
-func generateSummaryFromNarration(ctx context.Context, client llm.LLMClient, scene *engine.GeneratedScene, narration, transitionHint string, debug, raw bool, logger *session.Logger) (*engine.SceneSummary, error) {
+func generateSummaryFromNarration(ctx context.Context, client llm.LLMClient, scene *prompt.GeneratedScene, narration, transitionHint string, debug, raw bool, logger *session.Logger) (*prompt.SceneSummary, error) {
 	var aspects []string
 	aspects = append(aspects, scene.SituationAspects...)
 
-	var npcs []engine.NPCSummary
+	var npcs []prompt.NPCSummary
 	for _, npc := range scene.NPCs {
-		npcs = append(npcs, engine.NPCSummary{
+		npcs = append(npcs, prompt.NPCSummary{
 			Name:     npc.Name,
 			Attitude: npc.Disposition,
 		})
 	}
 
-	data := engine.SceneSummaryData{
+	data := prompt.SceneSummaryData{
 		SceneName:        scene.SceneName,
 		SceneDescription: scene.Description,
 		SituationAspects: aspects,
-		ConversationHistory: []engine.ConversationEntry{
+		ConversationHistory: []prompt.ConversationEntry{
 			{
 				PlayerInput: narration,
 				GMResponse:  "(Narrated outcome -- walkthrough mode)",
@@ -384,23 +384,23 @@ func generateSummaryFromNarration(ctx context.Context, client llm.LLMClient, sce
 		TransitionHint: transitionHint,
 	}
 
-	prompt, err := engine.RenderSceneSummary(data)
+	promptText, err := prompt.RenderSceneSummary(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to render prompt: %w", err)
 	}
 
 	if logger != nil {
-		logger.Log("summary_generation_prompt", map[string]any{"prompt": prompt})
+		logger.Log("summary_generation_prompt", map[string]any{"prompt": promptText})
 	}
 
 	if debug {
 		fmt.Println("--- Summary Generation Prompt ---")
-		fmt.Println(prompt)
+		fmt.Println(promptText)
 		fmt.Println()
 	}
 
 	resp, err := client.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		Messages:    []llm.Message{{Role: "user", Content: promptText}},
 		MaxTokens:   400,
 		Temperature: 0.5,
 	})
@@ -419,23 +419,23 @@ func generateSummaryFromNarration(ctx context.Context, client llm.LLMClient, sce
 		fmt.Println()
 	}
 
-	return engine.ParseSceneSummary(rawResponse)
+	return prompt.ParseSceneSummary(rawResponse)
 }
 
 // checkResolution checks if the scenario's story questions have been answered
-func checkResolution(ctx context.Context, client llm.LLMClient, scenario *engine.Scenario, summaries []engine.SceneSummary, name, concept, trouble string, debug, raw bool, logger *session.Logger) (*engine.ScenarioResolutionResult, error) {
+func checkResolution(ctx context.Context, client llm.LLMClient, scenario *prompt.Scenario, summaries []prompt.SceneSummary, name, concept, trouble string, debug, raw bool, logger *session.Logger) (*prompt.ScenarioResolutionResult, error) {
 	var playerAspects []string
 	playerAspects = append(playerAspects, concept)
 	if trouble != "" {
 		playerAspects = append(playerAspects, trouble)
 	}
 
-	var latestSummary *engine.SceneSummary
+	var latestSummary *prompt.SceneSummary
 	if len(summaries) > 0 {
 		latestSummary = &summaries[len(summaries)-1]
 	}
 
-	data := engine.ScenarioResolutionData{
+	data := prompt.ScenarioResolutionData{
 		Scenario:       scenario,
 		SceneSummaries: summaries,
 		LatestSummary:  latestSummary,
@@ -443,23 +443,23 @@ func checkResolution(ctx context.Context, client llm.LLMClient, scenario *engine
 		PlayerAspects:  playerAspects,
 	}
 
-	prompt, err := engine.RenderScenarioResolution(data)
+	promptText, err := prompt.RenderScenarioResolution(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to render prompt: %w", err)
 	}
 
 	if logger != nil {
-		logger.Log("resolution_check_prompt", map[string]any{"prompt": prompt})
+		logger.Log("resolution_check_prompt", map[string]any{"prompt": promptText})
 	}
 
 	if debug {
 		fmt.Println("--- Resolution Check Prompt ---")
-		fmt.Println(prompt)
+		fmt.Println(promptText)
 		fmt.Println()
 	}
 
 	resp, err := client.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		Messages:    []llm.Message{{Role: "user", Content: promptText}},
 		MaxTokens:   300,
 		Temperature: 0.3,
 	})
@@ -478,7 +478,7 @@ func checkResolution(ctx context.Context, client llm.LLMClient, scenario *engine
 		fmt.Println()
 	}
 
-	return engine.ParseScenarioResolution(rawResponse)
+	return prompt.ParseScenarioResolution(rawResponse)
 }
 
 // extractTransitionHint tries to extract a destination from narration
@@ -512,7 +512,7 @@ func extractTransitionHint(narration string) string {
 }
 
 // appendSummary adds a summary and keeps a sliding window of last 3
-func appendSummary(summaries []engine.SceneSummary, summary *engine.SceneSummary) []engine.SceneSummary {
+func appendSummary(summaries []prompt.SceneSummary, summary *prompt.SceneSummary) []prompt.SceneSummary {
 	if summary == nil {
 		return summaries
 	}
@@ -525,7 +525,7 @@ func appendSummary(summaries []engine.SceneSummary, summary *engine.SceneSummary
 
 // === Display functions ===
 
-func displayScenario(s *engine.Scenario) {
+func displayScenario(s *prompt.Scenario) {
 	fmt.Printf("Title: %s\n", s.Title)
 	if s.Genre != "" {
 		fmt.Printf("Genre: %s\n", s.Genre)
@@ -547,7 +547,7 @@ func displayScenario(s *engine.Scenario) {
 	}
 }
 
-func displayScene(num int, s *engine.GeneratedScene) {
+func displayScene(num int, s *prompt.GeneratedScene) {
 	fmt.Printf("\n=== Scene %d: %s ===\n", num, s.SceneName)
 	fmt.Println()
 
@@ -583,7 +583,7 @@ func displayScene(num int, s *engine.GeneratedScene) {
 	fmt.Println()
 }
 
-func displaySummary(s *engine.SceneSummary) {
+func displaySummary(s *prompt.SceneSummary) {
 	fmt.Println()
 	if len(s.KeyEvents) > 0 {
 		fmt.Println("Key Events:")
@@ -607,7 +607,7 @@ func displaySummary(s *engine.SceneSummary) {
 	fmt.Printf("Recap: %s\n", s.NarrativeProse)
 }
 
-func displayResolution(r *engine.ScenarioResolutionResult) {
+func displayResolution(r *prompt.ScenarioResolutionResult) {
 	if len(r.AnsweredQuestions) > 0 {
 		fmt.Println("Answered Questions:")
 		for _, q := range r.AnsweredQuestions {

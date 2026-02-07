@@ -12,6 +12,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 )
 
 // cleanJSONResponse is kept as a package-level alias for backward compatibility.
@@ -25,16 +26,6 @@ type ActionParseRequest struct {
 	Context         string                 `json:"context,omitempty"`          // Scene description, recent events, etc.
 	Scene           interface{}            `json:"scene,omitempty"`            // Current scene object
 	OtherCharacters []*character.Character `json:"other_characters,omitempty"` // Other characters in the scene
-}
-
-// ActionParseTemplateData is the data passed to the action parse template
-// It includes pre-computed difficulty guidance based on character skills
-type ActionParseTemplateData struct {
-	ActionParseRequest
-	DifficultyMin     int    // Recommended minimum difficulty
-	DifficultyMax     int    // Recommended maximum difficulty
-	DifficultyDefault int    // Suggested default difficulty
-	DifficultyGuide   string // Human-readable difficulty guidance
 }
 
 // ActionParseResponse represents the LLM's response for action parsing
@@ -149,7 +140,7 @@ func (ap *ActionParser) ParseAction(ctx context.Context, req ActionParseRequest)
 
 // buildSystemPrompt creates the system prompt using templates
 func (ap *ActionParser) buildSystemPrompt() (string, error) {
-	return RenderActionParseSystem()
+	return prompt.RenderActionParseSystem()
 }
 
 // buildUserPrompt creates the user prompt using templates with pre-computed difficulty guidance
@@ -177,15 +168,19 @@ func (ap *ActionParser) buildUserPrompt(req ActionParseRequest) (string, error) 
 	// Build human-readable guide
 	guide := fmt.Sprintf("%d=easy, %d=moderate, %d=hard", minDiff, defaultDiff, maxDiff)
 
-	templateData := ActionParseTemplateData{
-		ActionParseRequest: req,
-		DifficultyMin:      minDiff,
-		DifficultyMax:      maxDiff,
-		DifficultyDefault:  defaultDiff,
-		DifficultyGuide:    guide,
+	templateData := prompt.ActionParseTemplateData{
+		Character:         req.Character,
+		RawInput:          req.RawInput,
+		Context:           req.Context,
+		Scene:             req.Scene,
+		OtherCharacters:   req.OtherCharacters,
+		DifficultyMin:     minDiff,
+		DifficultyMax:     maxDiff,
+		DifficultyDefault: defaultDiff,
+		DifficultyGuide:   guide,
 	}
 
-	return RenderActionParse(templateData)
+	return prompt.RenderActionParse(templateData)
 }
 
 // parseActionType converts string action type to enum

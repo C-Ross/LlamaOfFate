@@ -14,10 +14,11 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 )
 
 // getNPCActionDecision uses the LLM to decide what action an NPC should take
-func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character.Character) (*NPCActionDecision, error) {
+func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character.Character) (*prompt.NPCActionDecision, error) {
 	if sm.engine.llmClient == nil {
 		return nil, fmt.Errorf("LLM client required for NPC decisions")
 	}
@@ -29,7 +30,7 @@ func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character
 	}
 
 	// Build target list (all active participants except this NPC)
-	var targets []NPCTargetInfo
+	var targets []prompt.NPCTargetInfo
 	for _, p := range sm.currentScene.ConflictState.Participants {
 		if p.CharacterID == npc.ID || p.Status != scene.StatusActive {
 			continue
@@ -38,7 +39,7 @@ func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character
 		if char == nil {
 			continue
 		}
-		target := NPCTargetInfo{
+		target := prompt.NPCTargetInfo{
 			ID:          char.ID,
 			Name:        char.Name,
 			HighConcept: char.Aspects.HighConcept,
@@ -67,7 +68,7 @@ func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character
 		mentalStress = track.Boxes
 	}
 
-	data := NPCActionDecisionData{
+	data := prompt.NPCActionDecisionData{
 		ConflictType:      conflictType,
 		Round:             sm.currentScene.ConflictState.Round,
 		SceneName:         sm.currentScene.Name,
@@ -83,13 +84,13 @@ func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character
 		SituationAspects:  sm.currentScene.SituationAspects,
 	}
 
-	prompt, err := RenderNPCActionDecision(data)
+	promptText, err := prompt.RenderNPCActionDecision(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to render NPC action decision template: %w", err)
 	}
 
 	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		Messages:    []llm.Message{{Role: "user", Content: promptText}},
 		MaxTokens:   150,
 		Temperature: 0.7,
 	})
@@ -103,7 +104,7 @@ func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character
 
 	// Parse JSON response
 	content := cleanJSONResponse(resp.Choices[0].Message.Content)
-	var decision NPCActionDecision
+	var decision prompt.NPCActionDecision
 	if err := json.Unmarshal([]byte(content), &decision); err != nil {
 		slog.Warn("Failed to parse NPC action decision",
 			"component", componentSceneManager,
@@ -144,7 +145,7 @@ func (sm *SceneManager) processNPCTurn(ctx context.Context, npcID string) {
 			"npc", npc.Name,
 			"error", err)
 		// Fallback to simple attack
-		decision = &NPCActionDecision{
+		decision = &prompt.NPCActionDecision{
 			ActionType:  "ATTACK",
 			Skill:       sm.getDefaultAttackSkill(),
 			TargetID:    sm.player.ID,
@@ -171,7 +172,7 @@ func (sm *SceneManager) getDefaultAttackSkill() string {
 }
 
 // processNPCDefend handles an NPC choosing full defense
-func (sm *SceneManager) processNPCDefend(ctx context.Context, npc *character.Character, decision *NPCActionDecision) {
+func (sm *SceneManager) processNPCDefend(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) {
 	// Set full defense flag
 	sm.currentScene.SetFullDefense(npc.ID)
 
@@ -189,7 +190,7 @@ func (sm *SceneManager) processNPCDefend(ctx context.Context, npc *character.Cha
 }
 
 // processNPCCreateAdvantage handles an NPC creating an advantage
-func (sm *SceneManager) processNPCCreateAdvantage(ctx context.Context, npc *character.Character, decision *NPCActionDecision) {
+func (sm *SceneManager) processNPCCreateAdvantage(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) {
 	skill := decision.Skill
 	if skill == "" {
 		skill = "Notice" // Default
@@ -246,7 +247,7 @@ func (sm *SceneManager) processNPCCreateAdvantage(ctx context.Context, npc *char
 }
 
 // processNPCOvercome handles an NPC attempting to overcome an obstacle
-func (sm *SceneManager) processNPCOvercome(ctx context.Context, npc *character.Character, decision *NPCActionDecision) {
+func (sm *SceneManager) processNPCOvercome(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) {
 	skill := decision.Skill
 	if skill == "" {
 		skill = "Athletics" // Default
@@ -285,7 +286,7 @@ func (sm *SceneManager) processNPCOvercome(ctx context.Context, npc *character.C
 }
 
 // processNPCAttack handles an NPC attacking a target
-func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Character, decision *NPCActionDecision) {
+func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) {
 	// Determine target
 	target := sm.player // Default to player
 	targetID := decision.TargetID
@@ -378,7 +379,7 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 	// Only apply damage if target is the player (for now, NPC vs NPC damage not fully implemented)
 	if target.ID == sm.player.ID {
 		// Create attack context with the skill, narrative, and shifts
-		attackCtx := AttackContext{
+		attackCtx := prompt.AttackContext{
 			Skill:       attackSkill,
 			Description: npcNarrative,
 			Shifts:      outcome.Shifts,
@@ -424,7 +425,7 @@ func (sm *SceneManager) generateNPCAttackNarrative(ctx context.Context, npc *cha
 	}
 
 	// Build template data with full context
-	data := NPCAttackData{
+	data := prompt.NPCAttackData{
 		ConflictType:       conflictType,
 		Round:              round,
 		SceneName:          sm.currentScene.Name,
@@ -438,13 +439,13 @@ func (sm *SceneManager) generateNPCAttackNarrative(ctx context.Context, npc *cha
 		OutcomeDescription: outcomeDesc,
 	}
 
-	prompt, err := RenderNPCAttack(data)
+	promptText, err := prompt.RenderNPCAttack(data)
 	if err != nil {
 		return "", fmt.Errorf("failed to render NPC attack template: %w", err)
 	}
 
 	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		Messages:    []llm.Message{{Role: "user", Content: promptText}},
 		MaxTokens:   100,
 		Temperature: 0.8,
 	})

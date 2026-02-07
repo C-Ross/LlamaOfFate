@@ -1,8 +1,11 @@
-package engine
+package prompt
 
 import (
+	"time"
+
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 )
 
@@ -240,4 +243,36 @@ type RecoveryAttempt struct {
 	Skill      string
 	RollResult int
 	Outcome    string // "success" or "failure"
+}
+
+// ConversationEntry represents a single exchange in the scene
+type ConversationEntry struct {
+	PlayerInput string    `json:"player_input"`
+	GMResponse  string    `json:"gm_response"`
+	Timestamp   time.Time `json:"timestamp"`
+	Type        string    `json:"type"` // "dialog", "action", "clarification"
+}
+
+// ActionParseTemplateData is the data passed to the action parse template
+// It includes pre-computed difficulty guidance based on character skills
+type ActionParseTemplateData struct {
+	Character         *character.Character
+	RawInput          string
+	Context           string
+	Scene             interface{}
+	OtherCharacters   []*character.Character
+	DifficultyMin     int    // Recommended minimum difficulty
+	DifficultyMax     int    // Recommended maximum difficulty
+	DifficultyDefault int    // Suggested default difficulty
+	DifficultyGuide   string // Human-readable difficulty guidance
+}
+
+// AspectGenerationRequest contains all the information needed to generate an aspect
+type AspectGenerationRequest struct {
+	Character       *character.Character `json:"character"`
+	Action          *action.Action       `json:"action"`
+	Outcome         *dice.Outcome        `json:"outcome"`
+	Context         string               `json:"context"`                    // Scene description or situational context
+	TargetType      string               `json:"target_type"`                // "character", "scene", "object", "situation"
+	ExistingAspects []string             `json:"existing_aspects,omitempty"` // Aspects already in play
 }

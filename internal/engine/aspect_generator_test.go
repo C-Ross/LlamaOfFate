@@ -9,6 +9,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -96,7 +97,7 @@ func TestGenerateAspect_Success(t *testing.T) {
 	result := roller.RollWithModifier(dice.Good, 0)
 	outcome := result.CompareAgainst(dice.Fair)
 
-	req := AspectGenerationRequest{
+	req := prompt.AspectGenerationRequest{
 		Character:       char,
 		Action:          testAction,
 		Outcome:         outcome,
@@ -141,7 +142,7 @@ func TestGenerateAspect_SuccessWithStyle(t *testing.T) {
 	result := roller.RollWithModifier(dice.Great, 2) // This should give us enough shifts
 	outcome := result.CompareAgainst(dice.Fair)
 
-	req := AspectGenerationRequest{
+	req := prompt.AspectGenerationRequest{
 		Character:  char,
 		Action:     testAction,
 		Outcome:    outcome,
@@ -190,7 +191,7 @@ func TestGenerateAspect_Tie(t *testing.T) {
 	}
 	outcome := result.CompareAgainst(dice.Fair)
 
-	req := AspectGenerationRequest{
+	req := prompt.AspectGenerationRequest{
 		Character:  char,
 		Action:     testAction,
 		Outcome:    outcome,
@@ -228,7 +229,7 @@ func TestGenerateAspect_Failure(t *testing.T) {
 	}
 	outcome := result.CompareAgainst(dice.Great)
 
-	req := AspectGenerationRequest{
+	req := prompt.AspectGenerationRequest{
 		Character:  char,
 		Action:     testAction,
 		Outcome:    outcome,
@@ -256,7 +257,7 @@ func TestGenerateAspect_WrongActionType(t *testing.T) {
 	result := &dice.CheckResult{FinalValue: dice.Good}
 	outcome := result.CompareAgainst(dice.Fair)
 
-	req := AspectGenerationRequest{
+	req := prompt.AspectGenerationRequest{
 		Character: char,
 		Action:    testAction,
 		Outcome:   outcome,
@@ -275,7 +276,7 @@ func TestGenerateAspect_NilOutcome(t *testing.T) {
 	char := character.NewCharacter("test-char", "Test Hero")
 	testAction := action.NewAction("test-action", "test-char", action.CreateAdvantage, "Athletics", "Climb")
 
-	req := AspectGenerationRequest{
+	req := prompt.AspectGenerationRequest{
 		Character: char,
 		Action:    testAction,
 		Outcome:   nil,
@@ -311,7 +312,7 @@ func TestBuildPrompt(t *testing.T) {
 	}
 	outcome := result.CompareAgainst(dice.Fair)
 
-	req := AspectGenerationRequest{
+	req := prompt.AspectGenerationRequest{
 		Character:       char,
 		Action:          testAction,
 		Outcome:         outcome,

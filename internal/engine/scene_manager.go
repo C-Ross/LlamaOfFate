@@ -17,6 +17,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 )
 
@@ -39,11 +40,11 @@ type SceneManager struct {
 	currentScene          *scene.Scene
 	player                *character.Character
 	roller                *dice.Roller
-	conversationHistory   []ConversationEntry
+	conversationHistory   []prompt.ConversationEntry
 	ui                    UI
-	shouldExit            bool             // Set to true when the game should end
-	exitOnSceneTransition bool             // Set to true to exit the loop on scene transition
-	lastTransition        *SceneTransition // Captured transition hint when scene ends
+	shouldExit            bool                    // Set to true when the game should end
+	exitOnSceneTransition bool                    // Set to true to exit the loop on scene transition
+	lastTransition        *prompt.SceneTransition // Captured transition hint when scene ends
 	aspectGenerator       *AspectGenerator
 	sessionLogger         *session.Logger
 	takenOutChars         []string       // Characters taken out during this scene
@@ -63,7 +64,7 @@ func NewSceneManager(engine *Engine) *SceneManager {
 	sm := &SceneManager{
 		engine:              engine,
 		roller:              dice.NewRoller(),
-		conversationHistory: make([]ConversationEntry, 0),
+		conversationHistory: make([]prompt.ConversationEntry, 0),
 	}
 	// Initialize aspect generator if LLM client is available
 	if engine.llmClient != nil {
@@ -287,18 +288,18 @@ func (sm *SceneManager) classifyInput(ctx context.Context, input string) (string
 	}
 
 	// Prepare template data and render
-	data := InputClassificationData{
+	data := prompt.InputClassificationData{
 		Scene:       sm.currentScene,
 		PlayerInput: input,
 	}
 
-	prompt, err := RenderInputClassification(data)
+	promptText, err := prompt.RenderInputClassification(data)
 	if err != nil {
 		return "", fmt.Errorf("classifyInput: %w: %v", ErrLLMInvalidResponse, err)
 	}
 
 	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		Messages:    []llm.Message{{Role: "user", Content: promptText}},
 		MaxTokens:   10,
 		Temperature: 0.1, // Low temperature for consistent classification
 	})
@@ -340,7 +341,7 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) {
 	// Check for markers in the response (conflict escalation, de-escalation, and scene transition)
 	conflictTrigger, cleanedResponse := sm.parseConflictMarker(response)
 	conflictResolution, cleanedResponse := sm.parseConflictEndMarker(cleanedResponse)
-	sceneTransition, cleanedResponse := ParseSceneTransitionMarker(cleanedResponse)
+	sceneTransition, cleanedResponse := prompt.ParseSceneTransitionMarker(cleanedResponse)
 
 	sm.ui.DisplayDialog(input, cleanedResponse)
 
@@ -376,7 +377,7 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) {
 }
 
 // handleSceneTransition processes a scene transition marker
-func (sm *SceneManager) handleSceneTransition(transition *SceneTransition) {
+func (sm *SceneManager) handleSceneTransition(transition *prompt.SceneTransition) {
 	// Log the scene transition
 	if sm.sessionLogger != nil {
 		sm.sessionLogger.Log("scene_transition", map[string]any{
@@ -400,7 +401,7 @@ func (sm *SceneManager) handleSceneTransition(transition *SceneTransition) {
 }
 
 // GetLastTransition returns the last scene transition that occurred, if any
-func (sm *SceneManager) GetLastTransition() *SceneTransition {
+func (sm *SceneManager) GetLastTransition() *prompt.SceneTransition {
 	return sm.lastTransition
 }
 
@@ -767,7 +768,7 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 		}
 	}
 
-	var prompt string
+	var promptText string
 	var renderErr error
 
 	// Use conflict-specific template when in conflict
@@ -794,7 +795,7 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 			}
 		}
 
-		conflictData := ConflictResponseData{
+		conflictData := prompt.ConflictResponseData{
 			Scene:                sm.currentScene,
 			CharacterContext:     sm.buildCharacterContext(),
 			AspectsContext:       sm.buildAspectsContext(),
@@ -808,10 +809,10 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 			ScenePurpose:         sm.scenePurpose,
 		}
 
-		prompt, renderErr = RenderConflictResponse(conflictData)
+		promptText, renderErr = prompt.RenderConflictResponse(conflictData)
 	} else {
 		// Use standard scene response template
-		data := SceneResponseData{
+		data := prompt.SceneResponseData{
 			Scene:               sm.currentScene,
 			CharacterContext:    sm.buildCharacterContext(),
 			AspectsContext:      sm.buildAspectsContext(),
@@ -823,7 +824,7 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 			ScenePurpose:        sm.scenePurpose,
 		}
 
-		prompt, renderErr = RenderSceneResponse(data)
+		promptText, renderErr = prompt.RenderSceneResponse(data)
 	}
 
 	if renderErr != nil {
@@ -832,7 +833,7 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 
 	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
 		Messages: []llm.Message{
-			{Role: "user", Content: prompt},
+			{Role: "user", Content: promptText},
 		},
 		MaxTokens:   300,
 		Temperature: 0.7,
@@ -864,7 +865,7 @@ func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedActio
 	}
 
 	// Prepare template data and render
-	data := ActionNarrativeData{
+	data := prompt.ActionNarrativeData{
 		Scene:               sm.currentScene,
 		CharacterContext:    sm.buildCharacterContext(),
 		AspectsContext:      sm.buildAspectsContext(),
@@ -873,13 +874,13 @@ func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedActio
 		OtherCharacters:     otherCharacters,
 	}
 
-	prompt, err := RenderActionNarrative(data)
+	promptText, err := prompt.RenderActionNarrative(data)
 	if err != nil {
 		return "", fmt.Errorf("generateActionNarrative: %w: %v", ErrLLMInvalidResponse, err)
 	}
 
 	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		Messages:    []llm.Message{{Role: "user", Content: promptText}},
 		MaxTokens:   200,
 		Temperature: 0.8,
 	})
@@ -982,7 +983,7 @@ func (sm *SceneManager) generateAspectName(parsedAction *action.Action) (string,
 	}
 
 	// Build the request
-	req := AspectGenerationRequest{
+	req := prompt.AspectGenerationRequest{
 		Character:       sm.player,
 		Action:          parsedAction,
 		Outcome:         parsedAction.Outcome,
@@ -1171,7 +1172,7 @@ func (sm *SceneManager) GetPlayer() *character.Character {
 }
 
 // GetConversationHistory returns the conversation history
-func (sm *SceneManager) GetConversationHistory() []ConversationEntry {
+func (sm *SceneManager) GetConversationHistory() []prompt.ConversationEntry {
 	return sm.conversationHistory
 }
 
@@ -1180,7 +1181,7 @@ var _ SceneInfo = (*SceneManager)(nil)
 
 // addToConversationHistory adds an exchange to the conversation history
 func (sm *SceneManager) addToConversationHistory(playerInput, gmResponse, interactionType string) {
-	entry := ConversationEntry{
+	entry := prompt.ConversationEntry{
 		PlayerInput: playerInput,
 		GMResponse:  gmResponse,
 		Timestamp:   time.Now(),
@@ -1302,7 +1303,7 @@ func (sm *SceneManager) buildAspectsContext() string {
 }
 
 // applyAttackDamageToPlayer applies attack damage to the player
-func (sm *SceneManager) applyAttackDamageToPlayer(ctx context.Context, outcome *dice.Outcome, attacker *character.Character, attackCtx AttackContext) {
+func (sm *SceneManager) applyAttackDamageToPlayer(ctx context.Context, outcome *dice.Outcome, attacker *character.Character, attackCtx prompt.AttackContext) {
 	// Apply stress if the attack hit
 	switch outcome.Type {
 	case dice.Success, dice.SuccessWithStyle:
@@ -1336,7 +1337,7 @@ func (sm *SceneManager) applyAttackDamageToPlayer(ctx context.Context, outcome *
 }
 
 // handleStressOverflow handles when the player cannot absorb stress with their stress track
-func (sm *SceneManager) handleStressOverflow(ctx context.Context, shifts int, stressType character.StressTrackType, attacker *character.Character, attackCtx AttackContext) {
+func (sm *SceneManager) handleStressOverflow(ctx context.Context, shifts int, stressType character.StressTrackType, attacker *character.Character, attackCtx prompt.AttackContext) {
 	sm.ui.DisplaySystemMessage(fmt.Sprintf(
 		"You cannot absorb %d shifts with your stress track!",
 		shifts,
@@ -1428,7 +1429,7 @@ func (sm *SceneManager) getAvailableConsequences(shifts int) []ConsequenceOption
 }
 
 // applyConsequence applies a consequence to the player character
-func (sm *SceneManager) applyConsequence(ctx context.Context, conseqType character.ConsequenceType, shifts int, attacker *character.Character, attackCtx AttackContext) {
+func (sm *SceneManager) applyConsequence(ctx context.Context, conseqType character.ConsequenceType, shifts int, attacker *character.Character, attackCtx prompt.AttackContext) {
 	// Generate a consequence aspect via LLM
 	aspectName, err := sm.generateConsequenceAspect(ctx, conseqType, attacker, attackCtx)
 	if err != nil {
@@ -1484,7 +1485,7 @@ func (sm *SceneManager) applyConsequence(ctx context.Context, conseqType charact
 }
 
 // generateConsequenceAspect uses LLM to generate a consequence aspect
-func (sm *SceneManager) generateConsequenceAspect(ctx context.Context, conseqType character.ConsequenceType, attacker *character.Character, attackCtx AttackContext) (string, error) {
+func (sm *SceneManager) generateConsequenceAspect(ctx context.Context, conseqType character.ConsequenceType, attacker *character.Character, attackCtx prompt.AttackContext) (string, error) {
 	if sm.engine.llmClient == nil {
 		return "", fmt.Errorf("LLM client required")
 	}
@@ -1494,7 +1495,7 @@ func (sm *SceneManager) generateConsequenceAspect(ctx context.Context, conseqTyp
 		conflictType = "mental"
 	}
 
-	data := ConsequenceAspectData{
+	data := prompt.ConsequenceAspectData{
 		CharacterName: sm.player.Name,
 		AttackerName:  attacker.Name,
 		Severity:      string(conseqType),
@@ -1502,13 +1503,13 @@ func (sm *SceneManager) generateConsequenceAspect(ctx context.Context, conseqTyp
 		AttackContext: attackCtx,
 	}
 
-	prompt, err := RenderConsequenceAspect(data)
+	promptText, err := prompt.RenderConsequenceAspect(data)
 	if err != nil {
 		return "", fmt.Errorf("failed to render consequence aspect template: %w", err)
 	}
 
 	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		Messages:    []llm.Message{{Role: "user", Content: promptText}},
 		MaxTokens:   20,
 		Temperature: 0.8,
 	})
@@ -1595,7 +1596,7 @@ const (
 )
 
 // handleTakenOut handles when the player is taken out
-func (sm *SceneManager) handleTakenOut(ctx context.Context, attacker *character.Character, attackCtx AttackContext) {
+func (sm *SceneManager) handleTakenOut(ctx context.Context, attacker *character.Character, attackCtx prompt.AttackContext) {
 	sm.ui.DisplaySystemMessage("\n=== You Are Taken Out! ===")
 	sm.ui.DisplaySystemMessage(fmt.Sprintf("%s decides your fate.", attacker.Name))
 
@@ -1641,7 +1642,7 @@ func (sm *SceneManager) handleTakenOut(ctx context.Context, attacker *character.
 }
 
 // generateTakenOutNarrativeAndOutcome generates narrative and classifies the outcome
-func (sm *SceneManager) generateTakenOutNarrativeAndOutcome(ctx context.Context, attacker *character.Character, attackCtx AttackContext) (narrative string, outcome TakenOutResult, newSceneHint string, err error) {
+func (sm *SceneManager) generateTakenOutNarrativeAndOutcome(ctx context.Context, attacker *character.Character, attackCtx prompt.AttackContext) (narrative string, outcome TakenOutResult, newSceneHint string, err error) {
 	if sm.engine.llmClient == nil {
 		return "", TakenOutTransition, "", fmt.Errorf("LLM client required")
 	}
@@ -1651,7 +1652,7 @@ func (sm *SceneManager) generateTakenOutNarrativeAndOutcome(ctx context.Context,
 		conflictType = "mental"
 	}
 
-	data := TakenOutData{
+	data := prompt.TakenOutData{
 		CharacterName:       sm.player.Name,
 		AttackerName:        attacker.Name,
 		AttackerHighConcept: attacker.Aspects.HighConcept,
@@ -1660,13 +1661,13 @@ func (sm *SceneManager) generateTakenOutNarrativeAndOutcome(ctx context.Context,
 		AttackContext:       attackCtx,
 	}
 
-	prompt, err := RenderTakenOut(data)
+	promptText, err := prompt.RenderTakenOut(data)
 	if err != nil {
 		return "", TakenOutTransition, "", fmt.Errorf("failed to render taken out template: %w", err)
 	}
 
 	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		Messages:    []llm.Message{{Role: "user", Content: promptText}},
 		MaxTokens:   200,
 		Temperature: 0.7,
 	})

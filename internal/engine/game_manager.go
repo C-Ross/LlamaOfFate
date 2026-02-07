@@ -6,6 +6,7 @@ import (
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 )
 
@@ -15,8 +16,8 @@ type GameManager struct {
 	player        *character.Character
 	ui            UI
 	sessionLogger *session.Logger
-	scenario      *Scenario // The scenario to run (can be provided or generated)
-	scenarioCount int       // Number of scenarios completed
+	scenario      *prompt.Scenario // The scenario to run (can be provided or generated)
+	scenarioCount int              // Number of scenarios completed
 }
 
 // NewGameManager creates a new game manager
@@ -42,7 +43,7 @@ func (g *GameManager) SetSessionLogger(logger *session.Logger) {
 }
 
 // SetScenario sets the scenario to run
-func (g *GameManager) SetScenario(scenario *Scenario) {
+func (g *GameManager) SetScenario(scenario *prompt.Scenario) {
 	g.scenario = scenario
 }
 
@@ -146,7 +147,7 @@ func (g *GameManager) handleMilestone() {
 	}
 
 	// Display milestone message
-	g.ui.DisplaySystemMessage("\n=== MILESTONE: Scenario Complete! ===")
+	g.ui.DisplaySystemMessage("\n=== MILESTONE: prompt.Scenario Complete! ===")
 	g.ui.DisplaySystemMessage("Your fate points have been refreshed.\n")
 
 	// Log the milestone

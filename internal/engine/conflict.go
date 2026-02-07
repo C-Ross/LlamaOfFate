@@ -4,75 +4,22 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"regexp"
 	"sort"
-	"strings"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 )
 
-// conflictMarkerRegex matches [CONFLICT:type:character_id] markers for escalation
-var conflictMarkerRegex = regexp.MustCompile(`\[CONFLICT:(physical|mental):([^\]]+)\]`)
-
-// conflictEndMarkerRegex matches [CONFLICT:end:reason] markers for de-escalation
-var conflictEndMarkerRegex = regexp.MustCompile(`\[CONFLICT:end:(surrender|agreement|retreat|resolved)\]`)
-
-// ConflictTrigger represents a detected conflict initiation
-type ConflictTrigger struct {
-	Type        scene.ConflictType
-	InitiatorID string
-}
-
-// ConflictResolution represents a detected conflict de-escalation
-type ConflictResolution struct {
-	Reason string
-}
-
 // parseConflictMarker extracts a conflict trigger from LLM response and returns cleaned text
-func (sm *SceneManager) parseConflictMarker(response string) (*ConflictTrigger, string) {
-	matches := conflictMarkerRegex.FindStringSubmatch(response)
-	if matches == nil {
-		return nil, response
-	}
-
-	conflictType := scene.PhysicalConflict
-	if matches[1] == "mental" {
-		conflictType = scene.MentalConflict
-	}
-
-	trigger := &ConflictTrigger{
-		Type:        conflictType,
-		InitiatorID: strings.TrimSpace(matches[2]),
-	}
-
-	// Remove the marker from the response and clean up any double spaces
-	cleanedResponse := conflictMarkerRegex.ReplaceAllString(response, "")
-	// Replace multiple spaces with single space
-	cleanedResponse = strings.Join(strings.Fields(cleanedResponse), " ")
-	cleanedResponse = strings.TrimSpace(cleanedResponse)
-
-	return trigger, cleanedResponse
+func (sm *SceneManager) parseConflictMarker(response string) (*prompt.ConflictTrigger, string) {
+	return prompt.ParseConflictMarker(response)
 }
 
 // parseConflictEndMarker extracts a conflict resolution from LLM response and returns cleaned text
-func (sm *SceneManager) parseConflictEndMarker(response string) (*ConflictResolution, string) {
-	matches := conflictEndMarkerRegex.FindStringSubmatch(response)
-	if matches == nil {
-		return nil, response
-	}
-
-	resolution := &ConflictResolution{
-		Reason: matches[1],
-	}
-
-	// Remove the marker from the response and clean up
-	cleanedResponse := conflictEndMarkerRegex.ReplaceAllString(response, "")
-	cleanedResponse = strings.Join(strings.Fields(cleanedResponse), " ")
-	cleanedResponse = strings.TrimSpace(cleanedResponse)
-
-	return resolution, cleanedResponse
+func (sm *SceneManager) parseConflictEndMarker(response string) (*prompt.ConflictResolution, string) {
+	return prompt.ParseConflictEndMarker(response)
 }
 
 // initiateConflict starts a conflict with all characters in the scene

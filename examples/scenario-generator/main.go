@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 )
 
@@ -135,7 +135,7 @@ func main() {
 	}
 
 	// Build scenario generation data
-	data := engine.ScenarioGenerationData{
+	data := prompt.ScenarioGenerationData{
 		PlayerName:        *nameFlag,
 		PlayerHighConcept: *conceptFlag,
 		PlayerTrouble:     *troubleFlag,
@@ -145,7 +145,7 @@ func main() {
 	}
 
 	// Render the prompt
-	prompt, err := engine.RenderScenarioGeneration(data)
+	promptText, err := prompt.RenderScenarioGeneration(data)
 	if err != nil {
 		log.Fatalf("Failed to render prompt: %v", err)
 	}
@@ -159,20 +159,20 @@ func main() {
 			"aspects":         data.PlayerAspects,
 			"genre":           data.Genre,
 			"theme":           data.Theme,
-			"rendered_prompt": prompt,
+			"rendered_prompt": promptText,
 		})
 	}
 
 	if *debugFlag {
 		fmt.Println("=== Rendered Prompt ===")
-		fmt.Println(prompt)
+		fmt.Println(promptText)
 		fmt.Println()
 	}
 
 	// Call LLM
 	ctx := context.Background()
 	resp, err := azureClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		Messages:    []llm.Message{{Role: "user", Content: promptText}},
 		MaxTokens:   500,
 		Temperature: 0.8,
 	})
@@ -193,7 +193,7 @@ func main() {
 	}
 
 	// Parse the response
-	scenario, err := engine.ParseScenario(rawResponse)
+	scenario, err := prompt.ParseScenario(rawResponse)
 	if err != nil {
 		fmt.Println("=== Parse Error ===")
 		fmt.Printf("Error: %v\n\n", err)
@@ -215,7 +215,7 @@ func main() {
 }
 
 // displayScenario prints the scenario in a readable format
-func displayScenario(s *engine.Scenario) {
+func displayScenario(s *prompt.Scenario) {
 	fmt.Println("=== Generated Scenario ===")
 	fmt.Printf("Title: %s\n", s.Title)
 	if s.Genre != "" {

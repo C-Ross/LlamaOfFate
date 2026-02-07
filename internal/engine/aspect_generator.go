@@ -6,20 +6,10 @@ import (
 	"strings"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 )
-
-// AspectGenerationRequest contains all the information needed to generate an aspect
-type AspectGenerationRequest struct {
-	Character       *character.Character `json:"character"`
-	Action          *action.Action       `json:"action"`
-	Outcome         *dice.Outcome        `json:"outcome"`
-	Context         string               `json:"context"`                    // Scene description or situational context
-	TargetType      string               `json:"target_type"`                // "character", "scene", "object", "situation"
-	ExistingAspects []string             `json:"existing_aspects,omitempty"` // Aspects already in play
-}
 
 // AspectGenerationResponse contains the generated aspect and related information
 type AspectGenerationResponse struct {
@@ -44,7 +34,7 @@ func NewAspectGenerator(llmClient llm.LLMClient) *AspectGenerator {
 }
 
 // GenerateAspect generates an aspect based on the Create an Advantage attempt and outcome
-func (ag *AspectGenerator) GenerateAspect(ctx context.Context, req AspectGenerationRequest) (*AspectGenerationResponse, error) {
+func (ag *AspectGenerator) GenerateAspect(ctx context.Context, req prompt.AspectGenerationRequest) (*AspectGenerationResponse, error) {
 	if req.Action.Type != action.CreateAdvantage {
 		return nil, fmt.Errorf("action type must be CreateAdvantage, got %s", req.Action.Type.String())
 	}
@@ -80,7 +70,7 @@ func (ag *AspectGenerator) GenerateAspect(ctx context.Context, req AspectGenerat
 
 // getSystemPrompt returns the system prompt for aspect generation
 func (ag *AspectGenerator) getSystemPrompt() string {
-	prompt, err := RenderAspectGenerationSystem()
+	prompt, err := prompt.RenderAspectGenerationSystem()
 	if err != nil {
 		// Fallback to hardcoded prompt if template fails
 		return `You are an expert Game Master for the Fate Core RPG system. Your job is to generate appropriate aspects based on a character's "Create an Advantage" action and the outcome of their dice roll.
@@ -112,8 +102,8 @@ Your response must be in JSON format with these fields:
 }
 
 // buildPrompt constructs the detailed prompt for aspect generation
-func (ag *AspectGenerator) buildPrompt(req AspectGenerationRequest) string {
-	prompt, err := RenderAspectGeneration(req)
+func (ag *AspectGenerator) buildPrompt(req prompt.AspectGenerationRequest) string {
+	prompt, err := prompt.RenderAspectGeneration(req)
 	if err != nil {
 		// Fallback to the old string building method if template fails
 		return ag.buildPromptFallback(req)
@@ -122,7 +112,7 @@ func (ag *AspectGenerator) buildPrompt(req AspectGenerationRequest) string {
 }
 
 // buildPromptFallback is the original string building method as a fallback
-func (ag *AspectGenerator) buildPromptFallback(req AspectGenerationRequest) string {
+func (ag *AspectGenerator) buildPromptFallback(req prompt.AspectGenerationRequest) string {
 	var prompt strings.Builder
 
 	prompt.WriteString("Generate an aspect for a Create an Advantage action with the following details:\n\n")
