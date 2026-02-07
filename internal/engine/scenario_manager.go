@@ -706,22 +706,11 @@ func (m *ScenarioManager) generateSceneSummary(ctx context.Context, sceneManager
 	// Determine how ended string
 	howEnded := string(result.Reason)
 
-	// Convert conversation history to prompt format
-	promptConvHistory := make([]prompt.ConversationEntry, len(sceneManager.GetConversationHistory()))
-	for i, entry := range sceneManager.GetConversationHistory() {
-		promptConvHistory[i] = prompt.ConversationEntry{
-			PlayerInput: entry.PlayerInput,
-			GMResponse:  entry.GMResponse,
-			Timestamp:   entry.Timestamp,
-			Type:        entry.Type,
-		}
-	}
-
 	data := prompt.SceneSummaryData{
 		SceneName:           completedScene.Name,
 		SceneDescription:    completedScene.Description,
 		SituationAspects:    aspects,
-		ConversationHistory: promptConvHistory,
+		ConversationHistory: sceneManager.GetConversationHistory(),
 		NPCsInScene:         npcsInScene,
 		TakenOutChars:       result.TakenOutChars,
 		HowEnded:            howEnded,
