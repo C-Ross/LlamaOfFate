@@ -34,8 +34,8 @@ func buildHeistScene() SceneConfig {
 	heistScene.AddSituationAspect(scene.NewSituationAspect(
 		"biometric-lockdown",
 		"Biometric Lockdown Protocols Active",
-		"scene", // created by the scene itself
-		2,       // 2 free invokes for enemies to use against the player
+		"scene",
+		0,
 	))
 
 	return SceneConfig{

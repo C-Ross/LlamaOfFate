@@ -25,8 +25,10 @@ func TestIntegration_BasicGameplay(t *testing.T) {
 	gameScene := scene.NewScene("scene-1", "The Burning Airship", "The deck tilts precariously as flames lick at the rigging")
 	gameScene.AddCharacter(char.ID)
 
-	// Add a situation aspect to the scene
-	situationAspect := scene.NewSituationAspect("aspect-1", "Deck Tilting Dangerously", char.ID, 2)
+	// Add a situation aspect representing a previously-created advantage.
+	// Per Fate Core: free invokes come from Create Advantage actions, not environmental aspects.
+	// This simulates a character who already created this advantage for testing purposes.
+	situationAspect := scene.NewSituationAspect("aspect-1", "Used the Ship's Tilt", char.ID, 2)
 	gameScene.AddSituationAspect(situationAspect)
 
 	// Create an action
@@ -162,8 +164,9 @@ func TestIntegration_CompleteActionResolution(t *testing.T) {
 	gameScene := scene.NewScene("test-scene", "The Masquerade Ball", "Elegant figures in masks dance through the ballroom")
 	gameScene.AddCharacter(character.ID)
 
-	// Create situation aspect
-	situationAspect := scene.NewSituationAspect("crowded", "Crowded Dance Floor", character.ID, 1)
+	// Situation aspect representing a previously-created advantage via Create Advantage.
+	// Per Fate Core: free invokes come from successful Create Advantage, not scene setup.
+	situationAspect := scene.NewSituationAspect("blending-in", "Blending Into the Crowd", character.ID, 1)
 	gameScene.AddSituationAspect(situationAspect)
 
 	// Create action
@@ -183,9 +186,9 @@ func TestIntegration_CompleteActionResolution(t *testing.T) {
 
 	// Use free invoke from situation aspect
 	freeInvoke := action.AspectInvoke{
-		AspectText:    "Crowded Dance Floor",
+		AspectText:    "Blending Into the Crowd",
 		Source:        "situation",
-		SourceID:      "crowded",
+		SourceID:      "blending-in",
 		IsFree:        true,
 		FatePointCost: 0,
 		Bonus:         2,
@@ -201,7 +204,7 @@ func TestIntegration_CompleteActionResolution(t *testing.T) {
 	assert.True(t, character.SpendFatePoint())
 
 	// Use free invoke
-	aspect := gameScene.GetSituationAspect("crowded")
+	aspect := gameScene.GetSituationAspect("blending-in")
 	require.NotNil(t, aspect)
 	assert.True(t, aspect.UseFreeInvoke())
 

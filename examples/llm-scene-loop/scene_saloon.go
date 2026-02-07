@@ -31,14 +31,14 @@ func buildSaloonScene() SceneConfig {
 		"information-for-sale",
 		"Everyone Here Has a Price",
 		"scene",
-		1, // 1 free invoke for social manipulation
+		0,
 	))
 
 	saloonScene.AddSituationAspect(scene.NewSituationAspect(
 		"nervous-tension",
 		"Strangers Ain't Welcome",
 		"scene",
-		1, // 1 free invoke - can work for or against the player
+		0,
 	))
 
 	return SceneConfig{
