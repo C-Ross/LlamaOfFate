@@ -1,0 +1,319 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"log"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/C-Ross/LlamaOfFate/internal/engine"
+	"github.com/C-Ross/LlamaOfFate/internal/llm"
+	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+	"github.com/C-Ross/LlamaOfFate/internal/logging"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
+)
+
+// arrayFlags allows multiple -aspect flags
+type arrayFlags []string
+
+func (a *arrayFlags) String() string {
+	return strings.Join(*a, ", ")
+}
+
+func (a *arrayFlags) Set(value string) error {
+	*a = append(*a, value)
+	return nil
+}
+
+func main() {
+	logging.SetupDefaultLogging()
+
+	// Required flags
+	nameFlag := flag.String("name", "", "Character name (required)")
+	conceptFlag := flag.String("concept", "", "High concept aspect (required)")
+
+	// Optional character flags
+	troubleFlag := flag.String("trouble", "", "Trouble aspect")
+	var aspects arrayFlags
+	flag.Var(&aspects, "aspect", "Additional aspect (can be repeated)")
+
+	// Generation hints
+	genreFlag := flag.String("genre", "", "Genre hint (e.g., Western, Cyberpunk, Fantasy)")
+	themeFlag := flag.String("theme", "", "Theme hint for scenario")
+
+	// Output flags
+	logFlag := flag.String("log", "auto", "Session log path (auto=generated filename, empty=disabled)")
+
+	// Debug flags
+	debugFlag := flag.Bool("debug", false, "Show rendered prompt")
+	rawFlag := flag.Bool("raw", false, "Show raw LLM response")
+
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: scenario-generator [options]\n\n")
+		fmt.Fprintf(os.Stderr, "Generate a Fate Core scenario from character aspects.\n\n")
+		fmt.Fprintf(os.Stderr, "Required:\n")
+		fmt.Fprintf(os.Stderr, "  -name string      Character name\n")
+		fmt.Fprintf(os.Stderr, "  -concept string   High concept aspect\n\n")
+		fmt.Fprintf(os.Stderr, "Optional:\n")
+		fmt.Fprintf(os.Stderr, "  -trouble string   Trouble aspect\n")
+		fmt.Fprintf(os.Stderr, "  -aspect string    Additional aspect (repeatable)\n")
+		fmt.Fprintf(os.Stderr, "  -genre string     Genre hint (Western, Cyberpunk, Fantasy, etc.)\n")
+		fmt.Fprintf(os.Stderr, "  -theme string     Theme hint for scenario\n\n")
+		fmt.Fprintf(os.Stderr, "Output:\n")
+		fmt.Fprintf(os.Stderr, "  -log string       Session log path (default: auto-generated, empty disables)\n\n")
+		fmt.Fprintf(os.Stderr, "Debug:\n")
+		fmt.Fprintf(os.Stderr, "  -debug            Show rendered prompt\n")
+		fmt.Fprintf(os.Stderr, "  -raw              Show raw LLM response\n\n")
+		fmt.Fprintf(os.Stderr, "Example:\n")
+		fmt.Fprintf(os.Stderr, "  scenario-generator -name \"Jesse Calhoun\" \\\n")
+		fmt.Fprintf(os.Stderr, "    -concept \"Haunted Former Rancher Seeking Justice\" \\\n")
+		fmt.Fprintf(os.Stderr, "    -trouble \"Vengeance Burns Hotter Than Reason\" \\\n")
+		fmt.Fprintf(os.Stderr, "    -genre Western\n")
+	}
+
+	flag.Parse()
+
+	// Validate required flags
+	if *nameFlag == "" || *conceptFlag == "" {
+		fmt.Fprintf(os.Stderr, "Error: -name and -concept are required\n\n")
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	// Load Azure config
+	configPath := "configs/azure-llm.yaml"
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		fmt.Printf("Azure LLM config not found at %s\n", configPath)
+		fmt.Println("Please copy configs/azure-llm.yaml.example to configs/azure-llm.yaml")
+		fmt.Println("and configure your Azure OpenAI credentials.")
+		os.Exit(1)
+	}
+
+	config, err := azure.LoadConfig(configPath)
+	if err != nil {
+		log.Fatalf("Failed to load Azure config: %v", err)
+	}
+
+	azureClient := azure.NewClient(*config)
+
+	// Set up session logging
+	var sessionLogger *session.Logger
+	logPath := *logFlag
+	if logPath == "auto" {
+		// Build a descriptive filename: scenario_gen_<name>_<genre>_<timestamp>.yaml
+		safeName := strings.ToLower(strings.ReplaceAll(*nameFlag, " ", "_"))
+		safeName = strings.Map(func(r rune) rune {
+			if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' {
+				return r
+			}
+			return -1
+		}, safeName)
+		if len(safeName) > 20 {
+			safeName = safeName[:20]
+		}
+		logPath = fmt.Sprintf("scenario_gen_%s", safeName)
+		if *genreFlag != "" {
+			logPath += "_" + strings.ToLower(*genreFlag)
+		}
+		logPath += "_" + time.Now().Format("20060102_150405") + ".yaml"
+	}
+	if logPath != "" {
+		var err error
+		sessionLogger, err = session.NewLogger(logPath)
+		if err != nil {
+			log.Fatalf("Failed to create session logger: %v", err)
+		}
+		defer func() {
+			if err := sessionLogger.Close(); err != nil {
+				log.Printf("Warning: Failed to close session logger: %v", err)
+			}
+		}()
+		fmt.Printf("Session log: %s\n\n", logPath)
+	}
+
+	// Build scenario generation data
+	data := engine.ScenarioGenerationData{
+		PlayerName:        *nameFlag,
+		PlayerHighConcept: *conceptFlag,
+		PlayerTrouble:     *troubleFlag,
+		PlayerAspects:     aspects,
+		Genre:             *genreFlag,
+		Theme:             *themeFlag,
+	}
+
+	// Render the prompt
+	prompt, err := engine.RenderScenarioGeneration(data)
+	if err != nil {
+		log.Fatalf("Failed to render prompt: %v", err)
+	}
+
+	// Log the input data and prompt
+	if sessionLogger != nil {
+		sessionLogger.Log("scenario_generation_input", map[string]any{
+			"player_name":     data.PlayerName,
+			"high_concept":    data.PlayerHighConcept,
+			"trouble":         data.PlayerTrouble,
+			"aspects":         data.PlayerAspects,
+			"genre":           data.Genre,
+			"theme":           data.Theme,
+			"rendered_prompt": prompt,
+		})
+	}
+
+	if *debugFlag {
+		fmt.Println("=== Rendered Prompt ===")
+		fmt.Println(prompt)
+		fmt.Println()
+	}
+
+	// Call LLM
+	ctx := context.Background()
+	resp, err := azureClient.ChatCompletion(ctx, llm.CompletionRequest{
+		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		MaxTokens:   500,
+		Temperature: 0.8,
+	})
+	if err != nil {
+		log.Fatalf("LLM request failed: %v", err)
+	}
+
+	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+		log.Fatal("Empty LLM response")
+	}
+
+	rawResponse := resp.Choices[0].Message.Content
+
+	if *rawFlag {
+		fmt.Println("=== Raw LLM Response ===")
+		fmt.Println(rawResponse)
+		fmt.Println()
+	}
+
+	// Parse the response
+	scenario, err := parseScenario(rawResponse)
+	if err != nil {
+		fmt.Println("=== Parse Error ===")
+		fmt.Printf("Error: %v\n\n", err)
+		fmt.Println("Raw response:")
+		fmt.Println(rawResponse)
+		os.Exit(1)
+	}
+
+	// Log the result
+	if sessionLogger != nil {
+		sessionLogger.Log("scenario_generation_output", map[string]any{
+			"raw_response": rawResponse,
+			"scenario":     scenario,
+		})
+	}
+
+	// Display formatted output
+	displayScenario(scenario)
+}
+
+// parseScenario extracts and parses JSON from the LLM response
+func parseScenario(content string) (*engine.Scenario, error) {
+	cleaned := cleanJSONResponse(content)
+
+	var scenario engine.Scenario
+	if err := json.Unmarshal([]byte(cleaned), &scenario); err != nil {
+		// Try to find JSON object in response
+		start := strings.Index(content, "{")
+		end := strings.LastIndex(content, "}")
+		if start >= 0 && end > start {
+			cleaned = content[start : end+1]
+			if err := json.Unmarshal([]byte(cleaned), &scenario); err != nil {
+				return nil, fmt.Errorf("JSON parse error: %w", err)
+			}
+		} else {
+			return nil, fmt.Errorf("no valid JSON found in response")
+		}
+	}
+
+	// Validate
+	if scenario.Title == "" {
+		return nil, fmt.Errorf("missing title")
+	}
+	if scenario.Problem == "" {
+		return nil, fmt.Errorf("missing problem")
+	}
+
+	return &scenario, nil
+}
+
+// cleanJSONResponse removes markdown formatting from LLM JSON responses
+func cleanJSONResponse(content string) string {
+	content = strings.TrimSpace(content)
+
+	// Handle markdown code blocks
+	blocks := strings.Split(content, "```")
+	var jsonBlocks []string
+
+	for _, block := range blocks {
+		block = strings.TrimSpace(block)
+		if strings.HasPrefix(block, "json\n") {
+			block = strings.TrimPrefix(block, "json\n")
+			block = strings.TrimSpace(block)
+			if strings.HasPrefix(block, "{") && strings.HasSuffix(block, "}") {
+				jsonBlocks = append(jsonBlocks, block)
+			}
+		} else if strings.HasPrefix(block, "{") && strings.HasSuffix(block, "}") {
+			jsonBlocks = append(jsonBlocks, block)
+		}
+	}
+
+	if len(jsonBlocks) > 0 {
+		return jsonBlocks[len(jsonBlocks)-1]
+	}
+
+	// Fallback: return trimmed content
+	return content
+}
+
+// displayScenario prints the scenario in a readable format
+func displayScenario(s *engine.Scenario) {
+	fmt.Println("=== Generated Scenario ===")
+	fmt.Printf("Title: %s\n", s.Title)
+	if s.Genre != "" {
+		fmt.Printf("Genre: %s\n", s.Genre)
+	}
+	fmt.Println()
+
+	fmt.Println("Problem:")
+	fmt.Printf("  %s\n", s.Problem)
+	fmt.Println()
+
+	if len(s.StoryQuestions) > 0 {
+		fmt.Println("Story Questions:")
+		for i, q := range s.StoryQuestions {
+			fmt.Printf("  %d. %s\n", i+1, q)
+		}
+		fmt.Println()
+	}
+
+	if s.Setting != "" {
+		fmt.Println("Setting:")
+		// Word wrap the setting at ~70 chars
+		words := strings.Fields(s.Setting)
+		line := "  "
+		for _, word := range words {
+			if len(line)+len(word)+1 > 75 {
+				fmt.Println(line)
+				line = "  " + word
+			} else {
+				if line == "  " {
+					line += word
+				} else {
+					line += " " + word
+				}
+			}
+		}
+		if line != "  " {
+			fmt.Println(line)
+		}
+	}
+}

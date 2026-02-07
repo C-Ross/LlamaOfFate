@@ -31,3 +31,6 @@ bin/
 
 # Session log files (auto-generated during gameplay)
 session_*.yaml
+
+# Scenario generator output files
+scenario_gen_*.yaml
