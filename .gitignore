@@ -25,6 +25,9 @@ bin/
 /llm-scene-loop
 /fate-guided-scene
 /main
+/scene-generator
+/scenario-generator
+/scenario-walkthrough
 
 # Configuration files with sensitive information
 *.local.yaml
@@ -34,3 +37,9 @@ session_*.yaml
 
 # Scenario generator output files
 scenario_gen_*.yaml
+
+# Scene generator output files
+scene_gen_*.yaml
+
+# Walkthrough output files
+walkthrough_*.yaml

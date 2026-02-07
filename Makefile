@@ -16,7 +16,7 @@ BINARY_NAME=llamaoffate
 BINARY_PATH=./bin/$(BINARY_NAME)
 MAIN_PATH=./cmd/cli
 
-.PHONY: all build clean test test-llm vet fmt lint deps validate help
+.PHONY: all build clean test test-llm vet fmt lint deps validate help scenario-generator scene-generator scenario-walkthrough
 
 # Default target
 all: clean deps vet fmt build
@@ -76,18 +76,40 @@ run: build
 	@echo "Running $(BINARY_NAME)..."
 	$(BINARY_PATH)
 
+# Build and run evaluation tools
+scenario-generator:
+	@echo "Building scenario-generator..."
+	@mkdir -p bin
+	$(GOBUILD) -o ./bin/scenario-generator ./examples/scenario-generator
+	@echo "Build complete: ./bin/scenario-generator"
+
+scene-generator:
+	@echo "Building scene-generator..."
+	@mkdir -p bin
+	$(GOBUILD) -o ./bin/scene-generator ./examples/scene-generator
+	@echo "Build complete: ./bin/scene-generator"
+
+scenario-walkthrough:
+	@echo "Building scenario-walkthrough..."
+	@mkdir -p bin
+	$(GOBUILD) -o ./bin/scenario-walkthrough ./examples/scenario-walkthrough
+	@echo "Build complete: ./bin/scenario-walkthrough"
+
 # Show help
 help:
 	@echo "Available targets:"
-	@echo "  all      - Clean, get deps, vet, format, and build"
-	@echo "  build    - Build the application"
-	@echo "  clean    - Remove build artifacts"
-	@echo "  test     - Run tests"
-	@echo "  test-llm - Run LLM evaluation tests (requires Azure credentials)"
-	@echo "  vet      - Run go vet"
-	@echo "  fmt      - Format code"
-	@echo "  lint     - Run golangci-lint"
-	@echo "  deps     - Download and tidy dependencies"
-	@echo "  validate - Run all validation checks (vet, fmt, lint, test)"
-	@echo "  run      - Build and run the application"
-	@echo "  help     - Show this help message"
+	@echo "  all                  - Clean, get deps, vet, format, and build"
+	@echo "  build                - Build the application"
+	@echo "  clean                - Remove build artifacts"
+	@echo "  test                 - Run tests"
+	@echo "  test-llm             - Run LLM evaluation tests (requires Azure credentials)"
+	@echo "  vet                  - Run go vet"
+	@echo "  fmt                  - Format code"
+	@echo "  lint                 - Run golangci-lint"
+	@echo "  deps                 - Download and tidy dependencies"
+	@echo "  validate             - Run all validation checks (vet, fmt, lint, test)"
+	@echo "  run                  - Build and run the application"
+	@echo "  scenario-generator   - Build scenario generation eval tool"
+	@echo "  scene-generator      - Build scene generation eval tool"
+	@echo "  scenario-walkthrough - Build scenario walkthrough eval tool"
+	@echo "  help                 - Show this help message"
