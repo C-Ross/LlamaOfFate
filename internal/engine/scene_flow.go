@@ -24,6 +24,24 @@ type SceneEndResult struct {
 	TakenOutChars  []string // Character IDs taken out during the scene
 }
 
+// ScenarioEndReason indicates why a scenario ended
+type ScenarioEndReason string
+
+const (
+	// ScenarioEndResolved indicates the scenario's story questions were answered
+	ScenarioEndResolved ScenarioEndReason = "resolved"
+	// ScenarioEndQuit indicates the player chose to quit
+	ScenarioEndQuit ScenarioEndReason = "quit"
+	// ScenarioEndPlayerTakenOut indicates the player was taken out permanently
+	ScenarioEndPlayerTakenOut ScenarioEndReason = "player_taken_out"
+)
+
+// ScenarioResult contains information about how and why a scenario ended
+type ScenarioResult struct {
+	Reason   ScenarioEndReason
+	Scenario *Scenario // The scenario that was run
+}
+
 // SceneTransition represents a detected scene exit/transition
 type SceneTransition struct {
 	Hint string // Where/what comes next (e.g., "streets of Redemption Gulch")

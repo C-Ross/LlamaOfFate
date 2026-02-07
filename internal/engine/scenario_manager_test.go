@@ -64,7 +64,7 @@ func TestNewScenarioManager(t *testing.T) {
 
 func TestScenarioManager_Run_RequiresEngine(t *testing.T) {
 	sm := &ScenarioManager{}
-	err := sm.Run(context.Background())
+	_, err := sm.Run(context.Background())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "engine is required")
 }
@@ -76,7 +76,7 @@ func TestScenarioManager_Run_RequiresLLM(t *testing.T) {
 	player := character.NewCharacter("player1", "Test Hero")
 	sm := NewScenarioManager(engine, player)
 
-	err = sm.Run(context.Background())
+	_, err = sm.Run(context.Background())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "LLM client is required")
 }
@@ -88,7 +88,7 @@ func TestScenarioManager_Run_RequiresUI(t *testing.T) {
 	player := character.NewCharacter("player1", "Test Hero")
 	sm := NewScenarioManager(engine, player)
 
-	err = sm.Run(context.Background())
+	_, err = sm.Run(context.Background())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "UI is required")
 }
@@ -102,26 +102,29 @@ func TestScenarioManager_Run_RequiresPlayer(t *testing.T) {
 		ui:     &MockUI{},
 	}
 
-	err = sm.Run(context.Background())
+	_, err = sm.Run(context.Background())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "player character is required")
 }
 
-func TestScenarioManager_SetSettings(t *testing.T) {
+func TestScenarioManager_SetScenario(t *testing.T) {
 	engine, err := NewWithLLM(&MockLLMClientForScenario{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
 	sm := NewScenarioManager(engine, player)
 
-	settings := ScenarioSettings{
-		Genre:          "Western",
-		SettingContext: "The Old West",
+	scenario := &Scenario{
+		Title:   "Test Scenario",
+		Problem: "A test problem",
+		Genre:   "Western",
+		Setting: "The Old West",
 	}
-	sm.SetSettings(settings)
+	sm.SetScenario(scenario)
 
-	assert.Equal(t, "Western", sm.settings.Genre)
-	assert.Equal(t, "The Old West", sm.settings.SettingContext)
+	assert.Equal(t, "Western", sm.scenario.Genre)
+	assert.Equal(t, "The Old West", sm.scenario.Setting)
+	assert.Equal(t, "A test problem", sm.scenario.Problem)
 }
 
 func TestScenarioManager_SetInitialScene(t *testing.T) {
@@ -214,10 +217,12 @@ func TestScenarioManager_parseGeneratedScene_InvalidJSON(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestScenarioSettings_Defaults(t *testing.T) {
-	settings := ScenarioSettings{}
-	assert.Equal(t, "", settings.Genre)
-	assert.Equal(t, "", settings.SettingContext)
+func TestScenario_Defaults(t *testing.T) {
+	scenario := Scenario{}
+	assert.Equal(t, "", scenario.Genre)
+	assert.Equal(t, "", scenario.Setting)
+	assert.Equal(t, "", scenario.Problem)
+	assert.False(t, scenario.IsResolved)
 }
 
 func TestGeneratedScene_EmptyNPCs(t *testing.T) {
@@ -378,4 +383,135 @@ func TestSceneSummaryData_Fields(t *testing.T) {
 	assert.Len(t, data.SituationAspects, 1)
 	assert.Len(t, data.NPCsInScene, 1)
 	assert.Len(t, data.TakenOutChars, 1)
+}
+
+func TestScenario_Fields(t *testing.T) {
+	scenario := Scenario{
+		Title:          "Test Scenario",
+		Problem:        "A test problem",
+		StoryQuestions: []string{"Can the hero win?", "Will the villain escape?"},
+		Setting:        "A fantasy world",
+		Genre:          "Fantasy",
+		IsResolved:     false,
+	}
+
+	assert.Equal(t, "Test Scenario", scenario.Title)
+	assert.Equal(t, "A test problem", scenario.Problem)
+	assert.Len(t, scenario.StoryQuestions, 2)
+	assert.Equal(t, "Fantasy", scenario.Genre)
+	assert.False(t, scenario.IsResolved)
+}
+
+func TestScenarioGenerationData_Fields(t *testing.T) {
+	data := ScenarioGenerationData{
+		PlayerName:        "Test Hero",
+		PlayerHighConcept: "Brave Knight",
+		PlayerTrouble:     "Hot-Headed",
+		PlayerAspects:     []string{"Loyal to Friends"},
+		Genre:             "Fantasy",
+		Theme:             "Redemption",
+	}
+
+	assert.Equal(t, "Test Hero", data.PlayerName)
+	assert.Equal(t, "Brave Knight", data.PlayerHighConcept)
+	assert.Equal(t, "Fantasy", data.Genre)
+}
+
+func TestScenarioResolutionData_Fields(t *testing.T) {
+	scenario := &Scenario{
+		Title:   "Test",
+		Problem: "Problem",
+	}
+
+	data := ScenarioResolutionData{
+		Scenario:       scenario,
+		SceneSummaries: []SceneSummary{{NarrativeProse: "Test"}},
+		LatestSummary:  &SceneSummary{NarrativeProse: "Latest"},
+		PlayerName:     "Hero",
+		PlayerAspects:  []string{"Aspect"},
+	}
+
+	assert.Equal(t, scenario, data.Scenario)
+	assert.Len(t, data.SceneSummaries, 1)
+	assert.NotNil(t, data.LatestSummary)
+}
+
+func TestScenarioResolutionResult_Fields(t *testing.T) {
+	result := ScenarioResolutionResult{
+		IsResolved:        true,
+		AnsweredQuestions: []string{"Can the hero win? - YES"},
+		Reasoning:         "The hero defeated the villain",
+	}
+
+	assert.True(t, result.IsResolved)
+	assert.Len(t, result.AnsweredQuestions, 1)
+	assert.Equal(t, "The hero defeated the villain", result.Reasoning)
+}
+
+func TestScenarioManager_parseScenarioResolution_Valid(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	jsonResponse := `{
+		"is_resolved": true,
+		"answered_questions": ["Can the hero win? - YES"],
+		"reasoning": "The hero defeated the villain"
+	}`
+
+	result, err := sm.parseScenarioResolution(jsonResponse)
+	require.NoError(t, err)
+
+	assert.True(t, result.IsResolved)
+	assert.Len(t, result.AnsweredQuestions, 1)
+	assert.Equal(t, "The hero defeated the villain", result.Reasoning)
+}
+
+func TestScenarioManager_parseScenarioResolution_WithCodeBlock(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	jsonResponse := "```json\n{\"is_resolved\": false, \"answered_questions\": [], \"reasoning\": \"Not yet\"}\n```"
+
+	result, err := sm.parseScenarioResolution(jsonResponse)
+	require.NoError(t, err)
+
+	assert.False(t, result.IsResolved)
+	assert.Len(t, result.AnsweredQuestions, 0)
+}
+
+func TestScenarioManager_parseScenarioResolution_InvalidJSON(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	jsonResponse := "This is not JSON"
+
+	_, err = sm.parseScenarioResolution(jsonResponse)
+	assert.Error(t, err)
+}
+
+func TestScenarioResult_Fields(t *testing.T) {
+	scenario := &Scenario{Title: "Test"}
+
+	result := ScenarioResult{
+		Reason:   ScenarioEndResolved,
+		Scenario: scenario,
+	}
+
+	assert.Equal(t, ScenarioEndResolved, result.Reason)
+	assert.Equal(t, scenario, result.Scenario)
+}
+
+func TestScenarioEndReason_Constants(t *testing.T) {
+	assert.Equal(t, ScenarioEndReason("resolved"), ScenarioEndResolved)
+	assert.Equal(t, ScenarioEndReason("quit"), ScenarioEndQuit)
+	assert.Equal(t, ScenarioEndReason("player_taken_out"), ScenarioEndPlayerTakenOut)
 }

@@ -51,6 +51,12 @@ var sceneGenerationPromptTemplate string
 //go:embed templates/scene_summary_prompt.tmpl
 var sceneSummaryPromptTemplate string
 
+//go:embed templates/scenario_generation_prompt.tmpl
+var scenarioGenerationPromptTemplate string
+
+//go:embed templates/scenario_resolution_prompt.tmpl
+var scenarioResolutionPromptTemplate string
+
 // Template instances
 var (
 	AspectGenerationPrompt       *template.Template
@@ -67,6 +73,8 @@ var (
 	TakenOutPrompt               *template.Template
 	SceneGenerationPrompt        *template.Template
 	SceneSummaryPrompt           *template.Template
+	ScenarioGenerationPrompt     *template.Template
+	ScenarioResolutionPrompt     *template.Template
 )
 
 func init() {
@@ -155,6 +163,18 @@ func init() {
 	if err != nil {
 		panic("failed to parse scene summary prompt template: " + err.Error())
 	}
+
+	// Parse the scenario generation prompt template
+	ScenarioGenerationPrompt, err = template.New("scenario_generation").Parse(scenarioGenerationPromptTemplate)
+	if err != nil {
+		panic("failed to parse scenario generation prompt template: " + err.Error())
+	}
+
+	// Parse the scenario resolution prompt template
+	ScenarioResolutionPrompt, err = template.New("scenario_resolution").Parse(scenarioResolutionPromptTemplate)
+	if err != nil {
+		panic("failed to parse scenario resolution prompt template: " + err.Error())
+	}
 }
 
 // executeTemplate is a helper that executes a template and returns the result as a string
@@ -234,4 +254,14 @@ func RenderSceneGeneration(data SceneGenerationData) (string, error) {
 // RenderSceneSummary renders the scene summary prompt
 func RenderSceneSummary(data SceneSummaryData) (string, error) {
 	return executeTemplate(SceneSummaryPrompt, data)
+}
+
+// RenderScenarioGeneration renders the scenario generation prompt
+func RenderScenarioGeneration(data ScenarioGenerationData) (string, error) {
+	return executeTemplate(ScenarioGenerationPrompt, data)
+}
+
+// RenderScenarioResolution renders the scenario resolution prompt
+func RenderScenarioResolution(data ScenarioResolutionData) (string, error) {
+	return executeTemplate(ScenarioResolutionPrompt, data)
 }

@@ -17,19 +17,13 @@ const (
 	componentScenarioManager = "scenario_manager"
 )
 
-// ScenarioSettings holds configuration for a scenario
-type ScenarioSettings struct {
-	Genre          string // e.g., "Western", "Cyberpunk", "Fantasy"
-	SettingContext string // World/setting description for LLM context
-}
-
-// ScenarioManager orchestrates multi-scene gameplay
+// ScenarioManager orchestrates multi-scene gameplay within a scenario
 type ScenarioManager struct {
 	engine         *Engine
 	player         *character.Character
 	ui             UI
 	sessionLogger  *session.Logger
-	settings       ScenarioSettings
+	scenario       *Scenario              // The current scenario with problem and story questions
 	initialScene   *scene.Scene           // Optional pre-configured starting scene
 	initialNPCs    []*character.Character // NPCs for initial scene
 	sceneSummaries []SceneSummary         // Summaries of recent scenes (sliding window of last 3)
@@ -53,9 +47,9 @@ func (m *ScenarioManager) SetSessionLogger(logger *session.Logger) {
 	m.sessionLogger = logger
 }
 
-// SetSettings configures the scenario settings
-func (m *ScenarioManager) SetSettings(settings ScenarioSettings) {
-	m.settings = settings
+// SetScenario sets the scenario for the manager
+func (m *ScenarioManager) SetScenario(scenario *Scenario) {
+	m.scenario = scenario
 }
 
 // SetInitialScene sets a pre-configured starting scene
@@ -64,19 +58,19 @@ func (m *ScenarioManager) SetInitialScene(s *scene.Scene, npcs []*character.Char
 	m.initialNPCs = npcs
 }
 
-// Run executes the scenario loop, transitioning between scenes until quit or player taken out
-func (m *ScenarioManager) Run(ctx context.Context) error {
+// Run executes the scenario loop, transitioning between scenes until quit, player taken out, or scenario resolved
+func (m *ScenarioManager) Run(ctx context.Context) (*ScenarioResult, error) {
 	if m.engine == nil {
-		return fmt.Errorf("engine is required")
+		return nil, fmt.Errorf("engine is required")
 	}
 	if m.engine.llmClient == nil {
-		return fmt.Errorf("LLM client is required")
+		return nil, fmt.Errorf("LLM client is required")
 	}
 	if m.ui == nil {
-		return fmt.Errorf("UI is required")
+		return nil, fmt.Errorf("UI is required")
 	}
 	if m.player == nil {
-		return fmt.Errorf("player character is required")
+		return nil, fmt.Errorf("player character is required")
 	}
 
 	// Register player with engine
@@ -85,7 +79,7 @@ func (m *ScenarioManager) Run(ctx context.Context) error {
 	// Get or create initial scene
 	currentScene, err := m.getInitialScene(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get initial scene: %w", err)
+		return nil, fmt.Errorf("failed to get initial scene: %w", err)
 	}
 
 	// Main scenario loop
@@ -101,13 +95,13 @@ func (m *ScenarioManager) Run(ctx context.Context) error {
 
 		// Start the scene
 		if err := sceneManager.StartScene(currentScene, m.player); err != nil {
-			return fmt.Errorf("failed to start scene: %w", err)
+			return nil, fmt.Errorf("failed to start scene: %w", err)
 		}
 
 		// Run the scene loop
 		result, err := sceneManager.RunSceneLoop(ctx)
 		if err != nil {
-			return fmt.Errorf("scene loop error: %w", err)
+			return nil, fmt.Errorf("scene loop error: %w", err)
 		}
 
 		// Log the scene end
@@ -129,7 +123,7 @@ func (m *ScenarioManager) Run(ctx context.Context) error {
 		switch result.Reason {
 		case SceneEndQuit:
 			// Player chose to quit
-			return nil
+			return &ScenarioResult{Reason: ScenarioEndQuit, Scenario: m.scenario}, nil
 
 		case SceneEndPlayerTakenOut:
 			// Player was taken out - could continue or end based on context
@@ -138,7 +132,7 @@ func (m *ScenarioManager) Run(ctx context.Context) error {
 				transitionHint = result.TransitionHint
 			} else {
 				// Game over
-				return nil
+				return &ScenarioResult{Reason: ScenarioEndPlayerTakenOut, Scenario: m.scenario}, nil
 			}
 
 		case SceneEndTransition:
@@ -160,6 +154,30 @@ func (m *ScenarioManager) Run(ctx context.Context) error {
 			if m.sessionLogger != nil {
 				m.sessionLogger.Log("scene_summary", summary)
 			}
+
+			// Check if the scenario is resolved (only if we have a scenario with story questions)
+			if m.scenario != nil && len(m.scenario.StoryQuestions) > 0 {
+				resolved, err := m.checkScenarioResolution(ctx, summary)
+				if err != nil {
+					slog.Warn("Failed to check scenario resolution, continuing",
+						"component", componentScenarioManager,
+						"error", err,
+					)
+				} else if resolved {
+					m.scenario.IsResolved = true
+					slog.Info("Scenario resolved",
+						"component", componentScenarioManager,
+						"scenario_title", m.scenario.Title,
+					)
+					if m.sessionLogger != nil {
+						m.sessionLogger.Log("scenario_resolved", map[string]any{
+							"scenario_title": m.scenario.Title,
+							"scenario":       m.scenario,
+						})
+					}
+					return &ScenarioResult{Reason: ScenarioEndResolved, Scenario: m.scenario}, nil
+				}
+			}
 		}
 
 		// Generate the next scene
@@ -169,7 +187,7 @@ func (m *ScenarioManager) Run(ctx context.Context) error {
 				"component", componentScenarioManager,
 				"error", err,
 			)
-			return fmt.Errorf("failed to generate next scene: %w", err)
+			return nil, fmt.Errorf("failed to generate next scene: %w", err)
 		}
 	}
 }
@@ -203,7 +221,7 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 
 	data := SceneGenerationData{
 		TransitionHint:    transitionHint,
-		SettingContext:    m.settings.SettingContext,
+		Scenario:          m.scenario,
 		PlayerName:        m.player.Name,
 		PlayerHighConcept: m.player.Aspects.HighConcept,
 		PlayerTrouble:     m.player.Aspects.Trouble,
@@ -439,4 +457,87 @@ func (m *ScenarioManager) parseSceneSummary(content string) (*SceneSummary, erro
 	}
 
 	return &summary, nil
+}
+
+// checkScenarioResolution uses the LLM to determine if the scenario's story questions have been answered
+func (m *ScenarioManager) checkScenarioResolution(ctx context.Context, latestSummary *SceneSummary) (bool, error) {
+	if m.scenario == nil {
+		return false, nil
+	}
+
+	// Gather player aspects
+	playerAspects := m.player.Aspects.GetAll()
+
+	data := ScenarioResolutionData{
+		Scenario:       m.scenario,
+		SceneSummaries: m.sceneSummaries,
+		LatestSummary:  latestSummary,
+		PlayerName:     m.player.Name,
+		PlayerAspects:  playerAspects,
+	}
+
+	prompt, err := RenderScenarioResolution(data)
+	if err != nil {
+		return false, fmt.Errorf("failed to render scenario resolution prompt: %w", err)
+	}
+
+	resp, err := m.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
+		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		MaxTokens:   300,
+		Temperature: 0.3, // Low temperature for more consistent analysis
+	})
+	if err != nil {
+		return false, fmt.Errorf("LLM request failed: %w", err)
+	}
+
+	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+		return false, fmt.Errorf("empty LLM response")
+	}
+
+	// Parse the resolution result
+	result, err := m.parseScenarioResolution(resp.Choices[0].Message.Content)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse scenario resolution: %w", err)
+	}
+
+	slog.Info("Scenario resolution check",
+		"component", componentScenarioManager,
+		"is_resolved", result.IsResolved,
+		"answered_questions", result.AnsweredQuestions,
+		"reasoning", result.Reasoning,
+	)
+
+	// Log the resolution check
+	if m.sessionLogger != nil {
+		m.sessionLogger.Log("scenario_resolution_check", map[string]any{
+			"is_resolved":        result.IsResolved,
+			"answered_questions": result.AnsweredQuestions,
+			"reasoning":          result.Reasoning,
+		})
+	}
+
+	return result.IsResolved, nil
+}
+
+// parseScenarioResolution parses the LLM response into a ScenarioResolutionResult
+func (m *ScenarioManager) parseScenarioResolution(content string) (*ScenarioResolutionResult, error) {
+	// Clean the response - extract JSON from potential markdown code blocks
+	cleaned := cleanJSONResponse(content)
+
+	var result ScenarioResolutionResult
+	if err := json.Unmarshal([]byte(cleaned), &result); err != nil {
+		// Try to extract just the first JSON object if there's extra content
+		start := strings.Index(content, "{")
+		end := strings.LastIndex(content, "}")
+		if start >= 0 && end > start {
+			cleaned = content[start : end+1]
+			if err := json.Unmarshal([]byte(cleaned), &result); err != nil {
+				return nil, fmt.Errorf("JSON parse error: %w", err)
+			}
+		} else {
+			return nil, fmt.Errorf("no valid JSON found in response")
+		}
+	}
+
+	return &result, nil
 }

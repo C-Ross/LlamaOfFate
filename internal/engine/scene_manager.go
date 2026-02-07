@@ -46,9 +46,9 @@ type SceneManager struct {
 	lastTransition        *SceneTransition // Captured transition hint when scene ends
 	aspectGenerator       *AspectGenerator
 	sessionLogger         *session.Logger
-	takenOutChars         []string         // Characters taken out during this scene
-	sceneEndReason        SceneEndReason   // Why the scene ended
-	playerTakenOutHint    string           // Transition hint if player was taken out
+	takenOutChars         []string       // Characters taken out during this scene
+	sceneEndReason        SceneEndReason // Why the scene ended
+	playerTakenOutHint    string         // Transition hint if player was taken out
 }
 
 // NewSceneManager creates a new scene manager

@@ -128,14 +128,13 @@ type NPCActionDecision struct {
 
 // SceneGenerationData holds the data for scene generation template
 type SceneGenerationData struct {
-	TransitionHint     string         // Hint from previous scene transition
-	SettingContext     string         // Genre/world description
-	PlayerName         string         // Player character name
-	PlayerHighConcept  string         // Player high concept
-	PlayerTrouble      string         // Player trouble aspect
-	PlayerAspects      []string       // Other player aspects
-	RecentEvents       string         // Summary of recent events (optional, deprecated - use PreviousSummaries)
-	PreviousSummaries  []SceneSummary // Summaries of recent scenes (last 3)
+	TransitionHint    string         // Hint from previous scene transition
+	Scenario          *Scenario      // The current scenario context (problem, questions, setting)
+	PlayerName        string         // Player character name
+	PlayerHighConcept string         // Player high concept
+	PlayerTrouble     string         // Player trouble aspect
+	PlayerAspects     []string       // Other player aspects
+	PreviousSummaries []SceneSummary // Summaries of recent scenes (last 3)
 }
 
 // GeneratedScene represents the LLM response for scene generation
@@ -180,4 +179,42 @@ type SceneSummaryData struct {
 	TakenOutChars       []string
 	HowEnded            string // "transition", "quit", "player_taken_out"
 	TransitionHint      string
+}
+
+// Scenario represents a Fate Core scenario with its problem and story questions.
+// Per Fate Core, a scenario is "a unit of game time usually lasting from one to four sessions"
+// with "some kind of big, urgent, open-ended problem" to resolve.
+type Scenario struct {
+	Title          string   `json:"title" yaml:"title"`
+	Problem        string   `json:"problem" yaml:"problem"`                 // The big urgent issue to resolve
+	StoryQuestions []string `json:"story_questions" yaml:"story_questions"` // 2-4 yes/no questions answered during play
+	Setting        string   `json:"setting" yaml:"setting"`                 // World/setting description
+	Genre          string   `json:"genre" yaml:"genre"`                     // e.g., "Western", "Cyberpunk", "Fantasy"
+	IsResolved     bool     `json:"is_resolved" yaml:"is_resolved"`
+}
+
+// ScenarioGenerationData holds the data for scenario generation template
+type ScenarioGenerationData struct {
+	PlayerName        string
+	PlayerHighConcept string
+	PlayerTrouble     string
+	PlayerAspects     []string
+	Genre             string // Optional genre hint
+	Theme             string // Optional theme hint
+}
+
+// ScenarioResolutionData holds the data for scenario resolution check template
+type ScenarioResolutionData struct {
+	Scenario       *Scenario
+	SceneSummaries []SceneSummary
+	LatestSummary  *SceneSummary
+	PlayerName     string
+	PlayerAspects  []string
+}
+
+// ScenarioResolutionResult represents the LLM response for resolution check
+type ScenarioResolutionResult struct {
+	IsResolved        bool     `json:"is_resolved"`
+	AnsweredQuestions []string `json:"answered_questions"` // Questions that have been answered
+	Reasoning         string   `json:"reasoning"`          // Brief explanation
 }

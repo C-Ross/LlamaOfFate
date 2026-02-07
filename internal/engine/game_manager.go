@@ -10,13 +10,12 @@ import (
 )
 
 // GameManager orchestrates the overall game flow, managing scenarios and game state
-// This is a thin wrapper for Phase 1; future phases will add scenario selection/generation
 type GameManager struct {
 	engine        *Engine
 	player        *character.Character
 	ui            UI
 	sessionLogger *session.Logger
-	settings      ScenarioSettings
+	scenario      *Scenario // The scenario to run (can be provided or generated)
 }
 
 // NewGameManager creates a new game manager
@@ -41,14 +40,12 @@ func (g *GameManager) SetSessionLogger(logger *session.Logger) {
 	g.sessionLogger = logger
 }
 
-// SetSettings configures the game/scenario settings
-func (g *GameManager) SetSettings(settings ScenarioSettings) {
-	g.settings = settings
+// SetScenario sets the scenario to run
+func (g *GameManager) SetScenario(scenario *Scenario) {
+	g.scenario = scenario
 }
 
 // Run starts the game loop
-// For Phase 1, this simply runs a single scenario
-// Future phases will add scenario selection, character creation, etc.
 func (g *GameManager) Run(ctx context.Context) error {
 	if g.engine == nil {
 		return fmt.Errorf("engine is required")
@@ -63,16 +60,20 @@ func (g *GameManager) Run(ctx context.Context) error {
 	// Create and configure the scenario manager
 	scenarioManager := NewScenarioManager(g.engine, g.player)
 	scenarioManager.SetUI(g.ui)
-	scenarioManager.SetSettings(g.settings)
+	scenarioManager.SetScenario(g.scenario)
 	if g.sessionLogger != nil {
 		scenarioManager.SetSessionLogger(g.sessionLogger)
 	}
 
 	// Run the scenario
-	// Phase 1: Single scenario, exit when done
-	// Future: Loop for multiple scenarios, handle scenario selection
-	if err := scenarioManager.Run(ctx); err != nil {
+	result, err := scenarioManager.Run(ctx)
+	if err != nil {
 		return fmt.Errorf("scenario error: %w", err)
+	}
+
+	// Handle milestone if scenario was resolved
+	if result != nil && result.Reason == ScenarioEndResolved {
+		g.handleMilestone()
 	}
 
 	return nil
@@ -97,18 +98,44 @@ func (g *GameManager) RunWithInitialScene(ctx context.Context, initialScene *Ini
 	// Create and configure the scenario manager
 	scenarioManager := NewScenarioManager(g.engine, g.player)
 	scenarioManager.SetUI(g.ui)
-	scenarioManager.SetSettings(g.settings)
+	scenarioManager.SetScenario(g.scenario)
 	scenarioManager.SetInitialScene(initialScene.Scene, initialScene.NPCs)
 	if g.sessionLogger != nil {
 		scenarioManager.SetSessionLogger(g.sessionLogger)
 	}
 
 	// Run the scenario
-	if err := scenarioManager.Run(ctx); err != nil {
+	result, err := scenarioManager.Run(ctx)
+	if err != nil {
 		return fmt.Errorf("scenario error: %w", err)
 	}
 
+	// Handle milestone if scenario was resolved
+	if result != nil && result.Reason == ScenarioEndResolved {
+		g.handleMilestone()
+	}
+
 	return nil
+}
+
+// handleMilestone processes a scenario milestone (fate point refresh, etc.)
+func (g *GameManager) handleMilestone() {
+	// Refresh fate points per Fate Core rules
+	g.player.RefreshFatePoints()
+
+	// Display milestone message
+	g.ui.DisplaySystemMessage("\n=== MILESTONE: Scenario Complete! ===")
+	g.ui.DisplaySystemMessage("Your fate points have been refreshed.\n")
+
+	// Log the milestone
+	if g.sessionLogger != nil {
+		g.sessionLogger.Log("milestone", map[string]any{
+			"type":           "scenario_complete",
+			"fate_points":    g.player.FatePoints,
+			"player":         g.player.Name,
+			"scenario_title": g.scenario.Title,
+		})
+	}
 }
 
 // InitialSceneConfig holds configuration for starting with a pre-built scene

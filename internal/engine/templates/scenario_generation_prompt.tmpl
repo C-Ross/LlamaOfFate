@@ -1,0 +1,53 @@
+You are a GM for a Fate Core RPG. Generate a scenario based on the player character.
+
+Per Fate Core, a scenario is "a unit of game time usually lasting from one to four sessions" with "some kind of big, urgent, open-ended problem" to resolve.
+
+PLAYER CHARACTER:
+Name: {{.PlayerName}}
+{{- if .PlayerHighConcept}}
+High Concept: {{.PlayerHighConcept}}
+{{- end}}
+{{- if .PlayerTrouble}}
+Trouble: {{.PlayerTrouble}}
+{{- end}}
+{{- if .PlayerAspects}}
+Other Aspects: {{range $i, $a := .PlayerAspects}}{{if $i}}, {{end}}{{$a}}{{end}}
+{{- end}}
+
+{{- if .Genre}}
+GENRE: {{.Genre}}
+{{- end}}
+
+{{- if .Theme}}
+OPTIONAL THEME: {{.Theme}}
+{{- end}}
+
+Generate a scenario in valid JSON format:
+
+```json
+{
+  "title": "A short evocative title (2-5 words)",
+  "problem": "The big urgent issue that needs to be resolved. Should be open-ended with multiple possible solutions.",
+  "story_questions": [
+    "Can/Will [character] accomplish [goal]?",
+    "Will [consequence] happen before [deadline]?",
+    "Can [obstacle] be overcome?"
+  ],
+  "setting": "A paragraph describing the world/setting context for the scenario",
+  "genre": "The genre (Western, Fantasy, Cyberpunk, etc.)"
+}
+```
+
+FATE CORE SCENARIO GUIDELINES:
+1. The problem should be BIG and URGENT - not something that can wait
+2. Story questions should be yes/no format, starting with "Can" or "Will"
+3. Include 2-4 story questions that add nuance before the final "Can they solve the problem?"
+4. Draw from the character's aspects - especially Trouble - to create complications
+5. The problem should have no single "right" solution
+6. Story questions should shape the plot - different answers lead to different outcomes
+
+Example story questions:
+- "Will the sheriff discover the outlaw's true identity?"
+- "Can the town be saved before the gang arrives?"
+- "Will old rivalries prevent cooperation?"
+

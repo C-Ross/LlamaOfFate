@@ -1,0 +1,58 @@
+You are a GM for a Fate Core RPG. Analyze whether the current scenario has been resolved.
+
+SCENARIO:
+Title: {{.Scenario.Title}}
+Problem: {{.Scenario.Problem}}
+Story Questions:
+{{- range .Scenario.StoryQuestions}}
+- {{.}}
+{{- end}}
+
+PLAYER: {{.PlayerName}}
+{{- if .PlayerAspects}}
+Player Aspects: {{range $i, $a := .PlayerAspects}}{{if $i}}, {{end}}{{$a}}{{end}}
+{{- end}}
+
+{{- if .SceneSummaries}}
+SCENE HISTORY:
+{{- range $i, $s := .SceneSummaries}}
+--- Scene {{$i}} ---
+{{$s.NarrativeProse}}
+Key Events: {{range $j, $e := $s.KeyEvents}}{{if $j}}; {{end}}{{$e}}{{end}}
+{{- end}}
+{{- end}}
+
+{{- if .LatestSummary}}
+MOST RECENT SCENE:
+{{.LatestSummary.NarrativeProse}}
+Key Events: {{range $i, $e := .LatestSummary.KeyEvents}}{{if $i}}; {{end}}{{$e}}{{end}}
+{{- if .LatestSummary.UnresolvedThreads}}
+Unresolved: {{range $i, $t := .LatestSummary.UnresolvedThreads}}{{if $i}}, {{end}}{{$t}}{{end}}
+{{- end}}
+{{- end}}
+
+Analyze whether the scenario's story questions have been answered and whether the central problem has been resolved.
+
+A scenario is resolved when:
+1. The main problem has been definitively addressed (solved, circumvented, or made moot)
+2. Most story questions have clear answers (yes or no)
+3. There's a natural sense of closure
+
+A scenario is NOT resolved if:
+- The problem is still active and urgent
+- Key story questions remain unanswered
+- There are significant unresolved threads that relate to the main problem
+
+Respond in valid JSON format:
+
+```json
+{
+  "is_resolved": true or false,
+  "answered_questions": [
+    "Question text - YES/NO"
+  ],
+  "reasoning": "Brief explanation of why the scenario is or is not resolved"
+}
+```
+
+Be conservative - only mark resolved if there's clear closure. Scenarios can continue even after partial answers.

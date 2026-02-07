@@ -6,6 +6,26 @@ FATE CORE SCENE GUIDELINES:
 - NPCs should be introduced only when dramatically appropriate
 - Keep descriptions evocative but concise
 
+{{- if .Scenario}}
+SCENARIO CONTEXT:
+{{- if .Scenario.Title}}
+Title: {{.Scenario.Title}}
+{{- end}}
+Problem: {{.Scenario.Problem}}
+Story Questions (to be answered through play):
+{{- range .Scenario.StoryQuestions}}
+- {{.}}
+{{- end}}
+
+{{- if .Scenario.Setting}}
+SETTING:
+{{.Scenario.Setting}}
+{{- end}}
+{{- if .Scenario.Genre}}
+Genre: {{.Scenario.Genre}}
+{{- end}}
+{{- end}}
+
 {{- if .PreviousSummaries}}
 STORY SO FAR:
 {{- range $i, $s := .PreviousSummaries}}
@@ -24,11 +44,6 @@ The previous scene ended with the player heading toward: {{.TransitionHint}}
 Starting a new adventure.
 {{- end}}
 
-{{- if .SettingContext}}
-SETTING/GENRE:
-{{.SettingContext}}
-{{- end}}
-
 PLAYER CHARACTER:
 Name: {{.PlayerName}}
 {{- if .PlayerHighConcept}}
@@ -39,11 +54,6 @@ Trouble: {{.PlayerTrouble}}
 {{- end}}
 {{- if .PlayerAspects}}
 Other Aspects: {{range $i, $a := .PlayerAspects}}{{if $i}}, {{end}}{{$a}}{{end}}
-{{- end}}
-
-{{- if .RecentEvents}}
-RECENT EVENTS:
-{{.RecentEvents}}
 {{- end}}
 
 Generate a new scene in valid JSON format:
@@ -72,6 +82,10 @@ Rules:
 - situation_aspects should be 2-3 invokable/compellable aspects
 - npcs array can be empty if no NPCs are present; include at most 1-2 NPCs
 - Keep the scene open-ended to allow player agency
+{{- if .Scenario}}
+- Create scenes that advance toward answering the story questions
+- Include elements that relate to the scenario's central problem
+{{- end}}
 {{- if .PreviousSummaries}}
 - Reference or build upon unresolved threads from previous scenes when appropriate
 - NPCs encountered previously may reappear or be referenced

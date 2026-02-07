@@ -44,20 +44,23 @@ func TestGameManager_SetUI(t *testing.T) {
 	assert.Equal(t, mockUI, gm.ui)
 }
 
-func TestGameManager_SetSettings(t *testing.T) {
+func TestGameManager_SetScenario(t *testing.T) {
 	engine, err := NewWithLLM(&MockLLMClientForScenario{})
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine)
-	settings := ScenarioSettings{
-		Genre:          "Fantasy",
-		SettingContext: "A magical realm",
+	scenario := &Scenario{
+		Title:   "Test Scenario",
+		Problem: "A test problem",
+		Genre:   "Fantasy",
+		Setting: "A magical realm",
 	}
 
-	gm.SetSettings(settings)
+	gm.SetScenario(scenario)
 
-	assert.Equal(t, "Fantasy", gm.settings.Genre)
-	assert.Equal(t, "A magical realm", gm.settings.SettingContext)
+	assert.Equal(t, "Fantasy", gm.scenario.Genre)
+	assert.Equal(t, "A magical realm", gm.scenario.Setting)
+	assert.Equal(t, "A test problem", gm.scenario.Problem)
 }
 
 func TestGameManager_Run_RequiresEngine(t *testing.T) {
