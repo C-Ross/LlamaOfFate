@@ -18,14 +18,14 @@ import (
 
 // ScenarioResTestCase represents a test case for scenario resolution checking
 type ScenarioResTestCase struct {
-	Name             string
-	Scenario         *engine.Scenario
-	SceneSummaries   []engine.SceneSummary
-	LatestSummary    *engine.SceneSummary
-	PlayerName       string
-	PlayerAspects    []string
-	ExpectResolved   bool
-	Description      string // Why this should/shouldn't be resolved
+	Name           string
+	Scenario       *engine.Scenario
+	SceneSummaries []engine.SceneSummary
+	LatestSummary  *engine.SceneSummary
+	PlayerName     string
+	PlayerAspects  []string
+	ExpectResolved bool
+	Description    string // Why this should/shouldn't be resolved
 }
 
 // getResolvedTestCases returns scenarios that SHOULD be marked resolved

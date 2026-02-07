@@ -31,21 +31,21 @@ type SceneGenTestCase struct {
 
 // SceneGenResult stores the result of a scene generation evaluation
 type SceneGenResult struct {
-	TestCase           SceneGenTestCase
-	RawResponse        string
-	Parsed             *engine.GeneratedScene
-	ValidJSON          bool
-	HasSceneName       bool
-	SceneNameLength    int  // word count
-	HasDescription     bool
+	TestCase            SceneGenTestCase
+	RawResponse         string
+	Parsed              *engine.GeneratedScene
+	ValidJSON           bool
+	HasSceneName        bool
+	SceneNameLength     int // word count
+	HasDescription      bool
 	HasSituationAspects bool
-	SituationAspectCt  int
-	NPCCount           int
-	NPCsHaveHighConc   bool
-	NPCsHaveDisp       bool
-	AdvancesStory      bool // Description or aspects relate to scenario
-	Passed             bool
-	Error              error
+	SituationAspectCt   int
+	NPCCount            int
+	NPCsHaveHighConc    bool
+	NPCsHaveDisp        bool
+	AdvancesStory       bool // Description or aspects relate to scenario
+	Passed              bool
+	Error               error
 }
 
 func getSceneGenTestCases() []SceneGenTestCase {

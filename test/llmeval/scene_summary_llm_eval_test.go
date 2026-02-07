@@ -33,7 +33,7 @@ type SceneSummaryResult struct {
 	HasKeyEvents      bool
 	KeyEventCount     int
 	HasHowEnded       bool
-	NPCsMatch        bool // NPCs encountered match those in the scene
+	NPCsMatch         bool // NPCs encountered match those in the scene
 	HasUnresolved     bool // Has unresolved threads when expected
 	ProseIsNarrative  bool // Reads like a recap, not a list
 	Passed            bool
@@ -72,7 +72,7 @@ func getSceneSummaryTestCases() []SceneSummaryTestCase {
 					{PlayerInput: "Jesse fires at the one reloading", GMResponse: "Your shot hits true. The bandit on the left collapses. The other one shouts a curse and starts retreating upstream."},
 					{PlayerInput: "Jesse chases after the retreating bandit", GMResponse: "You pursue through the shallows. The bandit stumbles and you catch up. He throws down his weapons. 'Don't shoot! Cortez sent us! He knows you're coming!'"},
 				},
-				NPCsInScene:   []engine.NPCSummary{{Name: "Creek Bandits", Attitude: "hostile"}},
+				NPCsInScene:    []engine.NPCSummary{{Name: "Creek Bandits", Attitude: "hostile"}},
 				TakenOutChars:  []string{"Bandit Left Flank"},
 				HowEnded:       "transition",
 				TransitionHint: "continuing upstream toward the mine",
@@ -110,8 +110,8 @@ func getSceneSummaryTestCases() []SceneSummaryTestCase {
 					{Name: "Big Pete", Attitude: "friendly"},
 					{Name: "Elena", Attitude: "friendly"},
 				},
-				TakenOutChars: []string{},
-				HowEnded:      "transition",
+				TakenOutChars:  []string{},
+				HowEnded:       "transition",
 				TransitionHint: "Hank's cabin up the mountain",
 			},
 			Description: "Complex scene with multiple NPCs should have multiple unresolved threads (map symbols, Hank's whereabouts, vault)",
