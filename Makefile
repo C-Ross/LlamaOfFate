@@ -16,13 +16,13 @@ BINARY_NAME=llamaoffate
 BINARY_PATH=./bin/$(BINARY_NAME)
 MAIN_PATH=./cmd/cli
 
-.PHONY: all build clean test test-llm vet fmt lint deps validate help scenario-generator scene-generator scenario-walkthrough
+.PHONY: all build clean test test-llm vet fmt fmtcheck lint deps validate help scenario-generator scene-generator scenario-walkthrough
 
 # Default target
 all: clean deps vet fmt build
 
 # Run all validation checks
-validate: vet fmt lint test
+validate: vet fmtcheck lint test
 	@echo "All validations passed!"
 
 # Build the application
@@ -59,6 +59,11 @@ vet:
 fmt:
 	@echo "Formatting code..."
 	$(GOFMT) -s -w .
+
+# Check code formatting (fails if unformatted)
+fmtcheck:
+	@echo "Checking formatting..."
+	@test -z "$$($(GOFMT) -s -l .)" || (echo "Files not formatted:" && $(GOFMT) -s -l . && exit 1)
 
 # Run golangci-lint
 lint:
