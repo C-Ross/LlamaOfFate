@@ -477,11 +477,21 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 	var defenseResult *dice.CheckResult
 	var targetChar *character.Character
 	if parsedAction.Type == action.Attack && parsedAction.Target != "" {
+		// Try ID-based lookup first, then fall back to name-based lookup
 		targetChar = sm.engine.GetCharacter(parsedAction.Target)
-		if targetChar != nil {
-			defenseResult = sm.rollTargetDefense(targetChar, parsedAction.Skill)
-			parsedAction.Difficulty = defenseResult.FinalValue
+		if targetChar == nil {
+			targetChar = sm.engine.GetCharacterByName(parsedAction.Target)
 		}
+		if targetChar == nil {
+			slog.Warn("Attack target not found, action aborted",
+				"component", componentSceneManager,
+				"target", parsedAction.Target)
+			sm.ui.DisplaySystemMessage(fmt.Sprintf(
+				"Could not find target '%s' — try again.", parsedAction.Target))
+			return
+		}
+		defenseResult = sm.rollTargetDefense(targetChar, parsedAction.Skill)
+		parsedAction.Difficulty = defenseResult.FinalValue
 	}
 
 	// Display initial result
@@ -915,8 +925,12 @@ func (sm *SceneManager) applyActionEffects(parsedAction *action.Action, target *
 
 	case action.Attack:
 		if target == nil {
-			slog.Debug("Attack has no valid target, skipping damage application",
-				"component", componentSceneManager)
+			slog.Warn("Attack has no valid target, cannot apply damage",
+				"component", componentSceneManager,
+				"action_id", parsedAction.ID,
+				"target", parsedAction.Target)
+			sm.ui.DisplaySystemMessage(fmt.Sprintf(
+				"Could not find target '%s' — attack has no effect.", parsedAction.Target))
 			return
 		}
 

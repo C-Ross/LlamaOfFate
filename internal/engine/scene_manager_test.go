@@ -1308,3 +1308,340 @@ func TestSceneManager_HandleConcession_WithConsequences(t *testing.T) {
 	}
 	assert.True(t, foundConsequenceBonus, "Expected message about bonus fate points for consequences")
 }
+
+func TestEngine_GetCharacterByName_ExactMatch(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	npc := character.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
+	engine.AddCharacter(npc)
+
+	result := engine.GetCharacterByName("Bart the Outlaw")
+	require.NotNil(t, result)
+	assert.Equal(t, "scene-abc_npc_0", result.ID)
+	assert.Equal(t, "Bart the Outlaw", result.Name)
+}
+
+func TestEngine_GetCharacterByName_CaseInsensitive(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	npc := character.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
+	engine.AddCharacter(npc)
+
+	result := engine.GetCharacterByName("bart the outlaw")
+	require.NotNil(t, result)
+	assert.Equal(t, "scene-abc_npc_0", result.ID)
+
+	result = engine.GetCharacterByName("BART THE OUTLAW")
+	require.NotNil(t, result)
+	assert.Equal(t, "scene-abc_npc_0", result.ID)
+}
+
+func TestEngine_GetCharacterByName_Trimmed(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	npc := character.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
+	engine.AddCharacter(npc)
+
+	result := engine.GetCharacterByName("  Bart the Outlaw  ")
+	require.NotNil(t, result)
+	assert.Equal(t, "scene-abc_npc_0", result.ID)
+}
+
+func TestEngine_GetCharacterByName_NoMatch(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	npc := character.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
+	engine.AddCharacter(npc)
+
+	result := engine.GetCharacterByName("Nobody")
+	assert.Nil(t, result)
+}
+
+func TestEngine_GetCharacterByName_IDDoesNotMatch(t *testing.T) {
+	// Reproduces issue #25: the LLM returns a name, not an ID
+	engine, err := New()
+	require.NoError(t, err)
+
+	npc := character.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
+	engine.AddCharacter(npc)
+
+	// ID-based lookup fails with a name
+	byID := engine.GetCharacter("Bart the Outlaw")
+	assert.Nil(t, byID, "Name should not match ID-based lookup")
+
+	// Name-based lookup succeeds
+	byName := engine.GetCharacterByName("Bart the Outlaw")
+	require.NotNil(t, byName, "Name-based lookup should find the character")
+	assert.Equal(t, "scene-abc_npc_0", byName.ID)
+}
+
+func TestSceneManager_ApplyActionEffects_Attack_NilTarget_ShowsError(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	player := character.NewCharacter("player-1", "Hero")
+	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
+	testScene.AddCharacter(player.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	// Create an attack action with a target name that can't be resolved
+	testAction := action.NewActionWithTarget(
+		"action-1",
+		player.ID,
+		action.Attack,
+		"Fight",
+		"Strike the bandit",
+		"Bart the Outlaw",
+	)
+	testAction.Outcome = &dice.Outcome{
+		Type:   dice.Success,
+		Shifts: 3,
+	}
+
+	// Call with nil target (simulating failed resolution)
+	sm.applyActionEffects(testAction, nil)
+
+	// Should display an error message to the player, not silently skip
+	found := false
+	for _, msg := range mockUI.displayedMessages {
+		if strings.Contains(msg, "Could not find target") && strings.Contains(msg, "Bart the Outlaw") {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "Expected error message about missing target, got: %v", mockUI.displayedMessages)
+}
+
+func TestSceneManager_ApplyActionEffects_Attack_DealsDamage(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	player := character.NewCharacter("player-1", "Hero")
+	target := character.NewCharacter("target-1", "Goblin")
+
+	engine.AddCharacter(player)
+	engine.AddCharacter(target)
+
+	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(target.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	// Verify target starts with full stress
+	initialAvailable := target.GetStressTrack(character.PhysicalStress).AvailableBoxes()
+
+	// Create a successful attack action
+	testAction := action.NewActionWithTarget(
+		"action-1",
+		player.ID,
+		action.Attack,
+		"Fight",
+		"Strike the goblin",
+		target.ID,
+	)
+	testAction.Outcome = &dice.Outcome{
+		Type:   dice.Success,
+		Shifts: 1,
+	}
+
+	sm.applyActionEffects(testAction, target)
+
+	// Verify stress was actually applied
+	afterAvailable := target.GetStressTrack(character.PhysicalStress).AvailableBoxes()
+	assert.Less(t, afterAvailable, initialAvailable, "Target should have taken stress")
+
+	// Verify damage message was displayed
+	foundDamageMsg := false
+	foundAbsorbMsg := false
+	for _, msg := range mockUI.displayedMessages {
+		if strings.Contains(msg, "deals") && strings.Contains(msg, "shifts") {
+			foundDamageMsg = true
+		}
+		if strings.Contains(msg, "absorbs the damage") {
+			foundAbsorbMsg = true
+		}
+	}
+	assert.True(t, foundDamageMsg, "Expected damage message")
+	assert.True(t, foundAbsorbMsg, "Expected stress absorption message")
+}
+
+func TestSceneManager_ApplyActionEffects_Attack_Tie_GrantsBoost(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	player := character.NewCharacter("player-1", "Hero")
+	target := character.NewCharacter("target-1", "Goblin")
+
+	engine.AddCharacter(player)
+	engine.AddCharacter(target)
+
+	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(target.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	// Create an attack action that ties
+	testAction := action.NewActionWithTarget(
+		"action-1",
+		player.ID,
+		action.Attack,
+		"Fight",
+		"Strike the goblin",
+		target.ID,
+	)
+	testAction.Outcome = &dice.Outcome{
+		Type:   dice.Tie,
+		Shifts: 0,
+	}
+
+	sm.applyActionEffects(testAction, target)
+
+	// Verify boost message was displayed
+	found := false
+	for _, msg := range mockUI.displayedMessages {
+		if strings.Contains(msg, "boost") {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "Expected boost message on tie, got: %v", mockUI.displayedMessages)
+}
+
+func TestSceneManager_ResolveAction_TargetByName(t *testing.T) {
+	// Tests the core fix for issue #25: resolveAction should find targets by name
+	mockClient := &MockLLMClient{response: "The attack strikes true!"}
+	engine, err := NewWithLLM(mockClient)
+	require.NoError(t, err)
+
+	sm := engine.GetSceneManager()
+	sm.roller = dice.NewSeededRoller(42)
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	// Create player and NPC with different ID and name
+	player := character.NewCharacter("player-1", "Hero")
+	player.SetSkill("Fight", dice.Good)
+	npc := character.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
+	npc.SetSkill("Athletics", dice.Fair)
+
+	engine.AddCharacter(player)
+	engine.AddCharacter(npc)
+
+	testScene := scene.NewScene("scene-abc", "Saloon", "A dusty saloon.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(npc.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	// Simulate what the LLM action parser returns: target is the NPC's NAME, not ID
+	testAction := action.NewActionWithTarget(
+		"action-1",
+		player.ID,
+		action.Attack,
+		"Fight",
+		"Punch Bart",
+		"Bart the Outlaw", // Name, not ID — this is what the LLM returns
+	)
+	testAction.Difficulty = dice.Fair
+
+	ctx := context.Background()
+	sm.resolveAction(ctx, testAction)
+
+	// The attack should have resolved against Bart — check defense was rolled
+	// and damage was applied (if target wasn't found, no damage messages would appear)
+	foundDefenseResult := false
+	foundDamageApplied := false
+	for _, msg := range mockUI.displayedMessages {
+		if strings.Contains(msg, "Bart the Outlaw") && strings.Contains(msg, "defends") {
+			foundDefenseResult = true
+		}
+		if strings.Contains(msg, "shifts") && strings.Contains(msg, "Bart the Outlaw") {
+			foundDamageApplied = true
+		}
+	}
+	assert.True(t, foundDefenseResult,
+		"Expected defense roll against 'Bart the Outlaw' via name lookup, got: %v",
+		mockUI.displayedMessages)
+	assert.True(t, foundDamageApplied,
+		"Expected damage applied to 'Bart the Outlaw', got: %v",
+		mockUI.displayedMessages)
+}
+
+func TestSceneManager_ResolveAction_UnknownTarget_AbortsWithoutConsumingTurn(t *testing.T) {
+	// When a target can't be resolved, the action should abort early:
+	// no dice roll, no narrative, no turn advancement.
+	mockClient := &MockLLMClient{response: "Should not be called"}
+	engine, err := NewWithLLM(mockClient)
+	require.NoError(t, err)
+
+	sm := engine.GetSceneManager()
+	sm.roller = dice.NewSeededRoller(42)
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	player := character.NewCharacter("player-1", "Hero")
+	player.SetSkill("Fight", dice.Good)
+	player.SetSkill("Notice", dice.Fair)
+	npc := character.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
+	npc.SetSkill("Notice", dice.Average)
+
+	engine.AddCharacter(player)
+	engine.AddCharacter(npc)
+
+	testScene := scene.NewScene("scene-abc", "Saloon", "A dusty saloon.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(npc.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	// Attack a target that doesn't exist in the scene
+	testAction := action.NewActionWithTarget(
+		"action-1",
+		player.ID,
+		action.Attack,
+		"Fight",
+		"Attack the ghost",
+		"The Ghost", // No such character
+	)
+	testAction.Difficulty = dice.Fair
+
+	ctx := context.Background()
+	sm.resolveAction(ctx, testAction)
+
+	// Should see the "try again" message
+	foundTryAgain := false
+	for _, msg := range mockUI.displayedMessages {
+		if strings.Contains(msg, "Could not find target") && strings.Contains(msg, "try again") {
+			foundTryAgain = true
+		}
+	}
+	assert.True(t, foundTryAgain,
+		"Expected 'try again' message for unknown target, got: %v", mockUI.displayedMessages)
+
+	// Should NOT see any dice results, narratives, or damage messages
+	for _, msg := range mockUI.displayedMessages {
+		assert.False(t, strings.HasPrefix(msg, "ActionResult:"),
+			"Should not roll dice when target is unknown, got: %v", mockUI.displayedMessages)
+		assert.False(t, strings.HasPrefix(msg, "Narrative:"),
+			"Should not generate narrative when target is unknown, got: %v", mockUI.displayedMessages)
+	}
+}

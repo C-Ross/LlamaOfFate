@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"strings"
+
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
@@ -64,9 +66,22 @@ func (e *Engine) AddCharacter(char *character.Character) {
 	e.characterRegistry[char.ID] = char
 }
 
-// GetCharacter retrieves a character from the registry
+// GetCharacter retrieves a character from the registry by ID
 func (e *Engine) GetCharacter(id string) *character.Character {
 	return e.characterRegistry[id]
+}
+
+// GetCharacterByName retrieves a character from the registry by name.
+// It performs a case-insensitive match against character names.
+// Returns nil if no match is found.
+func (e *Engine) GetCharacterByName(name string) *character.Character {
+	lowerName := strings.ToLower(strings.TrimSpace(name))
+	for _, char := range e.characterRegistry {
+		if strings.ToLower(char.Name) == lowerName {
+			return char
+		}
+	}
+	return nil
 }
 
 // GetAllCharacters returns all characters in the registry
