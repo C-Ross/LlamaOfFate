@@ -6,14 +6,14 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"strings"
+	"time"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
-	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
-	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/C-Ross/LlamaOfFate/internal/ui/terminal"
 )
 
@@ -22,24 +22,19 @@ const (
 	AppVersion = "0.1.0"
 )
 
-// initializeEngine attempts to create a game engine with LLM support if available
+// initializeEngine creates a game engine with LLM support
 func initializeEngine() *engine.Engine {
-	// Try to load LLM configuration
 	configPath := "configs/azure-llm.yaml"
 	if _, err := os.Stat(configPath); err != nil {
-
 		log.Fatalf("LLM config not found at %s", configPath)
 	}
-	// Config file exists, try to load it
+
 	config, err := azure.LoadConfig(configPath)
 	if err != nil {
 		log.Fatalf("Found LLM config but failed to load it: %v", err)
 	}
 
-	// Try to create engine with LLM
 	azureClient := azure.NewClient(*config)
-
-	// Wrap the Azure client with retry logic for resilience
 	retryClient := llm.NewRetryingClient(azureClient, llm.DefaultRetryConfig())
 
 	gameEngine, err := engine.NewWithLLM(retryClient)
@@ -52,106 +47,102 @@ func initializeEngine() *engine.Engine {
 }
 
 func main() {
-	// Setup logging early
 	logging.SetupDefaultLogging()
+
+	// Handle subcommands before engine init
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "version":
+			showVersion()
+			return
+		case "help":
+			showHelp()
+			return
+		default:
+			fmt.Fprintf(os.Stderr, "Unknown command: %s\n\n", os.Args[1])
+			showHelp()
+			os.Exit(1)
+		}
+	}
 
 	fmt.Printf("%s v%s - A Fate Core RPG with LLM integration\n", AppName, AppVersion)
 	fmt.Println("====================================================")
 
-	// Initialize the game engine, preferably with LLM if available
 	gameEngine := initializeEngine()
 
-	// Check for command line arguments
-	if len(os.Args) > 1 {
-		// Handle command line arguments
-		handleArgs(os.Args[1:])
-		return
-	}
+	// Use hardcoded scenario and player (see scenario.go)
+	scenario := defaultScenario()
+	player := defaultPlayer()
 
-	if err := runInteractiveMode(gameEngine); err != nil {
-		log.Fatalf("Interactive mode error: %v", err)
-	}
-}
-
-func handleArgs(args []string) {
-	switch args[0] {
-	case "version":
-		showVersion()
-	case "help":
-		showHelp()
-	default:
-		fmt.Printf("Unknown command: %s\n", args[0])
-		showHelp()
-		os.Exit(1)
-	}
-}
-
-func runInteractiveMode(gameEngine *engine.Engine) error {
-	ui := terminal.NewTerminalUI()
-
-	return startSampleScene(gameEngine, ui)
-}
-
-// startSampleScene starts a sample scene for testing
-func startSampleScene(gameEngine *engine.Engine, ui *terminal.TerminalUI) error {
-	fmt.Println("Starting sample scene...")
-
-	// Check if LLM is available
-	sceneManager := gameEngine.GetSceneManager()
-	if sceneManager == nil {
-		return fmt.Errorf("scene manager not available")
-	}
-
-	hasLLM := gameEngine.GetActionParser() != nil
-	if hasLLM {
-		fmt.Println("✓ Enhanced scene with LLM support - natural language actions available!")
-		fmt.Println("  You can try commands like:")
-		fmt.Println("    \"What do I see?\" \"Examine the symbols\" \"Enter the cave cautiously\"")
-	} else {
-		fmt.Println("⚠ Basic scene mode - LLM not configured")
-		fmt.Println("  Scene commands available: help, scene, character, status, aspects")
-		fmt.Println("  Configure LLM for natural language interactions")
-	}
+	fmt.Printf("Scenario: %s (%s)\n", scenario.Title, scenario.Genre)
+	fmt.Printf("Player:   %s — \"%s\"\n", player.Name, player.Aspects.HighConcept)
 	fmt.Println()
 
-	// Create a sample character
-	player := character.NewCharacter("player1", "Test Character")
-	player.Aspects.HighConcept = "Brave Adventurer"
-	player.Aspects.Trouble = "Too Curious for My Own Good"
-	player.SetSkill("Athletics", dice.Good)
-	player.SetSkill("Fight", dice.Fair)
-	player.SetSkill("Notice", dice.Fair)
-
-	// Create a sample scene
-	sampleScene := scene.NewScene(
-		"test-scene",
-		"A Mysterious Cave",
-		"You stand at the entrance of a dark cave. Cool air flows from within, "+
-			"and you can hear the distant sound of dripping water. "+
-			"Strange symbols are carved into the stone archway above.",
-	)
-
-	// Add the player to the scene
-	sampleScene.AddCharacter(player.ID)
-
-	// Set up the UI for the scene manager
-	sceneManager.SetUI(ui)
-
-	// Set scene info for the UI so it can display character and scene details
-	ui.SetSceneInfo(sceneManager)
-
-	// Start scene
-	if err := sceneManager.StartScene(sampleScene, player); err != nil {
-		return fmt.Errorf("failed to start scene: %w", err)
+	// Set up session logging
+	sessionLogger, err := setupSessionLogger(scenario, player.Name)
+	if err != nil {
+		log.Fatalf("Failed to create session logger: %v", err)
+	}
+	if sessionLogger != nil {
+		defer func() {
+			if closeErr := sessionLogger.Close(); closeErr != nil {
+				log.Printf("Warning: Failed to close session logger: %v", closeErr)
+			}
+		}()
+		sessionLogger.Log("scenario", scenario)
+		sessionLogger.Log("player", map[string]any{
+			"name":         player.Name,
+			"high_concept": player.Aspects.HighConcept,
+			"trouble":      player.Aspects.Trouble,
+		})
 	}
 
-	// Run scene loop
+	// Wire everything into the GameManager and run
+	ui := terminal.NewTerminalUI()
+
+	gm := engine.NewGameManager(gameEngine)
+	gm.SetPlayer(player)
+	gm.SetUI(ui)
+	gm.SetScenario(scenario)
+	if sessionLogger != nil {
+		gm.SetSessionLogger(sessionLogger)
+	}
+
+	fmt.Println("Type naturally to interact, 'quit' to exit.")
+	fmt.Println("====================================================")
+
 	ctx := context.Background()
-	if _, err := sceneManager.RunSceneLoop(ctx); err != nil {
-		return fmt.Errorf("scene loop error: %w", err)
+	if err := gm.Run(ctx); err != nil {
+		log.Fatalf("Game error: %v", err)
 	}
 
-	return nil
+	fmt.Println("\nThanks for playing!")
+}
+
+// setupSessionLogger creates a session logger with an auto-generated filename
+func setupSessionLogger(scenario *engine.Scenario, playerName string) (*session.Logger, error) {
+	label := strings.ToLower(scenario.Genre)
+	if label == "" {
+		label = "game"
+	}
+	safeName := strings.ToLower(strings.ReplaceAll(playerName, " ", "_"))
+	safeName = strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' {
+			return r
+		}
+		return -1
+	}, safeName)
+	if len(safeName) > 20 {
+		safeName = safeName[:20]
+	}
+	logPath := fmt.Sprintf("session_%s_%s_%s.yaml", label, safeName, time.Now().Format("20060102_150405"))
+
+	logger, err := session.NewLogger(logPath)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Printf("Session log: %s\n", logPath)
+	return logger, nil
 }
 
 func showHelp() {
@@ -160,7 +151,7 @@ func showHelp() {
 	fmt.Println("  help     - Show this help message")
 	fmt.Println("  version  - Show version information")
 	fmt.Println()
-	fmt.Println("If no command is provided, starts in interactive mode.")
+	fmt.Println("If no command is provided, starts the game.")
 }
 
 func showVersion() {
