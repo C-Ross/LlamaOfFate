@@ -450,7 +450,7 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 	}
 
 	// Apply mechanical effects based on action type and outcome
-	sm.applyActionEffects(parsedAction, targetChar)
+	sm.applyActionEffects(ctx, parsedAction, targetChar)
 
 	// If we're in a conflict, advance turn and process NPC turns
 	if sm.currentScene.IsConflict {
@@ -638,7 +638,7 @@ func (sm *SceneManager) handlePostRollInvokes(result *dice.CheckResult, difficul
 }
 
 // applyActionEffects applies mechanical effects based on action results
-func (sm *SceneManager) applyActionEffects(parsedAction *action.Action, target *character.Character) {
+func (sm *SceneManager) applyActionEffects(ctx context.Context, parsedAction *action.Action, target *character.Character) {
 	if parsedAction.Outcome == nil {
 		return
 	}
@@ -646,7 +646,7 @@ func (sm *SceneManager) applyActionEffects(parsedAction *action.Action, target *
 	switch parsedAction.Type {
 	case action.CreateAdvantage:
 		if parsedAction.IsSuccess() {
-			aspectName, freeInvokes := sm.generateAspectName(parsedAction)
+			aspectName, freeInvokes := sm.generateAspectName(ctx, parsedAction)
 
 			situationAspect := scene.NewSituationAspect(
 				fmt.Sprintf("aspect-%d", time.Now().UnixNano()),
@@ -695,7 +695,7 @@ func (sm *SceneManager) applyActionEffects(parsedAction *action.Action, target *
 
 // generateAspectName uses the LLM to generate a creative aspect name for Create an Advantage
 // Falls back to a simple description-based name if the LLM is unavailable or fails
-func (sm *SceneManager) generateAspectName(parsedAction *action.Action) (string, int) {
+func (sm *SceneManager) generateAspectName(ctx context.Context, parsedAction *action.Action) (string, int) {
 	// Determine free invokes based on outcome
 	freeInvokes := 1
 	if parsedAction.IsSuccessWithStyle() {
@@ -728,8 +728,8 @@ func (sm *SceneManager) generateAspectName(parsedAction *action.Action) (string,
 		ExistingAspects: existingAspects,
 	}
 
-	// Generate aspect via LLM
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// Generate aspect via LLM with timeout derived from the caller's context
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	response, err := sm.aspectGenerator.GenerateAspect(ctx, req)
@@ -785,11 +785,18 @@ func (sm *SceneManager) handleTargetStressOverflow(target *character.Character, 
 		return
 	}
 
-	// NPC takes the most appropriate consequence automatically
-	// (In a more sophisticated system, NPC AI could choose strategically)
+	// NPC takes the most appropriate consequence automatically.
+	// Prefer the smallest consequence that fully covers shifts.
+	// If none covers shifts, pick the largest available to minimize remaining damage.
 	bestConseq := availableConseq[0]
 	for _, c := range availableConseq {
-		if c.Value >= shifts && c.Value < bestConseq.Value {
+		if c.Value >= shifts {
+			// If current best doesn't cover shifts yet, or this one is a smaller fit.
+			if bestConseq.Value < shifts || c.Value < bestConseq.Value {
+				bestConseq = c
+			}
+		} else if bestConseq.Value < shifts && c.Value > bestConseq.Value {
+			// No covering consequence yet; track the largest under-shifts consequence.
 			bestConseq = c
 		}
 	}

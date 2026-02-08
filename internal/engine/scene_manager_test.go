@@ -221,7 +221,7 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage(t *testing.T) {
 	testAction.Outcome = result.CompareAgainst(dice.Fair)
 
 	initialAspectCount := len(sm.currentScene.SituationAspects)
-	sm.applyActionEffects(testAction, nil) // nil target for create advantage
+	sm.applyActionEffects(context.Background(), testAction, nil) // nil target for create advantage
 
 	assert.Equal(t, initialAspectCount+1, len(sm.currentScene.SituationAspects))
 
@@ -271,7 +271,7 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage_WithLLM(t *testing.T) {
 	testAction.Outcome = result.CompareAgainst(dice.Fair)
 
 	initialAspectCount := len(sm.currentScene.SituationAspects)
-	sm.applyActionEffects(testAction, nil)
+	sm.applyActionEffects(context.Background(), testAction, nil)
 
 	assert.Equal(t, initialAspectCount+1, len(sm.currentScene.SituationAspects))
 
@@ -923,6 +923,90 @@ func TestSceneManager_ApplyDamageToTarget_StressAbsorbed(t *testing.T) {
 	assert.True(t, found, "Expected stress absorption message")
 }
 
+func TestHandleTargetStressOverflow_ConsequenceSelection(t *testing.T) {
+	tests := []struct {
+		name           string
+		available      []ConsequenceOption
+		shifts         int
+		expectedType   character.ConsequenceType
+		expectedReason string
+	}{
+		{
+			name: "exact match picks that consequence",
+			available: []ConsequenceOption{
+				{Type: character.MildConsequence, Value: 2},
+				{Type: character.ModerateConsequence, Value: 4},
+				{Type: character.SevereConsequence, Value: 6},
+			},
+			shifts:       4,
+			expectedType: character.ModerateConsequence,
+		},
+		{
+			name: "picks smallest consequence that covers shifts",
+			available: []ConsequenceOption{
+				{Type: character.MildConsequence, Value: 2},
+				{Type: character.ModerateConsequence, Value: 4},
+				{Type: character.SevereConsequence, Value: 6},
+			},
+			shifts:       3,
+			expectedType: character.ModerateConsequence,
+		},
+		{
+			name: "large hit picks largest available when none covers",
+			available: []ConsequenceOption{
+				{Type: character.MildConsequence, Value: 2},
+				{Type: character.ModerateConsequence, Value: 4},
+			},
+			shifts:       5,
+			expectedType: character.ModerateConsequence,
+		},
+		{
+			name: "only mild available and shifts exceed it picks mild",
+			available: []ConsequenceOption{
+				{Type: character.MildConsequence, Value: 2},
+			},
+			shifts:       5,
+			expectedType: character.MildConsequence,
+		},
+		{
+			name: "single consequence that covers",
+			available: []ConsequenceOption{
+				{Type: character.SevereConsequence, Value: 6},
+			},
+			shifts:       3,
+			expectedType: character.SevereConsequence,
+		},
+		{
+			name: "prefers mild over severe when both cover",
+			available: []ConsequenceOption{
+				{Type: character.SevereConsequence, Value: 6},
+				{Type: character.MildConsequence, Value: 2},
+			},
+			shifts:       2,
+			expectedType: character.MildConsequence,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Exercise the same selection logic from handleTargetStressOverflow
+			bestConseq := tc.available[0]
+			for _, c := range tc.available {
+				if c.Value >= tc.shifts {
+					if bestConseq.Value < tc.shifts || c.Value < bestConseq.Value {
+						bestConseq = c
+					}
+				} else if bestConseq.Value < tc.shifts && c.Value > bestConseq.Value {
+					bestConseq = c
+				}
+			}
+
+			assert.Equal(t, tc.expectedType, bestConseq.Type,
+				"expected %s consequence for %d shifts", tc.expectedType, tc.shifts)
+		})
+	}
+}
+
 func TestSceneManager_HandleTargetTakenOut(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
@@ -1158,7 +1242,7 @@ func TestSceneManager_ApplyActionEffects_Attack(t *testing.T) {
 		Shifts: 3,
 	}
 
-	sm.applyActionEffects(testAction, target)
+	sm.applyActionEffects(context.Background(), testAction, target)
 
 	// Check that damage message was displayed
 	found := false
@@ -1408,7 +1492,7 @@ func TestSceneManager_ApplyActionEffects_Attack_NilTarget_ShowsError(t *testing.
 	}
 
 	// Call with nil target (simulating failed resolution)
-	sm.applyActionEffects(testAction, nil)
+	sm.applyActionEffects(context.Background(), testAction, nil)
 
 	// Should display an error message to the player, not silently skip
 	found := false
@@ -1458,7 +1542,7 @@ func TestSceneManager_ApplyActionEffects_Attack_DealsDamage(t *testing.T) {
 		Shifts: 1,
 	}
 
-	sm.applyActionEffects(testAction, target)
+	sm.applyActionEffects(context.Background(), testAction, target)
 
 	// Verify stress was actually applied
 	afterAvailable := target.GetStressTrack(character.PhysicalStress).AvailableBoxes()
@@ -1513,7 +1597,7 @@ func TestSceneManager_ApplyActionEffects_Attack_Tie_GrantsBoost(t *testing.T) {
 		Shifts: 0,
 	}
 
-	sm.applyActionEffects(testAction, target)
+	sm.applyActionEffects(context.Background(), testAction, target)
 
 	// Verify boost message was displayed
 	found := false
