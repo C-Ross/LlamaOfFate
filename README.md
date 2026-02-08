@@ -76,6 +76,67 @@ model_name: "Llama-4-Maverick-17B-128E-Instruct-FP8"
 timeout: 300
 ```
 
+## Building and Running
+
+LlamaOfFate uses [`just`](https://github.com/casey/just) as a command runner for common development tasks.
+
+### Installing Just
+
+**macOS:**
+```bash
+brew install just
+```
+
+**Linux:**
+```bash
+# Using cargo (Rust package manager)
+cargo install just
+
+# Or download pre-built binaries from:
+# https://github.com/casey/just/releases
+```
+
+**Windows:**
+```powershell
+# Using cargo (Rust package manager)
+cargo install just
+
+# Or using Chocolatey
+choco install just
+
+# Or using Scoop
+scoop install just
+```
+
+### Available Commands
+
+Run `just` without arguments to see all available commands. Common commands include:
+
+- **`just build`** - Build the application binary
+- **`just run`** - Build and run the application
+- **`just test`** - Run all unit and integration tests
+- **`just test-llm`** - Run LLM evaluation tests (requires Azure credentials)
+- **`just validate`** - Run all validation checks (vet, format check, lint, test)
+- **`just lint`** - Run golangci-lint
+- **`just fmt`** - Format code with gofmt
+- **`just clean`** - Clean build artifacts
+
+### Quick Start
+
+```bash
+# Install dependencies
+just deps
+
+# Build the application
+just build
+
+# Run all validations (recommended before committing)
+just validate
+
+# Run the application
+just run
+```
+
 ## Package Structure
 
 ```
