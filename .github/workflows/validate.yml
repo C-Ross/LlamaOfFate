@@ -39,8 +39,11 @@ jobs:
           version: latest
           args: --timeout=5m
 
+      - name: Install just
+        uses: extractions/setup-just@v2
+
       - name: Build
-        run: make build
+        run: just build
 
       - name: Test
         run: go test -v -race ./...
