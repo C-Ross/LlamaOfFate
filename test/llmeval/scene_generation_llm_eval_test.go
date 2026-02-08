@@ -4,7 +4,6 @@ package llmeval_test
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"strings"
 	"testing"
@@ -177,13 +176,13 @@ func evaluateSceneGeneration(ctx context.Context, client llm.LLMClient, tc Scene
 		RawResponse: raw,
 	}
 
-	var generated promptpkg.GeneratedScene
-	if err := json.Unmarshal([]byte(raw), &generated); err != nil {
+	generated, err := promptpkg.ParseGeneratedScene(raw)
+	if err != nil {
 		result.ValidJSON = false
 		return result
 	}
 	result.ValidJSON = true
-	result.Parsed = &generated
+	result.Parsed = generated
 
 	// Validate scene_name: 2-5 words per template rules
 	nameWords := len(strings.Fields(generated.SceneName))

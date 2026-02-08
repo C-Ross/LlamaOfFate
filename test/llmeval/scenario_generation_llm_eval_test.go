@@ -4,7 +4,6 @@ package llmeval_test
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"strings"
 	"testing"
@@ -121,14 +120,13 @@ func evaluateScenarioGeneration(ctx context.Context, client llm.LLMClient, tc Sc
 		RawResponse: raw,
 	}
 
-	// Parse JSON
-	var scenario scene.Scenario
-	if err := json.Unmarshal([]byte(raw), &scenario); err != nil {
+	scenario, err := promptpkg.ParseScenario(raw)
+	if err != nil {
 		result.ValidJSON = false
 		return result
 	}
 	result.ValidJSON = true
-	result.Parsed = &scenario
+	result.Parsed = scenario
 
 	// Validate fields
 	result.HasTitle = scenario.Title != "" && len(strings.Fields(scenario.Title)) >= 2

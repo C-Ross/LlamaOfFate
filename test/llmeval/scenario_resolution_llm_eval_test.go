@@ -4,7 +4,6 @@ package llmeval_test
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"strings"
 	"testing"
@@ -389,13 +388,13 @@ func evaluateScenarioResolution(ctx context.Context, client llm.LLMClient, tc Sc
 		RawResponse: raw,
 	}
 
-	var parsed promptpkg.ScenarioResolutionResult
-	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+	parsed, err := promptpkg.ParseScenarioResolution(raw)
+	if err != nil {
 		result.ValidJSON = false
 		return result
 	}
 	result.ValidJSON = true
-	result.Parsed = &parsed
+	result.Parsed = parsed
 	result.GotResolved = parsed.IsResolved
 	result.HasReasoning = parsed.Reasoning != "" && len(parsed.Reasoning) > 10
 	result.Matches = parsed.IsResolved == tc.ExpectResolved

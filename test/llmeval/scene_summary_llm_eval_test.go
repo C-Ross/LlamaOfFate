@@ -4,7 +4,6 @@ package llmeval_test
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"strings"
 	"testing"
@@ -134,13 +133,13 @@ func evaluateSceneSummary(ctx context.Context, client llm.LLMClient, tc SceneSum
 		RawResponse: raw,
 	}
 
-	var summary promptpkg.SceneSummary
-	if err := json.Unmarshal([]byte(raw), &summary); err != nil {
+	summary, err := promptpkg.ParseSceneSummary(raw)
+	if err != nil {
 		result.ValidJSON = false
 		return result
 	}
 	result.ValidJSON = true
-	result.Parsed = &summary
+	result.Parsed = summary
 
 	// Validate narrative_prose: should read like a recap, not bullet points
 	result.HasNarrativeProse = summary.NarrativeProse != "" && len(summary.NarrativeProse) > 30
