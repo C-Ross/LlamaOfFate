@@ -296,11 +296,7 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 	var defenseResult *dice.CheckResult
 	var targetChar *character.Character
 	if parsedAction.Type == action.Attack && parsedAction.Target != "" {
-		// Try ID-based lookup first, then fall back to name-based lookup
-		targetChar = sm.engine.GetCharacter(parsedAction.Target)
-		if targetChar == nil {
-			targetChar = sm.engine.GetCharacterByName(parsedAction.Target)
-		}
+		targetChar = sm.engine.ResolveCharacter(parsedAction.Target)
 		if targetChar == nil {
 			slog.Warn("Attack target not found, action aborted",
 				"component", componentSceneManager,

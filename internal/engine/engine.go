@@ -84,6 +84,48 @@ func (e *Engine) GetCharacterByName(name string) *character.Character {
 	return nil
 }
 
+// ResolveCharacter attempts to find a character using flexible matching.
+// It handles the "Name (ID)" format that LLMs produce from prompt context,
+// as well as plain ID or plain name lookups.
+func (e *Engine) ResolveCharacter(target string) *character.Character {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return nil
+	}
+
+	// Try exact ID lookup
+	if char := e.GetCharacter(target); char != nil {
+		return char
+	}
+
+	// Try exact name lookup
+	if char := e.GetCharacterByName(target); char != nil {
+		return char
+	}
+
+	// Try to extract ID from "Name (ID)" format
+	if idx := strings.LastIndex(target, "("); idx > 0 {
+		if end := strings.LastIndex(target, ")"); end > idx {
+			extractedID := strings.TrimSpace(target[idx+1 : end])
+			if char := e.GetCharacter(extractedID); char != nil {
+				return char
+			}
+			// Also try extracted ID as a name
+			if char := e.GetCharacterByName(extractedID); char != nil {
+				return char
+			}
+
+			// Try the part before parentheses as a name
+			extractedName := strings.TrimSpace(target[:idx])
+			if char := e.GetCharacterByName(extractedName); char != nil {
+				return char
+			}
+		}
+	}
+
+	return nil
+}
+
 // GetAllCharacters returns all characters in the registry
 func (e *Engine) GetAllCharacters() map[string]*character.Character {
 	return e.characterRegistry

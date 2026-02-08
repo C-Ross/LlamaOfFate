@@ -41,13 +41,14 @@ SKILL SELECTION — COMMON CONFUSIONS:
 - Reading someone's mood or motives → Empathy
 
 TARGETS: Identify if the action has a specific target (person, object, area). Leave empty if none.
+When targeting a character listed in OTHER CHARACTERS IN SCENE, use their ID (e.g. "scene_4_npc_1"), not the display format "Name (ID)".
 
 Your response must be valid JSON with no additional text:
 {
   "action_type": "One of: Overcome, Create an Advantage, Attack, Defend",
   "skill": "One of the 18 skills above",
   "description": "What they're trying to do",
-  "target": "Target of action or empty string",
+  "target": "Character ID from scene (e.g. scene_1_npc_0), object, or empty string",
   "difficulty": Integer from DIFFICULTY RANGE (use 0 for Attack or Defend),
   "reasoning": "Brief explanation including difficulty justification",
   "confidence": 1-10
