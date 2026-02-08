@@ -3,6 +3,7 @@ package engine
 import (
 	"testing"
 
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,7 +28,7 @@ func TestSceneEndResult_Fields(t *testing.T) {
 
 func TestParseSceneTransitionMarker_WithLocation(t *testing.T) {
 	response := "The swinging doors creak as you step out into the afternoon sun. [SCENE_TRANSITION:the dusty streets of Redemption Gulch]"
-	transition, cleanedResponse := ParseSceneTransitionMarker(response)
+	transition, cleanedResponse := prompt.ParseSceneTransitionMarker(response)
 
 	assert.NotNil(t, transition)
 	assert.Equal(t, "the dusty streets of Redemption Gulch", transition.Hint)
@@ -36,7 +37,7 @@ func TestParseSceneTransitionMarker_WithLocation(t *testing.T) {
 
 func TestParseSceneTransitionMarker_ShortHint(t *testing.T) {
 	response := "You mount your horse and ride off. [SCENE_TRANSITION:the road ahead]"
-	transition, cleanedResponse := ParseSceneTransitionMarker(response)
+	transition, cleanedResponse := prompt.ParseSceneTransitionMarker(response)
 
 	assert.NotNil(t, transition)
 	assert.Equal(t, "the road ahead", transition.Hint)
@@ -45,7 +46,7 @@ func TestParseSceneTransitionMarker_ShortHint(t *testing.T) {
 
 func TestParseSceneTransitionMarker_NoMarker(t *testing.T) {
 	response := "You walk over to the window and look outside."
-	transition, cleanedResponse := ParseSceneTransitionMarker(response)
+	transition, cleanedResponse := prompt.ParseSceneTransitionMarker(response)
 
 	assert.Nil(t, transition)
 	assert.Equal(t, "You walk over to the window and look outside.", cleanedResponse)
@@ -53,7 +54,7 @@ func TestParseSceneTransitionMarker_NoMarker(t *testing.T) {
 
 func TestParseSceneTransitionMarker_MarkerInMiddle(t *testing.T) {
 	response := "With a tip of your hat, you exit the saloon. [SCENE_TRANSITION:outside] The bright sun blinds you momentarily."
-	transition, cleanedResponse := ParseSceneTransitionMarker(response)
+	transition, cleanedResponse := prompt.ParseSceneTransitionMarker(response)
 
 	assert.NotNil(t, transition)
 	assert.Equal(t, "outside", transition.Hint)
@@ -92,7 +93,7 @@ func TestSceneEndResult_PlayerTakenOut(t *testing.T) {
 
 func TestSceneTransition_HintPreservesWhitespace(t *testing.T) {
 	response := "[SCENE_TRANSITION:  the dark alley  ]"
-	transition, _ := ParseSceneTransitionMarker(response)
+	transition, _ := prompt.ParseSceneTransitionMarker(response)
 
 	assert.NotNil(t, transition)
 	assert.Equal(t, "the dark alley", transition.Hint) // Should be trimmed

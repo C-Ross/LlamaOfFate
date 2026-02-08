@@ -8,6 +8,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -114,7 +115,7 @@ func TestScenarioManager_SetScenario(t *testing.T) {
 	player := character.NewCharacter("player1", "Test Hero")
 	sm := NewScenarioManager(engine, player)
 
-	scenario := &Scenario{
+	scenario := &scene.Scenario{
 		Title:   "Test Scenario",
 		Problem: "A test problem",
 		Genre:   "Western",
@@ -156,7 +157,7 @@ func TestParseGeneratedScene_Valid(t *testing.T) {
 		]
 	}`
 
-	generated, err := ParseGeneratedScene(jsonResponse)
+	generated, err := prompt.ParseGeneratedScene(jsonResponse)
 	require.NoError(t, err)
 
 	assert.Equal(t, "The Dusty Trail", generated.SceneName)
@@ -174,7 +175,7 @@ func TestParseGeneratedScene_WithCodeBlock(t *testing.T) {
 	// LLMs sometimes wrap JSON in markdown code blocks
 	jsonResponse := "```json\n{\"scene_name\": \"Test\", \"description\": \"A test.\", \"purpose\": \"Can the hero prevail?\", \"situation_aspects\": [], \"npcs\": []}\n```"
 
-	generated, err := ParseGeneratedScene(jsonResponse)
+	generated, err := prompt.ParseGeneratedScene(jsonResponse)
 	require.NoError(t, err)
 
 	assert.Equal(t, "Test", generated.SceneName)
@@ -185,7 +186,7 @@ func TestParseGeneratedScene_MissingFields(t *testing.T) {
 	// Missing scene_name
 	jsonResponse := `{"description": "A test scene.", "purpose": "Can the hero win?"}`
 
-	_, err := ParseGeneratedScene(jsonResponse)
+	_, err := prompt.ParseGeneratedScene(jsonResponse)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "missing scene_name")
 }
@@ -198,7 +199,7 @@ func TestParseGeneratedScene_MissingPurpose(t *testing.T) {
 		"npcs": []
 	}`
 
-	_, err := ParseGeneratedScene(jsonResponse)
+	_, err := prompt.ParseGeneratedScene(jsonResponse)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "missing purpose")
 }
@@ -213,7 +214,7 @@ func TestParseGeneratedScene_OptionalOpeningHook(t *testing.T) {
 		"npcs": []
 	}`
 
-	generated, err := ParseGeneratedScene(jsonResponse)
+	generated, err := prompt.ParseGeneratedScene(jsonResponse)
 	require.NoError(t, err)
 
 	assert.Equal(t, "Can the traveler survive?", generated.Purpose)
@@ -224,12 +225,12 @@ func TestParseGeneratedScene_InvalidJSON(t *testing.T) {
 	// Invalid JSON
 	jsonResponse := "This is not JSON at all"
 
-	_, err := ParseGeneratedScene(jsonResponse)
+	_, err := prompt.ParseGeneratedScene(jsonResponse)
 	assert.Error(t, err)
 }
 
 func TestScenario_Defaults(t *testing.T) {
-	scenario := Scenario{}
+	scenario := scene.Scenario{}
 	assert.Equal(t, "", scenario.Genre)
 	assert.Equal(t, "", scenario.Setting)
 	assert.Equal(t, "", scenario.Problem)
@@ -237,11 +238,11 @@ func TestScenario_Defaults(t *testing.T) {
 }
 
 func TestGeneratedScene_EmptyNPCs(t *testing.T) {
-	generated := GeneratedScene{
+	generated := prompt.GeneratedScene{
 		SceneName:        "Empty Scene",
 		Description:      "A scene with no NPCs",
 		SituationAspects: []string{"Lonely"},
-		NPCs:             []GeneratedNPC{},
+		NPCs:             []prompt.GeneratedNPC{},
 	}
 
 	assert.Equal(t, "Empty Scene", generated.SceneName)
@@ -256,22 +257,22 @@ func TestScenarioManager_addSceneSummary(t *testing.T) {
 	sm := NewScenarioManager(engine, player)
 
 	// Add first summary
-	summary1 := &SceneSummary{NarrativeProse: "First scene"}
+	summary1 := &prompt.SceneSummary{NarrativeProse: "First scene"}
 	sm.addSceneSummary(summary1)
 	assert.Len(t, sm.sceneSummaries, 1)
 
 	// Add second summary
-	summary2 := &SceneSummary{NarrativeProse: "Second scene"}
+	summary2 := &prompt.SceneSummary{NarrativeProse: "Second scene"}
 	sm.addSceneSummary(summary2)
 	assert.Len(t, sm.sceneSummaries, 2)
 
 	// Add third summary
-	summary3 := &SceneSummary{NarrativeProse: "Third scene"}
+	summary3 := &prompt.SceneSummary{NarrativeProse: "Third scene"}
 	sm.addSceneSummary(summary3)
 	assert.Len(t, sm.sceneSummaries, 3)
 
 	// Add fourth summary - should maintain sliding window of 3
-	summary4 := &SceneSummary{NarrativeProse: "Fourth scene"}
+	summary4 := &prompt.SceneSummary{NarrativeProse: "Fourth scene"}
 	sm.addSceneSummary(summary4)
 	assert.Len(t, sm.sceneSummaries, 3)
 	assert.Equal(t, "Second scene", sm.sceneSummaries[0].NarrativeProse)
@@ -301,11 +302,11 @@ func TestScenarioManager_extractComplications(t *testing.T) {
 	assert.Empty(t, sm.extractComplications())
 
 	// Add summaries with unresolved threads
-	sm.addSceneSummary(&SceneSummary{
+	sm.addSceneSummary(&prompt.SceneSummary{
 		NarrativeProse:    "First scene",
 		UnresolvedThreads: []string{"Find the treasure", "Mysterious stranger"},
 	})
-	sm.addSceneSummary(&SceneSummary{
+	sm.addSceneSummary(&prompt.SceneSummary{
 		NarrativeProse:    "Second scene",
 		UnresolvedThreads: []string{"Find the treasure", "Gang hideout location"}, // duplicate thread
 	})
@@ -324,7 +325,7 @@ func TestScenarioManager_extractComplications_NoThreads(t *testing.T) {
 	player := character.NewCharacter("player1", "Test Hero")
 	sm := NewScenarioManager(engine, player)
 
-	sm.addSceneSummary(&SceneSummary{
+	sm.addSceneSummary(&prompt.SceneSummary{
 		NarrativeProse: "A scene with no threads",
 	})
 
@@ -342,7 +343,7 @@ func TestParseSceneSummary_Valid(t *testing.T) {
 		"narrative_prose": "The stranger walked into the saloon and learned of a dangerous outlaw terrorizing the town."
 	}`
 
-	summary, err := ParseSceneSummary(jsonResponse)
+	summary, err := prompt.ParseSceneSummary(jsonResponse)
 	require.NoError(t, err)
 
 	assert.Equal(t, "A dusty saloon", summary.SceneDescription)
@@ -359,7 +360,7 @@ func TestParseSceneSummary_Valid(t *testing.T) {
 func TestParseSceneSummary_WithCodeBlock(t *testing.T) {
 	jsonResponse := "```json\n{\"narrative_prose\": \"A test summary.\"}\n```"
 
-	summary, err := ParseSceneSummary(jsonResponse)
+	summary, err := prompt.ParseSceneSummary(jsonResponse)
 	require.NoError(t, err)
 
 	assert.Equal(t, "A test summary.", summary.NarrativeProse)
@@ -369,16 +370,16 @@ func TestParseSceneSummary_MissingNarrativeProse(t *testing.T) {
 	// Missing narrative_prose
 	jsonResponse := `{"scene_description": "A test scene."}`
 
-	_, err := ParseSceneSummary(jsonResponse)
+	_, err := prompt.ParseSceneSummary(jsonResponse)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "missing narrative_prose")
 }
 
 func TestSceneSummary_Fields(t *testing.T) {
-	summary := SceneSummary{
+	summary := prompt.SceneSummary{
 		SceneDescription:  "A dusty saloon",
 		KeyEvents:         []string{"Event 1", "Event 2"},
-		NPCsEncountered:   []NPCSummary{{Name: "Test NPC", Attitude: "friendly"}},
+		NPCsEncountered:   []prompt.NPCSummary{{Name: "Test NPC", Attitude: "friendly"}},
 		AspectsDiscovered: []string{"Test Aspect"},
 		UnresolvedThreads: []string{"Find the treasure"},
 		HowEnded:          "transition",
@@ -393,7 +394,7 @@ func TestSceneSummary_Fields(t *testing.T) {
 }
 
 func TestNPCSummary_Fields(t *testing.T) {
-	npc := NPCSummary{
+	npc := prompt.NPCSummary{
 		Name:     "Sheriff Dan",
 		Attitude: "hostile",
 	}
@@ -403,11 +404,11 @@ func TestNPCSummary_Fields(t *testing.T) {
 }
 
 func TestSceneSummaryData_Fields(t *testing.T) {
-	data := SceneSummaryData{
+	data := prompt.SceneSummaryData{
 		SceneName:        "Test Scene",
 		SceneDescription: "A test scene",
 		SituationAspects: []string{"Aspect 1"},
-		NPCsInScene:      []NPCSummary{{Name: "NPC", Attitude: "neutral"}},
+		NPCsInScene:      []prompt.NPCSummary{{Name: "NPC", Attitude: "neutral"}},
 		TakenOutChars:    []string{"enemy1"},
 		HowEnded:         "transition",
 		TransitionHint:   "the forest",
@@ -420,7 +421,7 @@ func TestSceneSummaryData_Fields(t *testing.T) {
 }
 
 func TestScenario_Fields(t *testing.T) {
-	scenario := Scenario{
+	scenario := scene.Scenario{
 		Title:          "Test Scenario",
 		Problem:        "A test problem",
 		StoryQuestions: []string{"Can the hero win?", "Will the villain escape?"},
@@ -437,7 +438,7 @@ func TestScenario_Fields(t *testing.T) {
 }
 
 func TestScenarioGenerationData_Fields(t *testing.T) {
-	data := ScenarioGenerationData{
+	data := prompt.ScenarioGenerationData{
 		PlayerName:        "Test Hero",
 		PlayerHighConcept: "Brave Knight",
 		PlayerTrouble:     "Hot-Headed",
@@ -452,15 +453,15 @@ func TestScenarioGenerationData_Fields(t *testing.T) {
 }
 
 func TestScenarioResolutionData_Fields(t *testing.T) {
-	scenario := &Scenario{
+	scenario := &scene.Scenario{
 		Title:   "Test",
 		Problem: "Problem",
 	}
 
-	data := ScenarioResolutionData{
+	data := prompt.ScenarioResolutionData{
 		Scenario:       scenario,
-		SceneSummaries: []SceneSummary{{NarrativeProse: "Test"}},
-		LatestSummary:  &SceneSummary{NarrativeProse: "Latest"},
+		SceneSummaries: []prompt.SceneSummary{{NarrativeProse: "Test"}},
+		LatestSummary:  &prompt.SceneSummary{NarrativeProse: "Latest"},
 		PlayerName:     "Hero",
 		PlayerAspects:  []string{"Aspect"},
 	}
@@ -471,7 +472,7 @@ func TestScenarioResolutionData_Fields(t *testing.T) {
 }
 
 func TestScenarioResolutionResult_Fields(t *testing.T) {
-	result := ScenarioResolutionResult{
+	result := prompt.ScenarioResolutionResult{
 		IsResolved:        true,
 		AnsweredQuestions: []string{"Can the hero win? - YES"},
 		Reasoning:         "The hero defeated the villain",
@@ -489,7 +490,7 @@ func TestParseScenarioResolution_Valid(t *testing.T) {
 		"reasoning": "The hero defeated the villain"
 	}`
 
-	result, err := ParseScenarioResolution(jsonResponse)
+	result, err := prompt.ParseScenarioResolution(jsonResponse)
 	require.NoError(t, err)
 
 	assert.True(t, result.IsResolved)
@@ -500,7 +501,7 @@ func TestParseScenarioResolution_Valid(t *testing.T) {
 func TestParseScenarioResolution_WithCodeBlock(t *testing.T) {
 	jsonResponse := "```json\n{\"is_resolved\": false, \"answered_questions\": [], \"reasoning\": \"Not yet\"}\n```"
 
-	result, err := ParseScenarioResolution(jsonResponse)
+	result, err := prompt.ParseScenarioResolution(jsonResponse)
 	require.NoError(t, err)
 
 	assert.False(t, result.IsResolved)
@@ -510,12 +511,12 @@ func TestParseScenarioResolution_WithCodeBlock(t *testing.T) {
 func TestParseScenarioResolution_InvalidJSON(t *testing.T) {
 	jsonResponse := "This is not JSON"
 
-	_, err := ParseScenarioResolution(jsonResponse)
+	_, err := prompt.ParseScenarioResolution(jsonResponse)
 	assert.Error(t, err)
 }
 
 func TestScenarioResult_Fields(t *testing.T) {
-	scenario := &Scenario{Title: "Test"}
+	scenario := &scene.Scenario{Title: "Test"}
 
 	result := ScenarioResult{
 		Reason:   ScenarioEndResolved,
@@ -533,7 +534,7 @@ func TestScenarioEndReason_Constants(t *testing.T) {
 }
 
 func TestRenderSceneGeneration_WithComplications(t *testing.T) {
-	data := SceneGenerationData{
+	data := prompt.SceneGenerationData{
 		TransitionHint:    "the old mine",
 		PlayerName:        "Jesse",
 		PlayerHighConcept: "Vengeful Rancher",
@@ -543,7 +544,7 @@ func TestRenderSceneGeneration_WithComplications(t *testing.T) {
 		},
 	}
 
-	rendered, err := RenderSceneGeneration(data)
+	rendered, err := prompt.RenderSceneGeneration(data)
 	require.NoError(t, err)
 
 	assert.Contains(t, rendered, "HOOKS TO INCORPORATE")
@@ -552,29 +553,29 @@ func TestRenderSceneGeneration_WithComplications(t *testing.T) {
 }
 
 func TestRenderSceneGeneration_WithoutComplications(t *testing.T) {
-	data := SceneGenerationData{
+	data := prompt.SceneGenerationData{
 		TransitionHint: "the old mine",
 		PlayerName:     "Jesse",
 	}
 
-	rendered, err := RenderSceneGeneration(data)
+	rendered, err := prompt.RenderSceneGeneration(data)
 	require.NoError(t, err)
 
 	assert.NotContains(t, rendered, "HOOKS TO INCORPORATE")
 }
 
 func TestRenderSceneGeneration_WithKnownNPCs(t *testing.T) {
-	data := SceneGenerationData{
+	data := prompt.SceneGenerationData{
 		TransitionHint:    "the tavern",
 		PlayerName:        "Jesse",
 		PlayerHighConcept: "Vengeful Rancher",
-		KnownNPCs: []NPCSummary{
+		KnownNPCs: []prompt.NPCSummary{
 			{Name: "Greta Ironheart", Attitude: "friendly"},
 			{Name: "Dark Raven", Attitude: "hostile"},
 		},
 	}
 
-	rendered, err := RenderSceneGeneration(data)
+	rendered, err := prompt.RenderSceneGeneration(data)
 	require.NoError(t, err)
 
 	assert.Contains(t, rendered, "Greta Ironheart")
@@ -585,7 +586,7 @@ func TestRenderSceneGeneration_WithKnownNPCs(t *testing.T) {
 
 func TestRenderSceneResponse_WithPurpose(t *testing.T) {
 	s := scene.NewScene("s1", "Test Scene", "A test scene")
-	data := SceneResponseData{
+	data := prompt.SceneResponseData{
 		Scene:               s,
 		CharacterContext:    "Test character",
 		AspectsContext:      "Test aspects",
@@ -595,7 +596,7 @@ func TestRenderSceneResponse_WithPurpose(t *testing.T) {
 		ScenePurpose:        "Can the hero find the hidden passage?",
 	}
 
-	rendered, err := RenderSceneResponse(data)
+	rendered, err := prompt.RenderSceneResponse(data)
 	require.NoError(t, err)
 
 	assert.Contains(t, rendered, "SCENE PURPOSE")
@@ -604,7 +605,7 @@ func TestRenderSceneResponse_WithPurpose(t *testing.T) {
 
 func TestRenderSceneResponse_WithoutPurpose(t *testing.T) {
 	s := scene.NewScene("s1", "Test Scene", "A test scene")
-	data := SceneResponseData{
+	data := prompt.SceneResponseData{
 		Scene:               s,
 		CharacterContext:    "Test character",
 		AspectsContext:      "Test aspects",
@@ -613,7 +614,7 @@ func TestRenderSceneResponse_WithoutPurpose(t *testing.T) {
 		InteractionType:     "dialog",
 	}
 
-	rendered, err := RenderSceneResponse(data)
+	rendered, err := prompt.RenderSceneResponse(data)
 	require.NoError(t, err)
 
 	assert.NotContains(t, rendered, "SCENE PURPOSE")
@@ -705,8 +706,8 @@ func TestScenarioManager_UpdateNPCAttitudes(t *testing.T) {
 	npc := character.NewCharacter("npc1", "Greta Ironheart")
 	sm.npcRegistry[normalizeNPCName(npc.Name)] = npc
 
-	summary := &SceneSummary{
-		NPCsEncountered: []NPCSummary{
+	summary := &prompt.SceneSummary{
+		NPCsEncountered: []prompt.NPCSummary{
 			{Name: "Greta Ironheart", Attitude: "hostile"},
 		},
 	}

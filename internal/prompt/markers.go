@@ -1,0 +1,97 @@
+package prompt
+
+import (
+	"regexp"
+	"strings"
+
+	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
+)
+
+// SceneTransition represents a detected scene exit/transition
+type SceneTransition struct {
+	Hint string // Where/what comes next (e.g., "streets of Redemption Gulch")
+}
+
+// sceneTransitionMarkerRegex matches [SCENE_TRANSITION:hint] markers for scene exits
+var sceneTransitionMarkerRegex = regexp.MustCompile(`\[SCENE_TRANSITION:([^\]]+)\]`)
+
+// ParseSceneTransitionMarker extracts a scene transition from LLM response and returns cleaned text
+func ParseSceneTransitionMarker(response string) (*SceneTransition, string) {
+	matches := sceneTransitionMarkerRegex.FindStringSubmatch(response)
+	if matches == nil {
+		return nil, response
+	}
+
+	transition := &SceneTransition{
+		Hint: strings.TrimSpace(matches[1]),
+	}
+
+	// Remove the marker from the response and clean up
+	cleanedResponse := sceneTransitionMarkerRegex.ReplaceAllString(response, "")
+	cleanedResponse = strings.Join(strings.Fields(cleanedResponse), " ")
+	cleanedResponse = strings.TrimSpace(cleanedResponse)
+
+	return transition, cleanedResponse
+}
+
+// ConflictTrigger represents a detected conflict initiation
+type ConflictTrigger struct {
+	Type        scene.ConflictType
+	InitiatorID string
+}
+
+// conflictMarkerRegex matches [CONFLICT:type:character_id] markers for escalation
+var conflictMarkerRegex = regexp.MustCompile(`\[CONFLICT:(physical|mental):([^\]]+)\]`)
+
+// ParseConflictMarker extracts a conflict trigger from LLM response and returns cleaned text
+func ParseConflictMarker(response string) (*ConflictTrigger, string) {
+	matches := conflictMarkerRegex.FindStringSubmatch(response)
+	if matches == nil {
+		return nil, response
+	}
+
+	conflictType := scene.PhysicalConflict
+	if matches[1] == "mental" {
+		conflictType = scene.MentalConflict
+	}
+
+	trigger := &ConflictTrigger{
+		Type:        conflictType,
+		InitiatorID: strings.TrimSpace(matches[2]),
+	}
+
+	// Remove the marker from the response and clean up any double spaces
+	cleanedResponse := conflictMarkerRegex.ReplaceAllString(response, "")
+	// Replace multiple spaces with single space
+	cleanedResponse = strings.Join(strings.Fields(cleanedResponse), " ")
+	cleanedResponse = strings.TrimSpace(cleanedResponse)
+
+	return trigger, cleanedResponse
+}
+
+// ConflictResolution represents a detected conflict de-escalation
+type ConflictResolution struct {
+	Reason string
+}
+
+// conflictEndMarkerRegex matches [CONFLICT:end:reason] markers for de-escalation
+var conflictEndMarkerRegex = regexp.MustCompile(`\[CONFLICT:end:(surrender|agreement|retreat|resolved)\]`)
+
+// ParseConflictEndMarker extracts a conflict resolution from LLM response and returns cleaned text
+func ParseConflictEndMarker(response string) (*ConflictResolution, string) {
+	matches := conflictEndMarkerRegex.FindStringSubmatch(response)
+	if matches == nil {
+		return nil, response
+	}
+
+	resolution := &ConflictResolution{
+		Reason: matches[1],
+	}
+
+	// Remove the marker from the response and clean up
+	cleanedResponse := conflictEndMarkerRegex.ReplaceAllString(response, "")
+	cleanedResponse = strings.Join(strings.Fields(cleanedResponse), " ")
+	cleanedResponse = strings.TrimSpace(cleanedResponse)
+
+	return resolution, cleanedResponse
+}

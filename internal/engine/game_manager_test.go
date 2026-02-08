@@ -49,7 +49,7 @@ func TestGameManager_SetScenario(t *testing.T) {
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine)
-	scenario := &Scenario{
+	scenario := &scene.Scenario{
 		Title:   "Test Scenario",
 		Problem: "A test problem",
 		Genre:   "Fantasy",

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -19,26 +18,10 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 )
 
-// conflictMarkerRegex matches [CONFLICT:type:character_id] markers for escalation
-var conflictMarkerRegex = regexp.MustCompile(`\[CONFLICT:(physical|mental):([^\]]+)\]`)
-
-// conflictEndMarkerRegex matches [CONFLICT:end:reason] markers for de-escalation
-var conflictEndMarkerRegex = regexp.MustCompile(`\[CONFLICT:end:(surrender|agreement|retreat|resolved)\]`)
-
-// ConflictTrigger represents a detected conflict initiation
-type ConflictTrigger struct {
-	Type        scene.ConflictType
-	InitiatorID string
-}
-
-// ConflictResolution represents a detected conflict de-escalation
-type ConflictResolution struct {
-	Reason string
-}
-
-// ConsequenceOption represents an available consequence the player can take
+// ConsequenceOption represents an available consequence slot
 type ConsequenceOption struct {
 	Type  character.ConsequenceType
 	Value int
@@ -54,48 +37,13 @@ const (
 )
 
 // parseConflictMarker extracts a conflict trigger from LLM response and returns cleaned text
-func (sm *SceneManager) parseConflictMarker(response string) (*ConflictTrigger, string) {
-	matches := conflictMarkerRegex.FindStringSubmatch(response)
-	if matches == nil {
-		return nil, response
-	}
-
-	conflictType := scene.PhysicalConflict
-	if matches[1] == "mental" {
-		conflictType = scene.MentalConflict
-	}
-
-	trigger := &ConflictTrigger{
-		Type:        conflictType,
-		InitiatorID: strings.TrimSpace(matches[2]),
-	}
-
-	// Remove the marker from the response and clean up any double spaces
-	cleanedResponse := conflictMarkerRegex.ReplaceAllString(response, "")
-	// Replace multiple spaces with single space
-	cleanedResponse = strings.Join(strings.Fields(cleanedResponse), " ")
-	cleanedResponse = strings.TrimSpace(cleanedResponse)
-
-	return trigger, cleanedResponse
+func (sm *SceneManager) parseConflictMarker(response string) (*prompt.ConflictTrigger, string) {
+	return prompt.ParseConflictMarker(response)
 }
 
 // parseConflictEndMarker extracts a conflict resolution from LLM response and returns cleaned text
-func (sm *SceneManager) parseConflictEndMarker(response string) (*ConflictResolution, string) {
-	matches := conflictEndMarkerRegex.FindStringSubmatch(response)
-	if matches == nil {
-		return nil, response
-	}
-
-	resolution := &ConflictResolution{
-		Reason: matches[1],
-	}
-
-	// Remove the marker from the response and clean up
-	cleanedResponse := conflictEndMarkerRegex.ReplaceAllString(response, "")
-	cleanedResponse = strings.Join(strings.Fields(cleanedResponse), " ")
-	cleanedResponse = strings.TrimSpace(cleanedResponse)
-
-	return resolution, cleanedResponse
+func (sm *SceneManager) parseConflictEndMarker(response string) (*prompt.ConflictResolution, string) {
+	return prompt.ParseConflictEndMarker(response)
 }
 
 // initiateConflict starts a conflict with all characters in the scene
@@ -719,7 +667,7 @@ func (sm *SceneManager) generateAspectName(ctx context.Context, parsedAction *ac
 	}
 
 	// Build the request
-	req := AspectGenerationRequest{
+	req := prompt.AspectGenerationRequest{
 		Character:       sm.player,
 		Action:          parsedAction,
 		Outcome:         parsedAction.Outcome,
@@ -878,7 +826,7 @@ func (sm *SceneManager) handleTargetTakenOut(target *character.Character) {
 }
 
 // applyAttackDamageToPlayer applies attack damage to the player
-func (sm *SceneManager) applyAttackDamageToPlayer(ctx context.Context, outcome *dice.Outcome, attacker *character.Character, attackCtx AttackContext) {
+func (sm *SceneManager) applyAttackDamageToPlayer(ctx context.Context, outcome *dice.Outcome, attacker *character.Character, attackCtx prompt.AttackContext) {
 	// Apply stress if the attack hit
 	switch outcome.Type {
 	case dice.Success, dice.SuccessWithStyle:
@@ -912,7 +860,7 @@ func (sm *SceneManager) applyAttackDamageToPlayer(ctx context.Context, outcome *
 }
 
 // handleStressOverflow handles when the player cannot absorb stress with their stress track
-func (sm *SceneManager) handleStressOverflow(ctx context.Context, shifts int, stressType character.StressTrackType, attacker *character.Character, attackCtx AttackContext) {
+func (sm *SceneManager) handleStressOverflow(ctx context.Context, shifts int, stressType character.StressTrackType, attacker *character.Character, attackCtx prompt.AttackContext) {
 	sm.ui.DisplaySystemMessage(fmt.Sprintf(
 		"You cannot absorb %d shifts with your stress track!",
 		shifts,
@@ -998,7 +946,7 @@ func (sm *SceneManager) getAvailableConsequences(char *character.Character, shif
 }
 
 // applyConsequence applies a consequence to the player character
-func (sm *SceneManager) applyConsequence(ctx context.Context, conseqType character.ConsequenceType, shifts int, attacker *character.Character, attackCtx AttackContext) {
+func (sm *SceneManager) applyConsequence(ctx context.Context, conseqType character.ConsequenceType, shifts int, attacker *character.Character, attackCtx prompt.AttackContext) {
 	// Generate a consequence aspect via LLM
 	aspectName, err := sm.generateConsequenceAspect(ctx, conseqType, attacker, attackCtx)
 	if err != nil {
@@ -1054,7 +1002,7 @@ func (sm *SceneManager) applyConsequence(ctx context.Context, conseqType charact
 }
 
 // generateConsequenceAspect uses LLM to generate a consequence aspect
-func (sm *SceneManager) generateConsequenceAspect(ctx context.Context, conseqType character.ConsequenceType, attacker *character.Character, attackCtx AttackContext) (string, error) {
+func (sm *SceneManager) generateConsequenceAspect(ctx context.Context, conseqType character.ConsequenceType, attacker *character.Character, attackCtx prompt.AttackContext) (string, error) {
 	if sm.engine.llmClient == nil {
 		return "", fmt.Errorf("LLM client required")
 	}
@@ -1064,7 +1012,7 @@ func (sm *SceneManager) generateConsequenceAspect(ctx context.Context, conseqTyp
 		conflictType = "mental"
 	}
 
-	data := ConsequenceAspectData{
+	data := prompt.ConsequenceAspectData{
 		CharacterName: sm.player.Name,
 		AttackerName:  attacker.Name,
 		Severity:      string(conseqType),
@@ -1072,7 +1020,7 @@ func (sm *SceneManager) generateConsequenceAspect(ctx context.Context, conseqTyp
 		AttackContext: attackCtx,
 	}
 
-	prompt, err := RenderConsequenceAspect(data)
+	prompt, err := prompt.RenderConsequenceAspect(data)
 	if err != nil {
 		return "", fmt.Errorf("failed to render consequence aspect template: %w", err)
 	}
@@ -1156,7 +1104,7 @@ func (sm *SceneManager) handleConcession(ctx context.Context) {
 }
 
 // handleTakenOut handles when the player is taken out
-func (sm *SceneManager) handleTakenOut(ctx context.Context, attacker *character.Character, attackCtx AttackContext) {
+func (sm *SceneManager) handleTakenOut(ctx context.Context, attacker *character.Character, attackCtx prompt.AttackContext) {
 	sm.ui.DisplaySystemMessage("\n=== You Are Taken Out! ===")
 	sm.ui.DisplaySystemMessage(fmt.Sprintf("%s decides your fate.", attacker.Name))
 
@@ -1202,7 +1150,7 @@ func (sm *SceneManager) handleTakenOut(ctx context.Context, attacker *character.
 }
 
 // generateTakenOutNarrativeAndOutcome generates narrative and classifies the outcome
-func (sm *SceneManager) generateTakenOutNarrativeAndOutcome(ctx context.Context, attacker *character.Character, attackCtx AttackContext) (narrative string, outcome TakenOutResult, newSceneHint string, err error) {
+func (sm *SceneManager) generateTakenOutNarrativeAndOutcome(ctx context.Context, attacker *character.Character, attackCtx prompt.AttackContext) (narrative string, outcome TakenOutResult, newSceneHint string, err error) {
 	if sm.engine.llmClient == nil {
 		return "", TakenOutTransition, "", fmt.Errorf("LLM client required")
 	}
@@ -1212,7 +1160,7 @@ func (sm *SceneManager) generateTakenOutNarrativeAndOutcome(ctx context.Context,
 		conflictType = "mental"
 	}
 
-	data := TakenOutData{
+	data := prompt.TakenOutData{
 		CharacterName:       sm.player.Name,
 		AttackerName:        attacker.Name,
 		AttackerHighConcept: attacker.Aspects.HighConcept,
@@ -1221,7 +1169,7 @@ func (sm *SceneManager) generateTakenOutNarrativeAndOutcome(ctx context.Context,
 		AttackContext:       attackCtx,
 	}
 
-	prompt, err := RenderTakenOut(data)
+	prompt, err := prompt.RenderTakenOut(data)
 	if err != nil {
 		return "", TakenOutTransition, "", fmt.Errorf("failed to render taken out template: %w", err)
 	}

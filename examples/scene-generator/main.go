@@ -9,10 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/C-Ross/LlamaOfFate/internal/engine"
+	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"gopkg.in/yaml.v3"
 )
@@ -125,21 +126,21 @@ func main() {
 	}
 
 	// Build scenario context
-	var scenario *engine.Scenario
+	var scenario *scene.Scenario
 	if *scenarioFlag != "" {
-		scenario = engine.PredefinedScenario(*scenarioFlag)
+		scenario = scene.PredefinedScenario(*scenarioFlag)
 		if scenario == nil {
 			fmt.Fprintf(os.Stderr, "Unknown scenario: %s (use saloon, heist, or tower)\n", *scenarioFlag)
 			os.Exit(1)
 		}
 	} else if *genreFlag != "" {
-		scenario = &engine.Scenario{
+		scenario = &scene.Scenario{
 			Genre: *genreFlag,
 		}
 	}
 
 	// Load previous summaries if provided
-	var summaries []engine.SceneSummary
+	var summaries []prompt.SceneSummary
 	if *summariesFlag != "" {
 		summaries, err = loadSummaries(*summariesFlag)
 		if err != nil {
@@ -149,7 +150,7 @@ func main() {
 	}
 
 	// Build scene generation data
-	data := engine.SceneGenerationData{
+	data := prompt.SceneGenerationData{
 		TransitionHint:    *hintFlag,
 		Scenario:          scenario,
 		PlayerName:        *nameFlag,
@@ -159,7 +160,7 @@ func main() {
 	}
 
 	// Render the prompt
-	prompt, err := engine.RenderSceneGeneration(data)
+	promptText, err := prompt.RenderSceneGeneration(data)
 	if err != nil {
 		log.Fatalf("Failed to render prompt: %v", err)
 	}
@@ -173,20 +174,20 @@ func main() {
 			"high_concept":    data.PlayerHighConcept,
 			"trouble":         data.PlayerTrouble,
 			"summaries_count": len(summaries),
-			"rendered_prompt": prompt,
+			"rendered_prompt": promptText,
 		})
 	}
 
 	if *debugFlag {
 		fmt.Println("=== Rendered Prompt ===")
-		fmt.Println(prompt)
+		fmt.Println(promptText)
 		fmt.Println()
 	}
 
 	// Call LLM
 	ctx := context.Background()
 	resp, err := azureClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		Messages:    []llm.Message{{Role: "user", Content: promptText}},
 		MaxTokens:   500,
 		Temperature: 0.8,
 	})
@@ -207,7 +208,7 @@ func main() {
 	}
 
 	// Parse the response
-	generated, err := engine.ParseGeneratedScene(rawResponse)
+	generated, err := prompt.ParseGeneratedScene(rawResponse)
 	if err != nil {
 		fmt.Println("=== Parse Error ===")
 		fmt.Printf("Error: %v\n\n", err)
@@ -229,13 +230,13 @@ func main() {
 }
 
 // loadSummaries loads scene summaries from a YAML file
-func loadSummaries(path string) ([]engine.SceneSummary, error) {
+func loadSummaries(path string) ([]prompt.SceneSummary, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
-	var summaries []engine.SceneSummary
+	var summaries []prompt.SceneSummary
 	if err := yaml.Unmarshal(data, &summaries); err != nil {
 		return nil, fmt.Errorf("failed to parse YAML: %w", err)
 	}
@@ -244,7 +245,7 @@ func loadSummaries(path string) ([]engine.SceneSummary, error) {
 }
 
 // displayGeneratedScene prints the scene in a readable format
-func displayGeneratedScene(s *engine.GeneratedScene) {
+func displayGeneratedScene(s *prompt.GeneratedScene) {
 	fmt.Println("=== Generated Scene ===")
 	fmt.Printf("Name: %s\n", s.SceneName)
 	fmt.Println()

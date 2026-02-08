@@ -11,6 +11,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 )
 
@@ -24,10 +25,10 @@ type ScenarioManager struct {
 	player               *character.Character
 	ui                   UI
 	sessionLogger        *session.Logger
-	scenario             *Scenario                       // The current scenario with problem and story questions
+	scenario             *scene.Scenario                 // The current scenario with problem and story questions
 	initialScene         *scene.Scene                    // Optional pre-configured starting scene
 	initialNPCs          []*character.Character          // NPCs for initial scene
-	sceneSummaries       []SceneSummary                  // Summaries of recent scenes (sliding window of last 3)
+	sceneSummaries       []prompt.SceneSummary           // Summaries of recent scenes (sliding window of last 3)
 	lastGeneratedPurpose string                          // Purpose from the most recently generated scene
 	lastGeneratedHook    string                          // Opening hook from the most recently generated scene
 	sceneCount           int                             // Total scenes completed in this scenario
@@ -57,7 +58,7 @@ func (m *ScenarioManager) SetSessionLogger(logger *session.Logger) {
 }
 
 // SetScenario sets the scenario for the manager
-func (m *ScenarioManager) SetScenario(scenario *Scenario) {
+func (m *ScenarioManager) SetScenario(scenario *scene.Scenario) {
 	m.scenario = scenario
 }
 
@@ -270,7 +271,7 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 		}
 	}
 
-	data := SceneGenerationData{
+	data := prompt.SceneGenerationData{
 		TransitionHint:    transitionHint,
 		Scenario:          m.scenario,
 		PlayerName:        m.player.Name,
@@ -282,13 +283,13 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 		KnownNPCs:         m.getKnownNPCSummaries(),
 	}
 
-	prompt, err := RenderSceneGeneration(data)
+	promptText, err := prompt.RenderSceneGeneration(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to render scene generation prompt: %w", err)
 	}
 
 	resp, err := m.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		Messages:    []llm.Message{{Role: "user", Content: promptText}},
 		MaxTokens:   500,
 		Temperature: 0.8, // Higher creativity for scene generation
 	})
@@ -301,7 +302,7 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 	}
 
 	// Parse the generated scene
-	generated, err := ParseGeneratedScene(resp.Choices[0].Message.Content)
+	generated, err := prompt.ParseGeneratedScene(resp.Choices[0].Message.Content)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse generated scene: %w", err)
 	}
@@ -394,7 +395,7 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 }
 
 // addSceneSummary adds a summary to the sliding window (max 3 summaries)
-func (m *ScenarioManager) addSceneSummary(summary *SceneSummary) {
+func (m *ScenarioManager) addSceneSummary(summary *prompt.SceneSummary) {
 	if summary == nil {
 		return
 	}
@@ -454,7 +455,7 @@ func (m *ScenarioManager) handleBetweenSceneRecovery(ctx context.Context) {
 
 	// Attempt automatic recovery rolls
 	roller := dice.NewRoller()
-	var attempts []RecoveryAttempt
+	var attempts []prompt.RecoveryAttempt
 
 	for _, idx := range needsRecovery {
 		conseq := m.player.Consequences[idx]
@@ -479,7 +480,7 @@ func (m *ScenarioManager) handleBetweenSceneRecovery(ctx context.Context) {
 
 		difficultyLabel := dice.Ladder(difficulty).String()
 
-		attempts = append(attempts, RecoveryAttempt{
+		attempts = append(attempts, prompt.RecoveryAttempt{
 			Severity:   string(conseq.Type),
 			Aspect:     conseq.Aspect,
 			Difficulty: difficultyLabel,
@@ -539,7 +540,7 @@ func (m *ScenarioManager) bestRecoverySkill(conseq character.Consequence) (strin
 }
 
 // displayRecoveryNarrative generates and displays LLM-driven narrative for recovery
-func (m *ScenarioManager) displayRecoveryNarrative(ctx context.Context, attempts []RecoveryAttempt) {
+func (m *ScenarioManager) displayRecoveryNarrative(ctx context.Context, attempts []prompt.RecoveryAttempt) {
 	if len(attempts) == 0 {
 		return
 	}
@@ -570,13 +571,13 @@ func (m *ScenarioManager) displayRecoveryNarrative(ctx context.Context, attempts
 		setting = m.scenario.Setting
 	}
 
-	data := RecoveryNarrativeData{
+	data := prompt.RecoveryNarrativeData{
 		CharacterName: m.player.Name,
 		SceneSetting:  setting,
 		Consequences:  attempts,
 	}
 
-	prompt, err := RenderRecoveryNarrative(data)
+	promptText, err := prompt.RenderRecoveryNarrative(data)
 	if err != nil {
 		slog.Warn("Failed to render recovery narrative prompt",
 			"component", componentScenarioManager,
@@ -586,7 +587,7 @@ func (m *ScenarioManager) displayRecoveryNarrative(ctx context.Context, attempts
 	}
 
 	resp, err := m.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		Messages:    []llm.Message{{Role: "user", Content: promptText}},
 		MaxTokens:   200,
 		Temperature: 0.6,
 	})
@@ -640,7 +641,7 @@ func (m *ScenarioManager) displayRecoveryNarrative(ctx context.Context, attempts
 }
 
 // updateNPCAttitudes updates the NPC registry with attitude changes from a scene summary
-func (m *ScenarioManager) updateNPCAttitudes(summary *SceneSummary) {
+func (m *ScenarioManager) updateNPCAttitudes(summary *prompt.SceneSummary) {
 	if summary == nil {
 		return
 	}
@@ -656,14 +657,14 @@ func normalizeNPCName(name string) string {
 }
 
 // getKnownNPCSummaries returns summaries of known NPCs for scene generation prompts
-func (m *ScenarioManager) getKnownNPCSummaries() []NPCSummary {
-	var summaries []NPCSummary
+func (m *ScenarioManager) getKnownNPCSummaries() []prompt.NPCSummary {
+	var summaries []prompt.NPCSummary
 	for normalizedName, npc := range m.npcRegistry {
 		attitude := m.npcAttitudes[normalizedName]
 		if attitude == "" {
 			attitude = "neutral"
 		}
-		summaries = append(summaries, NPCSummary{
+		summaries = append(summaries, prompt.NPCSummary{
 			Name:     npc.Name,
 			Attitude: attitude,
 		})
@@ -672,7 +673,7 @@ func (m *ScenarioManager) getKnownNPCSummaries() []NPCSummary {
 }
 
 // generateSceneSummary creates a summary of the completed scene using LLM
-func (m *ScenarioManager) generateSceneSummary(ctx context.Context, sceneManager *SceneManager, completedScene *scene.Scene, result *SceneEndResult) (*SceneSummary, error) {
+func (m *ScenarioManager) generateSceneSummary(ctx context.Context, sceneManager *SceneManager, completedScene *scene.Scene, result *SceneEndResult) (*prompt.SceneSummary, error) {
 	// Gather situation aspects
 	var aspects []string
 	for _, sa := range completedScene.SituationAspects {
@@ -680,7 +681,7 @@ func (m *ScenarioManager) generateSceneSummary(ctx context.Context, sceneManager
 	}
 
 	// Gather NPCs in scene
-	var npcsInScene []NPCSummary
+	var npcsInScene []prompt.NPCSummary
 	for _, charID := range completedScene.Characters {
 		if charID == m.player.ID {
 			continue
@@ -695,7 +696,7 @@ func (m *ScenarioManager) generateSceneSummary(ctx context.Context, sceneManager
 					break
 				}
 			}
-			npcsInScene = append(npcsInScene, NPCSummary{
+			npcsInScene = append(npcsInScene, prompt.NPCSummary{
 				Name:     char.Name,
 				Attitude: attitude,
 			})
@@ -705,7 +706,7 @@ func (m *ScenarioManager) generateSceneSummary(ctx context.Context, sceneManager
 	// Determine how ended string
 	howEnded := string(result.Reason)
 
-	data := SceneSummaryData{
+	data := prompt.SceneSummaryData{
 		SceneName:           completedScene.Name,
 		SceneDescription:    completedScene.Description,
 		SituationAspects:    aspects,
@@ -716,13 +717,13 @@ func (m *ScenarioManager) generateSceneSummary(ctx context.Context, sceneManager
 		TransitionHint:      result.TransitionHint,
 	}
 
-	prompt, err := RenderSceneSummary(data)
+	promptText, err := prompt.RenderSceneSummary(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to render scene summary prompt: %w", err)
 	}
 
 	resp, err := m.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		Messages:    []llm.Message{{Role: "user", Content: promptText}},
 		MaxTokens:   400,
 		Temperature: 0.5, // More focused for summarization
 	})
@@ -735,7 +736,7 @@ func (m *ScenarioManager) generateSceneSummary(ctx context.Context, sceneManager
 	}
 
 	// Parse the generated summary
-	summary, err := ParseSceneSummary(resp.Choices[0].Message.Content)
+	summary, err := prompt.ParseSceneSummary(resp.Choices[0].Message.Content)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse scene summary: %w", err)
 	}
@@ -751,7 +752,7 @@ func (m *ScenarioManager) generateSceneSummary(ctx context.Context, sceneManager
 }
 
 // checkScenarioResolution uses the LLM to determine if the scenario's story questions have been answered
-func (m *ScenarioManager) checkScenarioResolution(ctx context.Context, latestSummary *SceneSummary) (bool, error) {
+func (m *ScenarioManager) checkScenarioResolution(ctx context.Context, latestSummary *prompt.SceneSummary) (bool, error) {
 	if m.scenario == nil {
 		return false, nil
 	}
@@ -759,7 +760,7 @@ func (m *ScenarioManager) checkScenarioResolution(ctx context.Context, latestSum
 	// Gather player aspects
 	playerAspects := m.player.Aspects.GetAll()
 
-	data := ScenarioResolutionData{
+	data := prompt.ScenarioResolutionData{
 		Scenario:       m.scenario,
 		SceneSummaries: m.sceneSummaries,
 		LatestSummary:  latestSummary,
@@ -767,13 +768,13 @@ func (m *ScenarioManager) checkScenarioResolution(ctx context.Context, latestSum
 		PlayerAspects:  playerAspects,
 	}
 
-	prompt, err := RenderScenarioResolution(data)
+	promptText, err := prompt.RenderScenarioResolution(data)
 	if err != nil {
 		return false, fmt.Errorf("failed to render scenario resolution prompt: %w", err)
 	}
 
 	resp, err := m.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		Messages:    []llm.Message{{Role: "user", Content: promptText}},
 		MaxTokens:   300,
 		Temperature: 0.3, // Low temperature for more consistent analysis
 	})
@@ -786,7 +787,7 @@ func (m *ScenarioManager) checkScenarioResolution(ctx context.Context, latestSum
 	}
 
 	// Parse the resolution result
-	result, err := ParseScenarioResolution(resp.Choices[0].Message.Content)
+	result, err := prompt.ParseScenarioResolution(resp.Choices[0].Message.Content)
 	if err != nil {
 		return false, fmt.Errorf("failed to parse scenario resolution: %w", err)
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 )
 
@@ -34,11 +35,11 @@ type SceneManager struct {
 	currentScene          *scene.Scene
 	player                *character.Character
 	roller                *dice.Roller
-	conversationHistory   []ConversationEntry
+	conversationHistory   []prompt.ConversationEntry
 	ui                    UI
-	shouldExit            bool             // Set to true when the game should end
-	exitOnSceneTransition bool             // Set to true to exit the loop on scene transition
-	lastTransition        *SceneTransition // Captured transition hint when scene ends
+	shouldExit            bool                    // Set to true when the game should end
+	exitOnSceneTransition bool                    // Set to true to exit the loop on scene transition
+	lastTransition        *prompt.SceneTransition // Captured transition hint when scene ends
 	aspectGenerator       *AspectGenerator
 	sessionLogger         *session.Logger
 	takenOutChars         []string       // Characters taken out during this scene
@@ -58,7 +59,7 @@ func NewSceneManager(engine *Engine) *SceneManager {
 	sm := &SceneManager{
 		engine:              engine,
 		roller:              dice.NewRoller(),
-		conversationHistory: make([]ConversationEntry, 0),
+		conversationHistory: make([]prompt.ConversationEntry, 0),
 	}
 	// Initialize aspect generator if LLM client is available
 	if engine.llmClient != nil {
@@ -287,18 +288,18 @@ func (sm *SceneManager) classifyInput(ctx context.Context, input string) (string
 	}
 
 	// Prepare template data and render
-	data := InputClassificationData{
+	data := prompt.InputClassificationData{
 		Scene:       sm.currentScene,
 		PlayerInput: input,
 	}
 
-	prompt, err := RenderInputClassification(data)
+	promptText, err := prompt.RenderInputClassification(data)
 	if err != nil {
 		return "", fmt.Errorf("classifyInput: %w: %v", ErrLLMInvalidResponse, err)
 	}
 
 	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		Messages:    []llm.Message{{Role: "user", Content: promptText}},
 		MaxTokens:   10,
 		Temperature: 0.1, // Low temperature for consistent classification
 	})
@@ -340,7 +341,7 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) {
 	// Check for markers in the response (conflict escalation, de-escalation, and scene transition)
 	conflictTrigger, cleanedResponse := sm.parseConflictMarker(response)
 	conflictResolution, cleanedResponse := sm.parseConflictEndMarker(cleanedResponse)
-	sceneTransition, cleanedResponse := ParseSceneTransitionMarker(cleanedResponse)
+	sceneTransition, cleanedResponse := prompt.ParseSceneTransitionMarker(cleanedResponse)
 
 	sm.ui.DisplayDialog(input, cleanedResponse)
 
@@ -376,7 +377,7 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) {
 }
 
 // handleSceneTransition processes a scene transition marker
-func (sm *SceneManager) handleSceneTransition(transition *SceneTransition) {
+func (sm *SceneManager) handleSceneTransition(transition *prompt.SceneTransition) {
 	// Log the scene transition
 	if sm.sessionLogger != nil {
 		sm.sessionLogger.Log("scene_transition", map[string]any{
@@ -400,7 +401,7 @@ func (sm *SceneManager) handleSceneTransition(transition *SceneTransition) {
 }
 
 // GetLastTransition returns the last scene transition that occurred, if any
-func (sm *SceneManager) GetLastTransition() *SceneTransition {
+func (sm *SceneManager) GetLastTransition() *prompt.SceneTransition {
 	return sm.lastTransition
 }
 
@@ -466,7 +467,7 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 		}
 	}
 
-	var prompt string
+	var promptText string
 	var renderErr error
 
 	// Use conflict-specific template when in conflict
@@ -493,7 +494,7 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 			}
 		}
 
-		conflictData := ConflictResponseData{
+		conflictData := prompt.ConflictResponseData{
 			Scene:                sm.currentScene,
 			CharacterContext:     sm.buildCharacterContext(),
 			AspectsContext:       sm.buildAspectsContext(),
@@ -507,10 +508,10 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 			ScenePurpose:         sm.scenePurpose,
 		}
 
-		prompt, renderErr = RenderConflictResponse(conflictData)
+		promptText, renderErr = prompt.RenderConflictResponse(conflictData)
 	} else {
 		// Use standard scene response template
-		data := SceneResponseData{
+		data := prompt.SceneResponseData{
 			Scene:               sm.currentScene,
 			CharacterContext:    sm.buildCharacterContext(),
 			AspectsContext:      sm.buildAspectsContext(),
@@ -522,7 +523,7 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 			ScenePurpose:        sm.scenePurpose,
 		}
 
-		prompt, renderErr = RenderSceneResponse(data)
+		promptText, renderErr = prompt.RenderSceneResponse(data)
 	}
 
 	if renderErr != nil {
@@ -531,7 +532,7 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 
 	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
 		Messages: []llm.Message{
-			{Role: "user", Content: prompt},
+			{Role: "user", Content: promptText},
 		},
 		MaxTokens:   300,
 		Temperature: 0.7,
@@ -563,7 +564,7 @@ func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedActio
 	}
 
 	// Prepare template data and render
-	data := ActionNarrativeData{
+	data := prompt.ActionNarrativeData{
 		Scene:               sm.currentScene,
 		CharacterContext:    sm.buildCharacterContext(),
 		AspectsContext:      sm.buildAspectsContext(),
@@ -572,13 +573,13 @@ func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedActio
 		OtherCharacters:     otherCharacters,
 	}
 
-	prompt, err := RenderActionNarrative(data)
+	promptText, err := prompt.RenderActionNarrative(data)
 	if err != nil {
 		return "", fmt.Errorf("generateActionNarrative: %w: %v", ErrLLMInvalidResponse, err)
 	}
 
 	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
+		Messages:    []llm.Message{{Role: "user", Content: promptText}},
 		MaxTokens:   200,
 		Temperature: 0.8,
 	})
@@ -610,7 +611,7 @@ func (sm *SceneManager) GetPlayer() *character.Character {
 }
 
 // GetConversationHistory returns the conversation history
-func (sm *SceneManager) GetConversationHistory() []ConversationEntry {
+func (sm *SceneManager) GetConversationHistory() []prompt.ConversationEntry {
 	return sm.conversationHistory
 }
 
@@ -619,7 +620,7 @@ var _ SceneInfo = (*SceneManager)(nil)
 
 // addToConversationHistory adds an exchange to the conversation history
 func (sm *SceneManager) addToConversationHistory(playerInput, gmResponse, interactionType string) {
-	entry := ConversationEntry{
+	entry := prompt.ConversationEntry{
 		PlayerInput: playerInput,
 		GMResponse:  gmResponse,
 		Timestamp:   time.Now(),

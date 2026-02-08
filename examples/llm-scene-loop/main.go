@@ -221,12 +221,12 @@ func runMultiSceneMode(ctx context.Context, gameEngine *engine.Engine, sceneConf
 }
 
 // getScenario returns appropriate scenario for each scene type
-func getScenario(sceneName string) *engine.Scenario {
-	scenario := engine.PredefinedScenario(sceneName)
+func getScenario(sceneName string) *scene.Scenario {
+	scenario := scene.PredefinedScenario(sceneName)
 	if scenario != nil {
 		return scenario
 	}
-	return &engine.Scenario{
+	return &scene.Scenario{
 		Title:   "A New Adventure",
 		Problem: "Danger lurks and heroes are needed",
 		StoryQuestions: []string{

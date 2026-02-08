@@ -1,25 +1,16 @@
 package engine
 
 import (
-	"time"
-
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 )
-
-// ConversationEntry represents a single exchange in the scene
-type ConversationEntry struct {
-	PlayerInput string    `json:"player_input"`
-	GMResponse  string    `json:"gm_response"`
-	Timestamp   time.Time `json:"timestamp"`
-	Type        string    `json:"type"` // "dialog", "action", "clarification"
-}
 
 // SceneInfo provides access to scene information for display purposes
 type SceneInfo interface {
 	GetCurrentScene() *scene.Scene
 	GetPlayer() *character.Character
-	GetConversationHistory() []ConversationEntry
+	GetConversationHistory() []prompt.ConversationEntry
 }
 
 // ConflictParticipantInfo provides display information about a conflict participant

@@ -15,8 +15,8 @@ type GameManager struct {
 	player        *character.Character
 	ui            UI
 	sessionLogger *session.Logger
-	scenario      *Scenario // The scenario to run (can be provided or generated)
-	scenarioCount int       // Number of scenarios completed
+	scenario      *scene.Scenario // The scenario to run (can be provided or generated)
+	scenarioCount int             // Number of scenarios completed
 }
 
 // NewGameManager creates a new game manager
@@ -42,7 +42,7 @@ func (g *GameManager) SetSessionLogger(logger *session.Logger) {
 }
 
 // SetScenario sets the scenario to run
-func (g *GameManager) SetScenario(scenario *Scenario) {
+func (g *GameManager) SetScenario(scenario *scene.Scenario) {
 	g.scenario = scenario
 }
 
