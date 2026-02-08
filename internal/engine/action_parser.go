@@ -87,15 +87,14 @@ func (ap *ActionParser) ParseAction(ctx context.Context, req ActionParseRequest)
 		return nil, fmt.Errorf("LLM request failed: %w", err)
 	}
 
-	if len(resp.Choices) == 0 {
+	if resp.Content() == "" {
 		return nil, fmt.Errorf("no response from LLM")
 	}
 
 	// Parse the JSON response
 	var parseResp ActionParseResponse
-	cleanedContent := llm.CleanJSONResponse(resp.Choices[0].Message.Content)
-	if err := json.Unmarshal([]byte(cleanedContent), &parseResp); err != nil {
-		return nil, fmt.Errorf("failed to parse LLM response: %w\nResponse was: %s", err, resp.Choices[0].Message.Content)
+	if err := json.Unmarshal([]byte(resp.Content()), &parseResp); err != nil {
+		return nil, fmt.Errorf("failed to parse LLM response: %w\nResponse was: %s", err, resp.Content())
 	}
 
 	// Convert string action type to enum

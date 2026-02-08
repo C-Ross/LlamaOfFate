@@ -73,7 +73,7 @@ func TestCompletionResponse(t *testing.T) {
 	assert.Len(t, resp.Choices, 1)
 	assert.Equal(t, 0, resp.Choices[0].Index)
 	assert.Equal(t, "assistant", resp.Choices[0].Message.Role)
-	assert.Equal(t, "Hello! How can I help you today?", resp.Choices[0].Message.Content)
+	assert.Equal(t, "Hello! How can I help you today?", resp.Content())
 	assert.Equal(t, "stop", resp.Choices[0].FinishReason)
 	assert.Equal(t, 10, resp.Usage.PromptTokens)
 	assert.Equal(t, 8, resp.Usage.CompletionTokens)

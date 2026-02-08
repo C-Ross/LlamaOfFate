@@ -505,14 +505,14 @@ func evaluateInputClassification(ctx context.Context, client llm.LLMClient, tc I
 		}
 	}
 
-	if len(resp.Choices) == 0 {
+	if resp.Content() == "" {
 		return InputClassificationResult{
 			TestCase: tc,
 			Error:    fmt.Errorf("no response from LLM"),
 		}
 	}
 
-	classification := strings.ToLower(strings.TrimSpace(resp.Choices[0].Message.Content))
+	classification := strings.ToLower(resp.Content())
 
 	return InputClassificationResult{
 		TestCase:   tc,

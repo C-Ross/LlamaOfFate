@@ -98,12 +98,12 @@ func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character
 		return nil, fmt.Errorf("LLM request failed: %w", err)
 	}
 
-	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+	if resp.Content() == "" {
 		return nil, fmt.Errorf("empty response from LLM")
 	}
 
 	// Parse JSON response
-	content := llm.CleanJSONResponse(resp.Choices[0].Message.Content)
+	content := resp.Content()
 	var decision prompt.NPCActionDecision
 	if err := json.Unmarshal([]byte(content), &decision); err != nil {
 		slog.Warn("Failed to parse NPC action decision",
@@ -453,9 +453,9 @@ func (sm *SceneManager) generateNPCAttackNarrative(ctx context.Context, npc *cha
 		return "", err
 	}
 
-	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+	if resp.Content() == "" {
 		return "", fmt.Errorf("empty response from LLM")
 	}
 
-	return strings.TrimSpace(resp.Choices[0].Message.Content), nil
+	return resp.Content(), nil
 }

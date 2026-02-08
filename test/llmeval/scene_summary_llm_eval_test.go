@@ -134,21 +134,18 @@ func evaluateSceneSummary(ctx context.Context, client llm.LLMClient, tc SceneSum
 		return SceneSummaryResult{TestCase: tc, Error: err}
 	}
 
-	if len(resp.Choices) == 0 {
+	if resp.Content() == "" {
 		return SceneSummaryResult{TestCase: tc, Error: err}
 	}
 
-	raw := resp.Choices[0].Message.Content
+	raw := resp.Content()
 	result := SceneSummaryResult{
 		TestCase:    tc,
 		RawResponse: raw,
 	}
 
-	// Use production JSON cleaning to prevent parsing divergence
-	cleaned := llm.CleanJSONResponse(raw)
-
 	var summary promptpkg.SceneSummary
-	if err := json.Unmarshal([]byte(cleaned), &summary); err != nil {
+	if err := json.Unmarshal([]byte(raw), &summary); err != nil {
 		result.ValidJSON = false
 		return result
 	}

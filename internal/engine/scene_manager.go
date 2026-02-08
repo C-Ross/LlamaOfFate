@@ -307,11 +307,11 @@ func (sm *SceneManager) classifyInput(ctx context.Context, input string) (string
 		return "", fmt.Errorf("classifyInput: %w: %v", ErrLLMUnavailable, err)
 	}
 
-	if len(resp.Choices) == 0 {
+	if resp.Content() == "" {
 		return "", fmt.Errorf("classifyInput: %w", ErrLLMInvalidResponse)
 	}
 
-	classification := strings.ToLower(strings.TrimSpace(resp.Choices[0].Message.Content))
+	classification := strings.ToLower(resp.Content())
 
 	// Validate the response is one of our expected types
 	switch classification {
@@ -541,11 +541,11 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 		return "", fmt.Errorf("generateSceneResponse: %w: %v", ErrLLMUnavailable, err)
 	}
 
-	if len(resp.Choices) == 0 {
+	if resp.Content() == "" {
 		return "", fmt.Errorf("generateSceneResponse: %w", ErrLLMInvalidResponse)
 	}
 
-	return strings.TrimSpace(resp.Choices[0].Message.Content), nil
+	return resp.Content(), nil
 }
 
 // generateActionNarrative generates narrative text for action results
@@ -587,11 +587,11 @@ func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedActio
 		return "", fmt.Errorf("generateActionNarrative: %w: %v", ErrLLMUnavailable, err)
 	}
 
-	if len(resp.Choices) == 0 {
+	if resp.Content() == "" {
 		return "", fmt.Errorf("generateActionNarrative: %w", ErrLLMInvalidResponse)
 	}
 
-	narrative := strings.TrimSpace(resp.Choices[0].Message.Content)
+	narrative := resp.Content()
 
 	// Add this to conversation history as well
 	actionDescription := fmt.Sprintf("Attempted: %s (Outcome: %s)", parsedAction.Description, parsedAction.Outcome.Type.String())

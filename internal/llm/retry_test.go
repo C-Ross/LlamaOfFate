@@ -107,7 +107,7 @@ func TestRetryingClient_ChatCompletion_Success(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.Equal(t, "test-id", resp.ID)
-	assert.Equal(t, "test response", resp.Choices[0].Message.Content)
+	assert.Equal(t, "test response", resp.Content())
 }
 
 func TestRetryingClient_ChatCompletion_RetriesOnNetworkError(t *testing.T) {

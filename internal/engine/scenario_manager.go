@@ -297,12 +297,12 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 		return nil, fmt.Errorf("LLM request failed: %w", err)
 	}
 
-	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+	if resp.Content() == "" {
 		return nil, fmt.Errorf("empty LLM response")
 	}
 
 	// Parse the generated scene
-	generated, err := prompt.ParseGeneratedScene(resp.Choices[0].Message.Content)
+	generated, err := prompt.ParseGeneratedScene(resp.Content())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse generated scene: %w", err)
 	}
@@ -599,7 +599,7 @@ func (m *ScenarioManager) displayRecoveryNarrative(ctx context.Context, attempts
 		return
 	}
 
-	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+	if resp.Content() == "" {
 		return
 	}
 
@@ -609,11 +609,11 @@ func (m *ScenarioManager) displayRecoveryNarrative(ctx context.Context, attempts
 		RenamedAspects map[string]string `json:"renamed_aspects"`
 	}
 
-	content := llm.CleanJSONResponse(resp.Choices[0].Message.Content)
+	content := resp.Content()
 	var parsed recoveryResponse
 	if parseErr := json.Unmarshal([]byte(content), &parsed); parseErr != nil {
 		// If parsing fails, display raw content
-		m.ui.DisplayNarrative(strings.TrimSpace(resp.Choices[0].Message.Content))
+		m.ui.DisplayNarrative(content)
 	} else {
 		if parsed.Narrative != "" {
 			m.ui.DisplayNarrative(parsed.Narrative)
@@ -731,12 +731,12 @@ func (m *ScenarioManager) generateSceneSummary(ctx context.Context, sceneManager
 		return nil, fmt.Errorf("LLM request failed: %w", err)
 	}
 
-	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+	if resp.Content() == "" {
 		return nil, fmt.Errorf("empty LLM response")
 	}
 
 	// Parse the generated summary
-	summary, err := prompt.ParseSceneSummary(resp.Choices[0].Message.Content)
+	summary, err := prompt.ParseSceneSummary(resp.Content())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse scene summary: %w", err)
 	}
@@ -782,12 +782,12 @@ func (m *ScenarioManager) checkScenarioResolution(ctx context.Context, latestSum
 		return false, fmt.Errorf("LLM request failed: %w", err)
 	}
 
-	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+	if resp.Content() == "" {
 		return false, fmt.Errorf("empty LLM response")
 	}
 
 	// Parse the resolution result
-	result, err := prompt.ParseScenarioResolution(resp.Choices[0].Message.Content)
+	result, err := prompt.ParseScenarioResolution(resp.Content())
 	if err != nil {
 		return false, fmt.Errorf("failed to parse scenario resolution: %w", err)
 	}

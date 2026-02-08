@@ -364,14 +364,14 @@ func evaluateSceneTransition(ctx context.Context, client llm.LLMClient, tc Scene
 		}
 	}
 
-	if len(resp.Choices) == 0 {
+	if resp.Content() == "" {
 		return SceneTransitionResult{
 			TestCase: tc,
 			Error:    err,
 		}
 	}
 
-	response := resp.Choices[0].Message.Content
+	response := resp.Content()
 
 	// Check for scene transition marker using production parser
 	transition, _ := promptpkg.ParseSceneTransitionMarker(response)

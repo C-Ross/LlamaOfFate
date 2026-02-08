@@ -165,6 +165,8 @@ func (c *Client) ChatCompletion(ctx context.Context, req llm.CompletionRequest) 
 
 	c.logTokenUsage(response.Usage, req.Model)
 
+	response.CleanContent()
+
 	return &response, nil
 }
 

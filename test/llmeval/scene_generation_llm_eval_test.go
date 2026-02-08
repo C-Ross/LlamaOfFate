@@ -177,21 +177,18 @@ func evaluateSceneGeneration(ctx context.Context, client llm.LLMClient, tc Scene
 		return SceneGenResult{TestCase: tc, Error: err}
 	}
 
-	if len(resp.Choices) == 0 {
+	if resp.Content() == "" {
 		return SceneGenResult{TestCase: tc, Error: err}
 	}
 
-	raw := resp.Choices[0].Message.Content
+	raw := resp.Content()
 	result := SceneGenResult{
 		TestCase:    tc,
 		RawResponse: raw,
 	}
 
-	// Use production JSON cleaning to prevent parsing divergence
-	cleaned := llm.CleanJSONResponse(raw)
-
 	var generated promptpkg.GeneratedScene
-	if err := json.Unmarshal([]byte(cleaned), &generated); err != nil {
+	if err := json.Unmarshal([]byte(raw), &generated); err != nil {
 		result.ValidJSON = false
 		return result
 	}

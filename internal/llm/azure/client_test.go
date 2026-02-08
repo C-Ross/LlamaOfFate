@@ -156,7 +156,7 @@ func TestChatCompletion(t *testing.T) {
 	assert.Equal(t, "Meta-Llama-3.1-405B-Instruct", response.Model)
 	assert.Len(t, response.Choices, 1)
 	assert.Equal(t, "assistant", response.Choices[0].Message.Role)
-	assert.Equal(t, "Hello! How can I help you today?", response.Choices[0].Message.Content)
+	assert.Equal(t, "Hello! How can I help you today?", response.Content())
 	assert.Equal(t, "stop", response.Choices[0].FinishReason)
 }
 

@@ -966,11 +966,11 @@ func (sm *SceneManager) generateConsequenceAspect(ctx context.Context, conseqTyp
 		return "", err
 	}
 
-	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+	if resp.Content() == "" {
 		return "", fmt.Errorf("empty response")
 	}
 
-	return strings.TrimSpace(resp.Choices[0].Message.Content), nil
+	return resp.Content(), nil
 }
 
 // isConcedeCommand checks if the input is a concession command
@@ -1114,7 +1114,7 @@ func (sm *SceneManager) generateTakenOutNarrativeAndOutcome(ctx context.Context,
 		return "", TakenOutTransition, "", err
 	}
 
-	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+	if resp.Content() == "" {
 		return "", TakenOutTransition, "", fmt.Errorf("empty response")
 	}
 
@@ -1125,7 +1125,7 @@ func (sm *SceneManager) generateTakenOutNarrativeAndOutcome(ctx context.Context,
 		NewSceneHint string `json:"new_scene_hint"`
 	}
 
-	content := llm.CleanJSONResponse(resp.Choices[0].Message.Content)
+	content := resp.Content()
 	var parsed takenOutResponse
 	if parseErr := json.Unmarshal([]byte(content), &parsed); parseErr != nil {
 		// If parsing fails, use the raw content as narrative and default to transition
@@ -1133,7 +1133,7 @@ func (sm *SceneManager) generateTakenOutNarrativeAndOutcome(ctx context.Context,
 			"error", parseErr,
 			"content", content,
 		)
-		return strings.TrimSpace(resp.Choices[0].Message.Content), TakenOutTransition, "You awaken later...", nil
+		return content, TakenOutTransition, "You awaken later...", nil
 	}
 
 	// Map outcome string to enum

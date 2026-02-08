@@ -6,12 +6,11 @@ import (
 	"strings"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
-	"github.com/C-Ross/LlamaOfFate/internal/llm"
 )
 
 // ParseGeneratedScene parses an LLM response into a GeneratedScene.
 func ParseGeneratedScene(content string) (*GeneratedScene, error) {
-	cleaned := llm.CleanJSONResponse(content)
+	cleaned := strings.TrimSpace(content)
 
 	var generated GeneratedScene
 	if err := json.Unmarshal([]byte(cleaned), &generated); err != nil {
@@ -42,7 +41,7 @@ func ParseGeneratedScene(content string) (*GeneratedScene, error) {
 
 // ParseSceneSummary parses an LLM response into a SceneSummary.
 func ParseSceneSummary(content string) (*SceneSummary, error) {
-	cleaned := llm.CleanJSONResponse(content)
+	cleaned := strings.TrimSpace(content)
 
 	var summary SceneSummary
 	if err := json.Unmarshal([]byte(cleaned), &summary); err != nil {
@@ -67,7 +66,7 @@ func ParseSceneSummary(content string) (*SceneSummary, error) {
 
 // ParseScenarioResolution parses an LLM response into a ScenarioResolutionResult.
 func ParseScenarioResolution(content string) (*ScenarioResolutionResult, error) {
-	cleaned := llm.CleanJSONResponse(content)
+	cleaned := strings.TrimSpace(content)
 
 	var result ScenarioResolutionResult
 	if err := json.Unmarshal([]byte(cleaned), &result); err != nil {
@@ -88,7 +87,7 @@ func ParseScenarioResolution(content string) (*ScenarioResolutionResult, error) 
 
 // ParseScenario parses an LLM response into a Scenario.
 func ParseScenario(content string) (*scene.Scenario, error) {
-	cleaned := llm.CleanJSONResponse(content)
+	cleaned := strings.TrimSpace(content)
 
 	var scenario scene.Scenario
 	if err := json.Unmarshal([]byte(cleaned), &scenario); err != nil {

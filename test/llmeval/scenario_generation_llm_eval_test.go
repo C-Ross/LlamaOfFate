@@ -120,14 +120,11 @@ func evaluateScenarioGeneration(ctx context.Context, client llm.LLMClient, tc Sc
 		return ScenarioGenResult{TestCase: tc, Error: err}
 	}
 
-	if len(resp.Choices) == 0 {
+	if resp.Content() == "" {
 		return ScenarioGenResult{TestCase: tc, Error: err}
 	}
 
-	raw := resp.Choices[0].Message.Content
-
-	// Use production JSON cleaning to prevent parsing divergence
-	cleaned := llm.CleanJSONResponse(raw)
+	raw := resp.Content()
 
 	result := ScenarioGenResult{
 		TestCase:    tc,
@@ -136,7 +133,7 @@ func evaluateScenarioGeneration(ctx context.Context, client llm.LLMClient, tc Sc
 
 	// Parse JSON
 	var scenario scene.Scenario
-	if err := json.Unmarshal([]byte(cleaned), &scenario); err != nil {
+	if err := json.Unmarshal([]byte(raw), &scenario); err != nil {
 		result.ValidJSON = false
 		return result
 	}

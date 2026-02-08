@@ -1,6 +1,34 @@
 package llm
 
-import "strings"
+import (
+	"log/slog"
+	"strings"
+)
+
+// Content returns the message content from the first completion choice.
+// Returns an empty string when no choices are present.
+// Logs a warning if the response contains multiple choices (only the first is used).
+func (r *CompletionResponse) Content() string {
+	if len(r.Choices) == 0 {
+		return ""
+	}
+	if len(r.Choices) > 1 {
+		slog.Warn("LLM response contained multiple choices, using first",
+			slog.String("component", "llm"),
+			slog.Int("choice_count", len(r.Choices)),
+		)
+	}
+	return r.Choices[0].Message.Content
+}
+
+// CleanContent strips markdown code fences and trims whitespace from all
+// choice messages in the response. This is called automatically by LLM
+// client implementations so callers don't need to clean responses manually.
+func (r *CompletionResponse) CleanContent() {
+	for i := range r.Choices {
+		r.Choices[i].Message.Content = CleanJSONResponse(r.Choices[i].Message.Content)
+	}
+}
 
 // CleanJSONResponse removes markdown formatting from LLM JSON responses.
 // LLMs often wrap JSON output in ```json code blocks; this extracts the raw JSON.

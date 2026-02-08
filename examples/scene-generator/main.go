@@ -195,11 +195,11 @@ func main() {
 		log.Fatalf("LLM request failed: %v", err)
 	}
 
-	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+	if resp.Content() == "" {
 		log.Fatal("Empty LLM response")
 	}
 
-	rawResponse := resp.Choices[0].Message.Content
+	rawResponse := resp.Content()
 
 	if *rawFlag {
 		fmt.Println("=== Raw LLM Response ===")

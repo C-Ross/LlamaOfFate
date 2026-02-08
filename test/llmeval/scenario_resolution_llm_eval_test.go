@@ -389,21 +389,18 @@ func evaluateScenarioResolution(ctx context.Context, client llm.LLMClient, tc Sc
 		return ScenarioResResult{TestCase: tc, Error: err}
 	}
 
-	if len(resp.Choices) == 0 {
+	if resp.Content() == "" {
 		return ScenarioResResult{TestCase: tc, Error: err}
 	}
 
-	raw := resp.Choices[0].Message.Content
+	raw := resp.Content()
 	result := ScenarioResResult{
 		TestCase:    tc,
 		RawResponse: raw,
 	}
 
-	// Use production JSON cleaning to prevent parsing divergence
-	cleaned := llm.CleanJSONResponse(raw)
-
 	var parsed promptpkg.ScenarioResolutionResult
-	if err := json.Unmarshal([]byte(cleaned), &parsed); err != nil {
+	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
 		result.ValidJSON = false
 		return result
 	}

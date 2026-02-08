@@ -344,11 +344,11 @@ func evaluateSceneResponseBehavior(ctx context.Context, client llm.LLMClient, tc
 		return SceneResponseResult{TestCase: tc, Error: err}
 	}
 
-	if len(resp.Choices) == 0 {
+	if resp.Content() == "" {
 		return SceneResponseResult{TestCase: tc, Error: err}
 	}
 
-	response := resp.Choices[0].Message.Content
+	response := resp.Content()
 
 	// Check for options patterns
 	hasOptions := false

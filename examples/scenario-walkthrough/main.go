@@ -294,11 +294,11 @@ func generateScenario(ctx context.Context, client llm.LLMClient, name, concept, 
 		return nil, fmt.Errorf("LLM request failed: %w", err)
 	}
 
-	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+	if resp.Content() == "" {
 		return nil, fmt.Errorf("empty LLM response")
 	}
 
-	rawResponse := resp.Choices[0].Message.Content
+	rawResponse := resp.Content()
 	if raw {
 		fmt.Println("--- Raw Scenario Response ---")
 		fmt.Println(rawResponse)
@@ -343,11 +343,11 @@ func generateScene(ctx context.Context, client llm.LLMClient, hint string, scena
 		return nil, fmt.Errorf("LLM request failed: %w", err)
 	}
 
-	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+	if resp.Content() == "" {
 		return nil, fmt.Errorf("empty LLM response")
 	}
 
-	rawResponse := resp.Choices[0].Message.Content
+	rawResponse := resp.Content()
 	if raw {
 		fmt.Println("--- Raw Scene Response ---")
 		fmt.Println(rawResponse)
@@ -409,11 +409,11 @@ func generateSummaryFromNarration(ctx context.Context, client llm.LLMClient, sce
 		return nil, fmt.Errorf("LLM request failed: %w", err)
 	}
 
-	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+	if resp.Content() == "" {
 		return nil, fmt.Errorf("empty LLM response")
 	}
 
-	rawResponse := resp.Choices[0].Message.Content
+	rawResponse := resp.Content()
 	if raw {
 		fmt.Println("--- Raw Summary Response ---")
 		fmt.Println(rawResponse)
@@ -468,11 +468,11 @@ func checkResolution(ctx context.Context, client llm.LLMClient, scenario *scene.
 		return nil, fmt.Errorf("LLM request failed: %w", err)
 	}
 
-	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+	if resp.Content() == "" {
 		return nil, fmt.Errorf("empty LLM response")
 	}
 
-	rawResponse := resp.Choices[0].Message.Content
+	rawResponse := resp.Content()
 	if raw {
 		fmt.Println("--- Raw Resolution Response ---")
 		fmt.Println(rawResponse)
