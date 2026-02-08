@@ -206,7 +206,7 @@ func (m *ScenarioManager) Run(ctx context.Context) (*ScenarioResult, error) {
 					)
 				} else if resolved {
 					m.scenario.IsResolved = true
-					slog.Info("prompt.Scenario resolved",
+					slog.Info("Scenario resolved",
 						"component", componentScenarioManager,
 						"scenario_title", m.scenario.Title,
 					)
