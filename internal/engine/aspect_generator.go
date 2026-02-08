@@ -60,10 +60,6 @@ func (ag *AspectGenerator) GenerateAspect(ctx context.Context, req prompt.Aspect
 		return nil, fmt.Errorf("failed to generate aspect: %w", err)
 	}
 
-	if response.Content() == "" {
-		return nil, fmt.Errorf("no response choices received")
-	}
-
 	// Parse the LLM response into an AspectGenerationResponse
 	return ag.parseResponse(response.Content(), req.Outcome)
 }

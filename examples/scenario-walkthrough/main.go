@@ -285,20 +285,10 @@ func generateScenario(ctx context.Context, client llm.LLMClient, name, concept, 
 		fmt.Println()
 	}
 
-	resp, err := client.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: promptText}},
-		MaxTokens:   500,
-		Temperature: 0.8,
-	})
+	rawResponse, err := llm.SimpleCompletion(ctx, client, promptText, 500, 0.8)
 	if err != nil {
-		return nil, fmt.Errorf("LLM request failed: %w", err)
+		return nil, err
 	}
-
-	if resp.Content() == "" {
-		return nil, fmt.Errorf("empty LLM response")
-	}
-
-	rawResponse := resp.Content()
 	if raw {
 		fmt.Println("--- Raw Scenario Response ---")
 		fmt.Println(rawResponse)
@@ -334,20 +324,10 @@ func generateScene(ctx context.Context, client llm.LLMClient, hint string, scena
 		fmt.Println()
 	}
 
-	resp, err := client.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: promptText}},
-		MaxTokens:   500,
-		Temperature: 0.8,
-	})
+	rawResponse, err := llm.SimpleCompletion(ctx, client, promptText, 500, 0.8)
 	if err != nil {
-		return nil, fmt.Errorf("LLM request failed: %w", err)
+		return nil, err
 	}
-
-	if resp.Content() == "" {
-		return nil, fmt.Errorf("empty LLM response")
-	}
-
-	rawResponse := resp.Content()
 	if raw {
 		fmt.Println("--- Raw Scene Response ---")
 		fmt.Println(rawResponse)
@@ -400,20 +380,10 @@ func generateSummaryFromNarration(ctx context.Context, client llm.LLMClient, sce
 		fmt.Println()
 	}
 
-	resp, err := client.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: promptText}},
-		MaxTokens:   400,
-		Temperature: 0.5,
-	})
+	rawResponse, err := llm.SimpleCompletion(ctx, client, promptText, 400, 0.5)
 	if err != nil {
-		return nil, fmt.Errorf("LLM request failed: %w", err)
+		return nil, err
 	}
-
-	if resp.Content() == "" {
-		return nil, fmt.Errorf("empty LLM response")
-	}
-
-	rawResponse := resp.Content()
 	if raw {
 		fmt.Println("--- Raw Summary Response ---")
 		fmt.Println(rawResponse)
@@ -459,20 +429,10 @@ func checkResolution(ctx context.Context, client llm.LLMClient, scenario *scene.
 		fmt.Println()
 	}
 
-	resp, err := client.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: promptText}},
-		MaxTokens:   300,
-		Temperature: 0.3,
-	})
+	rawResponse, err := llm.SimpleCompletion(ctx, client, promptText, 300, 0.3)
 	if err != nil {
-		return nil, fmt.Errorf("LLM request failed: %w", err)
+		return nil, err
 	}
-
-	if resp.Content() == "" {
-		return nil, fmt.Errorf("empty LLM response")
-	}
-
-	rawResponse := resp.Content()
 	if raw {
 		fmt.Println("--- Raw Resolution Response ---")
 		fmt.Println(rawResponse)

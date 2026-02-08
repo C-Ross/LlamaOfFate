@@ -42,7 +42,7 @@ func TestClassifyInput_LLMUnavailable(t *testing.T) {
 	_, err := sm.classifyInput(context.Background(), "hello")
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, ErrLLMUnavailable))
+	assert.True(t, errors.Is(err, llm.ErrUnavailable))
 }
 
 func TestClassifyInput_LLMError(t *testing.T) {
@@ -57,7 +57,7 @@ func TestClassifyInput_LLMError(t *testing.T) {
 	_, err = sm.classifyInput(context.Background(), "test input")
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, ErrLLMUnavailable))
+	assert.True(t, errors.Is(err, llm.ErrUnavailable))
 }
 
 func TestClassifyInput_EmptyResponse(t *testing.T) {
@@ -72,7 +72,7 @@ func TestClassifyInput_EmptyResponse(t *testing.T) {
 	_, err = sm.classifyInput(context.Background(), "test input")
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, ErrLLMInvalidResponse))
+	assert.True(t, errors.Is(err, llm.ErrUnavailable))
 }
 
 func TestClassifyInput_UnexpectedClassification(t *testing.T) {
@@ -129,7 +129,7 @@ func TestGenerateSceneResponse_LLMUnavailable(t *testing.T) {
 	_, err := sm.generateSceneResponse(context.Background(), "hello", inputTypeDialog)
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, ErrLLMUnavailable))
+	assert.True(t, errors.Is(err, llm.ErrUnavailable))
 }
 
 func TestGenerateSceneResponse_LLMError(t *testing.T) {
@@ -147,7 +147,7 @@ func TestGenerateSceneResponse_LLMError(t *testing.T) {
 	_, err = sm.generateSceneResponse(context.Background(), "hello", inputTypeDialog)
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, ErrLLMUnavailable))
+	assert.True(t, errors.Is(err, llm.ErrUnavailable))
 }
 
 func TestGenerateSceneResponse_EmptyResponse(t *testing.T) {
@@ -165,7 +165,7 @@ func TestGenerateSceneResponse_EmptyResponse(t *testing.T) {
 	_, err = sm.generateSceneResponse(context.Background(), "hello", inputTypeDialog)
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, ErrLLMInvalidResponse))
+	assert.True(t, errors.Is(err, llm.ErrUnavailable))
 }
 
 func TestGenerateActionNarrative_LLMUnavailable(t *testing.T) {
@@ -179,7 +179,7 @@ func TestGenerateActionNarrative_LLMUnavailable(t *testing.T) {
 	_, err := sm.generateActionNarrative(context.Background(), testAction)
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, ErrLLMUnavailable))
+	assert.True(t, errors.Is(err, llm.ErrUnavailable))
 }
 
 func TestGenerateActionNarrative_LLMError(t *testing.T) {
@@ -200,7 +200,7 @@ func TestGenerateActionNarrative_LLMError(t *testing.T) {
 	_, err = sm.generateActionNarrative(context.Background(), testAction)
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, ErrLLMUnavailable))
+	assert.True(t, errors.Is(err, llm.ErrUnavailable))
 }
 
 func TestBuildMechanicalNarrative(t *testing.T) {

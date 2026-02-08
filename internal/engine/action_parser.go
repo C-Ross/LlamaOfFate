@@ -87,10 +87,6 @@ func (ap *ActionParser) ParseAction(ctx context.Context, req ActionParseRequest)
 		return nil, fmt.Errorf("LLM request failed: %w", err)
 	}
 
-	if resp.Content() == "" {
-		return nil, fmt.Errorf("no response from LLM")
-	}
-
 	// Parse the JSON response
 	var parseResp ActionParseResponse
 	if err := json.Unmarshal([]byte(resp.Content()), &parseResp); err != nil {

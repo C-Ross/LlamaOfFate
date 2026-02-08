@@ -168,20 +168,10 @@ func evaluateSceneGeneration(ctx context.Context, client llm.LLMClient, tc Scene
 		return SceneGenResult{TestCase: tc, Error: err}
 	}
 
-	resp, err := client.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
-		MaxTokens:   800,
-		Temperature: 0.3,
-	})
+	raw, err := llm.SimpleCompletion(ctx, client, prompt, 800, 0.3)
 	if err != nil {
 		return SceneGenResult{TestCase: tc, Error: err}
 	}
-
-	if resp.Content() == "" {
-		return SceneGenResult{TestCase: tc, Error: err}
-	}
-
-	raw := resp.Content()
 	result := SceneGenResult{
 		TestCase:    tc,
 		RawResponse: raw,

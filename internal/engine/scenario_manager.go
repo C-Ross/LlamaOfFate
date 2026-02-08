@@ -288,21 +288,13 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 		return nil, fmt.Errorf("failed to render scene generation prompt: %w", err)
 	}
 
-	resp, err := m.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: promptText}},
-		MaxTokens:   500,
-		Temperature: 0.8, // Higher creativity for scene generation
-	})
+	rawResponse, err := llm.SimpleCompletion(ctx, m.engine.llmClient, promptText, 500, 0.8)
 	if err != nil {
-		return nil, fmt.Errorf("LLM request failed: %w", err)
-	}
-
-	if resp.Content() == "" {
-		return nil, fmt.Errorf("empty LLM response")
+		return nil, err
 	}
 
 	// Parse the generated scene
-	generated, err := prompt.ParseGeneratedScene(resp.Content())
+	generated, err := prompt.ParseGeneratedScene(rawResponse)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse generated scene: %w", err)
 	}
@@ -586,20 +578,12 @@ func (m *ScenarioManager) displayRecoveryNarrative(ctx context.Context, attempts
 		return
 	}
 
-	resp, err := m.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: promptText}},
-		MaxTokens:   200,
-		Temperature: 0.6,
-	})
+	content, err := llm.SimpleCompletion(ctx, m.engine.llmClient, promptText, 200, 0.6)
 	if err != nil {
 		slog.Warn("Failed to generate recovery narrative",
 			"component", componentScenarioManager,
 			"error", err,
 		)
-		return
-	}
-
-	if resp.Content() == "" {
 		return
 	}
 
@@ -609,7 +593,6 @@ func (m *ScenarioManager) displayRecoveryNarrative(ctx context.Context, attempts
 		RenamedAspects map[string]string `json:"renamed_aspects"`
 	}
 
-	content := resp.Content()
 	var parsed recoveryResponse
 	if parseErr := json.Unmarshal([]byte(content), &parsed); parseErr != nil {
 		// If parsing fails, display raw content
@@ -722,21 +705,13 @@ func (m *ScenarioManager) generateSceneSummary(ctx context.Context, sceneManager
 		return nil, fmt.Errorf("failed to render scene summary prompt: %w", err)
 	}
 
-	resp, err := m.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: promptText}},
-		MaxTokens:   400,
-		Temperature: 0.5, // More focused for summarization
-	})
+	rawResponse, err := llm.SimpleCompletion(ctx, m.engine.llmClient, promptText, 400, 0.5)
 	if err != nil {
-		return nil, fmt.Errorf("LLM request failed: %w", err)
-	}
-
-	if resp.Content() == "" {
-		return nil, fmt.Errorf("empty LLM response")
+		return nil, err
 	}
 
 	// Parse the generated summary
-	summary, err := prompt.ParseSceneSummary(resp.Content())
+	summary, err := prompt.ParseSceneSummary(rawResponse)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse scene summary: %w", err)
 	}
@@ -773,21 +748,13 @@ func (m *ScenarioManager) checkScenarioResolution(ctx context.Context, latestSum
 		return false, fmt.Errorf("failed to render scenario resolution prompt: %w", err)
 	}
 
-	resp, err := m.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: promptText}},
-		MaxTokens:   300,
-		Temperature: 0.3, // Low temperature for more consistent analysis
-	})
+	rawResponse, err := llm.SimpleCompletion(ctx, m.engine.llmClient, promptText, 300, 0.3)
 	if err != nil {
-		return false, fmt.Errorf("LLM request failed: %w", err)
-	}
-
-	if resp.Content() == "" {
-		return false, fmt.Errorf("empty LLM response")
+		return false, err
 	}
 
 	// Parse the resolution result
-	result, err := prompt.ParseScenarioResolution(resp.Content())
+	result, err := prompt.ParseScenarioResolution(rawResponse)
 	if err != nil {
 		return false, fmt.Errorf("failed to parse scenario resolution: %w", err)
 	}

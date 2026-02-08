@@ -352,26 +352,13 @@ func evaluateSceneTransition(ctx context.Context, client llm.LLMClient, tc Scene
 		}
 	}
 
-	resp, err := client.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
-		MaxTokens:   500,
-		Temperature: 0.3, // Low temperature for more consistent behavior
-	})
+	response, err := llm.SimpleCompletion(ctx, client, prompt, 500, 0.3)
 	if err != nil {
 		return SceneTransitionResult{
 			TestCase: tc,
 			Error:    err,
 		}
 	}
-
-	if resp.Content() == "" {
-		return SceneTransitionResult{
-			TestCase: tc,
-			Error:    err,
-		}
-	}
-
-	response := resp.Content()
 
 	// Check for scene transition marker using production parser
 	transition, _ := promptpkg.ParseSceneTransitionMarker(response)

@@ -167,6 +167,10 @@ func (c *Client) ChatCompletion(ctx context.Context, req llm.CompletionRequest) 
 
 	response.CleanContent()
 
+	if response.Content() == "" {
+		return nil, llm.ErrEmptyResponse
+	}
+
 	return &response, nil
 }
 

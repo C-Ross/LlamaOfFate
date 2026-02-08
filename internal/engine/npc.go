@@ -89,21 +89,12 @@ func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character
 		return nil, fmt.Errorf("failed to render NPC action decision template: %w", err)
 	}
 
-	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: promptText}},
-		MaxTokens:   150,
-		Temperature: 0.7,
-	})
+	content, err := llm.SimpleCompletion(ctx, sm.engine.llmClient, promptText, 150, 0.7)
 	if err != nil {
-		return nil, fmt.Errorf("LLM request failed: %w", err)
-	}
-
-	if resp.Content() == "" {
-		return nil, fmt.Errorf("empty response from LLM")
+		return nil, err
 	}
 
 	// Parse JSON response
-	content := resp.Content()
 	var decision prompt.NPCActionDecision
 	if err := json.Unmarshal([]byte(content), &decision); err != nil {
 		slog.Warn("Failed to parse NPC action decision",
@@ -444,18 +435,5 @@ func (sm *SceneManager) generateNPCAttackNarrative(ctx context.Context, npc *cha
 		return "", fmt.Errorf("failed to render NPC attack template: %w", err)
 	}
 
-	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: promptText}},
-		MaxTokens:   100,
-		Temperature: 0.8,
-	})
-	if err != nil {
-		return "", err
-	}
-
-	if resp.Content() == "" {
-		return "", fmt.Errorf("empty response from LLM")
-	}
-
-	return resp.Content(), nil
+	return llm.SimpleCompletion(ctx, sm.engine.llmClient, promptText, 100, 0.8)
 }

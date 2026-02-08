@@ -1,9 +1,23 @@
 package llm
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 )
+
+// Sentinel errors for LLM operations
+var (
+	ErrEmptyResponse   = errors.New("empty LLM response")
+	ErrUnavailable     = errors.New("LLM service unavailable")
+	ErrTimeout         = errors.New("LLM request timed out")
+	ErrInvalidResponse = errors.New("LLM returned invalid response")
+)
+
+// IsRetryable returns true if the error might succeed on retry.
+func IsRetryable(err error) bool {
+	return errors.Is(err, ErrTimeout) || errors.Is(err, ErrUnavailable)
+}
 
 // APIError represents an error response from an LLM API
 type APIError struct {

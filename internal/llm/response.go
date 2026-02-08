@@ -1,9 +1,28 @@
 package llm
 
 import (
+	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 )
+
+// SimpleCompletion sends a single user-message prompt and returns the text content.
+// Returns ErrEmptyResponse if the response is empty after cleaning.
+func SimpleCompletion(ctx context.Context, client LLMClient, prompt string, maxTokens int, temperature float64) (string, error) {
+	resp, err := client.ChatCompletion(ctx, CompletionRequest{
+		Messages:    []Message{{Role: "user", Content: prompt}},
+		MaxTokens:   maxTokens,
+		Temperature: temperature,
+	})
+	if err != nil {
+		return "", fmt.Errorf("LLM request failed: %w", err)
+	}
+	if resp.Content() == "" {
+		return "", ErrEmptyResponse
+	}
+	return resp.Content(), nil
+}
 
 // Content returns the message content from the first completion choice.
 // Returns an empty string when no choices are present.

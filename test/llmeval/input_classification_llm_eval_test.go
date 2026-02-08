@@ -4,7 +4,6 @@ package llmeval_test
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -493,11 +492,7 @@ func evaluateInputClassification(ctx context.Context, client llm.LLMClient, tc I
 		}
 	}
 
-	resp, err := client.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
-		MaxTokens:   10,
-		Temperature: 0.1,
-	})
+	classification, err := llm.SimpleCompletion(ctx, client, prompt, 10, 0.1)
 	if err != nil {
 		return InputClassificationResult{
 			TestCase: tc,
@@ -505,14 +500,7 @@ func evaluateInputClassification(ctx context.Context, client llm.LLMClient, tc I
 		}
 	}
 
-	if resp.Content() == "" {
-		return InputClassificationResult{
-			TestCase: tc,
-			Error:    fmt.Errorf("no response from LLM"),
-		}
-	}
-
-	classification := strings.ToLower(resp.Content())
+	classification = strings.ToLower(classification)
 
 	return InputClassificationResult{
 		TestCase:   tc,

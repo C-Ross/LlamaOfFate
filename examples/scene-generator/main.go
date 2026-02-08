@@ -186,20 +186,10 @@ func main() {
 
 	// Call LLM
 	ctx := context.Background()
-	resp, err := azureClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: promptText}},
-		MaxTokens:   500,
-		Temperature: 0.8,
-	})
+	rawResponse, err := llm.SimpleCompletion(ctx, azureClient, promptText, 500, 0.8)
 	if err != nil {
 		log.Fatalf("LLM request failed: %v", err)
 	}
-
-	if resp.Content() == "" {
-		log.Fatal("Empty LLM response")
-	}
-
-	rawResponse := resp.Content()
 
 	if *rawFlag {
 		fmt.Println("=== Raw LLM Response ===")

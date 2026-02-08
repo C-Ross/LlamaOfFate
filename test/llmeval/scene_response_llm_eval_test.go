@@ -335,20 +335,10 @@ func evaluateSceneResponseBehavior(ctx context.Context, client llm.LLMClient, tc
 		return SceneResponseResult{TestCase: tc, Error: err}
 	}
 
-	resp, err := client.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
-		MaxTokens:   600,
-		Temperature: 0.3,
-	})
+	response, err := llm.SimpleCompletion(ctx, client, prompt, 600, 0.3)
 	if err != nil {
 		return SceneResponseResult{TestCase: tc, Error: err}
 	}
-
-	if resp.Content() == "" {
-		return SceneResponseResult{TestCase: tc, Error: err}
-	}
-
-	response := resp.Content()
 
 	// Check for options patterns
 	hasOptions := false

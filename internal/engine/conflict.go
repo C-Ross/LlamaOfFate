@@ -957,20 +957,7 @@ func (sm *SceneManager) generateConsequenceAspect(ctx context.Context, conseqTyp
 		return "", fmt.Errorf("failed to render consequence aspect template: %w", err)
 	}
 
-	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
-		MaxTokens:   20,
-		Temperature: 0.8,
-	})
-	if err != nil {
-		return "", err
-	}
-
-	if resp.Content() == "" {
-		return "", fmt.Errorf("empty response")
-	}
-
-	return resp.Content(), nil
+	return llm.SimpleCompletion(ctx, sm.engine.llmClient, prompt, 20, 0.8)
 }
 
 // isConcedeCommand checks if the input is a concession command
@@ -1105,17 +1092,9 @@ func (sm *SceneManager) generateTakenOutNarrativeAndOutcome(ctx context.Context,
 		return "", TakenOutTransition, "", fmt.Errorf("failed to render taken out template: %w", err)
 	}
 
-	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
-		MaxTokens:   200,
-		Temperature: 0.7,
-	})
+	content, err := llm.SimpleCompletion(ctx, sm.engine.llmClient, prompt, 200, 0.7)
 	if err != nil {
 		return "", TakenOutTransition, "", err
-	}
-
-	if resp.Content() == "" {
-		return "", TakenOutTransition, "", fmt.Errorf("empty response")
 	}
 
 	// Parse the JSON response
@@ -1125,7 +1104,6 @@ func (sm *SceneManager) generateTakenOutNarrativeAndOutcome(ctx context.Context,
 		NewSceneHint string `json:"new_scene_hint"`
 	}
 
-	content := resp.Content()
 	var parsed takenOutResponse
 	if parseErr := json.Unmarshal([]byte(content), &parsed); parseErr != nil {
 		// If parsing fails, use the raw content as narrative and default to transition

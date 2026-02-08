@@ -125,20 +125,10 @@ func evaluateSceneSummary(ctx context.Context, client llm.LLMClient, tc SceneSum
 		return SceneSummaryResult{TestCase: tc, Error: err}
 	}
 
-	resp, err := client.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: prompt}},
-		MaxTokens:   800,
-		Temperature: 0.3,
-	})
+	raw, err := llm.SimpleCompletion(ctx, client, prompt, 800, 0.3)
 	if err != nil {
 		return SceneSummaryResult{TestCase: tc, Error: err}
 	}
-
-	if resp.Content() == "" {
-		return SceneSummaryResult{TestCase: tc, Error: err}
-	}
-
-	raw := resp.Content()
 	result := SceneSummaryResult{
 		TestCase:    tc,
 		RawResponse: raw,

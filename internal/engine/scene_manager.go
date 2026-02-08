@@ -284,7 +284,7 @@ func (sm *SceneManager) displayHelp() {
 // classifyInput uses LLM to determine if input is dialog, clarification, or action
 func (sm *SceneManager) classifyInput(ctx context.Context, input string) (string, error) {
 	if sm.engine.llmClient == nil {
-		return "", fmt.Errorf("classifyInput: %w", ErrLLMUnavailable)
+		return "", fmt.Errorf("classifyInput: %w", llm.ErrUnavailable)
 	}
 
 	// Prepare template data and render
@@ -295,23 +295,15 @@ func (sm *SceneManager) classifyInput(ctx context.Context, input string) (string
 
 	promptText, err := prompt.RenderInputClassification(data)
 	if err != nil {
-		return "", fmt.Errorf("classifyInput: %w: %v", ErrLLMInvalidResponse, err)
+		return "", fmt.Errorf("classifyInput: %w: %v", llm.ErrInvalidResponse, err)
 	}
 
-	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: promptText}},
-		MaxTokens:   10,
-		Temperature: 0.1, // Low temperature for consistent classification
-	})
+	content, err := llm.SimpleCompletion(ctx, sm.engine.llmClient, promptText, 10, 0.1)
 	if err != nil {
-		return "", fmt.Errorf("classifyInput: %w: %v", ErrLLMUnavailable, err)
+		return "", fmt.Errorf("classifyInput: %w: %v", llm.ErrUnavailable, err)
 	}
 
-	if resp.Content() == "" {
-		return "", fmt.Errorf("classifyInput: %w", ErrLLMInvalidResponse)
-	}
-
-	classification := strings.ToLower(resp.Content())
+	classification := strings.ToLower(content)
 
 	// Validate the response is one of our expected types
 	switch classification {
@@ -449,7 +441,7 @@ func (sm *SceneManager) handleAction(ctx context.Context, input string) {
 // generateSceneResponse generates an LLM response for dialog/clarification
 func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string, interactionType string) (string, error) {
 	if sm.engine.llmClient == nil {
-		return "", fmt.Errorf("generateSceneResponse: %w", ErrLLMUnavailable)
+		return "", fmt.Errorf("generateSceneResponse: %w", llm.ErrUnavailable)
 	}
 
 	// Get other characters in the scene
@@ -527,31 +519,21 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 	}
 
 	if renderErr != nil {
-		return "", fmt.Errorf("generateSceneResponse: %w: %v", ErrLLMInvalidResponse, renderErr)
+		return "", fmt.Errorf("generateSceneResponse: %w: %v", llm.ErrInvalidResponse, renderErr)
 	}
 
-	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages: []llm.Message{
-			{Role: "user", Content: promptText},
-		},
-		MaxTokens:   300,
-		Temperature: 0.7,
-	})
+	content, err := llm.SimpleCompletion(ctx, sm.engine.llmClient, promptText, 300, 0.7)
 	if err != nil {
-		return "", fmt.Errorf("generateSceneResponse: %w: %v", ErrLLMUnavailable, err)
+		return "", fmt.Errorf("generateSceneResponse: %w: %v", llm.ErrUnavailable, err)
 	}
 
-	if resp.Content() == "" {
-		return "", fmt.Errorf("generateSceneResponse: %w", ErrLLMInvalidResponse)
-	}
-
-	return resp.Content(), nil
+	return content, nil
 }
 
 // generateActionNarrative generates narrative text for action results
 func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedAction *action.Action) (string, error) {
 	if sm.engine.llmClient == nil {
-		return "", fmt.Errorf("generateActionNarrative: %w", ErrLLMUnavailable)
+		return "", fmt.Errorf("generateActionNarrative: %w", llm.ErrUnavailable)
 	}
 
 	// Get other characters in the scene
@@ -575,23 +557,13 @@ func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedActio
 
 	promptText, err := prompt.RenderActionNarrative(data)
 	if err != nil {
-		return "", fmt.Errorf("generateActionNarrative: %w: %v", ErrLLMInvalidResponse, err)
+		return "", fmt.Errorf("generateActionNarrative: %w: %v", llm.ErrInvalidResponse, err)
 	}
 
-	resp, err := sm.engine.llmClient.ChatCompletion(ctx, llm.CompletionRequest{
-		Messages:    []llm.Message{{Role: "user", Content: promptText}},
-		MaxTokens:   200,
-		Temperature: 0.8,
-	})
+	narrative, err := llm.SimpleCompletion(ctx, sm.engine.llmClient, promptText, 200, 0.8)
 	if err != nil {
-		return "", fmt.Errorf("generateActionNarrative: %w: %v", ErrLLMUnavailable, err)
+		return "", fmt.Errorf("generateActionNarrative: %w: %v", llm.ErrUnavailable, err)
 	}
-
-	if resp.Content() == "" {
-		return "", fmt.Errorf("generateActionNarrative: %w", ErrLLMInvalidResponse)
-	}
-
-	narrative := resp.Content()
 
 	// Add this to conversation history as well
 	actionDescription := fmt.Sprintf("Attempted: %s (Outcome: %s)", parsedAction.Description, parsedAction.Outcome.Type.String())
