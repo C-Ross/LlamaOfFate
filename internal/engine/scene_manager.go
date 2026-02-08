@@ -72,9 +72,14 @@ func NewSceneManager(engine *Engine) *SceneManager {
 	return sm
 }
 
-// SetUI sets the UI for the scene manager
+// SetUI sets the UI for the scene manager.
+// If the UI implements SceneInfoSetter, it also sets the scene info
+// so the UI can display character and scene status.
 func (sm *SceneManager) SetUI(ui UI) {
 	sm.ui = ui
+	if setter, ok := ui.(SceneInfoSetter); ok {
+		setter.SetSceneInfo(sm)
+	}
 }
 
 // SetSessionLogger sets the session logger for recording game transcripts

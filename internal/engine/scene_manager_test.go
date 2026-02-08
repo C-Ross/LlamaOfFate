@@ -1645,3 +1645,37 @@ func TestSceneManager_ResolveAction_UnknownTarget_AbortsWithoutConsumingTurn(t *
 			"Should not generate narrative when target is unknown, got: %v", mockUI.displayedMessages)
 	}
 }
+
+// MockSceneInfoAwareUI implements both UI and SceneInfoSetter for testing
+type MockSceneInfoAwareUI struct {
+	MockUI
+	sceneInfo SceneInfo
+}
+
+func (m *MockSceneInfoAwareUI) SetSceneInfo(info SceneInfo) {
+	m.sceneInfo = info
+}
+
+func TestSetUI_CallsSetSceneInfo_WhenUIImplementsSceneInfoSetter(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	mockUI := &MockSceneInfoAwareUI{}
+
+	sm.SetUI(mockUI)
+
+	assert.Equal(t, SceneInfo(sm), mockUI.sceneInfo, "SetUI should call SetSceneInfo on UIs that implement SceneInfoSetter")
+}
+
+func TestSetUI_DoesNotPanic_WhenUIDoesNotImplementSceneInfoSetter(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	mockUI := &MockUI{}
+
+	// Should not panic
+	sm.SetUI(mockUI)
+	assert.NotNil(t, sm.ui)
+}

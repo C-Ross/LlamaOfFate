@@ -46,6 +46,12 @@ type InvokeChoice struct {
 	IsReroll bool             // true = reroll dice, false = +2 bonus
 }
 
+// SceneInfoSetter is an optional interface that UIs can implement to receive
+// a reference back to the SceneInfo provider (e.g., for character/status display).
+type SceneInfoSetter interface {
+	SetSceneInfo(sceneInfo SceneInfo)
+}
+
 // UI defines the interface for user interaction during scene management
 type UI interface {
 	// Input methods - returns the cleaned input and whether it's an exit command
