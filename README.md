@@ -84,57 +84,66 @@ LlamaOfFate/
 │   └── cli/                    # Command-line interface
 ├── internal/
 │   ├── core/                   # Core game mechanics
+│   │   ├── action/             # Action resolution system
 │   │   ├── character/          # Character management
 │   │   ├── dice/               # Dice rolling and probability
 │   │   ├── scene/              # Scene and conflict management
-│   │   └── action/             # Action resolution system
-│   ├── llm/                    # LLM integration layer
-│   │   └── ollama/             # Ollama-specific implementation
+│   │   └── skills.go           # Skill definitions
 │   ├── engine/                 # Game engine coordination
-│   ├── storage/                # Data persistence
-│   │   ├── memory/             # In-memory storage
-│   │   └── json/               # JSON file storage
-│   └── ui/                     # User interface components
-│       ├── text/               # Text-based interface
-│       └── web/                # Web interface
-│           └── static/
-├── pkg/                        # Public API packages
-│   ├── types/                  # Shared type definitions
-│   └── client/                 # Client library for external integrations
-├── configs/                    # Configuration files
+│   │   ├── Scene and scenario managers
+│   │   ├── Action parsing and resolution
+│   │   └── Conflict management
+│   ├── llm/                    # LLM integration layer
+│   │   ├── azure/              # Azure OpenAI implementation
+│   │   └── Interface, retry logic, response handling
+│   ├── session/                # Session logging for game transcripts
+│   ├── logging/                # Application logging
+│   └── ui/
+│       └── terminal/           # Terminal-based interface
+├── examples/                   # Example programs and scenarios
+│   ├── llm-scene-loop/         # Interactive scene loop example
+│   ├── scenario-generator/     # Scenario generation example
+│   ├── scenario-walkthrough/   # Scenario walkthrough example
+│   └── scene-generator/        # Scene generation example
+├── configs/                    # Configuration files (azure-llm.yaml)
 ├── docs/                       # Documentation
-│   └── examples/
-├── scripts/                    # Build and development scripts
-├── test/                       # Integration tests
-│   ├── fixtures/               # Test data
-│   └── integration/
+│   └── architecture.md         # Architecture documentation
+├── test/                       # Tests
+│   ├── integration/            # Integration tests
+│   └── llmeval/                # LLM evaluation tests
 └── [standard Go project files]
 ```
 
 ### Package Responsibilities
 
-- **`cmd/`**: Entry point for the CLI application
-- **`internal/core/`**: Core Fate mechanics implementation, isolated from external dependencies
-- **`internal/llm/`**: LLM integration with pluggable backends (Ollama, OpenAI, etc.)
-- **`internal/engine/`**: Orchestrates core mechanics and LLM services
-- **`internal/storage/`**: Pluggable persistence layer for different storage backends
-- **`internal/ui/`**: Text-based user interface implementation
-- **`pkg/types/`**: Shared data structures that can be imported by external packages
-- **`pkg/client/`**: Go client library for programmatic access to the game engine
-- **`configs/`**: YAML configuration files for all system settings (skills, stunts, LLM services, etc.)
+- **`cmd/cli/`**: Entry point for the command-line application
+- **`internal/core/`**: Core Fate mechanics implementation (character, dice, scene, action, skills)
+- **`internal/engine/`**: Orchestrates core mechanics and LLM services (scene managers, action parsing, conflict resolution)
+- **`internal/llm/`**: LLM integration with Azure OpenAI backend, including retry logic and response handling
+- **`internal/session/`**: Session logging for game transcripts
+- **`internal/ui/terminal/`**: Terminal-based user interface implementation
+- **`examples/`**: Example programs demonstrating LLM scene loops, scenario generation, and walkthroughs
+- **`configs/`**: YAML configuration files (azure-llm.yaml)
+- **`test/integration/`**: Integration tests for the game system
+- **`test/llmeval/`**: LLM evaluation tests for prompt behavior
 
-## Implementation Notes
+## Implementation Status
 
-- Use Go's strong typing for game state validation
-- Implement comprehensive JSON serialization for save/load functionality
-- Consider database backends for persistence (PostgreSQL recommended)
-- Implement robust error handling for LLM integration failures
+### Completed Features
+- ✅ Core data structures (character, aspects, stress, consequences)
+- ✅ Complete Fate Core dice system (4dF) and skill ladder
+- ✅ All 18 default Fate Core skills with action mappings
+- ✅ Game engine with scene and scenario management
+- ✅ LLM integration with Azure OpenAI
+- ✅ Action parsing from natural language input
+- ✅ Conflict resolution system with stress and consequences
+- ✅ CLI interface for game interaction
+- ✅ Session logging for game transcripts
+- ✅ Integration tests and LLM evaluation tests
 
-## Next Steps
-
-1. Implement core data structures and interfaces
-2. Create basic game engine with dice rolling and skill checks
-3. Integrate LLM service for action parsing
-4. Build CLI interface for game interaction
-5. Add persistence layer
-6. Implement full conflict resolution system
+### Planned Features
+- 📋 Additional LLM backends (Ollama, OpenAI direct)
+- 📋 Persistence layer (save/load functionality)
+- 📋 Web-based user interface
+- 📋 Public API packages for external integrations
+- 📋 Database backends for long-term storage
