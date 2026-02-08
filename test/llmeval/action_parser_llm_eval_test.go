@@ -167,6 +167,33 @@ func getOvercomeTestCases() []ActionParserTestCase {
 			ExpectedDifficulty: 3, // Good - guard is suspicious
 			Description:        "Creating false identity aspect to manipulate situation - Create Advantage",
 		},
+		{
+			Name:               "Shoulder through crowd for attention",
+			RawInput:           "Jesse shoulders his way through the crowd and slaps a silver dollar down on the bar",
+			Context:            "A busy saloon filled with rough patrons, the barkeep is serving drinks at the far end of the bar",
+			ExpectedType:       action.Overcome,
+			ExpectedSkills:     []string{"Rapport", "Provoke", "Physique"},
+			ExpectedDifficulty: 1, // Average - busy but not hostile
+			Description:        "Getting barkeep's attention in a busy saloon is an immediate obstacle - Overcome, not Create Advantage",
+		},
+		{
+			Name:               "Order a drink at bar",
+			RawInput:           "\"Whiskey\" Jesse says, offering a silver dollar.",
+			Context:            "Standing at the bar in a frontier saloon, the barkeep has come over to take an order",
+			ExpectedType:       action.Overcome,
+			ExpectedSkills:     []string{"Rapport", "Resources"},
+			ExpectedDifficulty: 0, // Mediocre - routine transaction
+			Description:        "Ordering a drink is an honest social transaction - Overcome with Rapport, not Deceive",
+		},
+		{
+			Name:               "Honest request for help",
+			RawInput:           "I ask the shopkeeper if he has any rope for sale",
+			Context:            "Inside a general store, the shopkeeper is stocking shelves",
+			ExpectedType:       action.Overcome,
+			ExpectedSkills:     []string{"Rapport", "Resources"},
+			ExpectedDifficulty: 0, // Mediocre - simple request
+			Description:        "Simple honest request should use Rapport, not Deceive",
+		},
 	}
 }
 

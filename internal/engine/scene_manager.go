@@ -24,6 +24,7 @@ const (
 	inputTypeDialog        = "dialog"
 	inputTypeClarification = "clarification"
 	inputTypeAction        = "action"
+	inputTypeNarrative     = "narrative"
 
 	// User-facing messages
 	msgLLMUnavailable = "[The mists of fate obscure my vision...]"
@@ -227,7 +228,7 @@ func (sm *SceneManager) processInput(ctx context.Context, input string) {
 		"input", input)
 
 	switch inputType {
-	case inputTypeDialog, inputTypeClarification:
+	case inputTypeDialog, inputTypeClarification, inputTypeNarrative:
 		sm.handleDialog(ctx, input)
 	case inputTypeAction:
 		sm.handleAction(ctx, input)
@@ -305,9 +306,19 @@ func (sm *SceneManager) classifyInput(ctx context.Context, input string) (string
 
 	classification := strings.ToLower(content)
 
+	// LLM sometimes appends reasoning text; extract the first word
+	if idx := strings.IndexAny(classification, " \n\t"); idx > 0 {
+		firstWord := classification[:idx]
+		slog.Debug("Classification response contained extra text, using first word",
+			"component", componentSceneManager,
+			"raw_response", classification,
+			"extracted", firstWord)
+		classification = firstWord
+	}
+
 	// Validate the response is one of our expected types
 	switch classification {
-	case inputTypeDialog, inputTypeClarification, inputTypeAction:
+	case inputTypeDialog, inputTypeClarification, inputTypeAction, inputTypeNarrative:
 		return classification, nil
 	default:
 		slog.Warn("Unexpected classification from LLM",

@@ -19,7 +19,7 @@ Description: {{.Scene.Description}}
 PLAYER INPUT: "{{.PlayerInput}}"
 
 Classify this input as one of these types:
-- "dialog" - The player is speaking, asking questions, or requesting information about the scene
+- "dialog" - The player is speaking, ordering, buying, or making a social request to someone
 - "clarification" - The player wants to examine, look at, or understand something in the environment (NO DICE ROLL)
 - "action" - The player is attempting to take a specific action where both success and failure could be interesting
 
@@ -27,7 +27,8 @@ Examples:
 - "What do I see?" -> clarification (just provide information)
 - "Look around the room" -> clarification (basic observation)
 - "I say 'Hello there'" -> dialog
-- "Ask the bartender about rumors" -> dialog  
+- "Ask the bartender about rumors" -> dialog
+- "Whiskey, I say, putting money on the bar" -> dialog (routine social transaction)
 - "Open the door and step through" -> narrative
 - "I pace around the room" -> narrative
 - "Examine the mysterious door" -> clarification (unless there's danger/time pressure)

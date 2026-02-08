@@ -69,6 +69,25 @@ func getDialogTestCases() []InputClassificationTestCase {
 			ExpectedType:     "dialog",
 			Description:      "Social introduction - dialog",
 		},
+		{
+			Name:             "Order a drink",
+			RawInput:         "\"Whiskey\" Jesse says, offering a silver dollar.",
+			SceneName:        "Redemption Gulch Saloon",
+			SceneDescription: "A busy saloon filled with rough patrons, the barkeep polishes glasses behind the bar",
+			ExpectedType:     "dialog",
+			Description:      "Ordering a drink is a mundane social transaction - dialog, not action",
+		},
+		{
+			Name:             "Buy something from vendor",
+			RawInput:         "I'll take a room for the night, and a hot meal.",
+			SceneName:        "The Dusty Trail Inn",
+			SceneDescription: "A frontier inn with a few rooms available and a kitchen in the back",
+			ExpectedType:     "dialog",
+			Description:      "Simple commercial transaction - dialog, not action",
+		},
+		// Getting barkeep attention in a chaotic saloon is action - scene aspects
+		// like "Tension Hangs in the Air" create real opposition and interesting failure.
+		// Moved from dialog to action to reflect scene context.
 	}
 }
 
@@ -138,6 +157,39 @@ func getClarificationTestCases() []InputClassificationTestCase {
 			SceneDescription: "Walking through quiet evening streets",
 			ExpectedType:     "clarification",
 			Description:      "Internal reflection - clarification or dialog",
+		},
+	}
+}
+
+// getNarrativeTestCases returns inputs that should be classified as narrative
+// These are mundane actions with no interesting failure consequence
+func getNarrativeTestCases() []InputClassificationTestCase {
+	return []InputClassificationTestCase{
+		// Shouldering through a tense crowd is action when scene aspects like
+		// "Tension Hangs in the Air" make failure interesting (could start a fight).
+		{
+			Name:             "Shoulder through crowd",
+			RawInput:         "Jesse shoulders his way through the crowd and slaps a silver dollar down on the bar.",
+			SceneName:        "Redemption Gulch Saloon",
+			SceneDescription: "A busy saloon filled with rough patrons drinking and playing cards, tension hangs in the air",
+			ExpectedType:     "action",
+			Description:      "Pushing through a tense crowd has interesting failure (confrontation) - action to overcome scene aspects",
+		},
+		{
+			Name:             "Walk to table",
+			RawInput:         "I walk over to the empty table in the corner and sit down.",
+			SceneName:        "The Rusty Anchor Tavern",
+			SceneDescription: "A busy tavern filled with sailors and merchants",
+			ExpectedType:     "narrative",
+			Description:      "Simple movement in a non-threatening environment - narrative",
+		},
+		{
+			Name:             "Open unlocked door",
+			RawInput:         "I open the door and step through.",
+			SceneName:        "Inn Hallway",
+			SceneDescription: "A quiet hallway in the inn with several doors along the walls",
+			ExpectedType:     "narrative",
+			Description:      "Opening an unlocked unguarded door is trivial - narrative",
 		},
 	}
 }
@@ -240,6 +292,16 @@ func getActionTestCases() []InputClassificationTestCase {
 			SceneDescription: "Approaching a bandit camp, guards patrol the perimeter",
 			ExpectedType:     "action",
 			Description:      "Stealth reconnaissance with risk of detection - action",
+		},
+		// Scene aspects create opposition that makes mundane actions interesting.
+		// "Tension Hangs in the Air" means getting attention could provoke trouble.
+		{
+			Name:             "Get barkeep attention in chaotic saloon",
+			RawInput:         "Jesse ignores the chaos and gets the barkeeps attention.",
+			SceneName:        "Redemption Gulch Saloon",
+			SceneDescription: "A rowdy saloon with a bar fight breaking out, the barkeep is busy serving drinks, tension hangs in the air",
+			ExpectedType:     "action",
+			Description:      "Getting barkeep attention during chaos is action - scene aspects create real opposition and interesting failure",
 		},
 	}
 }
@@ -384,6 +446,7 @@ func TestInputClassification_LLMEvaluation(t *testing.T) {
 	}{
 		{"Dialog", getDialogTestCases()},
 		{"Clarification", getClarificationTestCases()},
+		{"Narrative", getNarrativeTestCases()},
 		{"Action", getActionTestCases()},
 		{"ThirdPerson", getThirdPersonClassificationTestCases()},
 	}
@@ -500,7 +563,11 @@ func evaluateInputClassification(ctx context.Context, client llm.LLMClient, tc I
 		}
 	}
 
-	classification = strings.ToLower(classification)
+	classification = strings.ToLower(strings.TrimSpace(classification))
+	// LLM sometimes appends reasoning despite prompt instructions; extract first word only
+	if idx := strings.IndexAny(classification, " \n\t"); idx > 0 {
+		classification = classification[:idx]
+	}
 
 	return InputClassificationResult{
 		TestCase:   tc,
