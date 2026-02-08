@@ -1,8 +1,10 @@
 package azure
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -32,6 +34,7 @@ func TestNewClient(t *testing.T) {
 	assert.Equal(t, "Meta-Llama-3.1-405B-Instruct", modelInfo.Name)
 	assert.Equal(t, "Azure ML", modelInfo.Provider)
 	assert.Equal(t, 2048, modelInfo.MaxTokens)
+	assert.Equal(t, 128000, modelInfo.ContextWindow)
 }
 
 func TestNewClientWithDefaults(t *testing.T) {
@@ -255,4 +258,124 @@ func TestChatCompletionStream(t *testing.T) {
 		}
 	}
 	assert.Equal(t, "Hello there!", content)
+}
+
+func TestGetContextWindowForModel(t *testing.T) {
+	tests := []struct {
+		modelName   string
+		expectedMax int
+	}{
+		{"Meta-Llama-3.1-405B-Instruct", 128000},
+		{"Meta-Llama-3.1-70B-Instruct", 128000},
+		{"Meta-Llama-3.1-8B-Instruct", 128000},
+		{"Meta-Llama-3-70B-Instruct", 8192},
+		{"unknown-model", 8192},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.modelName, func(t *testing.T) {
+			result := getContextWindowForModel(tt.modelName)
+			assert.Equal(t, tt.expectedMax, result)
+		})
+	}
+}
+
+func TestLogTokenUsage_DebugLog(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	slog.SetDefault(logger)
+	defer slog.SetDefault(slog.Default())
+
+	client := NewClient(Config{
+		APIEndpoint: "https://test.endpoint.com",
+		APIKey:      "test-key",
+		ModelName:   "Meta-Llama-3.1-405B-Instruct",
+	})
+
+	usage := llm.CompletionUsage{
+		PromptTokens:     500,
+		CompletionTokens: 200,
+		TotalTokens:      700,
+	}
+
+	client.logTokenUsage(usage, "Meta-Llama-3.1-405B-Instruct")
+
+	output := buf.String()
+	assert.Contains(t, output, "Token usage")
+	assert.Contains(t, output, "prompt_tokens=500")
+	assert.Contains(t, output, "completion_tokens=200")
+	assert.Contains(t, output, "total_tokens=700")
+	assert.NotContains(t, output, "approaching context window limit")
+}
+
+func TestLogTokenUsage_WarningNearLimit(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	slog.SetDefault(logger)
+	defer slog.SetDefault(slog.Default())
+
+	client := NewClient(Config{
+		APIEndpoint: "https://test.endpoint.com",
+		APIKey:      "test-key",
+		ModelName:   "Meta-Llama-3.1-405B-Instruct",
+	})
+
+	// 80% of 128000 = 102400; use something above that
+	usage := llm.CompletionUsage{
+		PromptTokens:     100000,
+		CompletionTokens: 5000,
+		TotalTokens:      105000,
+	}
+
+	client.logTokenUsage(usage, "Meta-Llama-3.1-405B-Instruct")
+
+	output := buf.String()
+	assert.Contains(t, output, "Token usage")
+	assert.Contains(t, output, "approaching context window limit")
+	assert.Contains(t, output, "context_window=128000")
+}
+
+func TestLogTokenUsage_NoLogOnZeroTokens(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	slog.SetDefault(logger)
+	defer slog.SetDefault(slog.Default())
+
+	client := NewClient(Config{
+		APIEndpoint: "https://test.endpoint.com",
+		APIKey:      "test-key",
+		ModelName:   "Meta-Llama-3.1-405B-Instruct",
+	})
+
+	usage := llm.CompletionUsage{}
+
+	client.logTokenUsage(usage, "Meta-Llama-3.1-405B-Instruct")
+
+	assert.Empty(t, buf.String())
+}
+
+func TestLogTokenUsage_NoWarningBelowThreshold(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	slog.SetDefault(logger)
+	defer slog.SetDefault(slog.Default())
+
+	client := NewClient(Config{
+		APIEndpoint: "https://test.endpoint.com",
+		APIKey:      "test-key",
+		ModelName:   "Meta-Llama-3.1-405B-Instruct",
+	})
+
+	// Well below 80% of 128000
+	usage := llm.CompletionUsage{
+		PromptTokens:     1000,
+		CompletionTokens: 200,
+		TotalTokens:      1200,
+	}
+
+	client.logTokenUsage(usage, "Meta-Llama-3.1-405B-Instruct")
+
+	output := buf.String()
+	assert.Contains(t, output, "Token usage")
+	assert.NotContains(t, output, "approaching context window limit")
 }

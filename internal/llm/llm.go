@@ -63,8 +63,9 @@ type LLMClient interface {
 
 // ModelInfo contains information about the LLM model
 type ModelInfo struct {
-	Name        string `json:"name"`
-	Provider    string `json:"provider"`
-	MaxTokens   int    `json:"max_tokens"`
-	Description string `json:"description"`
+	Name          string `json:"name"`
+	Provider      string `json:"provider"`
+	MaxTokens     int    `json:"max_tokens"`
+	ContextWindow int    `json:"context_window"` // Total context window size in tokens
+	Description   string `json:"description"`
 }

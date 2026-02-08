@@ -38,10 +38,11 @@ func NewClient(config Config) *Client {
 	}
 
 	modelInfo := llm.ModelInfo{
-		Name:        config.ModelName,
-		Provider:    "Azure ML",
-		MaxTokens:   getMaxTokensForModel(config.ModelName),
-		Description: fmt.Sprintf("Azure ML hosted %s", config.ModelName),
+		Name:          config.ModelName,
+		Provider:      "Azure ML",
+		MaxTokens:     getMaxTokensForModel(config.ModelName),
+		ContextWindow: getContextWindowForModel(config.ModelName),
+		Description:   fmt.Sprintf("Azure ML hosted %s", config.ModelName),
 	}
 
 	return &Client{
@@ -161,6 +162,8 @@ func (c *Client) ChatCompletion(ctx context.Context, req llm.CompletionRequest) 
 		slog.Any("headers", headers),
 		slog.Int("choices", len(response.Choices)),
 		slog.String("raw_body", string(bodyBytes)))
+
+	c.logTokenUsage(response.Usage, req.Model)
 
 	return &response, nil
 }
@@ -337,5 +340,48 @@ func getMaxTokensForModel(modelName string) int {
 		return 2048
 	default:
 		return 2048 // Default for Llama models
+	}
+}
+
+// getContextWindowForModel returns the context window size for different Llama models
+func getContextWindowForModel(modelName string) int {
+	switch {
+	case strings.Contains(modelName, "Llama-3.1"):
+		return 128000 // Llama 3.1 supports 128k context
+	case strings.Contains(modelName, "Llama-3"):
+		return 8192 // Llama 3.0 supports 8k context
+	default:
+		return 8192 // Conservative default
+	}
+}
+
+const tokenUsageWarningThreshold = 0.8 // Warn at 80% of context window
+
+// logTokenUsage logs token usage at debug level and warns if approaching the context window limit
+func (c *Client) logTokenUsage(usage llm.CompletionUsage, model string) {
+	if usage.TotalTokens == 0 {
+		return
+	}
+
+	slog.Debug("Token usage",
+		slog.String("component", "azure_llm"),
+		slog.String("model", model),
+		slog.Int("prompt_tokens", usage.PromptTokens),
+		slog.Int("completion_tokens", usage.CompletionTokens),
+		slog.Int("total_tokens", usage.TotalTokens))
+
+	contextWindow := c.modelInfo.ContextWindow
+	if contextWindow <= 0 {
+		return
+	}
+
+	usageRatio := float64(usage.TotalTokens) / float64(contextWindow)
+	if usageRatio >= tokenUsageWarningThreshold {
+		slog.Warn("Token usage approaching context window limit",
+			slog.String("component", "azure_llm"),
+			slog.String("model", model),
+			slog.Int("total_tokens", usage.TotalTokens),
+			slog.Int("context_window", contextWindow),
+			slog.Float64("usage_percent", usageRatio*100))
 	}
 }
