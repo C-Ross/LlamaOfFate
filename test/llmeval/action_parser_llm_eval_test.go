@@ -194,6 +194,103 @@ func getOvercomeTestCases() []ActionParserTestCase {
 			ExpectedDifficulty: 0, // Mediocre - simple request
 			Description:        "Simple honest request should use Rapport, not Deceive",
 		},
+		{
+			Name:               "Ask for directions",
+			RawInput:           "Excuse me, can you tell me where the blacksmith's shop is?",
+			Context:            "Standing in a busy market square, talking to a friendly looking local",
+			ExpectedType:       action.Overcome,
+			ExpectedSkills:     []string{"Rapport"},
+			ExpectedDifficulty: 0, // Mediocre - trivial request
+			Description:        "Polite request for directions is honest Rapport, never Deceive",
+		},
+		{
+			Name:               "Negotiate a fair price",
+			RawInput:           "I try to negotiate a better price for the horse",
+			Context:            "At the stables, the horse trader has quoted a price",
+			ExpectedType:       action.Overcome,
+			ExpectedSkills:     []string{"Rapport", "Resources"},
+			ExpectedDifficulty: 2, // Fair - trader wants profit
+			Description:        "Honest negotiation uses Rapport, not Deceive",
+		},
+		{
+			Name:               "Plead for mercy",
+			RawInput:           "Please, my family is starving — can you spare some bread?",
+			Context:            "At a bakery, appealing to the baker's compassion",
+			ExpectedType:       action.Overcome,
+			ExpectedSkills:     []string{"Rapport", "Provoke"},
+			ExpectedDifficulty: 1, // Average - emotional appeal
+			Description:        "Honest emotional plea uses Rapport, not Deceive",
+		},
+	}
+}
+
+// getOvercomeVsCaAEdgeCases returns test cases specifically targeting the
+// Overcome vs Create an Advantage boundary — issue #48 problem #2
+func getOvercomeVsCaAEdgeCases() []ActionParserTestCase {
+	return []ActionParserTestCase{
+		{
+			Name:               "Calm barkeep in chaotic saloon",
+			RawInput:           "Jesse waves down the barkeep and asks for a bottle of whiskey",
+			Context:            "A rowdy saloon, patrons shouting and playing cards, the barkeep is busy at the far end",
+			ExpectedType:       action.Overcome,
+			ExpectedSkills:     []string{"Rapport", "Provoke"},
+			ExpectedDifficulty: 1, // Average - busy but not hostile
+			Description:        "Getting the barkeep's attention is an immediate obstacle — Overcome, not CaA",
+		},
+		{
+			Name:               "Push through market crowd",
+			RawInput:           "I elbow my way through the dense crowd to reach the stage",
+			Context:            "A packed market square during a public announcement, people blocking the way",
+			ExpectedType:       action.Overcome,
+			ExpectedSkills:     []string{"Physique", "Athletics"},
+			ExpectedDifficulty: 1, // Average - crowd is obstacle
+			Description:        "Pushing through a crowd is immediate obstacle — Overcome, not CaA",
+		},
+		{
+			Name:               "Fast-talk a bouncer",
+			RawInput:           "I try to talk my way past the bouncer into the VIP room",
+			Context:            "At the entrance to the exclusive back room of a club, a large bouncer blocks entry",
+			ExpectedType:       action.Overcome,
+			ExpectedSkills:     []string{"Rapport", "Deceive"},
+			ExpectedDifficulty: 3, // Good - bouncers are trained
+			Description:        "Getting past a bouncer is an immediate obstacle — Overcome",
+		},
+		{
+			Name:               "Calm a spooked horse",
+			RawInput:           "I try to calm the horse so I can mount it",
+			Context:            "The horse is skittish after an explosion nearby, rearing and pulling at its tether",
+			ExpectedType:       action.Overcome,
+			ExpectedSkills:     []string{"Rapport", "Athletics", "Empathy"},
+			ExpectedDifficulty: 2, // Fair - spooked animal
+			Description:        "Calming an animal to mount it is immediate obstacle — Overcome, not CaA",
+		},
+		{
+			Name:               "Rig a distraction device for later",
+			RawInput:           "I rig a bucket of nails above the doorway so it falls when opened",
+			Context:            "Preparing the hideout for when the gang returns, currently alone and safe",
+			ExpectedType:       action.CreateAdvantage,
+			ExpectedSkills:     []string{"Crafts", "Burglary"},
+			ExpectedDifficulty: 2, // Fair - simple trap
+			Description:        "Setting a trap for future use creates an aspect — Create an Advantage",
+		},
+		{
+			Name:               "Case the joint",
+			RawInput:           "I spend the afternoon watching the bank, noting guard rotations and entry points",
+			Context:            "Planning a heist on the First National Bank, watching from a cafe across the street",
+			ExpectedType:       action.CreateAdvantage,
+			ExpectedSkills:     []string{"Notice", "Investigate"},
+			ExpectedDifficulty: 2, // Fair - standard surveillance
+			Description:        "Surveillance for future use creates an aspect — Create an Advantage",
+		},
+		{
+			Name:               "Bribe the servant for info",
+			RawInput:           "I slip the maid a few coins to learn the lord's schedule",
+			Context:            "Undercover at the estate, gathering intelligence before the heist",
+			ExpectedType:       action.CreateAdvantage,
+			ExpectedSkills:     []string{"Contacts", "Resources", "Rapport"},
+			ExpectedDifficulty: 2, // Fair - money talks
+			Description:        "Buying information for later use creates an aspect — Create an Advantage",
+		},
 	}
 }
 
@@ -574,6 +671,7 @@ func TestActionParser_LLMEvaluation(t *testing.T) {
 		{"Overcome", getOvercomeTestCases()},
 		{"Attack", getAttackTestCases()},
 		{"CreateAdvantage", getCreateAdvantageTestCases()},
+		{"OvercomeVsCaAEdgeCases", getOvercomeVsCaAEdgeCases()},
 		{"ThirdPerson", getThirdPersonTestCases()},
 	}
 
