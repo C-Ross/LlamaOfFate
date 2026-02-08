@@ -113,15 +113,45 @@ for _, r := range results {
 
 ## Running Tests
 
+All commands tee output to a temp file for review and tail the last lines to
+keep terminal output manageable:
+
 ```bash
 # Run specific test
-go test -v -tags=llmeval ./test/llmeval/ -run TestName -timeout 5m
+go test -v -tags=llmeval -run TestName ./test/llmeval/ -timeout 5m \
+  2>&1 | tee /tmp/llmeval_results.txt | tail -3
 
 # Run with verbose output
-VERBOSE=1 go test -tags=llmeval ./test/llmeval/ -run TestName
+VERBOSE=1 go test -tags=llmeval -run TestName ./test/llmeval/ \
+  2>&1 | tee /tmp/llmeval_results.txt | tail -3
 
 # Run all llmeval tests
-go test -v -tags=llmeval ./test/llmeval/ -timeout 10m
+go test -v -tags=llmeval ./test/llmeval/ -timeout 10m \
+  2>&1 | tee /tmp/llmeval_results.txt | tail -3
+```
+
+### Reviewing Results
+
+```bash
+# Review full output
+cat /tmp/llmeval_results.txt
+
+# Check accuracy across runs
+grep "Accuracy:" /tmp/llmeval_results.txt
+
+# Check which tests failed
+grep "FAIL:" /tmp/llmeval_results.txt
+```
+
+### Durability Testing
+
+LLM responses are non-deterministic. Use `-count=N` to run tests multiple times
+and validate that results are stable:
+
+```bash
+# Run 5 iterations, save full output, show only final result
+go test -v -tags=llmeval -count=5 -run TestName ./test/llmeval/ \
+  2>&1 | tee /tmp/llmeval_results.txt | tail -3
 ```
 
 ## Example: Scene Transition Test
