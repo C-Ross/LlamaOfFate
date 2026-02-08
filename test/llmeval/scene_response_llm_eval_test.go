@@ -11,9 +11,9 @@ import (
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
-	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+	promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -322,7 +322,7 @@ func evaluateSceneResponseBehavior(ctx context.Context, client llm.LLMClient, tc
 	}
 
 	// Prepare template data
-	data := engine.SceneResponseData{
+	data := promptpkg.SceneResponseData{
 		Scene:               testScene,
 		CharacterContext:    charContext,
 		AspectsContext:      aspectsContext,
@@ -332,7 +332,7 @@ func evaluateSceneResponseBehavior(ctx context.Context, client llm.LLMClient, tc
 		OtherCharacters:     tc.OtherCharacters,
 	}
 
-	prompt, err := engine.RenderSceneResponse(data)
+	prompt, err := promptpkg.RenderSceneResponse(data)
 	if err != nil {
 		return SceneResponseResult{TestCase: tc, Error: err}
 	}

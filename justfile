@@ -14,7 +14,7 @@ main_path := "./cmd/cli"
 default: clean deps vet fmt build
 
 # Run all validation checks
-validate: vet fmtcheck lint test
+validate: vet fmtcheck lint test build-llmeval
     @echo "All validations passed!"
 
 # Build the application
@@ -35,6 +35,11 @@ clean:
 test:
     @echo "Running tests..."
     {{gocmd}} test -v ./...
+
+# Compile LLM evaluation tests without running them
+build-llmeval:
+    @echo "Checking llmeval tests compile..."
+    {{gocmd}} test -tags=llmeval -count=0 ./test/llmeval/...
 
 # Run LLM evaluation tests (requires AZURE_API_ENDPOINT and AZURE_API_KEY)
 test-llm:

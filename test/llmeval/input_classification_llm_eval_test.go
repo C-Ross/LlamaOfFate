@@ -10,9 +10,9 @@ import (
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
-	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+	promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -480,12 +480,12 @@ func evaluateInputClassification(ctx context.Context, client llm.LLMClient, tc I
 	testScene := scene.NewScene("test-scene", tc.SceneName, tc.SceneDescription)
 
 	// Prepare template data
-	data := engine.InputClassificationData{
+	data := promptpkg.InputClassificationData{
 		Scene:       testScene,
 		PlayerInput: tc.RawInput,
 	}
 
-	prompt, err := engine.RenderInputClassification(data)
+	prompt, err := promptpkg.RenderInputClassification(data)
 	if err != nil {
 		return InputClassificationResult{
 			TestCase: tc,

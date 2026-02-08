@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+	promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +19,7 @@ import (
 // SceneSummaryTestCase represents a test case for scene summary generation
 type SceneSummaryTestCase struct {
 	Name        string
-	Data        engine.SceneSummaryData
+	Data        promptpkg.SceneSummaryData
 	Description string
 }
 
@@ -27,7 +27,7 @@ type SceneSummaryTestCase struct {
 type SceneSummaryResult struct {
 	TestCase          SceneSummaryTestCase
 	RawResponse       string
-	Parsed            *engine.SceneSummary
+	Parsed            *promptpkg.SceneSummary
 	ValidJSON         bool
 	HasNarrativeProse bool
 	HasKeyEvents      bool
@@ -44,16 +44,16 @@ func getSceneSummaryTestCases() []SceneSummaryTestCase {
 	return []SceneSummaryTestCase{
 		{
 			Name: "Saloon conversation with NPC",
-			Data: engine.SceneSummaryData{
+			Data: promptpkg.SceneSummaryData{
 				SceneName:        "The Dusty Spur Saloon",
 				SceneDescription: "A dimly lit saloon with swinging doors, a long bar, and the smell of whiskey.",
 				SituationAspects: []string{"Dim Flickering Lamplight", "Rowdy Crowd"},
-				ConversationHistory: []engine.ConversationEntry{
+				ConversationHistory: []promptpkg.ConversationEntry{
 					{PlayerInput: "Jesse walks in and sits at the bar", GMResponse: "Maggie slides a glass toward you. 'New in town, stranger?'"},
 					{PlayerInput: "Jesse nods. 'Looking for information about the Cortez Gang.'", GMResponse: "Maggie's face darkens. 'You don't want to go asking about them too loudly. They've got ears everywhere.' She leans in and whispers, 'Try the old mine south of here.'"},
 					{PlayerInput: "Jesse tips his hat and walks out.", GMResponse: "Maggie watches you leave with a concerned look. The swinging doors creak shut behind you. [SCENE_TRANSITION:old mine south of town]"},
 				},
-				NPCsInScene:    []engine.NPCSummary{{Name: "Maggie Two-Rivers", Attitude: "friendly"}},
+				NPCsInScene:    []promptpkg.NPCSummary{{Name: "Maggie Two-Rivers", Attitude: "friendly"}},
 				TakenOutChars:  []string{},
 				HowEnded:       "transition",
 				TransitionHint: "old mine south of town",
@@ -62,17 +62,17 @@ func getSceneSummaryTestCases() []SceneSummaryTestCase {
 		},
 		{
 			Name: "Combat scene with taken out NPC",
-			Data: engine.SceneSummaryData{
+			Data: promptpkg.SceneSummaryData{
 				SceneName:        "Ambush at Dead Man's Creek",
 				SceneDescription: "A narrow creek crossing flanked by rocky outcrops — perfect ambush territory.",
 				SituationAspects: []string{"Rocky Cover", "Rushing Water", "Narrow Crossing"},
-				ConversationHistory: []engine.ConversationEntry{
+				ConversationHistory: []promptpkg.ConversationEntry{
 					{PlayerInput: "Jesse approaches the creek cautiously", GMResponse: "You hear the click of a rifle being cocked. 'That's far enough, Calhoun!' A voice calls from the rocks above."},
 					{PlayerInput: "Jesse dives behind a boulder and draws his pistol", GMResponse: "Bullets chip the rock near your head. There are two bandits — one on each side of the creek. The one on the left is reloading."},
 					{PlayerInput: "Jesse fires at the one reloading", GMResponse: "Your shot hits true. The bandit on the left collapses. The other one shouts a curse and starts retreating upstream."},
 					{PlayerInput: "Jesse chases after the retreating bandit", GMResponse: "You pursue through the shallows. The bandit stumbles and you catch up. He throws down his weapons. 'Don't shoot! Cortez sent us! He knows you're coming!'"},
 				},
-				NPCsInScene:    []engine.NPCSummary{{Name: "Creek Bandits", Attitude: "hostile"}},
+				NPCsInScene:    []promptpkg.NPCSummary{{Name: "Creek Bandits", Attitude: "hostile"}},
 				TakenOutChars:  []string{"Bandit Left Flank"},
 				HowEnded:       "transition",
 				TransitionHint: "continuing upstream toward the mine",
@@ -81,32 +81,32 @@ func getSceneSummaryTestCases() []SceneSummaryTestCase {
 		},
 		{
 			Name: "Scene ending with player quitting",
-			Data: engine.SceneSummaryData{
+			Data: promptpkg.SceneSummaryData{
 				SceneName:        "The Sheriff's Office",
 				SceneDescription: "A small frontier office with a desk, a gun rack, and wanted posters on the walls.",
 				SituationAspects: []string{"Wanted Posters Everywhere", "Locked Gun Rack"},
-				ConversationHistory: []engine.ConversationEntry{
+				ConversationHistory: []promptpkg.ConversationEntry{
 					{PlayerInput: "Jesse walks in to talk to the sheriff", GMResponse: "Sheriff Daniels looks up from his desk. 'What brings you in, stranger?'"},
 					{PlayerInput: "Jesse asks about the Cortez Gang's recent activity", GMResponse: "The sheriff sighs. 'They hit the stagecoach again last week. Took everything, including the payroll for the mine workers. People are getting restless.'"},
 				},
-				NPCsInScene: []engine.NPCSummary{{Name: "Sheriff Daniels", Attitude: "neutral"}},
+				NPCsInScene: []promptpkg.NPCSummary{{Name: "Sheriff Daniels", Attitude: "neutral"}},
 				HowEnded:    "quit",
 			},
 			Description: "Scene ended by player quitting — should still capture what happened",
 		},
 		{
 			Name: "Scene with multiple NPCs and unresolved threads",
-			Data: engine.SceneSummaryData{
+			Data: promptpkg.SceneSummaryData{
 				SceneName:        "The Mining Camp",
 				SceneDescription: "A ramshackle mining camp with tents, pickaxes, and exhausted workers.",
 				SituationAspects: []string{"Exhausted Workers", "Unstable Mine Entrance"},
-				ConversationHistory: []engine.ConversationEntry{
+				ConversationHistory: []promptpkg.ConversationEntry{
 					{PlayerInput: "Jesse asks the foreman what happened here", GMResponse: "The foreman, Big Pete, wipes his brow. 'Cortez's men came through last night. Took our food supplies and beat up two of my workers.'"},
 					{PlayerInput: "Jesse asks if anyone saw where they went", GMResponse: "A young woman steps forward. 'I'm Elena. I saw them head into the upper tunnels. But there's something else — I found this map in one of their saddlebags.' She holds out a weathered map."},
 					{PlayerInput: "Jesse takes the map and examines it", GMResponse: "The map shows a network of tunnels beneath the mountain. One chamber is marked with an X and the word 'vault.' There are also strange symbols you don't recognize."},
 					{PlayerInput: "Jesse asks Elena about the symbols", GMResponse: "Elena shakes her head. 'I've never seen anything like them. But the old prospector, Hank, might know. He lives in a cabin further up the mountain. Haven't seen him in days though.'"},
 				},
-				NPCsInScene: []engine.NPCSummary{
+				NPCsInScene: []promptpkg.NPCSummary{
 					{Name: "Big Pete", Attitude: "friendly"},
 					{Name: "Elena", Attitude: "friendly"},
 				},
@@ -120,7 +120,7 @@ func getSceneSummaryTestCases() []SceneSummaryTestCase {
 }
 
 func evaluateSceneSummary(ctx context.Context, client llm.LLMClient, tc SceneSummaryTestCase) SceneSummaryResult {
-	prompt, err := engine.RenderSceneSummary(tc.Data)
+	prompt, err := promptpkg.RenderSceneSummary(tc.Data)
 	if err != nil {
 		return SceneSummaryResult{TestCase: tc, Error: err}
 	}
@@ -156,7 +156,7 @@ func evaluateSceneSummary(ctx context.Context, client llm.LLMClient, tc SceneSum
 	}
 	cleaned = strings.TrimSpace(cleaned)
 
-	var summary engine.SceneSummary
+	var summary promptpkg.SceneSummary
 	if err := json.Unmarshal([]byte(cleaned), &summary); err != nil {
 		result.ValidJSON = false
 		return result

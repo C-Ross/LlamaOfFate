@@ -9,9 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/C-Ross/LlamaOfFate/internal/engine"
+	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+	promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,7 +33,7 @@ type ScenarioGenTestCase struct {
 type ScenarioGenResult struct {
 	TestCase         ScenarioGenTestCase
 	RawResponse      string
-	Parsed           *engine.Scenario
+	Parsed           *scene.Scenario
 	ValidJSON        bool
 	HasTitle         bool
 	HasProblem       bool
@@ -96,7 +97,7 @@ func getScenarioGenTestCases() []ScenarioGenTestCase {
 }
 
 func evaluateScenarioGeneration(ctx context.Context, client llm.LLMClient, tc ScenarioGenTestCase) ScenarioGenResult {
-	data := engine.ScenarioGenerationData{
+	data := promptpkg.ScenarioGenerationData{
 		PlayerName:        tc.PlayerName,
 		PlayerHighConcept: tc.PlayerHighConcept,
 		PlayerTrouble:     tc.PlayerTrouble,
@@ -105,7 +106,7 @@ func evaluateScenarioGeneration(ctx context.Context, client llm.LLMClient, tc Sc
 		Theme:             tc.Theme,
 	}
 
-	prompt, err := engine.RenderScenarioGeneration(data)
+	prompt, err := promptpkg.RenderScenarioGeneration(data)
 	if err != nil {
 		return ScenarioGenResult{TestCase: tc, Error: err}
 	}
@@ -143,7 +144,7 @@ func evaluateScenarioGeneration(ctx context.Context, client llm.LLMClient, tc Sc
 	}
 
 	// Parse JSON
-	var scenario engine.Scenario
+	var scenario scene.Scenario
 	if err := json.Unmarshal([]byte(cleaned), &scenario); err != nil {
 		result.ValidJSON = false
 		return result

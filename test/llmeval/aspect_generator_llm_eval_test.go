@@ -14,6 +14,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -110,7 +111,7 @@ func TestAspectGeneratorLLMEvaluation(t *testing.T) {
 			}
 
 			// Create the aspect generation request
-			req := engine.AspectGenerationRequest{
+			req := prompt.AspectGenerationRequest{
 				Character:       char,
 				Action:          testAction,
 				Outcome:         outcome,
@@ -511,7 +512,7 @@ func TestAspectGeneratorEdgeCases(t *testing.T) {
 			"Setting Sun",
 		}
 
-		req := engine.AspectGenerationRequest{
+		req := prompt.AspectGenerationRequest{
 			Character:       char,
 			Action:          testAction,
 			Outcome:         outcome,
@@ -554,7 +555,7 @@ func TestAspectGeneratorEdgeCases(t *testing.T) {
 		testAction.CheckResult = &rollResult
 		outcome := rollResult.CompareAgainst(dice.Average)
 
-		req := engine.AspectGenerationRequest{
+		req := prompt.AspectGenerationRequest{
 			Character:       char,
 			Action:          testAction,
 			Outcome:         outcome,

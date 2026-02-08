@@ -9,9 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/C-Ross/LlamaOfFate/internal/engine"
+	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+	promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,12 +21,12 @@ import (
 type SceneGenTestCase struct {
 	Name              string
 	TransitionHint    string
-	Scenario          *engine.Scenario
+	Scenario          *scene.Scenario
 	PlayerName        string
 	PlayerHighConcept string
 	PlayerTrouble     string
 	PlayerAspects     []string
-	PreviousSummaries []engine.SceneSummary
+	PreviousSummaries []promptpkg.SceneSummary
 	Complications     []string // Unresolved threads to weave in as complications
 	Description       string
 }
@@ -34,7 +35,7 @@ type SceneGenTestCase struct {
 type SceneGenResult struct {
 	TestCase            SceneGenTestCase
 	RawResponse         string
-	Parsed              *engine.GeneratedScene
+	Parsed              *promptpkg.GeneratedScene
 	ValidJSON           bool
 	HasSceneName        bool
 	SceneNameLength     int // word count
@@ -52,7 +53,7 @@ type SceneGenResult struct {
 }
 
 func getSceneGenTestCases() []SceneGenTestCase {
-	westernScenario := &engine.Scenario{
+	westernScenario := &scene.Scenario{
 		Title:   "The Cortez Gang's Last Stand",
 		Problem: "The Cortez Gang is terrorizing Redemption Gulch and threatening to burn it down.",
 		StoryQuestions: []string{
@@ -64,7 +65,7 @@ func getSceneGenTestCases() []SceneGenTestCase {
 		Genre:   "Western",
 	}
 
-	fantasyScenario := &engine.Scenario{
+	fantasyScenario := &scene.Scenario{
 		Title:   "The Arcane Conspiracy",
 		Problem: "A conspiracy within the Collegia Arcana threatens to unleash forbidden magic.",
 		StoryQuestions: []string{
@@ -95,7 +96,7 @@ func getSceneGenTestCases() []SceneGenTestCase {
 			PlayerHighConcept: "Vengeful Rancher with Nothing Left to Lose",
 			PlayerTrouble:     "The Cortez Gang Burned My Life",
 			PlayerAspects:     []string{"Quick Draw"},
-			PreviousSummaries: []engine.SceneSummary{
+			PreviousSummaries: []promptpkg.SceneSummary{
 				{
 					NarrativeProse:    "Jesse arrived in Redemption Gulch and learned from Maggie at the saloon that the gang hides in the old silver mine.",
 					KeyEvents:         []string{"Arrived in town", "Gang location discovered"},
@@ -112,7 +113,7 @@ func getSceneGenTestCases() []SceneGenTestCase {
 			PlayerHighConcept: "Wizard Detective on the Trail of Forbidden Knowledge",
 			PlayerTrouble:     "The Lure of Ancient Mysteries",
 			PlayerAspects:     []string{"Rivals in the Collegia Arcana"},
-			PreviousSummaries: []engine.SceneSummary{
+			PreviousSummaries: []promptpkg.SceneSummary{
 				{
 					NarrativeProse:    "Zird discovered coded messages in his colleague's office hinting at forbidden research. A rival wizard spotted him snooping.",
 					KeyEvents:         []string{"Found coded messages", "Spotted by rival"},
@@ -137,7 +138,7 @@ func getSceneGenTestCases() []SceneGenTestCase {
 			PlayerHighConcept: "Vengeful Rancher with Nothing Left to Lose",
 			PlayerTrouble:     "The Cortez Gang Burned My Life",
 			PlayerAspects:     []string{"Quick Draw"},
-			PreviousSummaries: []engine.SceneSummary{
+			PreviousSummaries: []promptpkg.SceneSummary{
 				{
 					NarrativeProse:    "Jesse learned the gang's lieutenant is in town. The sheriff was found dead.",
 					KeyEvents:         []string{"Sheriff found dead", "Lieutenant spotted"},
@@ -151,7 +152,7 @@ func getSceneGenTestCases() []SceneGenTestCase {
 }
 
 func evaluateSceneGeneration(ctx context.Context, client llm.LLMClient, tc SceneGenTestCase) SceneGenResult {
-	data := engine.SceneGenerationData{
+	data := promptpkg.SceneGenerationData{
 		TransitionHint:    tc.TransitionHint,
 		Scenario:          tc.Scenario,
 		PlayerName:        tc.PlayerName,
@@ -162,7 +163,7 @@ func evaluateSceneGeneration(ctx context.Context, client llm.LLMClient, tc Scene
 		Complications:     tc.Complications,
 	}
 
-	prompt, err := engine.RenderSceneGeneration(data)
+	prompt, err := promptpkg.RenderSceneGeneration(data)
 	if err != nil {
 		return SceneGenResult{TestCase: tc, Error: err}
 	}
@@ -198,7 +199,7 @@ func evaluateSceneGeneration(ctx context.Context, client llm.LLMClient, tc Scene
 	}
 	cleaned = strings.TrimSpace(cleaned)
 
-	var generated engine.GeneratedScene
+	var generated promptpkg.GeneratedScene
 	if err := json.Unmarshal([]byte(cleaned), &generated); err != nil {
 		result.ValidJSON = false
 		return result
@@ -280,7 +281,7 @@ func evaluateSceneGeneration(ctx context.Context, client llm.LLMClient, tc Scene
 }
 
 // extractScenarioTerms pulls key words from the scenario for matching
-func extractScenarioTerms(s *engine.Scenario) []string {
+func extractScenarioTerms(s *scene.Scenario) []string {
 	var terms []string
 	allText := s.Problem + " " + s.Setting + " " + strings.Join(s.StoryQuestions, " ")
 	for _, w := range strings.Fields(allText) {
