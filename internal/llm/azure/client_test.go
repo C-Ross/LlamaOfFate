@@ -265,6 +265,8 @@ func TestGetContextWindowForModel(t *testing.T) {
 		modelName   string
 		expectedMax int
 	}{
+		{"Llama-4-Maverick-17B-128E-Instruct-FP8", 1000000},
+		{"Llama-4-Scout-17B-16E-Instruct", 10000000},
 		{"Meta-Llama-3.1-405B-Instruct", 128000},
 		{"Meta-Llama-3.1-70B-Instruct", 128000},
 		{"Meta-Llama-3.1-8B-Instruct", 128000},

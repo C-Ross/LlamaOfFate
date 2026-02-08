@@ -349,9 +349,14 @@ func getMaxTokensForModel(modelName string) int {
 	}
 }
 
-// getContextWindowForModel returns the context window size for different Llama models
+// getContextWindowForModel returns the context window size for different Llama models.
+// Model specs: https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8#model-information
 func getContextWindowForModel(modelName string) int {
 	switch {
+	case strings.Contains(modelName, "Maverick"):
+		return 1000000 // Llama 4 Maverick supports 1M context
+	case strings.Contains(modelName, "Scout"):
+		return 10000000 // Llama 4 Scout supports 10M context
 	case strings.Contains(modelName, "Llama-3.1"):
 		return 128000 // Llama 3.1 supports 128k context
 	case strings.Contains(modelName, "Llama-3"):
