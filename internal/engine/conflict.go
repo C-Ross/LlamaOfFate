@@ -823,8 +823,6 @@ func (sm *SceneManager) handleTargetStressOverflow(target *character.Character, 
 	}
 }
 
-// getTargetAvailableConsequences returns available consequence slots for a target
-
 // handleTargetTakenOut handles when a target is taken out of the conflict
 func (sm *SceneManager) handleTargetTakenOut(target *character.Character) {
 	sm.ui.DisplaySystemMessage(fmt.Sprintf(
