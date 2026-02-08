@@ -45,6 +45,14 @@ func (sm *SceneManager) initiateConflict(conflictType scene.ConflictType, initia
 		return fmt.Errorf("already in a conflict")
 	}
 
+	// Validate the initiator is a real character in this scene
+	if sm.engine.GetCharacter(initiatorID) == nil {
+		slog.Warn("Conflict trigger rejected: initiator ID does not match any character",
+			"component", componentSceneManager,
+			"initiator", initiatorID)
+		return fmt.Errorf("initiator %q is not a known character", initiatorID)
+	}
+
 	// Check if the initiator was taken out earlier in this scene
 	if sm.currentScene.IsCharacterTakenOut(initiatorID) {
 		slog.Debug("Conflict initiator was previously taken out this scene",

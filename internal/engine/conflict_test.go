@@ -210,6 +210,37 @@ func TestSceneManager_InitiateConflict_NotEnoughParticipants(t *testing.T) {
 	assert.Contains(t, err.Error(), "at least 2 participants")
 }
 
+func TestSceneManager_InitiateConflict_UnknownInitiator(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	mockUI := &MockUI{}
+	sm := NewSceneManager(engine)
+	sm.SetUI(mockUI)
+
+	// Create player and enemy
+	player := character.NewCharacter("player1", "Hero")
+	enemy := character.NewCharacter("enemy1", "Goblin")
+	engine.AddCharacter(player)
+	engine.AddCharacter(enemy)
+
+	// Create scene with both characters
+	testScene := scene.NewScene("scene1", "Test Scene", "A dangerous encounter")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(enemy.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	// Try to initiate conflict with an ID that doesn't match any character (LLM hallucination)
+	err = sm.initiateConflict(scene.PhysicalConflict, "none")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not a known character")
+
+	// Verify no conflict was started
+	assert.False(t, sm.currentScene.IsConflict)
+	assert.Empty(t, mockUI.conflictStartCalls)
+}
+
 func TestSceneManager_HandleConflictEscalation(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
