@@ -23,9 +23,10 @@ You are an AI agent that analyzes recent changes pushed to the `main` branch and
 
 ## Your Task
 
-1. **Gather context**: Read the current `README.md` to understand what it documents.
-2. **Analyze recent changes**: Look at the commits in the push event (use the push event's `before` and `after` SHAs, or review the last 10 commits on `main` if unavailable) to understand what changed.
-3. **Evaluate significance**: Determine whether the changes are significant enough to need a README update. Significant changes include:
+1. **Check for existing issues**: Before doing anything else, search for open issues in this repository with the label `documentation` or title containing "README". If an open issue already exists that covers README updates, call `noop` with a message like "An open README update issue already exists (#NN), skipping." Do NOT create a duplicate.
+2. **Gather context**: Read the current `README.md` to understand what it documents.
+3. **Analyze recent changes**: Look at the commits in the push event (use the push event's `before` and `after` SHAs, or review the last 10 commits on `main` if unavailable) to understand what changed.
+4. **Evaluate significance**: Determine whether the changes are significant enough to need a README update. Significant changes include:
    - New features, commands, or entry points added
    - Changes to the project structure (new packages, renamed directories)
    - New or changed configuration options
@@ -33,7 +34,8 @@ You are an AI agent that analyzes recent changes pushed to the `main` branch and
    - New integrations or external service dependencies
    - Removal of documented features
    - API or interface changes that affect users
-4. **Decide and act**:
+5. **Decide and act**:
+   - If an open README issue already exists: use `noop` (handled in step 1).
    - If changes are **significant**: Create an issue describing what changed and what parts of the README need updating.
    - If changes are **not significant** (e.g., minor bug fixes, test-only changes, internal refactors with no user-facing impact, comment updates): Call the `noop` safe output explaining that no README update is needed.
 
