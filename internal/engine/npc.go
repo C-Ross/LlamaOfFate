@@ -102,7 +102,7 @@ func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character
 	}
 
 	// Parse JSON response
-	content := cleanJSONResponse(resp.Choices[0].Message.Content)
+	content := llm.CleanJSONResponse(resp.Choices[0].Message.Content)
 	var decision NPCActionDecision
 	if err := json.Unmarshal([]byte(content), &decision); err != nil {
 		slog.Warn("Failed to parse NPC action decision",
