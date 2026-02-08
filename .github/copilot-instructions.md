@@ -34,7 +34,7 @@ Don't store llm prompts as raw strings in code; use Go templates instead.
 
 Avoid duplication by creating resuable functions and stucts.  If you think you must duplicate, ask the user for clarification on how to refactor instead.
 
-Ensure `make validate` passes before committing: all tests and linters must succeed.
+Ensure `just validate` passes before committing: all tests and linters must succeed.
 
 ### Testing (REQUIRED)
 - Use testify for ALL tests: `assert.Equal(t, expected, actual)`, `require.NotNil(t, object)`
@@ -44,13 +44,13 @@ Ensure `make validate` passes before committing: all tests and linters must succ
 
 ### Build System
 ```bash
-make build      # Build application
-make test       # Run all tests
-make run        # Build and run
-make clean      # Clean artifacts
-make lint       # Run linters
-make validate   # Run tests and linters
-make test-llm   # Run llm evaluate tests - may consume resources
+just build      # Build application
+just test       # Run all tests
+just run        # Build and run
+just clean      # Clean artifacts
+just lint       # Run linters
+just validate   # Run tests and linters
+just test-llm   # Run llm evaluate tests - may consume resources
 ```
 
 ### Format
