@@ -99,8 +99,10 @@ func TestClassifyInput_ValidTypes(t *testing.T) {
 		{"dialog type", "dialog", inputTypeDialog},
 		{"clarification type", "clarification", inputTypeClarification},
 		{"action type", "action", inputTypeAction},
+		{"narrative type", "narrative", inputTypeNarrative},
 		{"uppercase dialog", "DIALOG", inputTypeDialog},
 		{"mixed case action", "AcTiOn", inputTypeAction},
+		{"mixed case narrative", "Narrative", inputTypeNarrative},
 	}
 
 	for _, tt := range tests {

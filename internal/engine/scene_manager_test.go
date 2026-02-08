@@ -2,12 +2,14 @@ package engine
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
+	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -575,4 +577,104 @@ func TestSetUI_DoesNotPanic_WhenUIDoesNotImplementSceneInfoSetter(t *testing.T) 
 	// Should not panic
 	sm.SetUI(mockUI)
 	assert.NotNil(t, sm.ui)
+}
+
+// --- classifyInput unit tests (complement scene_manager_error_test.go) ---
+
+func TestClassifyInput_TrimsExtraText(t *testing.T) {
+	tests := []struct {
+		name     string
+		response string
+		expected string
+	}{
+		{"trailing explanation", "dialog - the player is speaking", "dialog"},
+		{"newline after type", "action\nbecause there is opposition", "action"},
+		{"tab after type", "narrative\tthis is mundane", "narrative"},
+		{"whitespace padded", "  clarification  ", "clarification"},
+		{"markdown heading", "## narrative", "narrative"},
+		{"markdown bold", "**action**", "action"},
+		{"markdown heading with explanation", "## dialog because they are speaking", "dialog"},
+		{"backtick wrapped", "`clarification`", "clarification"},
+		{"quotes wrapped", "\"narrative\"", "narrative"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mockClient := &MockLLMClient{response: tc.response}
+			engine, err := NewWithLLM(mockClient)
+			require.NoError(t, err)
+
+			sm := NewSceneManager(engine)
+			sm.currentScene = scene.NewScene("test", "Test", "Test scene")
+
+			result, err := sm.classifyInput(context.Background(), "test input")
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+// TestProcessInput_NarrativeRoutesToDialog verifies that narrative classification
+// goes through handleDialog (same as dialog/clarification, no dice roll).
+func TestProcessInput_NarrativeRoutesToDialog(t *testing.T) {
+	// First call returns "narrative" (classification), second returns scene response
+	client := &sequentialMockLLMClient{
+		responses: []string{"narrative", "You walk over to the table and sit down."},
+	}
+	engine, err := NewWithLLM(client)
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	testScene := scene.NewScene("test-scene", "Tavern", "A cozy tavern")
+	sm.currentScene = testScene
+
+	player := character.NewCharacter("player-1", "Test Player")
+	sm.player = player
+
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	sm.processInput(context.Background(), "I walk to the table")
+
+	// Should display dialog (handleDialog path), not an action result
+	hasDialog := false
+	for _, msg := range mockUI.displayedMessages {
+		if strings.HasPrefix(msg, "Dialog:") {
+			hasDialog = true
+		}
+	}
+	assert.True(t, hasDialog, "Narrative input should be routed through handleDialog. Got messages: %v", mockUI.displayedMessages)
+}
+
+// sequentialMockLLMClient returns responses in order, cycling through them
+type sequentialMockLLMClient struct {
+	responses []string
+	callIndex int
+}
+
+func (s *sequentialMockLLMClient) ChatCompletion(ctx context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
+	resp := s.responses[s.callIndex%len(s.responses)]
+	s.callIndex++
+	return &llm.CompletionResponse{
+		ID:      "test",
+		Object:  "chat.completion",
+		Created: 0,
+		Model:   "test",
+		Choices: []llm.CompletionResponseChoice{
+			{
+				Index:        0,
+				Message:      llm.Message{Role: "assistant", Content: resp},
+				FinishReason: "stop",
+			},
+		},
+		Usage: llm.CompletionUsage{PromptTokens: 10, CompletionTokens: 10, TotalTokens: 20},
+	}, nil
+}
+
+func (s *sequentialMockLLMClient) ChatCompletionStream(ctx context.Context, req llm.CompletionRequest, handler llm.StreamHandler) error {
+	return nil
+}
+
+func (s *sequentialMockLLMClient) GetModelInfo() llm.ModelInfo {
+	return llm.ModelInfo{Name: "test", MaxTokens: 4096}
 }

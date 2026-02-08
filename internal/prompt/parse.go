@@ -112,3 +112,43 @@ func ParseScenario(content string) (*scene.Scenario, error) {
 
 	return &scenario, nil
 }
+
+// ParseClassification extracts a single classification word from an LLM response.
+// It handles common LLM formatting artifacts:
+//   - Markdown formatting ("## narrative", "**action**")
+//   - Trailing explanations ("dialog - the player is speaking")
+//   - Quote/backtick wrapping ("`clarification`")
+//
+// Returns the lowercased first alphabetic word found in the response.
+func ParseClassification(raw string) string {
+	s := strings.ToLower(strings.TrimSpace(raw))
+
+	// Strip non-alphabetic characters from leading/trailing positions
+	// to handle markdown artifacts like ## or **
+	s = stripNonAlpha(s)
+
+	// Extract first word (LLM sometimes appends reasoning)
+	if idx := strings.IndexAny(s, " \n\t"); idx > 0 {
+		s = s[:idx]
+	}
+
+	// Final strip in case inner content had trailing punctuation
+	return stripNonAlpha(s)
+}
+
+// stripNonAlpha removes leading and trailing non-alphabetic characters from s.
+func stripNonAlpha(s string) string {
+	start := 0
+	for start < len(s) && !isAlpha(s[start]) {
+		start++
+	}
+	end := len(s)
+	for end > start && !isAlpha(s[end-1]) {
+		end--
+	}
+	return s[start:end]
+}
+
+func isAlpha(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+}

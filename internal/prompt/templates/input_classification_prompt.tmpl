@@ -19,18 +19,25 @@ Description: {{.Scene.Description}}
 PLAYER INPUT: "{{.PlayerInput}}"
 
 Classify this input as one of these types:
-- "dialog" - The player is speaking, ordering, buying, or making a social request to someone
+- "dialog" - The player is speaking, ordering, buying, making a routine social request, or having a conversation. Includes simple commercial transactions like ordering a drink, buying supplies, or renting a room.
 - "clarification" - The player wants to examine, look at, or understand something in the environment (NO DICE ROLL)
-- "action" - The player is attempting to take a specific action where both success and failure could be interesting
+- "narrative" - The player performs a mundane physical action with no meaningful opposition: walking somewhere, opening an unlocked door, sitting down, entering a building (NO DICE ROLL)
+- "action" - The player attempts something where both success AND failure would be interesting, because there is real opposition, danger, time pressure, or consequences for failure
+
+SCENE CONTEXT MATTERS:
+The scene description may contain aspects (like "tension hangs in the air" or "guards patrol nearby") that create opposition. The same physical action can be narrative in a calm scene but action in a tense one. Consider whether the scene establishes opposition that makes failure interesting.
 
 Examples:
 - "What do I see?" -> clarification (just provide information)
 - "Look around the room" -> clarification (basic observation)
 - "I say 'Hello there'" -> dialog
 - "Ask the bartender about rumors" -> dialog
-- "Whiskey, I say, putting money on the bar" -> dialog (routine social transaction)
-- "Open the door and step through" -> narrative
-- "I pace around the room" -> narrative
+- "Whiskey, I say, putting money on the bar" -> dialog (routine purchase)
+- "I'll take a room for the night" -> dialog (routine transaction)
+- "I ask the shopkeeper if he has any rope for sale" -> dialog (simple honest request)
+- "Open the door and step through" -> narrative (no opposition)
+- "I pace around the room" -> narrative (mundane movement)
+- "I walk over to the table and sit down" -> narrative (trivial action)
 - "Examine the mysterious door" -> clarification (unless there's danger/time pressure)
 - "Notice if anyone is watching" in a safe place -> clarification (basic awareness)
 - "Check if anyone is following me" when in danger/being pursued -> action (failure has consequences)
@@ -40,6 +47,6 @@ Examples:
 - "Try to pick the lock while guards might notice" -> action (time pressure, consequences)
 - "Climb the tower during a storm" -> action (environmental obstacles)
 
-Remember: Most simple observation and information gathering should be clarification, not action. Only classify as "action" when there's real opposition, danger, time pressure, or other factors that make both success and failure interesting.
+Remember: Most simple observation and information gathering should be clarification, not action. Routine purchases and honest social requests are dialog. Walking somewhere or performing trivial physical tasks is narrative. Only classify as "action" when there's real opposition, danger, time pressure, or other factors that make both success and failure interesting.
 
 Respond with ONLY the classification word: dialog, clarification, narrative, or action

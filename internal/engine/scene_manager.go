@@ -304,16 +304,13 @@ func (sm *SceneManager) classifyInput(ctx context.Context, input string) (string
 		return "", fmt.Errorf("classifyInput: %w: %v", llm.ErrUnavailable, err)
 	}
 
-	classification := strings.ToLower(content)
+	classification := prompt.ParseClassification(content)
 
-	// LLM sometimes appends reasoning text; extract the first word
-	if idx := strings.IndexAny(classification, " \n\t"); idx > 0 {
-		firstWord := classification[:idx]
-		slog.Debug("Classification response contained extra text, using first word",
+	if classification == "" {
+		slog.Warn("Could not parse classification from LLM response",
 			"component", componentSceneManager,
-			"raw_response", classification,
-			"extracted", firstWord)
-		classification = firstWord
+			"raw_response", content)
+		return "", fmt.Errorf("unexpected classification: %s", content)
 	}
 
 	// Validate the response is one of our expected types

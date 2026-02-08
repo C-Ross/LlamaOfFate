@@ -139,8 +139,8 @@ func getClarificationTestCases() []InputClassificationTestCase {
 			RawInput:         "I lean back in my chair and watch the crowd",
 			SceneName:        "Cafe Terrace",
 			SceneDescription: "An outdoor cafe overlooking the busy market",
-			ExpectedType:     "clarification",
-			Description:      "Passive watching without specific goal - clarification",
+			ExpectedType:     "narrative",
+			Description:      "Passive physical action (leaning, watching) with no information request - narrative",
 		},
 		{
 			Name:             "Simple movement",
@@ -563,11 +563,7 @@ func evaluateInputClassification(ctx context.Context, client llm.LLMClient, tc I
 		}
 	}
 
-	classification = strings.ToLower(strings.TrimSpace(classification))
-	// LLM sometimes appends reasoning despite prompt instructions; extract first word only
-	if idx := strings.IndexAny(classification, " \n\t"); idx > 0 {
-		classification = classification[:idx]
-	}
+	classification = promptpkg.ParseClassification(classification)
 
 	return InputClassificationResult{
 		TestCase:   tc,
