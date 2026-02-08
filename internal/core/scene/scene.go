@@ -1,6 +1,7 @@
 package scene
 
 import (
+	"sort"
 	"time"
 )
 
@@ -72,6 +73,21 @@ type ConflictParticipant struct {
 	Status      ParticipantStatus `json:"status"`
 	FullDefense bool              `json:"full_defense"` // Forgoes action for +2 to all defense rolls
 	HasActed    bool              `json:"has_acted"`    // Whether they've taken their action this exchange
+}
+
+// SortByInitiative sorts participants by initiative (descending) and rebuilds
+// the InitiativeOrder slice from active participants.
+func (cs *ConflictState) SortByInitiative() {
+	sort.Slice(cs.Participants, func(i, j int) bool {
+		return cs.Participants[i].Initiative > cs.Participants[j].Initiative
+	})
+
+	cs.InitiativeOrder = make([]string, 0, len(cs.Participants))
+	for _, p := range cs.Participants {
+		if p.Status == StatusActive {
+			cs.InitiativeOrder = append(cs.InitiativeOrder, p.CharacterID)
+		}
+	}
 }
 
 // NewScene creates a new scene
@@ -186,12 +202,8 @@ func (s *Scene) StartConflictWithInitiator(conflictType ConflictType, participan
 		}
 	}
 
-	// TODO: Sort participants by initiative (Notice for physical, Empathy for mental)
-	for _, participant := range s.ConflictState.Participants {
-		if participant.Status == StatusActive {
-			s.ConflictState.InitiativeOrder = append(s.ConflictState.InitiativeOrder, participant.CharacterID)
-		}
-	}
+	// Sort participants by initiative and build the initiative order
+	s.ConflictState.SortByInitiative()
 
 	s.UpdatedAt = time.Now()
 }

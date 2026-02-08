@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"sort"
 	"strings"
 	"time"
 
@@ -20,12 +19,6 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 )
-
-// ConsequenceOption represents an available consequence slot
-type ConsequenceOption struct {
-	Type  character.ConsequenceType
-	Value int
-}
 
 // TakenOutResult represents the outcome classification of being taken out
 type TakenOutResult int
@@ -91,15 +84,7 @@ func (sm *SceneManager) initiateConflict(conflictType scene.ConflictType, initia
 		return fmt.Errorf("conflict requires at least 2 participants")
 	}
 
-	// Sort by initiative (descending)
-	sort.Slice(participants, func(i, j int) bool {
-		return participants[i].Initiative > participants[j].Initiative
-	})
-
 	sm.currentScene.StartConflictWithInitiator(conflictType, participants, initiatorID)
-
-	// Re-sort initiative order after StartConflict
-	sm.sortInitiativeOrder()
 
 	// Display conflict start
 	initiatorName := initiatorID
@@ -181,20 +166,7 @@ func (sm *SceneManager) sortInitiativeOrder() {
 		return
 	}
 
-	// Sort participants by initiative
-	sort.Slice(sm.currentScene.ConflictState.Participants, func(i, j int) bool {
-		return sm.currentScene.ConflictState.Participants[i].Initiative >
-			sm.currentScene.ConflictState.Participants[j].Initiative
-	})
-
-	// Rebuild initiative order from sorted participants
-	sm.currentScene.ConflictState.InitiativeOrder = make([]string, 0)
-	for _, p := range sm.currentScene.ConflictState.Participants {
-		if p.Status == scene.StatusActive {
-			sm.currentScene.ConflictState.InitiativeOrder = append(
-				sm.currentScene.ConflictState.InitiativeOrder, p.CharacterID)
-		}
-	}
+	sm.currentScene.ConflictState.SortByInitiative()
 }
 
 // recalculateInitiative recalculates initiative for all participants based on conflict type
@@ -725,7 +697,7 @@ func (sm *SceneManager) applyDamageToTarget(target *character.Character, shifts 
 // handleTargetStressOverflow handles when a target can't absorb stress
 func (sm *SceneManager) handleTargetStressOverflow(target *character.Character, shifts int, stressType character.StressTrackType) {
 	// Check if target has available consequences
-	availableConseq := sm.getAvailableConsequences(target, shifts)
+	availableConseq := target.AvailableConsequenceSlots()
 
 	if len(availableConseq) == 0 {
 		// No way to absorb - target is taken out!
@@ -734,20 +706,7 @@ func (sm *SceneManager) handleTargetStressOverflow(target *character.Character, 
 	}
 
 	// NPC takes the most appropriate consequence automatically.
-	// Prefer the smallest consequence that fully covers shifts.
-	// If none covers shifts, pick the largest available to minimize remaining damage.
-	bestConseq := availableConseq[0]
-	for _, c := range availableConseq {
-		if c.Value >= shifts {
-			// If current best doesn't cover shifts yet, or this one is a smaller fit.
-			if bestConseq.Value < shifts || c.Value < bestConseq.Value {
-				bestConseq = c
-			}
-		} else if bestConseq.Value < shifts && c.Value > bestConseq.Value {
-			// No covering consequence yet; track the largest under-shifts consequence.
-			bestConseq = c
-		}
-	}
+	bestConseq, _ := character.BestConsequenceFor(availableConseq, shifts)
 
 	// Apply consequence to target
 	consequence := character.Consequence{
@@ -867,7 +826,7 @@ func (sm *SceneManager) handleStressOverflow(ctx context.Context, shifts int, st
 	))
 
 	// Determine available consequences
-	availableConsequences := sm.getAvailableConsequences(sm.player, shifts)
+	availableConsequences := sm.player.AvailableConsequenceSlots()
 
 	if len(availableConsequences) == 0 {
 		// No consequences available - taken out
@@ -916,33 +875,6 @@ func (sm *SceneManager) handleStressOverflow(ctx context.Context, shifts int, st
 	// Invalid choice - default to taken out
 	sm.ui.DisplaySystemMessage("Invalid choice. You are taken out!")
 	sm.handleTakenOut(ctx, attacker, attackCtx)
-}
-
-// getAvailableConsequences returns consequences that can absorb the given shifts
-func (sm *SceneManager) getAvailableConsequences(char *character.Character, shifts int) []ConsequenceOption {
-	available := []ConsequenceOption{}
-
-	// Use the character's CanTakeConsequence method which respects NPC type
-	if char.CanTakeConsequence(character.MildConsequence) {
-		available = append(available, ConsequenceOption{
-			Type:  character.MildConsequence,
-			Value: character.MildConsequence.Value(),
-		})
-	}
-	if char.CanTakeConsequence(character.ModerateConsequence) {
-		available = append(available, ConsequenceOption{
-			Type:  character.ModerateConsequence,
-			Value: character.ModerateConsequence.Value(),
-		})
-	}
-	if char.CanTakeConsequence(character.SevereConsequence) {
-		available = append(available, ConsequenceOption{
-			Type:  character.SevereConsequence,
-			Value: character.SevereConsequence.Value(),
-		})
-	}
-
-	return available
 }
 
 // applyConsequence applies a consequence to the player character
@@ -1064,9 +996,8 @@ func (sm *SceneManager) handleConcession(ctx context.Context) {
 	// Per Fate Core: "you get a fate point for choosing to concede.
 	// On top of that, if you've sustained any consequences in this conflict,
 	// you get an additional fate point for each consequence."
-	fatePointsGained := 1 // Base for conceding
 	consequenceCount := len(sm.player.Consequences)
-	fatePointsGained += consequenceCount
+	fatePointsGained := core.ConcessionFatePoints(consequenceCount)
 
 	for i := 0; i < fatePointsGained; i++ {
 		sm.player.GainFatePoint()

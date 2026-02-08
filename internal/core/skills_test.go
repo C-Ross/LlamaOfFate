@@ -164,3 +164,23 @@ func TestCalculateInitiative(t *testing.T) {
 	char5 := character.NewCharacter("test-5", "Test Character 5")
 	assert.Equal(t, 0, CalculateInitiative(char5, scene.PhysicalConflict))
 }
+
+func TestConcessionFatePoints(t *testing.T) {
+	tests := []struct {
+		name             string
+		consequenceCount int
+		expected         int
+	}{
+		{"no consequences grants 1 FP", 0, 1},
+		{"one consequence grants 2 FP", 1, 2},
+		{"two consequences grants 3 FP", 2, 3},
+		{"three consequences grants 4 FP", 3, 4},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ConcessionFatePoints(tt.consequenceCount)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}

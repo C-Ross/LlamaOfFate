@@ -926,14 +926,14 @@ func TestSceneManager_ApplyDamageToTarget_StressAbsorbed(t *testing.T) {
 func TestHandleTargetStressOverflow_ConsequenceSelection(t *testing.T) {
 	tests := []struct {
 		name           string
-		available      []ConsequenceOption
+		available      []character.ConsequenceSlot
 		shifts         int
 		expectedType   character.ConsequenceType
 		expectedReason string
 	}{
 		{
 			name: "exact match picks that consequence",
-			available: []ConsequenceOption{
+			available: []character.ConsequenceSlot{
 				{Type: character.MildConsequence, Value: 2},
 				{Type: character.ModerateConsequence, Value: 4},
 				{Type: character.SevereConsequence, Value: 6},
@@ -943,7 +943,7 @@ func TestHandleTargetStressOverflow_ConsequenceSelection(t *testing.T) {
 		},
 		{
 			name: "picks smallest consequence that covers shifts",
-			available: []ConsequenceOption{
+			available: []character.ConsequenceSlot{
 				{Type: character.MildConsequence, Value: 2},
 				{Type: character.ModerateConsequence, Value: 4},
 				{Type: character.SevereConsequence, Value: 6},
@@ -953,7 +953,7 @@ func TestHandleTargetStressOverflow_ConsequenceSelection(t *testing.T) {
 		},
 		{
 			name: "large hit picks largest available when none covers",
-			available: []ConsequenceOption{
+			available: []character.ConsequenceSlot{
 				{Type: character.MildConsequence, Value: 2},
 				{Type: character.ModerateConsequence, Value: 4},
 			},
@@ -962,7 +962,7 @@ func TestHandleTargetStressOverflow_ConsequenceSelection(t *testing.T) {
 		},
 		{
 			name: "only mild available and shifts exceed it picks mild",
-			available: []ConsequenceOption{
+			available: []character.ConsequenceSlot{
 				{Type: character.MildConsequence, Value: 2},
 			},
 			shifts:       5,
@@ -970,7 +970,7 @@ func TestHandleTargetStressOverflow_ConsequenceSelection(t *testing.T) {
 		},
 		{
 			name: "single consequence that covers",
-			available: []ConsequenceOption{
+			available: []character.ConsequenceSlot{
 				{Type: character.SevereConsequence, Value: 6},
 			},
 			shifts:       3,
@@ -978,7 +978,7 @@ func TestHandleTargetStressOverflow_ConsequenceSelection(t *testing.T) {
 		},
 		{
 			name: "prefers mild over severe when both cover",
-			available: []ConsequenceOption{
+			available: []character.ConsequenceSlot{
 				{Type: character.SevereConsequence, Value: 6},
 				{Type: character.MildConsequence, Value: 2},
 			},
@@ -989,17 +989,8 @@ func TestHandleTargetStressOverflow_ConsequenceSelection(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			// Exercise the same selection logic from handleTargetStressOverflow
-			bestConseq := tc.available[0]
-			for _, c := range tc.available {
-				if c.Value >= tc.shifts {
-					if bestConseq.Value < tc.shifts || c.Value < bestConseq.Value {
-						bestConseq = c
-					}
-				} else if bestConseq.Value < tc.shifts && c.Value > bestConseq.Value {
-					bestConseq = c
-				}
-			}
+			bestConseq, ok := character.BestConsequenceFor(tc.available, tc.shifts)
+			require.True(t, ok)
 
 			assert.Equal(t, tc.expectedType, bestConseq.Type,
 				"expected %s consequence for %d shifts", tc.expectedType, tc.shifts)

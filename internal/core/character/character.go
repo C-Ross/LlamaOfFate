@@ -420,6 +420,56 @@ func (c *Character) CheckConsequenceRecovery(currentScene, currentScenario int) 
 	return cleared
 }
 
+// ConsequenceSlot represents an available consequence slot and how much stress it absorbs.
+type ConsequenceSlot struct {
+	Type  ConsequenceType
+	Value int
+}
+
+// AvailableConsequenceSlots returns all consequence slots available for the character.
+// The result respects the character's NPC type restrictions (e.g., nameless NPCs
+// have no consequence slots, supporting NPCs only have mild).
+func (c *Character) AvailableConsequenceSlots() []ConsequenceSlot {
+	var slots []ConsequenceSlot
+
+	if c.CanTakeConsequence(MildConsequence) {
+		slots = append(slots, ConsequenceSlot{Type: MildConsequence, Value: MildConsequence.Value()})
+	}
+	if c.CanTakeConsequence(ModerateConsequence) {
+		slots = append(slots, ConsequenceSlot{Type: ModerateConsequence, Value: ModerateConsequence.Value()})
+	}
+	if c.CanTakeConsequence(SevereConsequence) {
+		slots = append(slots, ConsequenceSlot{Type: SevereConsequence, Value: SevereConsequence.Value()})
+	}
+
+	return slots
+}
+
+// BestConsequenceFor picks the most appropriate consequence slot to absorb shifts.
+// Prefers the smallest consequence that fully covers the shifts.
+// If none covers the shifts, returns the largest available to minimise leftover damage.
+// Returns the chosen slot and true, or zero-value and false when no slots are provided.
+func BestConsequenceFor(slots []ConsequenceSlot, shifts int) (ConsequenceSlot, bool) {
+	if len(slots) == 0 {
+		return ConsequenceSlot{}, false
+	}
+
+	best := slots[0]
+	for _, s := range slots[1:] {
+		if s.Value >= shifts {
+			// s covers the damage; prefer it when best doesn't cover shifts
+			// or when s is a tighter fit.
+			if best.Value < shifts || s.Value < best.Value {
+				best = s
+			}
+		} else if best.Value < shifts && s.Value > best.Value {
+			// Neither covers shifts — track the largest to minimise remainder.
+			best = s
+		}
+	}
+	return best, true
+}
+
 // HasAspect checks if the character has a specific aspect
 func (c *Character) HasAspect(aspect string) bool {
 	aspects := c.Aspects.GetAll()

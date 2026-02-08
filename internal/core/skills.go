@@ -130,3 +130,12 @@ func DefaultAttackSkillForConflict(conflictType scene.ConflictType) string {
 	}
 	return "Fight"
 }
+
+// ConcessionFatePoints returns the number of fate points awarded for conceding a conflict.
+// Per Fate Core: "you get a fate point for choosing to concede. On top of that,
+// if you've sustained any consequences in this conflict, you get an additional
+// fate point for each consequence."
+// See: https://fate-srd.com/fate-core/conflicts#conceding-the-conflict
+func ConcessionFatePoints(consequenceCount int) int {
+	return 1 + consequenceCount
+}
