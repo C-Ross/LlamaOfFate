@@ -5,7 +5,6 @@ package llmeval_test
 import (
 	"context"
 	"os"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -17,9 +16,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// sceneTransitionMarkerRegex matches [SCENE_TRANSITION:hint] markers
-var sceneTransitionMarkerRegex = regexp.MustCompile(`\[SCENE_TRANSITION:([^\]]+)\]`)
 
 // SceneTransitionTestCase represents a test case for scene transition detection
 type SceneTransitionTestCase struct {
@@ -377,12 +373,12 @@ func evaluateSceneTransition(ctx context.Context, client llm.LLMClient, tc Scene
 
 	response := resp.Choices[0].Message.Content
 
-	// Check for scene transition marker
-	matches := sceneTransitionMarkerRegex.FindStringSubmatch(response)
-	hasMarker := matches != nil
+	// Check for scene transition marker using production parser
+	transition, _ := promptpkg.ParseSceneTransitionMarker(response)
+	hasMarker := transition != nil
 	hint := ""
-	if hasMarker && len(matches) > 1 {
-		hint = strings.TrimSpace(matches[1])
+	if transition != nil {
+		hint = transition.Hint
 	}
 
 	return SceneTransitionResult{

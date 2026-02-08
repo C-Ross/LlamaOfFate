@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
-	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+	llmazure "github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -144,17 +144,8 @@ func evaluateSceneSummary(ctx context.Context, client llm.LLMClient, tc SceneSum
 		RawResponse: raw,
 	}
 
-	// Strip code fences
-	cleaned := raw
-	if idx := strings.Index(cleaned, "```json"); idx != -1 {
-		cleaned = cleaned[idx+7:]
-	} else if idx := strings.Index(cleaned, "```"); idx != -1 {
-		cleaned = cleaned[idx+3:]
-	}
-	if idx := strings.LastIndex(cleaned, "```"); idx != -1 {
-		cleaned = cleaned[:idx]
-	}
-	cleaned = strings.TrimSpace(cleaned)
+	// Use production JSON cleaning to prevent parsing divergence
+	cleaned := llm.CleanJSONResponse(raw)
 
 	var summary promptpkg.SceneSummary
 	if err := json.Unmarshal([]byte(cleaned), &summary); err != nil {
@@ -233,10 +224,10 @@ func TestSceneSummary_LLMEvaluation(t *testing.T) {
 		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
 	}
 
-	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
+	config, err := llmazure.LoadConfig("../../configs/azure-llm.yaml")
 	require.NoError(t, err, "Failed to load Azure config")
 
-	client := azure.NewClient(*config)
+	client := llmazure.NewClient(*config)
 	ctx := context.Background()
 
 	verboseLogging := os.Getenv("VERBOSE") == "1"

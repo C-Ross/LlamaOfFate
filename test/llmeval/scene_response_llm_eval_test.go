@@ -26,8 +26,6 @@ var (
 	bulletOptionsRegex = regexp.MustCompile(`(?m)^[\s]*[-•*]\s+(Use|Take|Press|Attempt|Keep|Try|Draw|Reach|Spin|Slowly)`)
 	// Matches numbered options like "1. Option" or "1) Option"
 	numberedOptionsRegex = regexp.MustCompile(`(?m)^[\s]*\d+[.)]\s+\w+`)
-	// Scene transition marker
-	sceneTransitionRegex = regexp.MustCompile(`\[SCENE_TRANSITION:([^\]]+)\]`)
 )
 
 // SceneResponseTestCase for testing scene response behaviors
@@ -372,12 +370,12 @@ func evaluateSceneResponseBehavior(ctx context.Context, client llm.LLMClient, tc
 		optionsFound += " Numbered options: " + strings.Join(matches, ", ")
 	}
 
-	// Check for transition marker
-	transitionMatches := sceneTransitionRegex.FindStringSubmatch(response)
-	hasTransition := transitionMatches != nil
+	// Check for transition marker using production parser
+	transition, _ := promptpkg.ParseSceneTransitionMarker(response)
+	hasTransition := transition != nil
 	transitionHint := ""
-	if hasTransition && len(transitionMatches) > 1 {
-		transitionHint = strings.TrimSpace(transitionMatches[1])
+	if transition != nil {
+		transitionHint = transition.Hint
 	}
 
 	// Determine if test passed

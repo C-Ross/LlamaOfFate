@@ -11,7 +11,7 @@ import (
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
-	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+	llmazure "github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -126,17 +126,8 @@ func evaluateScenarioGeneration(ctx context.Context, client llm.LLMClient, tc Sc
 
 	raw := resp.Choices[0].Message.Content
 
-	// Strip markdown code fences if present
-	cleaned := raw
-	if idx := strings.Index(cleaned, "```json"); idx != -1 {
-		cleaned = cleaned[idx+7:]
-	} else if idx := strings.Index(cleaned, "```"); idx != -1 {
-		cleaned = cleaned[idx+3:]
-	}
-	if idx := strings.LastIndex(cleaned, "```"); idx != -1 {
-		cleaned = cleaned[:idx]
-	}
-	cleaned = strings.TrimSpace(cleaned)
+	// Use production JSON cleaning to prevent parsing divergence
+	cleaned := llm.CleanJSONResponse(raw)
 
 	result := ScenarioGenResult{
 		TestCase:    tc,
@@ -267,10 +258,10 @@ func TestScenarioGeneration_LLMEvaluation(t *testing.T) {
 		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
 	}
 
-	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
+	config, err := llmazure.LoadConfig("../../configs/azure-llm.yaml")
 	require.NoError(t, err, "Failed to load Azure config")
 
-	client := azure.NewClient(*config)
+	client := llmazure.NewClient(*config)
 	ctx := context.Background()
 
 	verboseLogging := os.Getenv("VERBOSE") == "1"
