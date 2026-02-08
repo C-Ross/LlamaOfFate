@@ -1,11 +1,10 @@
-package engine
+package prompt
 
 import (
 	"bytes"
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
-	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,14 +12,14 @@ import (
 func TestInputClassificationTemplate(t *testing.T) {
 	// Create test data
 	testScene := scene.NewScene("test-scene", "Test Scene", "A test scene description")
-	data := prompt.InputClassificationData{
+	data := InputClassificationData{
 		Scene:       testScene,
 		PlayerInput: "What do I see?",
 	}
 
 	// Execute the template
 	var buf bytes.Buffer
-	err := prompt.InputClassificationPrompt.Execute(&buf, data)
+	err := InputClassificationPrompt.Execute(&buf, data)
 	require.NoError(t, err, "Template execution should not fail")
 
 	result := buf.String()
@@ -35,7 +34,7 @@ func TestInputClassificationTemplate(t *testing.T) {
 func TestSceneResponseTemplate(t *testing.T) {
 	// Create test data
 	testScene := scene.NewScene("test-scene", "Test Scene", "A test scene description")
-	data := prompt.SceneResponseData{
+	data := SceneResponseData{
 		Scene:               testScene,
 		CharacterContext:    "Test Character Context",
 		AspectsContext:      "Test Aspects Context",
@@ -46,7 +45,7 @@ func TestSceneResponseTemplate(t *testing.T) {
 
 	// Execute the template
 	var buf bytes.Buffer
-	err := prompt.SceneResponsePrompt.Execute(&buf, data)
+	err := SceneResponsePrompt.Execute(&buf, data)
 	require.NoError(t, err, "Template execution should not fail")
 
 	result := buf.String()
@@ -61,12 +60,12 @@ func TestSceneResponseTemplate(t *testing.T) {
 
 func TestConsequenceAspectTemplate(t *testing.T) {
 	// Create test data
-	data := prompt.ConsequenceAspectData{
+	data := ConsequenceAspectData{
 		CharacterName: "Hero",
 		AttackerName:  "Dark Knight",
 		Severity:      "moderate",
 		ConflictType:  "physical",
-		AttackContext: prompt.AttackContext{
+		AttackContext: AttackContext{
 			Skill:       "Fight",
 			Description: "The Dark Knight's sword crashes down on your shield",
 			Shifts:      4,
@@ -75,7 +74,7 @@ func TestConsequenceAspectTemplate(t *testing.T) {
 
 	// Execute the template
 	var buf bytes.Buffer
-	err := prompt.ConsequenceAspectPrompt.Execute(&buf, data)
+	err := ConsequenceAspectPrompt.Execute(&buf, data)
 	require.NoError(t, err, "Template execution should not fail")
 
 	result := buf.String()
@@ -92,7 +91,7 @@ func TestConsequenceAspectTemplate(t *testing.T) {
 
 func TestConsequenceAspectTemplateWithoutAttackContext(t *testing.T) {
 	// Create test data without attack context (optional fields)
-	data := prompt.ConsequenceAspectData{
+	data := ConsequenceAspectData{
 		CharacterName: "Hero",
 		AttackerName:  "Dark Knight",
 		Severity:      "mild",
@@ -101,7 +100,7 @@ func TestConsequenceAspectTemplateWithoutAttackContext(t *testing.T) {
 
 	// Execute the template
 	var buf bytes.Buffer
-	err := prompt.ConsequenceAspectPrompt.Execute(&buf, data)
+	err := ConsequenceAspectPrompt.Execute(&buf, data)
 	require.NoError(t, err, "Template execution should not fail even without attack context")
 
 	result := buf.String()
@@ -115,13 +114,13 @@ func TestConsequenceAspectTemplateWithoutAttackContext(t *testing.T) {
 
 func TestTakenOutTemplate(t *testing.T) {
 	// Create test data
-	data := prompt.TakenOutData{
+	data := TakenOutData{
 		CharacterName:       "Hero",
 		AttackerName:        "Dark Knight",
 		AttackerHighConcept: "Corrupted Champion of Darkness",
 		ConflictType:        "physical",
 		SceneDescription:    "A dark throne room with shadowy pillars",
-		AttackContext: prompt.AttackContext{
+		AttackContext: AttackContext{
 			Skill:       "Fight",
 			Description: "The Dark Knight's final blow strikes true",
 			Shifts:      6,
@@ -130,7 +129,7 @@ func TestTakenOutTemplate(t *testing.T) {
 
 	// Execute the template
 	var buf bytes.Buffer
-	err := prompt.TakenOutPrompt.Execute(&buf, data)
+	err := TakenOutPrompt.Execute(&buf, data)
 	require.NoError(t, err, "Template execution should not fail")
 
 	result := buf.String()
@@ -148,7 +147,7 @@ func TestTakenOutTemplate(t *testing.T) {
 
 func TestTakenOutTemplateWithoutAttackContext(t *testing.T) {
 	// Create test data without attack context (optional fields)
-	data := prompt.TakenOutData{
+	data := TakenOutData{
 		CharacterName:       "Hero",
 		AttackerName:        "Dark Knight",
 		AttackerHighConcept: "Corrupted Champion of Darkness",
@@ -158,7 +157,7 @@ func TestTakenOutTemplateWithoutAttackContext(t *testing.T) {
 
 	// Execute the template
 	var buf bytes.Buffer
-	err := prompt.TakenOutPrompt.Execute(&buf, data)
+	err := TakenOutPrompt.Execute(&buf, data)
 	require.NoError(t, err, "Template execution should not fail even without attack context")
 
 	result := buf.String()
@@ -172,10 +171,10 @@ func TestTakenOutTemplateWithoutAttackContext(t *testing.T) {
 }
 
 func TestRecoveryNarrativeTemplate(t *testing.T) {
-	data := prompt.RecoveryNarrativeData{
+	data := RecoveryNarrativeData{
 		CharacterName: "Simon Falcon",
 		SceneSetting:  "The crew rests after escaping the orbital station",
-		Consequences: []prompt.RecoveryAttempt{
+		Consequences: []RecoveryAttempt{
 			{
 				Aspect:     "Bruised Ribs",
 				Severity:   "mild",
@@ -195,7 +194,7 @@ func TestRecoveryNarrativeTemplate(t *testing.T) {
 		},
 	}
 
-	rendered, err := prompt.RenderRecoveryNarrative(data)
+	rendered, err := RenderRecoveryNarrative(data)
 	require.NoError(t, err)
 
 	assert.Contains(t, rendered, "Simon Falcon")
