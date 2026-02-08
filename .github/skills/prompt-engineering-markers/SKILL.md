@@ -9,11 +9,11 @@ This skill covers modifying LLM prompt templates and implementing marker parsing
 
 ## Prompt Templates
 
-Located in `internal/engine/templates/*.tmpl`. Each template has a corresponding data struct and render function.
+Located in `internal/prompt/templates/*.tmpl`. Each template has a corresponding data struct in `internal/prompt/data.go` and render function in `internal/prompt/templates.go`.
 
 ## Data Structures
 
-Defined in `internal/engine/scene_manager.go`:
+Defined in `internal/prompt/data.go`:
 
 ```go
 // For scene_response_prompt.tmpl
@@ -37,40 +37,47 @@ type InputClassificationData struct {
 
 ## Render Functions
 
-In `internal/engine/templates.go`:
+In `internal/prompt/templates.go`:
 
 ```go
-engine.RenderSceneResponse(data SceneResponseData) (string, error)
-engine.RenderInputClassification(data InputClassificationData) (string, error)
-engine.RenderActionNarrative(data ActionNarrativeData) (string, error)
-engine.RenderConflictResponse(data ConflictResponseData) (string, error)
+prompt.RenderSceneResponse(data SceneResponseData) (string, error)
+prompt.RenderInputClassification(data InputClassificationData) (string, error)
+prompt.RenderActionNarrative(data ActionNarrativeData) (string, error)
+prompt.RenderConflictResponse(data ConflictResponseData) (string, error)
+prompt.RenderConsequenceAspect(data ConsequenceAspectData) (string, error)
+prompt.RenderTakenOut(data TakenOutData) (string, error)
+prompt.RenderNPCActionDecision(data NPCActionDecisionData) (string, error)
+prompt.RenderNPCAttack(data NPCAttackData) (string, error)
+prompt.RenderActionParse(data ActionParseTemplateData) (string, error)
+prompt.RenderActionParseSystem() (string, error)
+prompt.RenderAspectGeneration(data AspectGenerationRequest) (string, error)
+prompt.RenderAspectGenerationSystem() (string, error)
+prompt.RenderSceneGeneration(data SceneGenerationData) (string, error)
+prompt.RenderSceneSummary(data SceneSummaryData) (string, error)
+prompt.RenderScenarioGeneration(data ScenarioGenerationData) (string, error)
+prompt.RenderScenarioResolution(data ScenarioResolutionData) (string, error)
+prompt.RenderRecoveryNarrative(data RecoveryNarrativeData) (string, error)
 ```
 
 ## Adding New Markers
 
-Follow these 7 steps to add a new marker:
+Follow these 6 steps to add a new marker:
 
-### Step 1: Define regex in `internal/engine/conflict.go`
+### Step 1: Define regex, struct, and parser in `internal/prompt/markers.go`
 
-```go
-// myMarkerRegex matches [MY_MARKER:value] markers
-var myMarkerRegex = regexp.MustCompile(`\[MY_MARKER:([^\]]+)\]`)
-```
-
-### Step 2: Add struct for parsed data
+All marker definitions live in `internal/prompt/markers.go` as exported package-level functions:
 
 ```go
 // MyMarker represents a detected my marker
 type MyMarker struct {
     Value string
 }
-```
 
-### Step 3: Add parser function
+// myMarkerRegex matches [MY_MARKER:value] markers
+var myMarkerRegex = regexp.MustCompile(`\[MY_MARKER:([^\]]+)\]`)
 
-```go
-// parseMyMarker extracts a my marker from LLM response and returns cleaned text
-func (sm *SceneManager) parseMyMarker(response string) (*MyMarker, string) {
+// ParseMyMarker extracts a my marker from LLM response and returns cleaned text
+func ParseMyMarker(response string) (*MyMarker, string) {
     matches := myMarkerRegex.FindStringSubmatch(response)
     if matches == nil {
         return nil, response
@@ -89,9 +96,21 @@ func (sm *SceneManager) parseMyMarker(response string) (*MyMarker, string) {
 }
 ```
 
-### Step 4: Update template with marker instructions
+### Step 2: (Optional) Add convenience wrapper on SceneManager in `internal/engine/`
 
-In the template file, add to the SCENE MARKERS section:
+If the marker is conflict-related, add a thin wrapper in `internal/engine/conflict.go`:
+
+```go
+func (sm *SceneManager) parseMyMarker(response string) (*prompt.MyMarker, string) {
+    return prompt.ParseMyMarker(response)
+}
+```
+
+Otherwise, call `prompt.ParseMyMarker()` directly from the handler.
+
+### Step 3: Update template with marker instructions
+
+In the relevant template file under `internal/prompt/templates/`, add to the SCENE MARKERS section:
 
 ```
 MY MARKER - Description of when to use:
@@ -103,11 +122,11 @@ Examples:
 Only add this when [specific conditions].
 ```
 
-### Step 5: Handle in `handleDialog()` in `scene_manager.go`
+### Step 4: Handle in `handleDialog()` in `internal/engine/scene_manager.go`
 
 ```go
 // In handleDialog(), after other marker parsing:
-myMarker, cleanedResponse := sm.parseMyMarker(cleanedResponse)
+myMarker, cleanedResponse := prompt.ParseMyMarker(cleanedResponse)
 
 // Later, handle the marker:
 if myMarker != nil {
@@ -115,42 +134,41 @@ if myMarker != nil {
 }
 ```
 
-### Step 6: Add unit tests in `scene_manager_test.go`
+### Step 5: Add unit tests
+
+Add unit tests alongside the parser. If the parser is in `internal/prompt/markers.go`, add tests in `internal/prompt/` (or `internal/engine/conflict_test.go` if you added a wrapper):
 
 ```go
-func TestSceneManager_ParseMyMarker_WithValue(t *testing.T) {
-    engine, err := New()
-    require.NoError(t, err)
-    sm := NewSceneManager(engine)
-
+func TestParseMyMarker_WithValue(t *testing.T) {
     response := "Some narrative text. [MY_MARKER:test_value]"
-    marker, cleanedResponse := sm.parseMyMarker(response)
+    marker, cleanedResponse := prompt.ParseMyMarker(response)
 
     require.NotNil(t, marker)
     assert.Equal(t, "test_value", marker.Value)
     assert.Equal(t, "Some narrative text.", cleanedResponse)
 }
 
-func TestSceneManager_ParseMyMarker_NoMarker(t *testing.T) {
-    engine, err := New()
-    require.NoError(t, err)
-    sm := NewSceneManager(engine)
-
+func TestParseMyMarker_NoMarker(t *testing.T) {
     response := "Just regular text without markers."
-    marker, cleanedResponse := sm.parseMyMarker(response)
+    marker, cleanedResponse := prompt.ParseMyMarker(response)
 
     assert.Nil(t, marker)
     assert.Equal(t, "Just regular text without markers.", cleanedResponse)
 }
 ```
 
-### Step 7: Add LLM eval tests
+### Step 6: Add LLM eval tests
 
 Create tests in `test/llmeval/` to verify the LLM correctly uses the marker. See the `llm-eval-tests` skill for structure.
 
 ## Existing Markers
 
-Search `conflict.go` for existing marker regexes (e.g., `conflictMarkerRegex`, `sceneTransitionMarkerRegex`) to see current patterns.
+All marker regexes and parsers are in `internal/prompt/markers.go`:
+- `sceneTransitionMarkerRegex` / `ParseSceneTransitionMarker()` — scene exits
+- `conflictMarkerRegex` / `ParseConflictMarker()` — conflict escalation
+- `conflictEndMarkerRegex` / `ParseConflictEndMarker()` — conflict de-escalation
+
+The engine layer in `internal/engine/conflict.go` has thin `SceneManager` method wrappers that delegate to these.
 
 ## Prompt Best Practices
 

@@ -7,18 +7,15 @@ Core premise is to leverage LLMs for narrative generation and player input parsi
 
 ## Repository Structure
 ```
-cmd/cli/                    - CLI entry point (single hardcoded scene currently)
-examples/llm-scene-loop/    - Example scenes (saloon, heist, tower)
+cmd/cli/                    - CLI entry point
+examples/                   - Evaluation tools (llm-scene-loop, scenario-generator, scenario-walkthrough, scene-generator)
 internal/
-  core/                     - Fate Core mechanics
-    action/                 - Action types (Overcome, Create Advantage, Attack, Defend)
-    character/              - Character, aspects, stress, consequences
-    dice/                   - 4dF dice, ladder, check results
-    scene/                  - Scene state, conflicts, situation aspects
-  engine/                   - Game loop, LLM integration, prompt templates
-  llm/                      - LLM client interface and retry logic
-    azure/                  - Azure OpenAI client implementation
-  session/                  - Session logging for game transcripts
+  core/                     - Fate Core mechanics (action, character, dice, scene)
+  engine/                   - Game loop, LLM orchestration (game_manager → scene_flow → scene_manager)
+  prompt/                   - LLM prompt system (Go templates, data structs, marker parsing)
+  llm/                      - LLM client interface and retry logic (azure/ implementation)
+  logging/                  - Structured logging (slog)
+  session/                  - Session logging for game transcripts (YAML)
   ui/terminal/              - Terminal UI implementation
 test/
   integration/              - Integration tests

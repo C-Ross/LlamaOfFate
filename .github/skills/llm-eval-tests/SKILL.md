@@ -21,9 +21,9 @@ import (
 
     "github.com/C-Ross/LlamaOfFate/internal/core/character"
     "github.com/C-Ross/LlamaOfFate/internal/core/scene"
-    "github.com/C-Ross/LlamaOfFate/internal/engine"
     "github.com/C-Ross/LlamaOfFate/internal/llm"
     "github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+    promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
     "github.com/stretchr/testify/assert"
     "github.com/stretchr/testify/require"
 )
@@ -73,11 +73,14 @@ ctx := context.Background()
 ```
 
 ### Template Rendering
-Use `engine.Render*()` functions:
+Use `promptpkg.Render*()` functions (imported as `promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"`):
 ```go
-prompt, err := engine.RenderSceneResponse(data)
-prompt, err := engine.RenderInputClassification(data)
-prompt, err := engine.RenderActionNarrative(data)
+prompt, err := promptpkg.RenderSceneResponse(data)
+prompt, err := promptpkg.RenderInputClassification(data)
+prompt, err := promptpkg.RenderActionNarrative(data)
+prompt, err := promptpkg.RenderActionParse(data)
+prompt, err := promptpkg.RenderSceneGeneration(data)
+prompt, err := promptpkg.RenderScenarioGeneration(data)
 ```
 
 ### Scene Aspects
