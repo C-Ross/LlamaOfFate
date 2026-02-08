@@ -300,6 +300,151 @@ func TestSceneResponse_TransitionOnLeave_LLMEvaluation(t *testing.T) {
 	}
 }
 
+// getNoFalseTransitionTestCases returns cases where the player moves WITHIN the scene
+// and should NOT trigger a scene transition. Extracted from session_western_jesse_calhoun_20260208_190311.yaml
+// where "steps into the eaves" falsely triggered [SCENE_TRANSITION:the eaves outside the saloon].
+func getNoFalseTransitionTestCases() []SceneResponseTestCase {
+	dustyCowboy := character.NewCharacter("scene_1_npc_1", "The Dusty Cowboy")
+	dustyCowboy.Aspects.HighConcept = "Mysterious Drifter with a Watchful Eye"
+
+	bartender := character.NewCharacter("bartender", "Maggie Two-Rivers")
+	bartender.Aspects.HighConcept = "Weathered Saloon Owner"
+
+	blackJack := character.NewCharacter("blackjack", "Black Jack McCoy")
+	blackJack.Aspects.HighConcept = "Dangerous Outlaw with a Quick Draw"
+
+	return []SceneResponseTestCase{
+		{
+			Name:             "Steps into the eaves - within scene movement",
+			PlayerInput:      `Jesse tips his hat to the stranger "Howdy partner, mind if I join you for a smoke?"  He steps into the eaves and pulls out a matchbook and a hand rolled cigar.`,
+			SceneName:        "Roping a Plan",
+			SceneDescription: "The moon casts long shadows across the dusty main street of Redemption Gulch as Jesse walks away from the saloon. The sound of crickets and distant laughter from the saloon's patrons fill the night air, punctuated by the creaking of wooden signs and the occasional bark of a dog.",
+			OtherCharacters:  []*character.Character{dustyCowboy},
+			ConversationContext: `GM: As Jesse turns a corner, he notices a figure watching him from the shadows near the local livery stable, the faint glow of a cigar illuminating their features.`,
+			Description:      "Walking to a nearby person under the eaves is movement WITHIN the scene, not leaving. Reproduced from session_western_jesse_calhoun_20260208_190311.yaml",
+			CheckNoOptions:   false,
+			CheckTransition:  false, // We use the dedicated NoFalseTransition check below
+		},
+		{
+			Name:             "Walks to the bar - within scene movement",
+			PlayerInput:      `Jesse walks over to the bar and sits down on a stool. "What'll it be tonight?"`,
+			SceneName:        "The Dusty Spur Saloon",
+			SceneDescription: "A dimly lit saloon with swinging doors, a long bar, and the smell of whiskey and tobacco. Miners and cowboys crowd the tables.",
+			OtherCharacters:  []*character.Character{bartender},
+			ConversationContext: `GM: Jesse pushes through the swinging doors and surveys the room. The piano player pauses briefly, then continues.`,
+			Description:      "Walking to the bar inside a saloon is not leaving the saloon",
+			CheckNoOptions:   false,
+			CheckTransition:  false,
+		},
+		{
+			Name:             "Moves to a corner table",
+			PlayerInput:      `Jesse takes his drink and moves to the corner table where the card game is happening.`,
+			SceneName:        "The Dusty Spur Saloon",
+			SceneDescription: "A dimly lit saloon with swinging doors, a long bar, poker tables, and a stage for entertainment.",
+			OtherCharacters:  []*character.Character{bartender},
+			ConversationContext: `GM: Maggie slides the whiskey down the bar. "Careful with that crowd in the corner, stranger."`,
+			Description:      "Moving to a different spot within the same room is not leaving",
+			CheckNoOptions:   false,
+			CheckTransition:  false,
+		},
+		{
+			Name:             "Steps behind cover during conversation",
+			PlayerInput:      `Jesse steps behind the windmill wall, keeping his hand near his holster. "Let's talk where we can't be seen from the road."`,
+			SceneName:        "Windmill on the Outskirts",
+			SceneDescription: "An old abandoned windmill on the outskirts of town. The creaking blades announce any arrival. Black Jack McCoy stands near the entrance.",
+			OtherCharacters:  []*character.Character{blackJack},
+			ConversationContext: `GM: Black Jack eyes Jesse warily. "I don't much like being out in the open neither."`,
+			Description:      "Moving behind cover at the same location is not departing the scene",
+			CheckNoOptions:   false,
+			CheckTransition:  false,
+		},
+		{
+			Name:             "Approaches NPC on the porch",
+			PlayerInput:      `Jesse walks up the porch steps and leans against the railing next to the old man. "Evening. Nice night for it."`,
+			SceneName:        "The General Store",
+			SceneDescription: "The general store sits at the end of the main street. An old man rocks in a chair on the front porch, watching the town.",
+			OtherCharacters:  nil,
+			ConversationContext: `GM: The rocking chair creaks rhythmically as the old man watches Jesse approach.`,
+			Description:      "Walking up porch steps to talk to someone at the current location is not leaving",
+			CheckNoOptions:   false,
+			CheckTransition:  false,
+		},
+	}
+}
+
+// TestSceneResponse_NoFalseTransition_LLMEvaluation tests that within-scene movement
+// does NOT trigger a scene transition marker. Reproduces the bug from
+// session_western_jesse_calhoun_20260208_190311.yaml where "steps into the eaves"
+// caused a false [SCENE_TRANSITION:the eaves outside the saloon].
+func TestSceneResponse_NoFalseTransition_LLMEvaluation(t *testing.T) {
+	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
+		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
+	}
+
+	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
+	require.NoError(t, err, "Failed to load Azure config")
+
+	client := azure.NewClient(*config)
+	ctx := context.Background()
+
+	verboseLogging := os.Getenv("VERBOSE") == "1"
+	testCases := getNoFalseTransitionTestCases()
+
+	var results []SceneResponseResult
+	correct := 0
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			result := evaluateSceneResponseBehavior(ctx, client, tc)
+			results = append(results, result)
+
+			if result.Error != nil {
+				t.Errorf("Error: %v", result.Error)
+				return
+			}
+
+			// For these tests, success = NO transition marker
+			passed := !result.HasTransition
+			result.Matches = passed
+			if passed {
+				correct++
+			}
+
+			if verboseLogging || !passed {
+				status := "✓ PASS"
+				if !passed {
+					status = "✗ FAIL"
+				}
+				t.Logf("%s: HasTransition=%v", status, result.HasTransition)
+				t.Logf("  Input: %s", tc.PlayerInput)
+				t.Logf("  Why: %s", tc.Description)
+				if result.HasTransition {
+					t.Logf("  False transition hint: %s", result.TransitionHint)
+				}
+				t.Logf("  Response: %s", truncateResponseText(result.Response, 300))
+			}
+
+			assert.False(t, result.HasTransition,
+				"Response should NOT have SCENE_TRANSITION marker for within-scene movement.\nInput: %s\nTransition hint: %s\nResponse: %s",
+				tc.PlayerInput, result.TransitionHint, truncateResponseText(result.Response, 400))
+		})
+	}
+
+	// Summary
+	t.Log("\n========== NO FALSE TRANSITION TEST SUMMARY ==========")
+	t.Logf("Cases without false transition: %d/%d (%.1f%%)",
+		correct, len(testCases), float64(correct)*100/float64(len(testCases)))
+
+	t.Log("\n--- Failed Cases ---")
+	for _, r := range results {
+		if !r.Matches {
+			t.Logf("FAIL: '%s'", r.TestCase.Name)
+			t.Logf("      Input: %s", truncateResponseText(r.TestCase.PlayerInput, 80))
+			t.Logf("      False transition: %s", r.TransitionHint)
+		}
+	}
+}
+
 // evaluateSceneResponseBehavior runs a single scene response test
 func evaluateSceneResponseBehavior(ctx context.Context, client llm.LLMClient, tc SceneResponseTestCase) SceneResponseResult {
 	// Create test scene
