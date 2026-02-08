@@ -87,15 +87,10 @@ LlamaOfFate/
 │   │   ├── action/             # Action resolution system
 │   │   ├── character/          # Character management
 │   │   ├── dice/               # Dice rolling and probability
-│   │   ├── scene/              # Scene and conflict management
-│   │   └── skills.go           # Skill definitions
-│   ├── engine/                 # Game engine coordination
-│   │   ├── Scene and scenario managers
-│   │   ├── Action parsing and resolution
-│   │   └── Conflict management
+│   │   └── scene/              # Scene and conflict management
+│   ├── engine/                 # Game engine (scene/scenario managers, action parsing, conflict resolution)
 │   ├── llm/                    # LLM integration layer
-│   │   ├── azure/              # Azure OpenAI implementation
-│   │   └── Interface, retry logic, response handling
+│   │   └── azure/              # Azure OpenAI implementation
 │   ├── session/                # Session logging for game transcripts
 │   ├── logging/                # Application logging
 │   └── ui/
