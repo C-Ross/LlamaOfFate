@@ -68,20 +68,6 @@ char.Aspects.Trouble = "The Lure of Ancient Mysteries"
 char.Aspects.AddAspect("Well Connected")  // Unlimited additional aspects
 ```
 
-### Dice & Actions
-```go
-roller := dice.NewRoller()
-action := action.NewAction(id, charID, actionType, skill, description)
-action.AddAspectInvoke(aspectInvoke)  // Fate points/free invokes
-result := roller.RollWithModifier(skill, action.CalculateBonus())
-```
-
-## Fate Core Mechanics
-- **Ladder**: Terrible (-2) to Legendary (+8)+
-- **4dF Dice**: -1/0/+1 (Minus/Blank/Plus)
-- **Stress**: Physical/Mental tracks, configurable boxes
-- **Consequences**: Mild(2), Moderate(4), Severe(6), Extreme(8)
-
 When you need to consider the rules use the Fate Core SRD at https://fate-srd.com/fate-core.
 
 ## Important Notes
