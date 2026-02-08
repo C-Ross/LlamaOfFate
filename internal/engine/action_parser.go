@@ -14,10 +14,6 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 )
 
-// cleanJSONResponse is kept as a package-level alias for backward compatibility.
-// New code should use llm.CleanJSONResponse directly.
-var cleanJSONResponse = llm.CleanJSONResponse
-
 // ActionParseRequest represents a request to parse user input into an action
 type ActionParseRequest struct {
 	Character       *character.Character   `json:"character"`
@@ -106,7 +102,7 @@ func (ap *ActionParser) ParseAction(ctx context.Context, req ActionParseRequest)
 
 	// Parse the JSON response
 	var parseResp ActionParseResponse
-	cleanedContent := cleanJSONResponse(resp.Choices[0].Message.Content)
+	cleanedContent := llm.CleanJSONResponse(resp.Choices[0].Message.Content)
 	if err := json.Unmarshal([]byte(cleanedContent), &parseResp); err != nil {
 		return nil, fmt.Errorf("failed to parse LLM response: %w\nResponse was: %s", err, resp.Choices[0].Message.Content)
 	}
