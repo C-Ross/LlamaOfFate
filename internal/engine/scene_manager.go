@@ -598,6 +598,21 @@ func (sm *SceneManager) GetConversationHistory() []prompt.ConversationEntry {
 // Ensure SceneManager implements the SceneInfo interface
 var _ SceneInfo = (*SceneManager)(nil)
 
+// Snapshot returns a SceneState capturing the current scene-level state
+// for persistence. This includes the scene itself (with any active conflict),
+// the conversation history, and the scene's dramatic purpose.
+func (sm *SceneManager) Snapshot() SceneState {
+	// Copy conversation history to avoid aliasing
+	history := make([]prompt.ConversationEntry, len(sm.conversationHistory))
+	copy(history, sm.conversationHistory)
+
+	return SceneState{
+		CurrentScene:        sm.currentScene,
+		ConversationHistory: history,
+		ScenePurpose:        sm.scenePurpose,
+	}
+}
+
 // addToConversationHistory adds an exchange to the conversation history
 func (sm *SceneManager) addToConversationHistory(playerInput, gmResponse, interactionType string) {
 	entry := prompt.ConversationEntry{

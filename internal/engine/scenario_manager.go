@@ -35,6 +35,7 @@ type ScenarioManager struct {
 	scenarioCount        int                             // Current scenario number (set by GameManager)
 	npcRegistry          map[string]*character.Character // Named NPCs persisted across scenes, keyed by normalized name
 	npcAttitudes         map[string]string               // Last-known attitude per NPC (keyed by normalized name)
+	saveFunc             func() error                    // Optional callback to trigger a save via GameManager
 }
 
 // NewScenarioManager creates a new scenario manager
@@ -71,6 +72,47 @@ func (m *ScenarioManager) SetScenarioCount(count int) {
 func (m *ScenarioManager) SetInitialScene(s *scene.Scene, npcs []*character.Character) {
 	m.initialScene = s
 	m.initialNPCs = npcs
+}
+
+// SetSaveFunc sets a callback that triggers a game state save.
+// The callback is provided by GameManager to avoid upward coupling.
+func (m *ScenarioManager) SetSaveFunc(fn func() error) {
+	m.saveFunc = fn
+}
+
+// Snapshot returns the scenario-level and scene-level state for persistence.
+// It cascades to SceneManager.Snapshot() for the scene layer.
+func (m *ScenarioManager) Snapshot() (ScenarioState, SceneState) {
+	// Copy NPC registry to avoid aliasing
+	npcRegistry := make(map[string]*character.Character, len(m.npcRegistry))
+	for k, v := range m.npcRegistry {
+		npcRegistry[k] = v
+	}
+
+	// Copy NPC attitudes to avoid aliasing
+	npcAttitudes := make(map[string]string, len(m.npcAttitudes))
+	for k, v := range m.npcAttitudes {
+		npcAttitudes[k] = v
+	}
+
+	// Copy scene summaries to avoid aliasing
+	summaries := make([]prompt.SceneSummary, len(m.sceneSummaries))
+	copy(summaries, m.sceneSummaries)
+
+	scenarioState := ScenarioState{
+		Player:         m.player,
+		Scenario:       m.scenario,
+		ScenarioCount:  m.scenarioCount,
+		SceneCount:     m.sceneCount,
+		SceneSummaries: summaries,
+		NPCRegistry:    npcRegistry,
+		NPCAttitudes:   npcAttitudes,
+		LastPurpose:    m.lastGeneratedPurpose,
+		LastHook:       m.lastGeneratedHook,
+	}
+
+	sceneState := m.engine.GetSceneManager().Snapshot()
+	return scenarioState, sceneState
 }
 
 // Run executes the scenario loop, transitioning between scenes until quit, player taken out, or scenario resolved

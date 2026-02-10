@@ -11,18 +11,21 @@ import (
 
 // GameManager orchestrates the overall game flow, managing scenarios and game state
 type GameManager struct {
-	engine        *Engine
-	player        *character.Character
-	ui            UI
-	sessionLogger *session.Logger
-	scenario      *scene.Scenario // The scenario to run (can be provided or generated)
-	scenarioCount int             // Number of scenarios completed
+	engine          *Engine
+	player          *character.Character
+	ui              UI
+	sessionLogger   *session.Logger
+	scenario        *scene.Scenario  // The scenario to run (can be provided or generated)
+	scenarioCount   int              // Number of scenarios completed
+	saver           GameStateSaver   // Persistence interface (defaults to noopSaver)
+	scenarioManager *ScenarioManager // Current scenario manager (stored for Save access)
 }
 
 // NewGameManager creates a new game manager
 func NewGameManager(engine *Engine) *GameManager {
 	return &GameManager{
 		engine: engine,
+		saver:  noopSaver{},
 	}
 }
 
@@ -46,6 +49,29 @@ func (g *GameManager) SetScenario(scenario *scene.Scenario) {
 	g.scenario = scenario
 }
 
+// SetSaver sets the persistence implementation for saving and loading game state.
+// If not called, a no-op saver is used and persistence is silently skipped.
+func (g *GameManager) SetSaver(saver GameStateSaver) {
+	if saver == nil {
+		g.saver = noopSaver{}
+		return
+	}
+	g.saver = saver
+}
+
+// Save persists the current game state by cascading through the manager hierarchy:
+// GameManager → ScenarioManager.Snapshot() → SceneManager.Snapshot()
+func (g *GameManager) Save() error {
+	if g.scenarioManager == nil {
+		return nil
+	}
+	scenarioState, sceneState := g.scenarioManager.Snapshot()
+	return g.saver.Save(GameState{
+		Scenario: scenarioState,
+		Scene:    sceneState,
+	})
+}
+
 // Run starts the game loop
 func (g *GameManager) Run(ctx context.Context) error {
 	if g.engine == nil {
@@ -59,16 +85,17 @@ func (g *GameManager) Run(ctx context.Context) error {
 	}
 
 	// Create and configure the scenario manager
-	scenarioManager := NewScenarioManager(g.engine, g.player)
-	scenarioManager.SetUI(g.ui)
-	scenarioManager.SetScenario(g.scenario)
-	scenarioManager.SetScenarioCount(g.scenarioCount)
+	g.scenarioManager = NewScenarioManager(g.engine, g.player)
+	g.scenarioManager.SetUI(g.ui)
+	g.scenarioManager.SetScenario(g.scenario)
+	g.scenarioManager.SetScenarioCount(g.scenarioCount)
+	g.scenarioManager.SetSaveFunc(g.Save)
 	if g.sessionLogger != nil {
-		scenarioManager.SetSessionLogger(g.sessionLogger)
+		g.scenarioManager.SetSessionLogger(g.sessionLogger)
 	}
 
 	// Run the scenario
-	result, err := scenarioManager.Run(ctx)
+	result, err := g.scenarioManager.Run(ctx)
 	if err != nil {
 		return fmt.Errorf("scenario error: %w", err)
 	}
@@ -99,17 +126,18 @@ func (g *GameManager) RunWithInitialScene(ctx context.Context, initialScene *Ini
 	}
 
 	// Create and configure the scenario manager
-	scenarioManager := NewScenarioManager(g.engine, g.player)
-	scenarioManager.SetUI(g.ui)
-	scenarioManager.SetScenario(g.scenario)
-	scenarioManager.SetScenarioCount(g.scenarioCount)
-	scenarioManager.SetInitialScene(initialScene.Scene, initialScene.NPCs)
+	g.scenarioManager = NewScenarioManager(g.engine, g.player)
+	g.scenarioManager.SetUI(g.ui)
+	g.scenarioManager.SetScenario(g.scenario)
+	g.scenarioManager.SetScenarioCount(g.scenarioCount)
+	g.scenarioManager.SetInitialScene(initialScene.Scene, initialScene.NPCs)
+	g.scenarioManager.SetSaveFunc(g.Save)
 	if g.sessionLogger != nil {
-		scenarioManager.SetSessionLogger(g.sessionLogger)
+		g.scenarioManager.SetSessionLogger(g.sessionLogger)
 	}
 
 	// Run the scenario
-	result, err := scenarioManager.Run(ctx)
+	result, err := g.scenarioManager.Run(ctx)
 	if err != nil {
 		return fmt.Errorf("scenario error: %w", err)
 	}
