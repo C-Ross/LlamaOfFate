@@ -6,6 +6,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
+	"github.com/C-Ross/LlamaOfFate/internal/storage"
 	"github.com/C-Ross/LlamaOfFate/internal/ui/terminal"
 )
 
@@ -105,6 +107,7 @@ func main() {
 	gm.SetPlayer(player)
 	gm.SetUI(ui)
 	gm.SetScenario(scenario)
+	gm.SetSaver(newSaver())
 	if sessionLogger != nil {
 		gm.SetSessionLogger(sessionLogger)
 	}
@@ -118,6 +121,19 @@ func main() {
 	}
 
 	fmt.Println("\nThanks for playing!")
+}
+
+// newSaver creates a YAMLSaver that stores saves in ~/.llamaoffate/saves.
+func newSaver() *storage.YAMLSaver {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Printf("Warning: Could not determine home directory for saves: %v", err)
+		home = "."
+	}
+	saveDir := filepath.Join(home, ".llamaoffate", "saves")
+	saver := storage.NewYAMLSaver(saveDir)
+	slog.Info("Save file location", slog.String("path", saver.Path()))
+	return saver
 }
 
 // setupSessionLogger creates a session logger with an auto-generated filename

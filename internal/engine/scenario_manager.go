@@ -80,6 +80,26 @@ func (m *ScenarioManager) SetSaveFunc(fn func() error) {
 	m.saveFunc = fn
 }
 
+// triggerSave calls the save callback if configured, logging any errors.
+// Save failures are non-fatal — the game continues even if persistence fails.
+func (m *ScenarioManager) triggerSave(trigger string) {
+	if m.saveFunc == nil {
+		return
+	}
+	if err := m.saveFunc(); err != nil {
+		slog.Warn("Failed to save game state",
+			"component", componentScenarioManager,
+			"trigger", trigger,
+			"error", err,
+		)
+	} else {
+		slog.Info("Game state saved",
+			"component", componentScenarioManager,
+			"trigger", trigger,
+		)
+	}
+}
+
 // Snapshot returns the scenario-level and scene-level state for persistence.
 // It cascades to SceneManager.Snapshot() for the scene layer.
 func (m *ScenarioManager) Snapshot() (ScenarioState, SceneState) {
@@ -178,6 +198,9 @@ func (m *ScenarioManager) Run(ctx context.Context) (*ScenarioResult, error) {
 			}
 		}
 
+		// Save state at scene start (new scene, fresh conversation, purpose set)
+		m.triggerSave("scene_start")
+
 		// Run the scene loop
 		result, err := sceneManager.RunSceneLoop(ctx)
 		if err != nil {
@@ -202,7 +225,8 @@ func (m *ScenarioManager) Run(ctx context.Context) (*ScenarioResult, error) {
 		// Handle the scene result
 		switch result.Reason {
 		case SceneEndQuit:
-			// Player chose to quit
+			// Player chose to quit — save before exiting
+			m.triggerSave("player_quit")
 			return &ScenarioResult{Reason: ScenarioEndQuit, Scenario: m.scenario}, nil
 
 		case SceneEndPlayerTakenOut:
@@ -258,6 +282,7 @@ func (m *ScenarioManager) Run(ctx context.Context) (*ScenarioResult, error) {
 							"scenario":       m.scenario,
 						})
 					}
+					m.triggerSave("scenario_complete")
 					return &ScenarioResult{Reason: ScenarioEndResolved, Scenario: m.scenario}, nil
 				}
 			}
@@ -266,6 +291,9 @@ func (m *ScenarioManager) Run(ctx context.Context) (*ScenarioResult, error) {
 		// Increment scene count and handle between-scene recovery
 		m.sceneCount++
 		m.handleBetweenSceneRecovery(ctx)
+
+		// Save state at scene transition (summaries updated, NPC attitudes refreshed)
+		m.triggerSave("scene_transition")
 
 		// Generate the next scene
 		currentScene, err = m.generateNextScene(ctx, transitionHint)

@@ -74,12 +74,12 @@ func TestIntegration_SaveCascade_ThroughGameManagerRun(t *testing.T) {
 	// ScenarioManager should be stored on GameManager after Run
 	require.NotNil(t, gm.scenarioManager, "scenarioManager should be stored after Run")
 
-	// Now explicitly call Save (save triggers in the run loop are Phase 2)
+	// Now explicitly call Save — automatic triggers already saved during Run
 	err = gm.Save()
 	require.NoError(t, err)
-	require.Len(t, recorder.savedStates, 1, "expected exactly one save call")
+	require.NotEmpty(t, recorder.savedStates, "expected at least one save call")
 
-	saved := recorder.savedStates[0]
+	saved := recorder.savedStates[len(recorder.savedStates)-1]
 
 	// --- Verify scenario state ---
 	assert.Equal(t, "Jesse Calhoun", saved.Scenario.Player.Name)
@@ -146,10 +146,10 @@ func TestIntegration_SaveFunc_WiredThroughRun(t *testing.T) {
 	// Calling saveFunc should cascade through GameManager.Save to the recorder
 	err = gm.scenarioManager.saveFunc()
 	require.NoError(t, err)
-	require.Len(t, recorder.savedStates, 1)
+	require.NotEmpty(t, recorder.savedStates)
 
-	// Verify the save captured state from both layers
-	saved := recorder.savedStates[0]
+	// Verify the most recent save captured state from both layers
+	saved := recorder.savedStates[len(recorder.savedStates)-1]
 	assert.Equal(t, "Test Hero", saved.Scenario.Player.Name)
 	assert.Equal(t, "Test Arena", saved.Scene.CurrentScene.Name)
 }
@@ -193,11 +193,9 @@ func TestIntegration_SaveCascade_NPCRegistry(t *testing.T) {
 
 	err = gm.Save()
 	require.NoError(t, err)
-	require.Len(t, recorder.savedStates, 1)
+	require.NotEmpty(t, recorder.savedStates)
 
-	saved := recorder.savedStates[0]
-
-	// NPCs should be in the registry (keyed by normalized name)
+	saved := recorder.savedStates[len(recorder.savedStates)-1]
 	assert.Contains(t, saved.Scenario.NPCRegistry, "marshal dan")
 	assert.Contains(t, saved.Scenario.NPCRegistry, "old pete")
 	assert.Equal(t, "Stern Lawman", saved.Scenario.NPCRegistry["marshal dan"].Aspects.HighConcept)
@@ -233,20 +231,24 @@ func TestIntegration_SaveCascade_MultipleSaves(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// First save
+	// Automatic saves happen during Run (scene_start, player_quit).
+	// Record the baseline count so we can verify our manual saves.
+	baseline := len(recorder.savedStates)
+
+	// First manual save
 	err = gm.Save()
 	require.NoError(t, err)
-	require.Len(t, recorder.savedStates, 1)
-	assert.Equal(t, 3, recorder.savedStates[0].Scenario.Player.FatePoints)
+	require.Len(t, recorder.savedStates, baseline+1)
+	assert.Equal(t, 3, recorder.savedStates[baseline].Scenario.Player.FatePoints)
 
 	// Mutate player state
 	player.SpendFatePoint()
 
-	// Second save — should reflect the change
+	// Second manual save — should reflect the change
 	err = gm.Save()
 	require.NoError(t, err)
-	require.Len(t, recorder.savedStates, 2)
-	assert.Equal(t, 2, recorder.savedStates[1].Scenario.Player.FatePoints)
+	require.Len(t, recorder.savedStates, baseline+2)
+	assert.Equal(t, 2, recorder.savedStates[baseline+1].Scenario.Player.FatePoints)
 }
 
 // TestIntegration_SaveCascade_NoopSaverByDefault verifies that without calling
@@ -312,9 +314,11 @@ func TestIntegration_SaveCascade_ConversationHistory(t *testing.T) {
 
 	err = gm.Save()
 	require.NoError(t, err)
-	require.Len(t, recorder.savedStates, 1)
+	require.NotEmpty(t, recorder.savedStates, "expected at least one save call")
 
-	saved := recorder.savedStates[0]
+	// Check the most recent save (automatic triggers from the scene loop
+	// produce earlier saves; our manual Save() with injected history is last)
+	saved := recorder.savedStates[len(recorder.savedStates)-1]
 	require.Len(t, saved.Scene.ConversationHistory, 2)
 	assert.Equal(t, "I look around the saloon", saved.Scene.ConversationHistory[0].PlayerInput)
 	assert.Equal(t, "I approach the bar", saved.Scene.ConversationHistory[1].PlayerInput)
@@ -366,13 +370,53 @@ func TestIntegration_SaveCascade_SceneSummaries(t *testing.T) {
 
 	err = gm.Save()
 	require.NoError(t, err)
-	require.Len(t, recorder.savedStates, 1)
+	require.NotEmpty(t, recorder.savedStates, "expected at least one save call")
 
-	saved := recorder.savedStates[0]
+	// Check the most recent save (automatic triggers from the scene loop
+	// produce earlier saves; our manual Save() with injected summaries is last)
+	saved := recorder.savedStates[len(recorder.savedStates)-1]
 	require.Len(t, saved.Scenario.SceneSummaries, 2)
 	assert.Equal(t, "The dusty saloon", saved.Scenario.SceneSummaries[0].SceneDescription)
 	assert.Equal(t, "The back alley", saved.Scenario.SceneSummaries[1].SceneDescription)
 	assert.Contains(t, saved.Scenario.SceneSummaries[0].KeyEvents, "Met the bartender")
 	assert.Len(t, saved.Scenario.SceneSummaries[0].NPCsEncountered, 1)
 	assert.Equal(t, "Old Pete", saved.Scenario.SceneSummaries[0].NPCsEncountered[0].Name)
+}
+
+// TestIntegration_AutomaticSaveTriggers verifies that the scene loop
+// automatically triggers saves at scene_start and player_quit.
+func TestIntegration_AutomaticSaveTriggers(t *testing.T) {
+	mockLLM := &MockLLMClientForScenario{}
+	engine, err := NewWithLLM(mockLLM)
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Jesse")
+	player.Aspects.HighConcept = "Gunslinger"
+	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
+	mockUI := &MockUI{lastInput: "exit", lastExit: true}
+	recorder := &recordingSaver{}
+
+	gm := NewGameManager(engine)
+	gm.SetPlayer(player)
+	gm.SetUI(mockUI)
+	gm.SetSaver(recorder)
+	gm.SetScenario(&scene.Scenario{
+		Title: "Test", Problem: "Test", Genre: "Western", Setting: "Town",
+	})
+
+	// Run — player quits immediately, no manual Save() call
+	err = gm.RunWithInitialScene(context.Background(), &InitialSceneConfig{
+		Scene: testScene,
+		NPCs:  nil,
+	})
+	require.NoError(t, err)
+
+	// Automatic triggers: scene_start + player_quit = 2 saves
+	require.Len(t, recorder.savedStates, 2, "expected scene_start and player_quit saves")
+
+	// Both saves should capture valid state
+	for i, saved := range recorder.savedStates {
+		assert.Equal(t, "Jesse", saved.Scenario.Player.Name, "save %d: player name", i)
+		assert.Equal(t, "Saloon", saved.Scene.CurrentScene.Name, "save %d: scene name", i)
+	}
 }
