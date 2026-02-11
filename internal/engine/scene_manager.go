@@ -430,9 +430,12 @@ func (sm *SceneManager) handleAction(ctx context.Context, input string) {
 		// Remove the player from other characters (they're already the main character)
 		delete(otherCharactersMap, sm.player.ID)
 
-		// Convert map to slice for ActionParseRequest
+		// Convert map to slice for ActionParseRequest, excluding taken-out characters
 		var otherCharacters []*character.Character
 		for _, char := range otherCharactersMap {
+			if sm.currentScene.IsCharacterTakenOut(char.ID) {
+				continue
+			}
 			otherCharacters = append(otherCharacters, char)
 		}
 
@@ -562,8 +565,12 @@ func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedActio
 	otherCharactersMap := sm.engine.GetCharactersByScene(sm.currentScene)
 	delete(otherCharactersMap, sm.player.ID) // Remove the player
 
+	// Exclude taken-out characters from narrative context
 	var otherCharacters []*character.Character
 	for _, char := range otherCharactersMap {
+		if sm.currentScene.IsCharacterTakenOut(char.ID) {
+			continue
+		}
 		otherCharacters = append(otherCharacters, char)
 	}
 

@@ -4,14 +4,50 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
+	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// capturingMockLLMClient captures prompts sent to the LLM and returns a fixed response
+type capturingMockLLMClient struct {
+	response       string
+	capturedPrompts []string
+}
+
+func (c *capturingMockLLMClient) ChatCompletion(ctx context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
+	for _, msg := range req.Messages {
+		c.capturedPrompts = append(c.capturedPrompts, msg.Content)
+	}
+	return &llm.CompletionResponse{
+		ID:      "test",
+		Object:  "chat.completion",
+		Created: time.Now().Unix(),
+		Model:   "test",
+		Choices: []llm.CompletionResponseChoice{
+			{
+				Index:        0,
+				Message:      llm.Message{Role: "assistant", Content: c.response},
+				FinishReason: "stop",
+			},
+		},
+		Usage: llm.CompletionUsage{PromptTokens: 10, CompletionTokens: 10, TotalTokens: 20},
+	}, nil
+}
+
+func (c *capturingMockLLMClient) ChatCompletionStream(ctx context.Context, req llm.CompletionRequest, handler llm.StreamHandler) error {
+	return nil
+}
+
+func (c *capturingMockLLMClient) GetModelInfo() llm.ModelInfo {
+	return llm.ModelInfo{Name: "test", MaxTokens: 4096}
+}
 
 func TestSceneManager_ParseConflictMarker_Physical(t *testing.T) {
 	engine, err := New()
@@ -1219,4 +1255,56 @@ func TestSceneManager_ResolveAction_UnknownTarget_AbortsWithoutConsumingTurn(t *
 		assert.False(t, strings.HasPrefix(msg, "Narrative:"),
 			"Should not generate narrative when target is unknown, got: %v", mockUI.displayedMessages)
 	}
+}
+
+func TestSceneManager_HandleAction_ExcludesTakenOutFromTargets(t *testing.T) {
+	// Mock LLM returns a valid action parse response targeting the active NPC
+	actionResponse := `{
+		"action_type": "Attack",
+		"skill": "Fight",
+		"description": "Punch the orc",
+		"target": "active-npc",
+		"difficulty": 2,
+		"reasoning": "Physical attack",
+		"confidence": 9
+	}`
+	mockClient := &capturingMockLLMClient{response: actionResponse}
+
+	engine, err := NewWithLLM(mockClient)
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	player := character.NewCharacter("player-1", "Hero")
+	player.SetSkill("Fight", dice.Good)
+	activeNPC := character.NewCharacter("active-npc", "Angry Orc")
+	takenOutNPC := character.NewCharacter("taken-out-npc", "Defeated Goblin")
+
+	engine.AddCharacter(player)
+	engine.AddCharacter(activeNPC)
+	engine.AddCharacter(takenOutNPC)
+
+	testScene := scene.NewScene("test-scene", "Battle Room", "A room with enemies.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(activeNPC.ID)
+	testScene.AddCharacter(takenOutNPC.ID)
+
+	sm.currentScene = testScene
+	sm.player = player
+	sm.roller = dice.NewSeededRoller(12345)
+
+	// Mark the goblin as taken out
+	testScene.MarkCharacterTakenOut(takenOutNPC.ID)
+
+	// Call handleAction — this will invoke the action parser with the LLM
+	sm.handleAction(context.Background(), "I punch the orc")
+
+	// Verify the taken-out NPC name does NOT appear in any prompt sent to the LLM
+	allPrompts := strings.Join(mockClient.capturedPrompts, "\n")
+	assert.NotContains(t, allPrompts, "Defeated Goblin",
+		"Taken-out NPC should not appear in action parser prompt")
+	assert.Contains(t, allPrompts, "Angry Orc",
+		"Active NPC should appear in action parser prompt")
 }
