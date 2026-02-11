@@ -94,6 +94,10 @@ func (sm *SceneManager) StartScene(scene *scene.Scene, player *character.Charact
 	sm.currentScene = scene
 	sm.player = player
 
+	// Clear conversation history from previous scene — recap should only
+	// appear when restoring from a save (via Restore()), not on normal transitions.
+	sm.conversationHistory = nil
+
 	// Ensure the player is in the scene
 	sm.currentScene.AddCharacter(player.ID)
 
@@ -141,6 +145,16 @@ func (sm *SceneManager) RunSceneLoop(ctx context.Context) (*SceneEndResult, erro
 	// Display the initial scene
 	sm.ui.DisplaySystemMessage(fmt.Sprintf("=== %s ===", sm.currentScene.Name))
 	sm.ui.DisplayNarrative(sm.currentScene.Description)
+
+	// If resuming with existing conversation, replay it so the player has context
+	if len(sm.conversationHistory) > 0 {
+		sm.ui.DisplaySystemMessage("--- Recap of recent events ---")
+		for _, entry := range sm.conversationHistory {
+			sm.ui.DisplayDialog(entry.PlayerInput, entry.GMResponse)
+		}
+		sm.ui.DisplaySystemMessage("--- End of recap ---")
+	}
+
 	sm.ui.DisplaySystemMessage("Type 'help' for commands, 'exit' to end.")
 
 	for !sm.shouldExit {

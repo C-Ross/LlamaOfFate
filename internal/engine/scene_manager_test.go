@@ -10,6 +10,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -677,4 +678,88 @@ func (s *sequentialMockLLMClient) ChatCompletionStream(ctx context.Context, req 
 
 func (s *sequentialMockLLMClient) GetModelInfo() llm.ModelInfo {
 	return llm.ModelInfo{Name: "test", MaxTokens: 4096}
+}
+
+func TestSceneManager_RunSceneLoop_RecapsConversationOnResume(t *testing.T) {
+	gameEngine, err := New()
+	require.NoError(t, err)
+	gameEngine.llmClient = &MockLLMClient{}
+
+	sm := NewSceneManager(gameEngine)
+	mockUI := &MockUI{lastInput: "quit", lastExit: true} // Exit immediately
+	sm.SetUI(mockUI)
+
+	player := character.NewCharacter("player1", "Test Character")
+	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
+
+	// Restore state with existing conversation history
+	sm.Restore(SceneState{
+		CurrentScene: testScene,
+		ConversationHistory: []prompt.ConversationEntry{
+			{PlayerInput: "I look around the room", GMResponse: "You see a dusty old tavern"},
+			{PlayerInput: "I approach the bartender", GMResponse: "He eyes you warily"},
+		},
+		ScenePurpose: "Gather information",
+	}, player)
+
+	ctx := context.Background()
+	_, err = sm.RunSceneLoop(ctx)
+	require.NoError(t, err)
+
+	// Should contain the recap markers and both conversation entries
+	assert.Contains(t, mockUI.displayedMessages, "System: --- Recap of recent events ---")
+	assert.Contains(t, mockUI.displayedMessages, "Dialog: I look around the room -> You see a dusty old tavern")
+	assert.Contains(t, mockUI.displayedMessages, "Dialog: I approach the bartender -> He eyes you warily")
+	assert.Contains(t, mockUI.displayedMessages, "System: --- End of recap ---")
+}
+
+func TestSceneManager_RunSceneLoop_NoRecapWithoutConversation(t *testing.T) {
+	gameEngine, err := New()
+	require.NoError(t, err)
+	gameEngine.llmClient = &MockLLMClient{}
+
+	sm := NewSceneManager(gameEngine)
+	mockUI := &MockUI{lastInput: "quit", lastExit: true} // Exit immediately
+	sm.SetUI(mockUI)
+
+	player := character.NewCharacter("player1", "Test Character")
+	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
+
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	_, err = sm.RunSceneLoop(ctx)
+	require.NoError(t, err)
+
+	// Should NOT contain recap markers
+	for _, msg := range mockUI.displayedMessages {
+		assert.NotContains(t, msg, "Recap of recent events")
+		assert.NotContains(t, msg, "End of recap")
+	}
+}
+
+func TestSceneManager_StartScene_ClearsConversationHistory(t *testing.T) {
+	gameEngine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(gameEngine)
+	player := character.NewCharacter("player1", "Test Character")
+
+	// Restore with conversation history (simulating a previous scene)
+	firstScene := scene.NewScene("scene1", "First Scene", "First scene desc")
+	sm.Restore(SceneState{
+		CurrentScene: firstScene,
+		ConversationHistory: []prompt.ConversationEntry{
+			{PlayerInput: "hello", GMResponse: "hi there"},
+		},
+	}, player)
+	assert.Len(t, sm.GetConversationHistory(), 1)
+
+	// StartScene should clear the old conversation
+	secondScene := scene.NewScene("scene2", "Second Scene", "Second scene desc")
+	err = sm.StartScene(secondScene, player)
+	require.NoError(t, err)
+
+	assert.Empty(t, sm.GetConversationHistory())
 }
