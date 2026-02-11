@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -298,4 +299,383 @@ func TestNoopSaver_ImplementsInterface(t *testing.T) {
 
 func TestRecordingSaver_ImplementsInterface(t *testing.T) {
 	var _ GameStateSaver = &recordingSaver{}
+}
+
+// --- SceneManager.Restore tests ---
+
+func TestSceneManager_Restore_Empty(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	player := character.NewCharacter("player1", "Jesse")
+
+	sm.Restore(SceneState{}, player)
+
+	assert.Nil(t, sm.currentScene)
+	assert.Empty(t, sm.conversationHistory)
+	assert.Empty(t, sm.scenePurpose)
+	assert.Equal(t, player, sm.player)
+}
+
+func TestSceneManager_Restore_WithState(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	player := character.NewCharacter("player1", "Jesse")
+
+	testScene := scene.NewScene("scene1", "Saloon", "A dusty saloon")
+	history := []prompt.ConversationEntry{
+		{PlayerInput: "look around", GMResponse: "you see a bartender", Type: "dialog"},
+		{PlayerInput: "approach bar", GMResponse: "he nods", Type: "dialog"},
+	}
+
+	sm.Restore(SceneState{
+		CurrentScene:        testScene,
+		ConversationHistory: history,
+		ScenePurpose:        "Find the informant",
+	}, player)
+
+	assert.Equal(t, testScene, sm.currentScene)
+	assert.Equal(t, player, sm.player)
+	assert.Len(t, sm.conversationHistory, 2)
+	assert.Equal(t, "look around", sm.conversationHistory[0].PlayerInput)
+	assert.Equal(t, "Find the informant", sm.scenePurpose)
+}
+
+func TestSceneManager_Restore_AddsPlayerToScene(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	player := character.NewCharacter("player1", "Jesse")
+
+	testScene := scene.NewScene("scene1", "Saloon", "A dusty saloon")
+	// Scene starts with no characters
+	assert.Empty(t, testScene.Characters)
+
+	sm.Restore(SceneState{CurrentScene: testScene}, player)
+
+	assert.Contains(t, testScene.Characters, "player1")
+}
+
+func TestSceneManager_Restore_RoundTrip(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	// Create and populate a scene manager
+	sm := NewSceneManager(engine)
+	player := character.NewCharacter("player1", "Jesse")
+	testScene := scene.NewScene("scene1", "Saloon", "A dusty saloon")
+	require.NoError(t, sm.StartScene(testScene, player))
+	sm.SetScenePurpose("Find the informant")
+	sm.conversationHistory = []prompt.ConversationEntry{
+		{PlayerInput: "hello", GMResponse: "greetings", Type: "dialog"},
+	}
+
+	// Snapshot
+	snapshot := sm.Snapshot()
+
+	// Restore into a fresh scene manager
+	sm2 := NewSceneManager(engine)
+	sm2.Restore(snapshot, player)
+
+	assert.Equal(t, testScene, sm2.currentScene)
+	assert.Equal(t, "Find the informant", sm2.scenePurpose)
+	assert.Len(t, sm2.conversationHistory, 1)
+	assert.Equal(t, "hello", sm2.conversationHistory[0].PlayerInput)
+}
+
+// --- ScenarioManager.Restore tests ---
+
+func TestScenarioManager_Restore(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Jesse")
+	player.Aspects.HighConcept = "Gunslinger"
+	player.SetSkill("Shoot", dice.Great)
+	player.FatePoints = 5
+
+	sm := NewScenarioManager(engine, player)
+
+	bartender := character.NewCharacter("npc_bartender", "Old Pete")
+	bartender.Aspects.HighConcept = "Grizzled Barkeep"
+
+	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
+
+	scenarioState := ScenarioState{
+		Player: player,
+		Scenario: &scene.Scenario{
+			Title:   "The Showdown",
+			Problem: "Outlaws threaten the town",
+			Genre:   "Western",
+		},
+		ScenarioCount: 2,
+		SceneCount:    4,
+		SceneSummaries: []prompt.SceneSummary{
+			{SceneDescription: "The dusty saloon"},
+		},
+		NPCRegistry:  map[string]*character.Character{"old pete": bartender},
+		NPCAttitudes: map[string]string{"old pete": "friendly"},
+		LastPurpose:  "Confront the marshal",
+		LastHook:     "The doors swing open...",
+	}
+
+	sceneState := SceneState{
+		CurrentScene:        testScene,
+		ConversationHistory: []prompt.ConversationEntry{{PlayerInput: "hi", GMResponse: "hey", Type: "dialog"}},
+		ScenePurpose:        "Confront the marshal",
+	}
+
+	sm.Restore(scenarioState, sceneState)
+
+	// Verify scenario-level state
+	assert.Equal(t, player, sm.player)
+	assert.Equal(t, "The Showdown", sm.scenario.Title)
+	assert.Equal(t, 2, sm.scenarioCount)
+	assert.Equal(t, 4, sm.sceneCount)
+	assert.Len(t, sm.sceneSummaries, 1)
+	assert.Equal(t, "The dusty saloon", sm.sceneSummaries[0].SceneDescription)
+	assert.Contains(t, sm.npcRegistry, "old pete")
+	assert.Equal(t, "friendly", sm.npcAttitudes["old pete"])
+	assert.Equal(t, "Confront the marshal", sm.lastGeneratedPurpose)
+	assert.Equal(t, "The doors swing open...", sm.lastGeneratedHook)
+	assert.True(t, sm.resumed)
+}
+
+func TestScenarioManager_Restore_RegistersNPCsWithEngine(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Jesse")
+	sm := NewScenarioManager(engine, player)
+
+	bartender := character.NewCharacter("npc_bartender", "Old Pete")
+	marshal := character.NewCharacter("npc_marshal", "Marshal Dan")
+
+	// Engine should not have these NPCs yet
+	assert.Nil(t, engine.GetCharacter("npc_bartender"))
+	assert.Nil(t, engine.GetCharacter("npc_marshal"))
+
+	scenarioState := ScenarioState{
+		Player: player,
+		NPCRegistry: map[string]*character.Character{
+			"old pete":    bartender,
+			"marshal dan": marshal,
+		},
+	}
+
+	sm.Restore(scenarioState, SceneState{})
+
+	// NPCs should now be registered with the engine
+	assert.NotNil(t, engine.GetCharacter("npc_bartender"))
+	assert.NotNil(t, engine.GetCharacter("npc_marshal"))
+	assert.Equal(t, "Old Pete", engine.GetCharacter("npc_bartender").Name)
+}
+
+func TestScenarioManager_Restore_NilMaps(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Jesse")
+	sm := NewScenarioManager(engine, player)
+
+	// Restore with nil maps — should not panic
+	sm.Restore(ScenarioState{
+		Player:       player,
+		NPCRegistry:  nil,
+		NPCAttitudes: nil,
+	}, SceneState{})
+
+	assert.NotNil(t, sm.npcRegistry)
+	assert.NotNil(t, sm.npcAttitudes)
+}
+
+func TestScenarioManager_Restore_CascadesToSceneManager(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Jesse")
+	sm := NewScenarioManager(engine, player)
+
+	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
+	sceneState := SceneState{
+		CurrentScene:        testScene,
+		ConversationHistory: []prompt.ConversationEntry{{PlayerInput: "test", GMResponse: "ok", Type: "dialog"}},
+		ScenePurpose:        "Test purpose",
+	}
+
+	sm.Restore(ScenarioState{Player: player}, sceneState)
+
+	// Verify scene manager received the state
+	sceneManager := engine.GetSceneManager()
+	assert.Equal(t, testScene, sceneManager.GetCurrentScene())
+	assert.Equal(t, "Test purpose", sceneManager.scenePurpose)
+	assert.Len(t, sceneManager.conversationHistory, 1)
+}
+
+func TestScenarioManager_Restore_RoundTrip(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Jesse")
+	player.Aspects.HighConcept = "Gunslinger"
+
+	sm := NewScenarioManager(engine, player)
+	sm.SetScenario(&scene.Scenario{Title: "Train Heist", Genre: "Western"})
+	sm.SetScenarioCount(1)
+	sm.sceneCount = 2
+	sm.npcRegistry["bandit"] = character.NewCharacter("npc1", "Bandit")
+	sm.npcAttitudes["bandit"] = "hostile"
+	sm.lastGeneratedPurpose = "Board the train"
+	sm.lastGeneratedHook = "All aboard!"
+
+	// Set up a scene
+	testScene := scene.NewScene("scene1", "Station", "A busy station")
+	sceneManager := engine.GetSceneManager()
+	require.NoError(t, sceneManager.StartScene(testScene, player))
+	sceneManager.SetScenePurpose("Board the train")
+
+	// Snapshot
+	scenarioState, sceneState := sm.Snapshot()
+
+	// Create a new engine and scenario manager, then restore
+	engine2, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	sm2 := NewScenarioManager(engine2, player)
+	sm2.Restore(scenarioState, sceneState)
+
+	// Verify round-trip
+	assert.Equal(t, "Train Heist", sm2.scenario.Title)
+	assert.Equal(t, 1, sm2.scenarioCount)
+	assert.Equal(t, 2, sm2.sceneCount)
+	assert.Contains(t, sm2.npcRegistry, "bandit")
+	assert.Equal(t, "hostile", sm2.npcAttitudes["bandit"])
+	assert.Equal(t, "Board the train", sm2.lastGeneratedPurpose)
+	assert.Equal(t, "All aboard!", sm2.lastGeneratedHook)
+	assert.True(t, sm2.resumed)
+
+	// Scene should be restored on the new engine's scene manager
+	assert.Equal(t, "Station", engine2.GetSceneManager().GetCurrentScene().Name)
+}
+
+// --- GameManager.Run load-on-startup tests ---
+
+func TestGameManager_Run_LoadsOnStartup(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Jesse")
+	player.Aspects.HighConcept = "Gunslinger"
+
+	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
+
+	// Pre-populate a SaveState that the saver will return
+	savedState := &GameState{
+		Scenario: ScenarioState{
+			Player: player,
+			Scenario: &scene.Scenario{
+				Title:   "Saved Scenario",
+				Problem: "Test",
+				Genre:   "Western",
+			},
+			ScenarioCount: 1,
+			SceneCount:    3,
+		},
+		Scene: SceneState{
+			CurrentScene: testScene,
+			ScenePurpose: "Find the clue",
+		},
+	}
+
+	mockUI := &MockUI{lastInput: "exit", lastExit: true}
+	recorder := &recordingSaver{loadResult: savedState}
+
+	gm := NewGameManager(engine)
+	gm.SetPlayer(character.NewCharacter("different", "Different Player"))
+	gm.SetUI(mockUI)
+	gm.SetSaver(recorder)
+	gm.SetScenario(&scene.Scenario{Title: "Different Scenario"})
+
+	err = gm.Run(context.Background())
+	require.NoError(t, err)
+
+	// Should have used the saved player, not the one from SetPlayer
+	assert.Equal(t, player, gm.player)
+
+	// Save should have been triggered during Run (player_quit)
+	require.NotEmpty(t, recorder.savedStates)
+	lastSave := recorder.savedStates[len(recorder.savedStates)-1]
+	assert.Equal(t, "Jesse", lastSave.Scenario.Player.Name)
+	assert.Equal(t, "Saved Scenario", lastSave.Scenario.Scenario.Title)
+}
+
+func TestGameManager_Run_CompletedScenario_StartsFresh(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Jesse")
+
+	// Save has a completed scenario
+	savedState := &GameState{
+		Scenario: ScenarioState{
+			Player: player,
+			Scenario: &scene.Scenario{
+				Title:      "Completed Scenario",
+				IsResolved: true,
+			},
+		},
+		Scene: SceneState{
+			CurrentScene: scene.NewScene("s1", "Scene", "Desc"),
+		},
+	}
+
+	mockUI := &MockUI{lastInput: "exit", lastExit: true}
+	recorder := &recordingSaver{loadResult: savedState}
+
+	gm := NewGameManager(engine)
+	gm.SetPlayer(player)
+	gm.SetUI(mockUI)
+	gm.SetSaver(recorder)
+
+	// RunWithInitialScene to ensure a fresh start (Run would need an LLM for scene gen)
+	testScene := scene.NewScene("fresh_scene", "Fresh Start", "A new beginning")
+	err = gm.RunWithInitialScene(context.Background(), &InitialSceneConfig{
+		Scene: testScene,
+	})
+	require.NoError(t, err)
+
+	// Should NOT have used the completed save — fresh start should use the initial scene
+	require.NotEmpty(t, recorder.savedStates)
+	lastSave := recorder.savedStates[len(recorder.savedStates)-1]
+	assert.Equal(t, "Fresh Start", lastSave.Scene.CurrentScene.Name)
+}
+
+func TestGameManager_Run_NoSave_FreshStart(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Jesse")
+	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
+	mockUI := &MockUI{lastInput: "exit", lastExit: true}
+	recorder := &recordingSaver{loadResult: nil} // No saved state
+
+	gm := NewGameManager(engine)
+	gm.SetPlayer(player)
+	gm.SetUI(mockUI)
+	gm.SetSaver(recorder)
+
+	// Use RunWithInitialScene since we don't have an LLM for scene generation
+	err = gm.RunWithInitialScene(context.Background(), &InitialSceneConfig{
+		Scene: testScene,
+	})
+	require.NoError(t, err)
+
+	// Should have started fresh
+	require.NotEmpty(t, recorder.savedStates)
+	lastSave := recorder.savedStates[len(recorder.savedStates)-1]
+	assert.Equal(t, "Saloon", lastSave.Scene.CurrentScene.Name)
 }

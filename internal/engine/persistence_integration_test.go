@@ -420,3 +420,241 @@ func TestIntegration_AutomaticSaveTriggers(t *testing.T) {
 		assert.Equal(t, "Saloon", saved.Scene.CurrentScene.Name, "save %d: scene name", i)
 	}
 }
+
+// TestIntegration_SaveThenResume verifies the full save → load → resume flow:
+// play a session (gets saved automatically), then create a new GameManager that
+// loads the save and resumes mid-scene.
+func TestIntegration_SaveThenResume(t *testing.T) {
+	// --- Session 1: Play and quit ---
+	engine1, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Jesse Calhoun")
+	player.Aspects.HighConcept = "Gunslinger With a Past"
+	player.Aspects.Trouble = "Wanted Dead or Alive"
+	player.FatePoints = 5
+	player.SetSkill("Shoot", dice.Great)
+
+	testScene := scene.NewScene("saloon_1", "The Dusty Saloon", "A dimly lit saloon.")
+	testScene.AddSituationAspect(scene.SituationAspect{ID: "a1", Aspect: "Smoky Atmosphere", Duration: "scene"})
+
+	bartender := character.NewCharacter("npc_bartender", "Old Pete")
+	bartender.Aspects.HighConcept = "Grizzled Barkeep"
+	bartender.CharacterType = character.CharacterTypeSupportingNPC
+
+	mockUI1 := &MockUI{lastInput: "exit", lastExit: true}
+	recorder1 := &recordingSaver{}
+
+	scenario := &scene.Scenario{
+		Title:   "The Showdown",
+		Problem: "Outlaws threaten the town",
+		Genre:   "Western",
+		Setting: "Frontier town",
+	}
+
+	gm1 := NewGameManager(engine1)
+	gm1.SetPlayer(player)
+	gm1.SetUI(mockUI1)
+	gm1.SetSaver(recorder1)
+	gm1.SetScenario(scenario)
+
+	err = gm1.RunWithInitialScene(context.Background(), &InitialSceneConfig{
+		Scene: testScene,
+		NPCs:  []*character.Character{bartender},
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, recorder1.savedStates)
+
+	// Get the last saved state (from player_quit trigger)
+	lastSave := recorder1.savedStates[len(recorder1.savedStates)-1]
+
+	// --- Session 2: Resume from save ---
+	engine2, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	mockUI2 := &MockUI{lastInput: "exit", lastExit: true}
+	recorder2 := &recordingSaver{loadResult: &lastSave}
+
+	gm2 := NewGameManager(engine2)
+	gm2.SetPlayer(character.NewCharacter("dummy", "Should Be Overridden"))
+	gm2.SetUI(mockUI2)
+	gm2.SetSaver(recorder2)
+	gm2.SetScenario(&scene.Scenario{Title: "Should Be Overridden"})
+
+	// Run will load the save and resume
+	err = gm2.Run(context.Background())
+	require.NoError(t, err)
+
+	// Player should be the saved one, not the dummy
+	assert.Equal(t, "Jesse Calhoun", gm2.player.Name)
+	assert.Equal(t, "Gunslinger With a Past", gm2.player.Aspects.HighConcept)
+	assert.Equal(t, 5, gm2.player.FatePoints)
+	assert.Equal(t, dice.Great, gm2.player.GetSkill("Shoot"))
+
+	// Saves from session 2 should reference the restored state
+	require.NotEmpty(t, recorder2.savedStates)
+	session2Save := recorder2.savedStates[len(recorder2.savedStates)-1]
+	assert.Equal(t, "Jesse Calhoun", session2Save.Scenario.Player.Name)
+	assert.Equal(t, "The Showdown", session2Save.Scenario.Scenario.Title)
+	assert.Equal(t, "The Dusty Saloon", session2Save.Scene.CurrentScene.Name)
+}
+
+// TestIntegration_Resume_PreservesNPCRegistry verifies that NPCs from the NPC
+// registry are available after resume and appear in subsequent saves.
+func TestIntegration_Resume_PreservesNPCRegistry(t *testing.T) {
+	// Session 1: Play with NPCs
+	engine1, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Jesse")
+	player.Aspects.HighConcept = "Gunslinger"
+
+	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
+
+	marshal := character.NewCharacter("npc_marshal", "Marshal Dan")
+	marshal.Aspects.HighConcept = "Stern Lawman"
+	marshal.CharacterType = character.CharacterTypeMainNPC
+
+	mockUI := &MockUI{lastInput: "exit", lastExit: true}
+	recorder := &recordingSaver{}
+
+	gm1 := NewGameManager(engine1)
+	gm1.SetPlayer(player)
+	gm1.SetUI(mockUI)
+	gm1.SetSaver(recorder)
+	gm1.SetScenario(&scene.Scenario{Title: "Test", Problem: "Test", Genre: "Western"})
+
+	err = gm1.RunWithInitialScene(context.Background(), &InitialSceneConfig{
+		Scene: testScene,
+		NPCs:  []*character.Character{marshal},
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, recorder.savedStates)
+
+	lastSave := recorder.savedStates[len(recorder.savedStates)-1]
+
+	// Verify NPC in the save
+	require.Contains(t, lastSave.Scenario.NPCRegistry, "marshal dan")
+
+	// Session 2: Resume
+	engine2, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	mockUI2 := &MockUI{lastInput: "exit", lastExit: true}
+	recorder2 := &recordingSaver{loadResult: &lastSave}
+
+	gm2 := NewGameManager(engine2)
+	gm2.SetPlayer(player)
+	gm2.SetUI(mockUI2)
+	gm2.SetSaver(recorder2)
+
+	err = gm2.Run(context.Background())
+	require.NoError(t, err)
+
+	// NPC should be in the engine's registry after resume
+	assert.NotNil(t, engine2.GetCharacter("npc_marshal"))
+	assert.Equal(t, "Marshal Dan", engine2.GetCharacter("npc_marshal").Name)
+
+	// And in subsequent saves
+	require.NotEmpty(t, recorder2.savedStates)
+	resumeSave := recorder2.savedStates[len(recorder2.savedStates)-1]
+	assert.Contains(t, resumeSave.Scenario.NPCRegistry, "marshal dan")
+}
+
+// TestIntegration_Resume_SkipsSceneStartSave verifies that resuming does NOT
+// trigger a redundant "scene_start" save — only "player_quit" fires on exit.
+func TestIntegration_Resume_SkipsSceneStartSave(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Jesse")
+	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
+
+	savedState := &GameState{
+		Scenario: ScenarioState{
+			Player:   player,
+			Scenario: &scene.Scenario{Title: "Test", Problem: "Test", Genre: "Western"},
+		},
+		Scene: SceneState{
+			CurrentScene: testScene,
+		},
+	}
+
+	mockUI := &MockUI{lastInput: "exit", lastExit: true}
+	recorder := &recordingSaver{loadResult: savedState}
+
+	gm := NewGameManager(engine)
+	gm.SetPlayer(player)
+	gm.SetUI(mockUI)
+	gm.SetSaver(recorder)
+
+	err = gm.Run(context.Background())
+	require.NoError(t, err)
+
+	// On resume, only player_quit should trigger (no scene_start)
+	require.Len(t, recorder.savedStates, 1, "expected only player_quit save on resume")
+}
+
+// TestIntegration_Resume_MidConflict verifies that resuming into a scene with
+// an active conflict preserves the conflict state.
+func TestIntegration_Resume_MidConflict(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Jesse")
+	player.Aspects.HighConcept = "Gunslinger"
+
+	// Create a scene with an active conflict
+	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
+	testScene.IsConflict = true
+	testScene.ConflictState = &scene.ConflictState{
+		Type:  scene.PhysicalConflict,
+		Round: 2,
+		Participants: []scene.ConflictParticipant{
+			{CharacterID: "player1", Initiative: 3},
+			{CharacterID: "npc_bandit", Initiative: 1},
+		},
+		InitiativeOrder: []string{"player1", "npc_bandit"},
+		CurrentTurn:     0,
+	}
+
+	savedState := &GameState{
+		Scenario: ScenarioState{
+			Player:   player,
+			Scenario: &scene.Scenario{Title: "Test", Problem: "Test", Genre: "Western"},
+			NPCRegistry: map[string]*character.Character{
+				"bandit": {ID: "npc_bandit", Name: "Bandit"},
+			},
+		},
+		Scene: SceneState{
+			CurrentScene: testScene,
+			ConversationHistory: []prompt.ConversationEntry{
+				{PlayerInput: "I draw my gun!", GMResponse: "The bandit snarls!", Type: "action"},
+			},
+			ScenePurpose: "Survive the ambush",
+		},
+	}
+
+	mockUI := &MockUI{lastInput: "exit", lastExit: true}
+	recorder := &recordingSaver{loadResult: savedState}
+
+	gm := NewGameManager(engine)
+	gm.SetPlayer(player)
+	gm.SetUI(mockUI)
+	gm.SetSaver(recorder)
+
+	err = gm.Run(context.Background())
+	require.NoError(t, err)
+
+	// The save from player_quit should preserve conflict state
+	require.NotEmpty(t, recorder.savedStates)
+	lastSave := recorder.savedStates[len(recorder.savedStates)-1]
+
+	assert.True(t, lastSave.Scene.CurrentScene.IsConflict, "conflict should still be active")
+	require.NotNil(t, lastSave.Scene.CurrentScene.ConflictState)
+	assert.Equal(t, scene.PhysicalConflict, lastSave.Scene.CurrentScene.ConflictState.Type)
+	assert.Equal(t, 2, lastSave.Scene.CurrentScene.ConflictState.Round)
+	assert.Len(t, lastSave.Scene.CurrentScene.ConflictState.Participants, 2)
+	assert.Equal(t, "Survive the ambush", lastSave.Scene.ScenePurpose)
+	assert.Len(t, lastSave.Scene.ConversationHistory, 1)
+}

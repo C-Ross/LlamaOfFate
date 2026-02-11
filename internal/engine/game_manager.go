@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
@@ -84,7 +85,24 @@ func (g *GameManager) Run(ctx context.Context) error {
 		return fmt.Errorf("UI is required")
 	}
 
-	// Create and configure the scenario manager
+	// Check for a saved game to resume
+	savedState, err := g.saver.Load()
+	if err != nil {
+		slog.Warn("Failed to load saved game, starting fresh",
+			"error", err,
+		)
+		savedState = nil
+	}
+
+	// Resume from save if a valid, unfinished game exists
+	if savedState != nil && savedState.Scene.CurrentScene != nil {
+		if savedState.Scenario.Scenario == nil || !savedState.Scenario.Scenario.IsResolved {
+			return g.resumeFromSave(ctx, savedState)
+		}
+		slog.Info("Previous scenario was completed, starting fresh")
+	}
+
+	// Fresh start
 	g.scenarioManager = NewScenarioManager(g.engine, g.player)
 	g.scenarioManager.SetUI(g.ui)
 	g.scenarioManager.SetScenario(g.scenario)
@@ -101,6 +119,52 @@ func (g *GameManager) Run(ctx context.Context) error {
 	}
 
 	// Handle milestone if scenario was resolved
+	if result != nil && result.Reason == ScenarioEndResolved {
+		g.scenarioCount++
+		g.handleMilestone()
+	}
+
+	return nil
+}
+
+// resumeFromSave restores game state from a saved snapshot and resumes
+// the scene loop where the player left off.
+func (g *GameManager) resumeFromSave(ctx context.Context, state *GameState) error {
+	// Use the saved player (has updated stress, consequences, fate points, etc.)
+	g.player = state.Scenario.Player
+
+	// Create and configure ScenarioManager
+	g.scenarioManager = NewScenarioManager(g.engine, g.player)
+	g.scenarioManager.SetUI(g.ui)
+	g.scenarioManager.SetSaveFunc(g.Save)
+	if g.sessionLogger != nil {
+		g.scenarioManager.SetSessionLogger(g.sessionLogger)
+	}
+
+	// Restore full state — this also restores the SceneManager and marks resumed
+	g.scenarioManager.Restore(state.Scenario, state.Scene)
+
+	slog.Info("Resuming saved game",
+		"scene", state.Scene.CurrentScene.Name,
+		"scenario", state.Scenario.Scenario.Title,
+	)
+	g.ui.DisplaySystemMessage("=== Resuming saved game ===")
+	g.ui.DisplaySystemMessage(fmt.Sprintf("Scenario: %s", state.Scenario.Scenario.Title))
+
+	if g.sessionLogger != nil {
+		g.sessionLogger.Log("game_resumed", map[string]any{
+			"scene_name":     state.Scene.CurrentScene.Name,
+			"scenario_title": state.Scenario.Scenario.Title,
+			"scene_count":    state.Scenario.SceneCount,
+		})
+	}
+
+	// Run the scenario — ScenarioManager.Run() will skip initial scene generation
+	result, err := g.scenarioManager.Run(ctx)
+	if err != nil {
+		return fmt.Errorf("scenario error: %w", err)
+	}
+
 	if result != nil && result.Reason == ScenarioEndResolved {
 		g.scenarioCount++
 		g.handleMilestone()

@@ -613,6 +613,24 @@ func (sm *SceneManager) Snapshot() SceneState {
 	}
 }
 
+// Restore sets the scene manager's state from a previously saved SceneState,
+// enabling mid-scene (and mid-conflict) resume. The player must be provided
+// separately since it lives in ScenarioState, not SceneState.
+func (sm *SceneManager) Restore(state SceneState, player *character.Character) {
+	sm.currentScene = state.CurrentScene
+	sm.player = player
+	sm.conversationHistory = state.ConversationHistory
+	sm.scenePurpose = state.ScenePurpose
+
+	// Ensure player is in the scene (defensive — should already be from saved state)
+	if sm.currentScene != nil {
+		sm.currentScene.AddCharacter(player.ID)
+		if sm.currentScene.ActiveCharacter == "" {
+			sm.currentScene.ActiveCharacter = player.ID
+		}
+	}
+}
+
 // addToConversationHistory adds an exchange to the conversation history
 func (sm *SceneManager) addToConversationHistory(playerInput, gmResponse, interactionType string) {
 	entry := prompt.ConversationEntry{

@@ -36,6 +36,7 @@ type ScenarioManager struct {
 	npcRegistry          map[string]*character.Character // Named NPCs persisted across scenes, keyed by normalized name
 	npcAttitudes         map[string]string               // Last-known attitude per NPC (keyed by normalized name)
 	saveFunc             func() error                    // Optional callback to trigger a save via GameManager
+	resumed              bool                            // True when restoring from a saved game
 }
 
 // NewScenarioManager creates a new scenario manager
@@ -135,6 +136,42 @@ func (m *ScenarioManager) Snapshot() (ScenarioState, SceneState) {
 	return scenarioState, sceneState
 }
 
+// Restore sets the scenario manager's state from a previously saved game state,
+// enabling session resume. It restores all scenario-level fields, delegates
+// scene restoration to the engine's SceneManager, and registers NPCs with the
+// engine. After calling Restore, the next call to Run will resume mid-scene
+// instead of generating a fresh initial scene.
+func (m *ScenarioManager) Restore(scenarioState ScenarioState, sceneState SceneState) {
+	m.player = scenarioState.Player
+	m.scenario = scenarioState.Scenario
+	m.scenarioCount = scenarioState.ScenarioCount
+	m.sceneCount = scenarioState.SceneCount
+	m.sceneSummaries = scenarioState.SceneSummaries
+	m.npcRegistry = scenarioState.NPCRegistry
+	m.npcAttitudes = scenarioState.NPCAttitudes
+	m.lastGeneratedPurpose = scenarioState.LastPurpose
+	m.lastGeneratedHook = scenarioState.LastHook
+
+	// Initialize maps if nil (defensive against empty saves)
+	if m.npcRegistry == nil {
+		m.npcRegistry = make(map[string]*character.Character)
+	}
+	if m.npcAttitudes == nil {
+		m.npcAttitudes = make(map[string]string)
+	}
+
+	// Register NPCs with the engine so scene character lookups work
+	for _, npc := range m.npcRegistry {
+		m.engine.AddCharacter(npc)
+	}
+
+	// Restore scene-level state via the engine's SceneManager
+	m.engine.GetSceneManager().Restore(sceneState, m.player)
+
+	// Mark as resumed so Run() skips initial scene generation
+	m.resumed = true
+}
+
 // Run executes the scenario loop, transitioning between scenes until quit, player taken out, or scenario resolved
 func (m *ScenarioManager) Run(ctx context.Context) (*ScenarioResult, error) {
 	if m.engine == nil {
@@ -153,10 +190,20 @@ func (m *ScenarioManager) Run(ctx context.Context) (*ScenarioResult, error) {
 	// Register player with engine
 	m.engine.AddCharacter(m.player)
 
-	// Get or create initial scene
-	currentScene, err := m.getInitialScene(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get initial scene: %w", err)
+	// Get the initial scene — either restored from save, pre-configured, or generated
+	var currentScene *scene.Scene
+	resuming := m.resumed
+	m.resumed = false
+
+	if resuming {
+		// Scene already restored via Restore() — retrieve it from the scene manager
+		currentScene = m.engine.GetSceneManager().GetCurrentScene()
+	} else {
+		var err error
+		currentScene, err = m.getInitialScene(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get initial scene: %w", err)
+		}
 	}
 
 	// Main scenario loop
@@ -170,36 +217,42 @@ func (m *ScenarioManager) Run(ctx context.Context) (*ScenarioResult, error) {
 		}
 		sceneManager.SetExitOnSceneTransition(true)
 
-		// Pass scene purpose so the response LLM is aware of it
-		if m.lastGeneratedPurpose != "" {
-			sceneManager.SetScenePurpose(m.lastGeneratedPurpose)
-		}
-
-		// Start the scene
-		if err := sceneManager.StartScene(currentScene, m.player); err != nil {
-			return nil, fmt.Errorf("failed to start scene: %w", err)
-		}
-
-		// Display scene purpose and opening hook to the player
-		if m.lastGeneratedPurpose != "" {
-			m.ui.DisplaySystemMessage("Scene Purpose: " + m.lastGeneratedPurpose)
-			if m.sessionLogger != nil {
-				m.sessionLogger.Log("scene_purpose", map[string]any{
-					"purpose": m.lastGeneratedPurpose,
-				})
+		if resuming {
+			// Scene already restored — skip StartScene, purpose display, and initial save.
+			// RunSceneLoop will re-display the scene name and description.
+			resuming = false
+		} else {
+			// Normal path: set purpose, start scene, display hook, save
+			if m.lastGeneratedPurpose != "" {
+				sceneManager.SetScenePurpose(m.lastGeneratedPurpose)
 			}
-		}
-		if m.lastGeneratedHook != "" {
-			m.ui.DisplayNarrative(m.lastGeneratedHook)
-			if m.sessionLogger != nil {
-				m.sessionLogger.Log("opening_hook", map[string]any{
-					"hook": m.lastGeneratedHook,
-				})
-			}
-		}
 
-		// Save state at scene start (new scene, fresh conversation, purpose set)
-		m.triggerSave("scene_start")
+			// Start the scene
+			if err := sceneManager.StartScene(currentScene, m.player); err != nil {
+				return nil, fmt.Errorf("failed to start scene: %w", err)
+			}
+
+			// Display scene purpose and opening hook to the player
+			if m.lastGeneratedPurpose != "" {
+				m.ui.DisplaySystemMessage("Scene Purpose: " + m.lastGeneratedPurpose)
+				if m.sessionLogger != nil {
+					m.sessionLogger.Log("scene_purpose", map[string]any{
+						"purpose": m.lastGeneratedPurpose,
+					})
+				}
+			}
+			if m.lastGeneratedHook != "" {
+				m.ui.DisplayNarrative(m.lastGeneratedHook)
+				if m.sessionLogger != nil {
+					m.sessionLogger.Log("opening_hook", map[string]any{
+						"hook": m.lastGeneratedHook,
+					})
+				}
+			}
+
+			// Save state at scene start (new scene, fresh conversation, purpose set)
+			m.triggerSave("scene_start")
+		}
 
 		// Run the scene loop
 		result, err := sceneManager.RunSceneLoop(ctx)
