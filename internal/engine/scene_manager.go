@@ -41,7 +41,7 @@ type SceneManager struct {
 	shouldExit            bool                    // Set to true when the game should end
 	exitOnSceneTransition bool                    // Set to true to exit the loop on scene transition
 	lastTransition        *prompt.SceneTransition // Captured transition hint when scene ends
-	aspectGenerator       *AspectGenerator
+	aspectGenerator       AspectGeneratorI
 	sessionLogger         *session.Logger
 	takenOutChars         []string       // Characters taken out during this scene
 	sceneEndReason        SceneEndReason // Why the scene ended

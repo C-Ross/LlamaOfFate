@@ -21,6 +21,15 @@ type AspectGenerationResponse struct {
 	Reasoning   string `json:"reasoning"`    // Explanation of why this aspect was chosen
 }
 
+// AspectGeneratorI is the interface for generating aspects from Create an Advantage actions.
+// This enables dependency injection and testability by allowing mock implementations.
+type AspectGeneratorI interface {
+	GenerateAspect(ctx context.Context, req prompt.AspectGenerationRequest) (*AspectGenerationResponse, error)
+}
+
+// Compile-time check that AspectGenerator satisfies AspectGeneratorI.
+var _ AspectGeneratorI = (*AspectGenerator)(nil)
+
 // AspectGenerator handles generating aspects based on Create an Advantage attempts
 type AspectGenerator struct {
 	llmClient llm.LLMClient

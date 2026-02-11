@@ -35,6 +35,15 @@ type ActionParseResponse struct {
 	Confidence  int    `json:"confidence"`  // 1-10 scale of how confident the LLM is
 }
 
+// ActionParserI is the interface for parsing user input into structured actions.
+// This enables dependency injection and testability by allowing mock implementations.
+type ActionParserI interface {
+	ParseAction(ctx context.Context, req ActionParseRequest) (*action.Action, error)
+}
+
+// Compile-time check that ActionParser satisfies ActionParserI.
+var _ ActionParserI = (*ActionParser)(nil)
+
 // ActionParser handles parsing user input into structured actions using LLM
 type ActionParser struct {
 	llmClient llm.LLMClient
