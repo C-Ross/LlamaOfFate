@@ -1,0 +1,8 @@
+{
+  "servers": {
+    "shellwright": {
+      "command": "npx",
+      "args": ["-y", "@dwmkerr/shellwright@latest"]
+    }
+  }
+}

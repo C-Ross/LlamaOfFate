@@ -1,6 +1,6 @@
 {
     "name": "LlamaOfFate",
-    "image": "mcr.microsoft.com/devcontainers/go:1-1.24-bookworm",
+    "image": "mcr.microsoft.com/devcontainers/go:2-1.24-bookworm",
     "features": {
         "ghcr.io/guiyomh/features/golangci-lint:0": {
             "version": "latest"
@@ -8,7 +8,10 @@
         "ghcr.io/devcontainers/features/git-lfs:1": {},
         "ghcr.io/devcontainers/features/github-cli:1": {},
         "ghcr.io/devcontainers/features/copilot-cli:1": {},
-        "ghcr.io/jsburckhardt/devcontainer-features/just:1": {}
+        "ghcr.io/jsburckhardt/devcontainer-features/just:1": {},
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "lts"
+        }
     },
     "customizations": {
         "vscode": {
