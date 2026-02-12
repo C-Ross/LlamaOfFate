@@ -17,7 +17,7 @@ import (
 
 // capturingMockLLMClient captures prompts sent to the LLM and returns a fixed response
 type capturingMockLLMClient struct {
-	response       string
+	response        string
 	capturedPrompts []string
 }
 
@@ -516,7 +516,7 @@ func TestSceneManager_ApplyDamageToTarget_StressAbsorbed(t *testing.T) {
 	target := character.NewCharacter("target-1", "Goblin")
 	// Default stress track should be able to absorb small hits
 
-	sm.applyDamageToTarget(target, 1, character.PhysicalStress)
+	sm.applyDamageToTarget(context.Background(), target, 1, character.PhysicalStress)
 
 	// Check that stress was absorbed message was displayed
 	found := false
@@ -632,7 +632,7 @@ func TestSceneManager_HandleTargetTakenOut(t *testing.T) {
 	require.NoError(t, err)
 
 	// Take out the target
-	sm.handleTargetTakenOut(target)
+	sm.handleTargetTakenOut(context.Background(), target)
 
 	// Check that target is marked as taken out (conflict still active because of otherEnemy)
 	participant := sm.currentScene.GetParticipant(target.ID)
@@ -668,7 +668,7 @@ func TestSceneManager_HandleTargetTakenOut_ConflictEnds(t *testing.T) {
 	require.NoError(t, err)
 
 	// Take out the only target
-	sm.handleTargetTakenOut(target)
+	sm.handleTargetTakenOut(context.Background(), target)
 
 	// Conflict should end since no active opponents remain
 	assert.False(t, sm.currentScene.IsConflict)
@@ -709,7 +709,7 @@ func TestSceneManager_HandleTargetTakenOut_MarksSceneLevelTakenOut(t *testing.T)
 	require.NoError(t, err)
 
 	// Take out the target
-	sm.handleTargetTakenOut(target)
+	sm.handleTargetTakenOut(context.Background(), target)
 
 	// Conflict ends, but character should still be marked as taken out at scene level
 	assert.False(t, sm.currentScene.IsConflict)
@@ -743,7 +743,7 @@ func TestSceneManager_InitiateConflict_ExcludesTakenOutCharacters(t *testing.T) 
 	err = sm.initiateConflict(scene.PhysicalConflict, enemy1.ID)
 	require.NoError(t, err)
 
-	sm.handleTargetTakenOut(enemy1)
+	sm.handleTargetTakenOut(context.Background(), enemy1)
 	// Conflict still ongoing because enemy2 is active
 	assert.True(t, sm.currentScene.IsConflict)
 
@@ -788,7 +788,7 @@ func TestSceneManager_InitiateConflict_TakenOutInitiatorFails(t *testing.T) {
 	err = sm.initiateConflict(scene.PhysicalConflict, enemy.ID)
 	require.NoError(t, err)
 
-	sm.handleTargetTakenOut(enemy)
+	sm.handleTargetTakenOut(context.Background(), enemy)
 	assert.False(t, sm.currentScene.IsConflict) // Conflict ended
 
 	// Enemy is marked as taken out at scene level

@@ -484,3 +484,33 @@ func TestCharacter_CheckConsequenceRecovery_MixedConsequences(t *testing.T) {
 	// Moderate stays because it's not recovering
 	assert.Equal(t, "moderate", char.Consequences[0].ID)
 }
+
+func TestCharacter_IsTakenOut(t *testing.T) {
+	char := NewCharacter("npc-1", "Goblin")
+
+	assert.False(t, char.IsTakenOut(), "New character should not be taken out")
+
+	char.Fate = &TakenOutFate{
+		Description: "Killed",
+		Permanent:   true,
+	}
+	assert.True(t, char.IsTakenOut(), "Character with Fate set should be taken out")
+}
+
+func TestCharacter_IsPermanentlyRemoved(t *testing.T) {
+	char := NewCharacter("npc-1", "Goblin")
+
+	assert.False(t, char.IsPermanentlyRemoved(), "New character should not be permanently removed")
+
+	char.Fate = &TakenOutFate{
+		Description: "Knocked unconscious",
+		Permanent:   false,
+	}
+	assert.False(t, char.IsPermanentlyRemoved(), "Non-permanent fate should not be permanently removed")
+
+	char.Fate = &TakenOutFate{
+		Description: "Killed",
+		Permanent:   true,
+	}
+	assert.True(t, char.IsPermanentlyRemoved(), "Permanent fate should be permanently removed")
+}

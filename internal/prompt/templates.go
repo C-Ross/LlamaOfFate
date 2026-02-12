@@ -60,6 +60,9 @@ var scenarioResolutionPromptTemplate string
 //go:embed templates/recovery_narrative_prompt.tmpl
 var recoveryNarrativePromptTemplate string
 
+//go:embed templates/fate_narration_prompt.tmpl
+var fateNarrationPromptTemplate string
+
 // Template instances
 var (
 	AspectGenerationPrompt       *template.Template
@@ -79,6 +82,7 @@ var (
 	ScenarioGenerationPrompt     *template.Template
 	ScenarioResolutionPrompt     *template.Template
 	RecoveryNarrativePrompt      *template.Template
+	FateNarrationPrompt          *template.Template
 )
 
 func init() {
@@ -185,6 +189,12 @@ func init() {
 	if err != nil {
 		panic("failed to parse recovery narrative prompt template: " + err.Error())
 	}
+
+	// Parse the fate narration prompt template
+	FateNarrationPrompt, err = template.New("fate_narration").Parse(fateNarrationPromptTemplate)
+	if err != nil {
+		panic("failed to parse fate narration prompt template: " + err.Error())
+	}
 }
 
 // executeTemplate is a helper that executes a template and returns the result as a string
@@ -279,4 +289,9 @@ func RenderScenarioResolution(data ScenarioResolutionData) (string, error) {
 // RenderRecoveryNarrative renders the between-scene recovery narrative prompt
 func RenderRecoveryNarrative(data RecoveryNarrativeData) (string, error) {
 	return executeTemplate(RecoveryNarrativePrompt, data)
+}
+
+// RenderFateNarration renders the post-victory fate narration prompt
+func RenderFateNarration(data FateNarrationData) (string, error) {
+	return executeTemplate(FateNarrationPrompt, data)
 }

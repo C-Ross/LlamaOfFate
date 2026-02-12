@@ -609,7 +609,7 @@ func (sm *SceneManager) applyActionEffects(ctx context.Context, parsedAction *ac
 				shifts, target.Name))
 
 			// Apply stress to target
-			sm.applyDamageToTarget(target, shifts, stressType)
+			sm.applyDamageToTarget(ctx, target, shifts, stressType)
 		} else if parsedAction.Outcome.Type == dice.Tie {
 			// On a tie, attacker gets a boost
 			sm.ui.DisplaySystemMessage("Tie! You gain a boost against your opponent.")
@@ -684,7 +684,7 @@ func (sm *SceneManager) generateAspectName(ctx context.Context, parsedAction *ac
 }
 
 // applyDamageToTarget applies shifts as stress/consequences to a target
-func (sm *SceneManager) applyDamageToTarget(target *character.Character, shifts int, stressType character.StressTrackType) {
+func (sm *SceneManager) applyDamageToTarget(ctx context.Context, target *character.Character, shifts int, stressType character.StressTrackType) {
 	// Try to absorb with stress track
 	absorbed := target.TakeStress(stressType, shifts)
 	if absorbed {
@@ -695,17 +695,17 @@ func (sm *SceneManager) applyDamageToTarget(target *character.Character, shifts 
 	}
 
 	// Target couldn't absorb all stress - check for consequences or taken out
-	sm.handleTargetStressOverflow(target, shifts, stressType)
+	sm.handleTargetStressOverflow(ctx, target, shifts, stressType)
 }
 
 // handleTargetStressOverflow handles when a target can't absorb stress
-func (sm *SceneManager) handleTargetStressOverflow(target *character.Character, shifts int, stressType character.StressTrackType) {
+func (sm *SceneManager) handleTargetStressOverflow(ctx context.Context, target *character.Character, shifts int, stressType character.StressTrackType) {
 	// Check if target has available consequences
 	availableConseq := target.AvailableConsequenceSlots()
 
 	if len(availableConseq) == 0 {
 		// No way to absorb - target is taken out!
-		sm.handleTargetTakenOut(target)
+		sm.handleTargetTakenOut(ctx, target)
 		return
 	}
 
@@ -736,16 +736,15 @@ func (sm *SceneManager) handleTargetStressOverflow(target *character.Character, 
 				"%s absorbs remaining %d shifts with stress.",
 				target.Name, remaining))
 		} else {
-			sm.handleTargetTakenOut(target)
+			sm.handleTargetTakenOut(ctx, target)
 		}
 	}
 }
 
 // handleTargetTakenOut handles when a target is taken out of the conflict
-func (sm *SceneManager) handleTargetTakenOut(target *character.Character) {
+func (sm *SceneManager) handleTargetTakenOut(ctx context.Context, target *character.Character) {
 	sm.ui.DisplaySystemMessage(fmt.Sprintf(
 		"\n=== %s is Taken Out! ===", target.Name))
-	sm.ui.DisplaySystemMessage("You decide their fate!")
 
 	// Track this character as taken out during this scene
 	sm.takenOutChars = append(sm.takenOutChars, target.ID)
@@ -777,6 +776,7 @@ func (sm *SceneManager) handleTargetTakenOut(target *character.Character) {
 
 		if activeOpponents == 0 {
 			sm.ui.DisplaySystemMessage("\n=== Victory! All opponents defeated! ===")
+			sm.promptPlayerForFates(ctx)
 			sm.clearConflictStress()
 			sm.currentScene.EndConflict()
 		}
@@ -786,6 +786,122 @@ func (sm *SceneManager) handleTargetTakenOut(target *character.Character) {
 		"component", componentSceneManager,
 		"target", target.ID,
 		"target_name", target.Name)
+}
+
+// promptPlayerForFates prompts the player to narrate the fates of all taken-out
+// NPCs after a victory. Per Fate Core, the victor decides what the loss looks like.
+// The player's free-text narration is sent to the LLM, which classifies each NPC's
+// fate and whether they are permanently removed from the story.
+func (sm *SceneManager) promptPlayerForFates(ctx context.Context) {
+	if len(sm.takenOutChars) == 0 {
+		return
+	}
+
+	// Collect taken-out NPC info
+	var takenOutNPCs []prompt.FateNarrationNPC
+	var npcNames []string
+	for _, charID := range sm.takenOutChars {
+		char := sm.engine.GetCharacter(charID)
+		if char == nil || charID == sm.player.ID {
+			continue
+		}
+		takenOutNPCs = append(takenOutNPCs, prompt.FateNarrationNPC{
+			ID:          charID,
+			Name:        char.Name,
+			HighConcept: char.Aspects.HighConcept,
+		})
+		npcNames = append(npcNames, char.Name)
+	}
+
+	if len(takenOutNPCs) == 0 {
+		return
+	}
+
+	// Build the prompt for the player
+	nameList := strings.Join(npcNames, ", ")
+	sm.ui.DisplaySystemMessage(fmt.Sprintf(
+		"You decide their fate! What happens to %s?", nameList))
+
+	input, _, err := sm.ui.ReadInput()
+	if err != nil || strings.TrimSpace(input) == "" {
+		slog.Warn("Failed to read fate narration input",
+			"component", componentSceneManager,
+			"error", err)
+		return
+	}
+
+	// Determine conflict type for context
+	conflictType := "physical"
+	if sm.currentScene.ConflictState != nil && sm.currentScene.ConflictState.Type == scene.MentalConflict {
+		conflictType = "mental"
+	}
+
+	// Send to LLM for structured parsing
+	data := prompt.FateNarrationData{
+		SceneName:        sm.currentScene.Name,
+		SceneDescription: sm.currentScene.Description,
+		ConflictType:     conflictType,
+		TakenOutNPCs:     takenOutNPCs,
+		PlayerNarration:  input,
+	}
+
+	rendered, err := prompt.RenderFateNarration(data)
+	if err != nil {
+		slog.Error("Failed to render fate narration prompt",
+			"component", componentSceneManager,
+			"error", err)
+		return
+	}
+
+	content, err := llm.SimpleCompletion(ctx, sm.engine.llmClient, rendered, 400, 0.4)
+	if err != nil {
+		slog.Error("Failed to get fate narration from LLM",
+			"component", componentSceneManager,
+			"error", err)
+		return
+	}
+
+	result, err := prompt.ParseFateNarration(content)
+	if err != nil {
+		slog.Error("Failed to parse fate narration response",
+			"component", componentSceneManager,
+			"error", err)
+		return
+	}
+
+	// Apply fates to characters
+	for _, fate := range result.Fates {
+		char := sm.engine.GetCharacter(fate.ID)
+		if char == nil {
+			slog.Warn("Could not resolve character for fate",
+				"component", componentSceneManager,
+				"id", fate.ID,
+				"name", fate.Name)
+			continue
+		}
+		char.Fate = &character.TakenOutFate{
+			Description: fate.Description,
+			Permanent:   fate.Permanent,
+		}
+
+		slog.Info("Applied fate to character",
+			"component", componentSceneManager,
+			"character", char.Name,
+			"fate", fate.Description,
+			"permanent", fate.Permanent)
+	}
+
+	// Display the narrative
+	sm.ui.DisplayNarrative(result.Narrative)
+
+	// Log the fate narration
+	if sm.sessionLogger != nil {
+		sm.sessionLogger.Log("fate_narration", map[string]any{
+			"player_input": input,
+			"fates":        result.Fates,
+			"narrative":    result.Narrative,
+		})
+	}
 }
 
 // applyAttackDamageToPlayer applies attack damage to the player

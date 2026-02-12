@@ -7,6 +7,15 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 )
 
+// TakenOutFate records what happened to a character after being taken out.
+// Per Fate Core, the victor narrates the defeated character's fate.
+// The Description is a 1-3 word summary (e.g., "killed", "unconscious", "fled").
+// Permanent indicates whether the character is permanently removed from the story.
+type TakenOutFate struct {
+	Description string `json:"description" yaml:"description"` // 1-3 word summary: "destroyed", "unconscious", "fled"
+	Permanent   bool   `json:"permanent" yaml:"permanent"`     // true = permanently removed from the story
+}
+
 // Character represents a player character or NPC
 type Character struct {
 	ID            string        `json:"id"`
@@ -26,10 +35,22 @@ type Character struct {
 	// Health and Status
 	StressTracks map[string]*StressTrack `json:"stress_tracks"`
 	Consequences []Consequence           `json:"consequences"`
+	Fate         *TakenOutFate           `json:"fate,omitempty" yaml:"fate,omitempty"` // Set when character is taken out
 
 	// Metadata
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// IsTakenOut returns true if this character has been taken out and assigned a fate.
+func (c *Character) IsTakenOut() bool {
+	return c.Fate != nil
+}
+
+// IsPermanentlyRemoved returns true if this character was taken out with a permanent fate
+// (e.g., killed, destroyed) and should not appear in future scenes.
+func (c *Character) IsPermanentlyRemoved() bool {
+	return c.Fate != nil && c.Fate.Permanent
 }
 
 // Aspects holds the character aspects

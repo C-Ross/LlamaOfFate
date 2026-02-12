@@ -152,3 +152,31 @@ func stripNonAlpha(s string) string {
 func isAlpha(b byte) bool {
 	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
 }
+
+// ParseFateNarration parses an LLM response into a FateNarrationResult.
+func ParseFateNarration(content string) (*FateNarrationResult, error) {
+	cleaned := strings.TrimSpace(content)
+
+	var result FateNarrationResult
+	if err := json.Unmarshal([]byte(cleaned), &result); err != nil {
+		start := strings.Index(content, "{")
+		end := strings.LastIndex(content, "}")
+		if start >= 0 && end > start {
+			cleaned = content[start : end+1]
+			if err := json.Unmarshal([]byte(cleaned), &result); err != nil {
+				return nil, fmt.Errorf("JSON parse error: %w", err)
+			}
+		} else {
+			return nil, fmt.Errorf("no valid JSON found in response")
+		}
+	}
+
+	if len(result.Fates) == 0 {
+		return nil, fmt.Errorf("missing fates")
+	}
+	if result.Narrative == "" {
+		return nil, fmt.Errorf("missing narrative")
+	}
+
+	return &result, nil
+}

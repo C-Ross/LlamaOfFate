@@ -203,3 +203,27 @@ func TestRecoveryNarrativeTemplate(t *testing.T) {
 	assert.Contains(t, rendered, "success")
 	assert.Contains(t, rendered, "failure")
 }
+
+func TestFateNarrationTemplate(t *testing.T) {
+	data := FateNarrationData{
+		SceneName:        "Warehouse Showdown",
+		SceneDescription: "A tense fight in a dark warehouse",
+		ConflictType:     "physical",
+		TakenOutNPCs: []FateNarrationNPC{
+			{ID: "npc-thug", Name: "Thug", HighConcept: "Hired Muscle"},
+			{ID: "npc-boss", Name: "Boss", HighConcept: "Criminal Mastermind"},
+		},
+		PlayerNarration: "I knock them both out and tie them up for the authorities.",
+	}
+
+	rendered, err := RenderFateNarration(data)
+	require.NoError(t, err)
+
+	assert.Contains(t, rendered, "Warehouse Showdown")
+	assert.Contains(t, rendered, "Thug")
+	assert.Contains(t, rendered, "npc-thug")
+	assert.Contains(t, rendered, "npc-boss")
+	assert.Contains(t, rendered, "Criminal Mastermind")
+	assert.Contains(t, rendered, "knock them both out")
+	assert.Contains(t, rendered, "physical")
+}

@@ -255,6 +255,38 @@ type ActionParseTemplateData struct {
 	DifficultyGuide   string // Human-readable difficulty guidance
 }
 
+// FateNarrationData holds the data for the fate narration template.
+// After a conflict victory, the player narrates what happens to each taken-out NPC.
+// This prompt asks the LLM to parse that narration into per-NPC fates.
+type FateNarrationData struct {
+	SceneName        string
+	SceneDescription string
+	ConflictType     string // "physical" or "mental"
+	TakenOutNPCs     []FateNarrationNPC
+	PlayerNarration  string
+}
+
+// FateNarrationNPC holds brief info about a taken-out NPC for the fate prompt.
+type FateNarrationNPC struct {
+	ID          string
+	Name        string
+	HighConcept string
+}
+
+// NPCFateResult represents the LLM's parsed fate for a single taken-out NPC.
+type NPCFateResult struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"` // 1-3 word fate: "killed", "unconscious", "fled"
+	Permanent   bool   `json:"permanent"`   // true = permanently removed from the story
+}
+
+// FateNarrationResult represents the full LLM response for fate narration.
+type FateNarrationResult struct {
+	Fates     []NPCFateResult `json:"fates"`
+	Narrative string          `json:"narrative"`
+}
+
 // AspectGenerationRequest holds the data for aspect generation template
 type AspectGenerationRequest struct {
 	Character       *character.Character `json:"character"`
