@@ -443,6 +443,17 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 
 		// Check if this NPC already exists in the registry
 		if existingNPC, found := m.npcRegistry[normalizedName]; found {
+			// Skip permanently removed NPCs — they should never reappear
+			if existingNPC.IsPermanentlyRemoved() {
+				slog.Info("Skipping permanently removed NPC",
+					"component", componentScenarioManager,
+					"npc_name", existingNPC.Name,
+					"npc_id", existingNPC.ID,
+					"fate", existingNPC.Fate.Description,
+				)
+				continue
+			}
+
 			// Reuse existing NPC — they persist across scenes
 			m.engine.AddCharacter(existingNPC) // Re-register in case engine was reset
 			newScene.AddCharacter(existingNPC.ID)
@@ -762,14 +773,27 @@ func normalizeNPCName(name string) string {
 	return strings.ToLower(strings.TrimSpace(name))
 }
 
-// getKnownNPCSummaries returns summaries of known NPCs for scene generation prompts
+// getKnownNPCSummaries returns summaries of known NPCs for scene generation prompts.
+// Permanently removed NPCs (killed, destroyed) are excluded entirely.
+// Temporarily defeated NPCs include their fate description in the attitude.
 func (m *ScenarioManager) getKnownNPCSummaries() []prompt.NPCSummary {
 	var summaries []prompt.NPCSummary
 	for normalizedName, npc := range m.npcRegistry {
+		// Exclude permanently removed NPCs — they should never reappear
+		if npc.IsPermanentlyRemoved() {
+			continue
+		}
+
 		attitude := m.npcAttitudes[normalizedName]
 		if attitude == "" {
 			attitude = "neutral"
 		}
+
+		// For temporarily defeated NPCs, include the fate description
+		if npc.IsTakenOut() && !npc.Fate.Permanent {
+			attitude = fmt.Sprintf("defeated (%s)", npc.Fate.Description)
+		}
+
 		summaries = append(summaries, prompt.NPCSummary{
 			Name:     npc.Name,
 			Attitude: attitude,

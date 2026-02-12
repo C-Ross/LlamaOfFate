@@ -695,6 +695,142 @@ func TestScenarioManager_GetKnownNPCSummaries(t *testing.T) {
 	assert.Equal(t, "friendly", summaries[0].Attitude)
 }
 
+func TestScenarioManager_GetKnownNPCSummaries_ExcludesPermanentlyRemoved(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	// Add a normal NPC
+	alive := character.NewCharacter("npc1", "Greta Ironheart")
+	sm.npcRegistry[normalizeNPCName(alive.Name)] = alive
+	sm.npcAttitudes[normalizeNPCName(alive.Name)] = "friendly"
+
+	// Add a permanently removed NPC (killed)
+	dead := character.NewCharacter("npc2", "Bandit Leader")
+	dead.Fate = &character.TakenOutFate{Description: "killed in the explosion", Permanent: true}
+	sm.npcRegistry[normalizeNPCName(dead.Name)] = dead
+	sm.npcAttitudes[normalizeNPCName(dead.Name)] = "hostile"
+
+	summaries := sm.getKnownNPCSummaries()
+	assert.Len(t, summaries, 1)
+	assert.Equal(t, "Greta Ironheart", summaries[0].Name)
+	assert.Equal(t, "friendly", summaries[0].Attitude)
+}
+
+func TestScenarioManager_GetKnownNPCSummaries_TemporaryDefeatShowsFate(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	// Add a temporarily defeated NPC (knocked unconscious)
+	knocked := character.NewCharacter("npc1", "Guard Captain")
+	knocked.Fate = &character.TakenOutFate{Description: "knocked unconscious", Permanent: false}
+	sm.npcRegistry[normalizeNPCName(knocked.Name)] = knocked
+	sm.npcAttitudes[normalizeNPCName(knocked.Name)] = "hostile"
+
+	summaries := sm.getKnownNPCSummaries()
+	require.Len(t, summaries, 1)
+	assert.Equal(t, "Guard Captain", summaries[0].Name)
+	assert.Equal(t, "defeated (knocked unconscious)", summaries[0].Attitude)
+}
+
+func TestScenarioManager_GetKnownNPCSummaries_MixedFates(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	// Normal NPC
+	normal := character.NewCharacter("npc1", "Shopkeeper")
+	sm.npcRegistry[normalizeNPCName(normal.Name)] = normal
+	sm.npcAttitudes[normalizeNPCName(normal.Name)] = "neutral"
+
+	// Temporarily defeated NPC
+	temp := character.NewCharacter("npc2", "Thug")
+	temp.Fate = &character.TakenOutFate{Description: "fled in terror", Permanent: false}
+	sm.npcRegistry[normalizeNPCName(temp.Name)] = temp
+
+	// Permanently removed NPC
+	perm := character.NewCharacter("npc3", "Assassin")
+	perm.Fate = &character.TakenOutFate{Description: "fell off the cliff", Permanent: true}
+	sm.npcRegistry[normalizeNPCName(perm.Name)] = perm
+
+	summaries := sm.getKnownNPCSummaries()
+	assert.Len(t, summaries, 2, "should exclude permanently removed NPC")
+
+	nameMap := make(map[string]string)
+	for _, s := range summaries {
+		nameMap[s.Name] = s.Attitude
+	}
+	assert.Equal(t, "neutral", nameMap["Shopkeeper"])
+	assert.Equal(t, "defeated (fled in terror)", nameMap["Thug"])
+	_, found := nameMap["Assassin"]
+	assert.False(t, found, "permanently removed NPC should not appear")
+}
+
+func TestScenarioManager_GenerateNextScene_SkipsPermanentlyRemovedNPCs(t *testing.T) {
+	// Mock LLM returns a scene that tries to reintroduce a permanently removed NPC
+	sceneJSON := `{
+		"scene_name": "The Aftermath",
+		"description": "The dust settles.",
+		"purpose": "Can the hero move on?",
+		"situation_aspects": ["Eerie Silence"],
+		"npcs": [
+			{"name": "Bandit Leader", "high_concept": "Ruthless Outlaw", "disposition": "hostile"},
+			{"name": "Innkeeper", "high_concept": "Friendly Barkeep", "disposition": "friendly"}
+		]
+	}`
+	engine, err := NewWithLLM(&MockLLMClientForScenario{
+		responses: []string{sceneJSON},
+	})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+	sm.scenario = &scene.Scenario{
+		Title:   "Test Scenario",
+		Problem: "A test problem",
+		Genre:   "Fantasy",
+	}
+
+	// Pre-register "Bandit Leader" as permanently removed
+	dead := character.NewCharacter("old_npc_1", "Bandit Leader")
+	dead.Fate = &character.TakenOutFate{Description: "killed", Permanent: true}
+	sm.npcRegistry[normalizeNPCName(dead.Name)] = dead
+
+	newScene, err := sm.generateNextScene(context.Background(), "moving on")
+	require.NoError(t, err)
+	require.NotNil(t, newScene)
+
+	// The permanently removed NPC should NOT be in the scene's character list
+	for _, charID := range newScene.Characters {
+		if charID == player.ID {
+			continue
+		}
+		char := engine.GetCharacter(charID)
+		if char != nil {
+			assert.NotEqual(t, normalizeNPCName("Bandit Leader"), normalizeNPCName(char.Name),
+				"permanently removed NPC should not appear in new scene")
+		}
+	}
+
+	// The Innkeeper should be in the scene
+	foundInnkeeper := false
+	for _, charID := range newScene.Characters {
+		char := engine.GetCharacter(charID)
+		if char != nil && normalizeNPCName(char.Name) == normalizeNPCName("Innkeeper") {
+			foundInnkeeper = true
+			break
+		}
+	}
+	assert.True(t, foundInnkeeper, "non-removed NPC should appear in scene")
+}
+
 func TestScenarioManager_UpdateNPCAttitudes(t *testing.T) {
 	engine, err := NewWithLLM(&MockLLMClientForScenario{})
 	require.NoError(t, err)
