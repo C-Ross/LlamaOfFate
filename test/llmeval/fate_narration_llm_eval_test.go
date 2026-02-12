@@ -58,7 +58,7 @@ func getFateNarrationTestCases() []FateNarrationTestCase {
 			ExpectedFates: 2,
 			PermanentIDs:  []string{"npc-thug", "npc-enforcer"},
 			TemporaryIDs:  []string{},
-			Description:    "Explicit killing of all opponents should mark both as permanent",
+			Description:   "Explicit killing of all opponents should mark both as permanent",
 		},
 		{
 			Name: "Mixed fates - one killed, one spared",
@@ -75,7 +75,7 @@ func getFateNarrationTestCases() []FateNarrationTestCase {
 			ExpectedFates: 2,
 			PermanentIDs:  []string{"npc-leader"},
 			TemporaryIDs:  []string{"npc-young"},
-			Description:    "Mixed narrative should differentiate permanent vs temporary fates",
+			Description:   "Mixed narrative should differentiate permanent vs temporary fates",
 		},
 		{
 			Name: "All spared - nonlethal takedown",
@@ -92,7 +92,7 @@ func getFateNarrationTestCases() []FateNarrationTestCase {
 			ExpectedFates: 2,
 			PermanentIDs:  []string{},
 			TemporaryIDs:  []string{"npc-captain", "npc-guard"},
-			Description:    "Nonlethal takedown should mark all as temporary",
+			Description:   "Nonlethal takedown should mark all as temporary",
 		},
 		{
 			Name: "Single opponent killed",
@@ -108,7 +108,7 @@ func getFateNarrationTestCases() []FateNarrationTestCase {
 			ExpectedFates: 1,
 			PermanentIDs:  []string{"npc-bart"},
 			TemporaryIDs:  []string{},
-			Description:    "Single opponent killed should produce one permanent fate",
+			Description:   "Single opponent killed should produce one permanent fate",
 		},
 		{
 			Name: "Vague narration - they're all done",
@@ -125,7 +125,7 @@ func getFateNarrationTestCases() []FateNarrationTestCase {
 			ExpectedFates: 2,
 			PermanentIDs:  []string{},
 			TemporaryIDs:  []string{"npc-joe", "npc-pete"},
-			Description:    "Vague narration without explicit killing should default to non-permanent",
+			Description:   "Vague narration without explicit killing should default to non-permanent",
 		},
 		{
 			Name: "Mental conflict - intimidation",
@@ -141,7 +141,7 @@ func getFateNarrationTestCases() []FateNarrationTestCase {
 			ExpectedFates: 1,
 			PermanentIDs:  []string{},
 			TemporaryIDs:  []string{"npc-lawyer"},
-			Description:    "Mental conflict taken out should not be permanent (no physical harm)",
+			Description:   "Mental conflict taken out should not be permanent (no physical harm)",
 		},
 	}
 }
@@ -280,7 +280,7 @@ func TestFateNarration_LLMEvaluation(t *testing.T) {
 					result.HasNarrative, result.FatesHaveDesc, result.IDsMatch)
 				if result.Parsed != nil {
 					for _, f := range result.Parsed.Fates {
-					t.Logf("  Fate: %s [%s] — %s (permanent=%v)", f.Name, f.ID, f.Description, f.Permanent)
+						t.Logf("  Fate: %s [%s] — %s (permanent=%v)", f.Name, f.ID, f.Description, f.Permanent)
 					}
 					t.Logf("  Narrative: %s", truncateFateText(result.Parsed.Narrative, 200))
 				}

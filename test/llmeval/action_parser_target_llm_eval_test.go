@@ -70,6 +70,30 @@ func getSceneNPCs() []*character.Character {
 	return []*character.Character{bandit, scout, sheriff}
 }
 
+// getNonPatternNPCs creates NPCs with non-conventional IDs (no scene_N_npc_N pattern).
+// These IDs match what the scenario generator actually produces (short descriptive slugs).
+func getNonPatternNPCs() []*character.Character {
+	agent := character.NewCharacter("corp-agent", "Agent Chen")
+	agent.Aspects.HighConcept = "Ruthless Corporate Troubleshooter"
+	agent.Aspects.Trouble = "Answers to the Board"
+	agent.SetSkill("Shoot", dice.Good)
+	agent.SetSkill("Fight", dice.Fair)
+	agent.SetSkill("Notice", dice.Fair)
+
+	drone := character.NewCharacter("drone-1", "Security Drone Alpha")
+	drone.Aspects.HighConcept = "Automated Patrol Unit"
+	drone.SetSkill("Shoot", dice.Great)
+	drone.SetSkill("Notice", dice.Good)
+
+	mechanic := character.NewCharacter("npc_42", "Grease Monkey Voss")
+	mechanic.Aspects.HighConcept = "Underground Tech Genius"
+	mechanic.Aspects.Trouble = "Owes Favors to Everyone"
+	mechanic.SetSkill("Crafts", dice.Great)
+	mechanic.SetSkill("Contacts", dice.Fair)
+
+	return []*character.Character{agent, drone, mechanic}
+}
+
 // getAttackTargetTestCases returns test cases where the player attacks a specific NPC
 func getAttackTargetTestCases() []TargetTestCase {
 	npcs := getSceneNPCs()
@@ -191,6 +215,66 @@ func getNoTargetTestCases() []TargetTestCase {
 	}
 }
 
+// getNonPatternTargetTestCases returns test cases where NPCs have non-conventional IDs
+// (short descriptive slugs like "corp-agent" instead of "scene_N_npc_N").
+// This catches the bug where the LLM hallucinates pattern-based IDs from examples
+// instead of copying the actual ID from the scene context.
+func getNonPatternTargetTestCases() []TargetTestCase {
+	npcs := getNonPatternNPCs()
+	return []TargetTestCase{
+		{
+			Name:            "Shoot the agent by name",
+			RawInput:        "I shoot Agent Chen with my blaster",
+			Context:         "In a data vault, Agent Chen stands by the terminal",
+			OtherCharacters: npcs,
+			ExpectedType:    action.Attack,
+			ExpectedSkills:  []string{"Shoot"},
+			ValidTargets:    []string{"corp-agent", "Agent Chen"},
+			Description:     "Must use actual ID 'corp-agent', not hallucinate scene_N_npc_N",
+		},
+		{
+			Name:            "Attack the drone",
+			RawInput:        "I hit the security drone with an EMP",
+			Context:         "Security Drone Alpha hovers nearby, scanning",
+			OtherCharacters: npcs,
+			ExpectedType:    action.Attack,
+			ExpectedSkills:  []string{"Shoot"},
+			ValidTargets:    []string{"drone-1", "Security Drone Alpha"},
+			Description:     "Must use actual ID 'drone-1', not hallucinate a pattern ID",
+		},
+		{
+			Name:            "Study the mechanic",
+			RawInput:        "I watch Grease Monkey Voss to see what he's working on",
+			Context:         "Voss is tinkering at his workbench in the underground garage",
+			OtherCharacters: npcs,
+			ExpectedType:    action.CreateAdvantage,
+			ExpectedSkills:  []string{"Notice", "Investigate"},
+			ValidTargets:    []string{"npc_42", "Grease Monkey Voss"},
+			Description:     "Must use actual ID 'npc_42' from scene context",
+		},
+		{
+			Name:            "Provoke the agent by title",
+			RawInput:        "I taunt the corporate agent, calling him a lapdog",
+			Context:         "Face to face with Agent Chen after being cornered",
+			OtherCharacters: npcs,
+			ExpectedType:    action.Attack,
+			ExpectedSkills:  []string{"Provoke"},
+			ValidTargets:    []string{"corp-agent", "Agent Chen"},
+			Description:     "Referencing 'the corporate agent' should resolve to Agent Chen's actual ID",
+		},
+		{
+			Name:            "Punch the agent",
+			RawInput:        "I throw a punch at Chen",
+			Context:         "Close quarters in the server room, Agent Chen blocks the exit",
+			OtherCharacters: npcs,
+			ExpectedType:    action.Attack,
+			ExpectedSkills:  []string{"Fight"},
+			ValidTargets:    []string{"corp-agent", "Agent Chen"},
+			Description:     "Partial name 'Chen' should resolve to the correct character",
+		},
+	}
+}
+
 // evaluateTargetTestCase runs a single targeting test case
 func evaluateTargetTestCase(ctx context.Context, parser *engine.ActionParser, char *character.Character, tc TargetTestCase) TargetEvalResult {
 	req := engine.ActionParseRequest{
@@ -299,6 +383,7 @@ func TestActionParser_TargetResolution(t *testing.T) {
 		{"AttackTargets", getAttackTargetTestCases()},
 		{"CreateAdvantageTargets", getCreateAdvantageTargetTestCases()},
 		{"NoTarget", getNoTargetTestCases()},
+		{"NonPatternIDs", getNonPatternTargetTestCases()},
 	}
 
 	var results []TargetEvalResult
