@@ -33,6 +33,8 @@ Avoid duplication by creating resuable functions and stucts.  If you think you m
 
 Ensure `just validate` passes before committing: all tests and linters must succeed.
 
+Use inversion of control to enable multiple UI's.  The core game logic should not depend on ui specific code.
+
 ### Testing (REQUIRED)
 - Use testify for ALL tests: `assert.Equal(t, expected, actual)`, `require.NotNil(t, object)`
 - Maintain high coverage: Unit tests per package + integration tests
