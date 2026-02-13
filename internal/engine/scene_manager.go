@@ -136,11 +136,7 @@ func (sm *SceneManager) RunSceneLoop(ctx context.Context) (*SceneEndResult, erro
 	}
 
 	// Reset scene-specific state
-	sm.takenOutChars = nil
-	sm.sceneEndReason = ""
-	sm.playerTakenOutHint = ""
-	sm.lastTransition = nil
-	sm.shouldExit = false
+	sm.resetSceneState()
 
 	// Display the initial scene
 	sm.ui.DisplaySystemMessage(fmt.Sprintf("=== %s ===", sm.currentScene.Name))
@@ -171,44 +167,42 @@ func (sm *SceneManager) RunSceneLoop(ctx context.Context) (*SceneEndResult, erro
 			break
 		}
 
-		sm.processInput(ctx, input)
-	}
-
-	// Build the scene end result
-	result := &SceneEndResult{
-		Reason:        sm.sceneEndReason,
-		TakenOutChars: sm.takenOutChars,
-	}
-
-	// If no reason was set but we exited, default to quit
-	if result.Reason == "" {
-		result.Reason = SceneEndQuit
-	}
-
-	// Add transition hint based on reason
-	switch result.Reason {
-	case SceneEndTransition:
-		if sm.lastTransition != nil {
-			result.TransitionHint = sm.lastTransition.Hint
+		result, err := sm.HandleInput(ctx, input)
+		if err != nil {
+			return nil, err
 		}
-	case SceneEndPlayerTakenOut:
-		result.TransitionHint = sm.playerTakenOutHint
+
+		// Render any events produced by this input
+		sm.renderEvents(result.Events)
+
+		if result.SceneEnded {
+			return result.EndResult, nil
+		}
 	}
 
-	return result, nil
+	return sm.buildSceneEndResult(), nil
 }
 
-// processInput handles player input
-func (sm *SceneManager) processInput(ctx context.Context, input string) {
+// HandleInput processes a single player input and returns the resulting events.
+// The caller (UI) is responsible for driving the loop and rendering events.
+// This is the primary entry point for event-driven UIs (e.g. web via WebSocket).
+func (sm *SceneManager) HandleInput(ctx context.Context, input string) (*InputResult, error) {
+	result := &InputResult{}
+
 	// Log player input
 	if sm.sessionLogger != nil {
 		sm.sessionLogger.Log("player_input", map[string]any{"input": input})
 	}
 
-	// Check for concession command during conflict (before any roll per Fate Core rules)
+	// Check for concession command during conflict (before any roll per Fate Core rules).
+	// Concession involves mid-flow ReadInput — still uses sm.ui directly (#63).
 	if sm.currentScene.IsConflict && sm.isConcedeCommand(input) {
 		sm.handleConcession(ctx)
-		return
+		if sm.shouldExit {
+			result.SceneEnded = true
+			result.EndResult = sm.buildSceneEndResult()
+		}
+		return result, nil
 	}
 
 	// Use LLM to determine the type of input
@@ -236,12 +230,85 @@ func (sm *SceneManager) processInput(ctx context.Context, input string) {
 
 	switch inputType {
 	case inputTypeDialog, inputTypeClarification, inputTypeNarrative:
-		sm.handleDialog(ctx, input)
+		result.Events = sm.handleDialog(ctx, input)
 	case inputTypeAction:
+		// Action/conflict path still uses sm.ui directly for Display* and
+		// PromptForInvoke — full event conversion deferred to #63/#64.
 		sm.handleAction(ctx, input)
 	default:
-		// Default to dialog if classification is unclear
-		sm.handleDialog(ctx, input)
+		result.Events = sm.handleDialog(ctx, input)
+	}
+
+	if sm.shouldExit {
+		result.SceneEnded = true
+		result.EndResult = sm.buildSceneEndResult()
+	}
+
+	return result, nil
+}
+
+// resetSceneState clears per-scene state before a new scene loop begins.
+func (sm *SceneManager) resetSceneState() {
+	sm.takenOutChars = nil
+	sm.sceneEndReason = ""
+	sm.playerTakenOutHint = ""
+	sm.lastTransition = nil
+	sm.shouldExit = false
+}
+
+// buildSceneEndResult constructs a SceneEndResult from the current state.
+func (sm *SceneManager) buildSceneEndResult() *SceneEndResult {
+	result := &SceneEndResult{
+		Reason:        sm.sceneEndReason,
+		TakenOutChars: sm.takenOutChars,
+	}
+
+	if result.Reason == "" {
+		result.Reason = SceneEndQuit
+	}
+
+	switch result.Reason {
+	case SceneEndTransition:
+		if sm.lastTransition != nil {
+			result.TransitionHint = sm.lastTransition.Hint
+		}
+	case SceneEndPlayerTakenOut:
+		result.TransitionHint = sm.playerTakenOutHint
+	}
+
+	return result
+}
+
+// renderEvents dispatches a slice of GameEvent to the UI for display.
+// Used by RunSceneLoop (terminal path). Web/async callers process events directly.
+func (sm *SceneManager) renderEvents(events []GameEvent) {
+	for _, event := range events {
+		switch e := event.(type) {
+		case NarrativeEvent:
+			sm.ui.DisplayNarrative(e.Text)
+		case DialogEvent:
+			sm.ui.DisplayDialog(e.PlayerInput, e.GMResponse)
+		case SystemMessageEvent:
+			sm.ui.DisplaySystemMessage(e.Message)
+		case ActionAttemptEvent:
+			sm.ui.DisplayActionAttempt(e.Description)
+		case ActionResultEvent:
+			sm.ui.DisplayActionResult(e.Skill, e.SkillLevel, e.Bonuses, e.Result, e.Outcome)
+		case SceneTransitionEvent:
+			sm.ui.DisplaySceneTransition(e.Narrative, e.NewSceneHint)
+		case GameOverEvent:
+			sm.ui.DisplayGameOver(e.Reason)
+		case ConflictStartEvent:
+			sm.ui.DisplayConflictStart(e.ConflictType, e.InitiatorName, e.Participants)
+		case ConflictEscalationEvent:
+			sm.ui.DisplayConflictEscalation(e.FromType, e.ToType, e.TriggerCharName)
+		case TurnAnnouncementEvent:
+			sm.ui.DisplayTurnAnnouncement(e.CharacterName, e.TurnNumber, e.IsPlayer)
+		case ConflictEndEvent:
+			sm.ui.DisplayConflictEnd(e.Reason)
+		case CharacterDisplayEvent:
+			sm.ui.DisplayCharacter()
+		}
 	}
 }
 
@@ -289,7 +356,9 @@ func (sm *SceneManager) classifyInput(ctx context.Context, input string) (string
 }
 
 // handleDialog processes dialog and clarification requests
-func (sm *SceneManager) handleDialog(ctx context.Context, input string) {
+func (sm *SceneManager) handleDialog(ctx context.Context, input string) []GameEvent {
+	var events []GameEvent
+
 	// Generate LLM response
 	response, err := sm.generateSceneResponse(ctx, input, inputTypeDialog)
 	if err != nil {
@@ -297,8 +366,7 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) {
 			"component", componentSceneManager,
 			"input", input,
 			"error", err)
-		sm.ui.DisplayDialog(input, msgLLMUnavailable)
-		return
+		return append(events, DialogEvent{PlayerInput: input, GMResponse: msgLLMUnavailable})
 	}
 
 	// Check for markers in the response (conflict escalation, de-escalation, and scene transition)
@@ -306,7 +374,7 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) {
 	conflictResolution, cleanedResponse := sm.parseConflictEndMarker(cleanedResponse)
 	sceneTransition, cleanedResponse := prompt.ParseSceneTransitionMarker(cleanedResponse)
 
-	sm.ui.DisplayDialog(input, cleanedResponse)
+	events = append(events, DialogEvent{PlayerInput: input, GMResponse: cleanedResponse})
 
 	// Log the dialog exchange
 	if sm.sessionLogger != nil {
@@ -325,22 +393,40 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) {
 			slog.Warn("Failed to initiate conflict from dialog",
 				"component", componentSceneManager,
 				"error", err)
+		} else {
+			initiatorName := conflictTrigger.InitiatorID
+			if char := sm.engine.GetCharacter(conflictTrigger.InitiatorID); char != nil {
+				initiatorName = char.Name
+			}
+			events = append(events, ConflictStartEvent{
+				ConflictType:  string(conflictTrigger.Type),
+				InitiatorName: initiatorName,
+				Participants:  sm.getParticipantInfo(),
+			})
 		}
 	}
 
 	// Handle conflict de-escalation if detected
 	if conflictResolution != nil && sm.currentScene.IsConflict {
-		sm.resolveConflictPeacefully(conflictResolution.Reason)
+		reasonMessage := sm.resolveConflictPeacefully(conflictResolution.Reason)
+		if reasonMessage != "" {
+			events = append(events,
+				SystemMessageEvent{Message: "\n=== Conflict Resolved ==="},
+				SystemMessageEvent{Message: reasonMessage},
+			)
+		}
 	}
 
 	// Handle scene transition if detected
 	if sceneTransition != nil {
-		sm.handleSceneTransition(sceneTransition)
+		events = append(events, sm.handleSceneTransition(sceneTransition)...)
 	}
+
+	return events
 }
 
 // handleSceneTransition processes a scene transition marker
-func (sm *SceneManager) handleSceneTransition(transition *prompt.SceneTransition) {
+func (sm *SceneManager) handleSceneTransition(transition *prompt.SceneTransition) []GameEvent {
 	// Log the scene transition
 	if sm.sessionLogger != nil {
 		sm.sessionLogger.Log("scene_transition", map[string]any{
@@ -355,12 +441,11 @@ func (sm *SceneManager) handleSceneTransition(transition *prompt.SceneTransition
 	// Capture the transition for the caller (ScenarioManager)
 	sm.lastTransition = transition
 
-	// Display the transition to the player
-	sm.ui.DisplaySceneTransition("", transition.Hint)
-
 	// Mark that we should exit the scene loop
 	sm.sceneEndReason = SceneEndTransition
 	sm.shouldExit = true
+
+	return []GameEvent{SceneTransitionEvent{Narrative: "", NewSceneHint: transition.Hint}}
 }
 
 // GetLastTransition returns the last scene transition that occurred, if any

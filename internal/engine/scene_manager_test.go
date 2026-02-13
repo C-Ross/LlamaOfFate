@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
@@ -635,16 +634,17 @@ func TestProcessInput_NarrativeRoutesToDialog(t *testing.T) {
 	mockUI := &MockUI{}
 	sm.SetUI(mockUI)
 
-	sm.processInput(context.Background(), "I walk to the table")
+	result, err := sm.HandleInput(context.Background(), "I walk to the table")
+	require.NoError(t, err)
 
-	// Should display dialog (handleDialog path), not an action result
+	// Should return a DialogEvent (handleDialog path), not an action result
 	hasDialog := false
-	for _, msg := range mockUI.displayedMessages {
-		if strings.HasPrefix(msg, "Dialog:") {
+	for _, event := range result.Events {
+		if _, ok := event.(DialogEvent); ok {
 			hasDialog = true
 		}
 	}
-	assert.True(t, hasDialog, "Narrative input should be routed through handleDialog. Got messages: %v", mockUI.displayedMessages)
+	assert.True(t, hasDialog, "Narrative input should produce a DialogEvent. Got events: %v", result.Events)
 }
 
 // sequentialMockLLMClient returns responses in order, cycling through them
@@ -762,4 +762,170 @@ func TestSceneManager_StartScene_ClearsConversationHistory(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Empty(t, sm.GetConversationHistory())
+}
+
+// --- HandleInput tests ---
+
+func TestHandleInput_DialogReturnsDialogEvent(t *testing.T) {
+	// First call: classification → "dialog", second call: scene response
+	client := &sequentialMockLLMClient{
+		responses: []string{"dialog", "The bartender nods slowly."},
+	}
+	engine, err := NewWithLLM(client)
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	testScene := scene.NewScene("tavern", "Tavern", "A dimly lit tavern")
+	sm.currentScene = testScene
+	sm.player = character.NewCharacter("player-1", "Hero")
+
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	result, err := sm.HandleInput(context.Background(), "I greet the bartender")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// Should have exactly one DialogEvent
+	require.Len(t, result.Events, 1)
+	de, ok := result.Events[0].(DialogEvent)
+	require.True(t, ok, "expected DialogEvent, got %T", result.Events[0])
+	assert.Equal(t, "I greet the bartender", de.PlayerInput)
+	assert.Equal(t, "The bartender nods slowly.", de.GMResponse)
+
+	// Scene should not have ended
+	assert.False(t, result.SceneEnded)
+	assert.Nil(t, result.EndResult)
+}
+
+func TestHandleInput_DialogWithSceneTransition(t *testing.T) {
+	// Response includes a scene transition marker
+	client := &sequentialMockLLMClient{
+		responses: []string{"dialog", "You step outside into the rain. [SCENE_TRANSITION:The rainy streets]"},
+	}
+	engine, err := NewWithLLM(client)
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	sm.exitOnSceneTransition = true
+	testScene := scene.NewScene("tavern", "Tavern", "A dimly lit tavern")
+	sm.currentScene = testScene
+	sm.player = character.NewCharacter("player-1", "Hero")
+
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	result, err := sm.HandleInput(context.Background(), "I leave the tavern")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// Should have a DialogEvent and a SceneTransitionEvent
+	require.Len(t, result.Events, 2)
+
+	de, ok := result.Events[0].(DialogEvent)
+	require.True(t, ok, "expected DialogEvent, got %T", result.Events[0])
+	assert.Equal(t, "You step outside into the rain.", de.GMResponse)
+
+	ste, ok := result.Events[1].(SceneTransitionEvent)
+	require.True(t, ok, "expected SceneTransitionEvent, got %T", result.Events[1])
+	assert.Equal(t, "The rainy streets", ste.NewSceneHint)
+
+	// Scene should have ended with transition
+	assert.True(t, result.SceneEnded)
+	require.NotNil(t, result.EndResult)
+	assert.Equal(t, SceneEndTransition, result.EndResult.Reason)
+	assert.Equal(t, "The rainy streets", result.EndResult.TransitionHint)
+}
+
+func TestHandleInput_ActionPath_NoEvents(t *testing.T) {
+	// Classification returns "action"; action/conflict path uses sm.ui directly
+	client := &sequentialMockLLMClient{
+		responses: []string{
+			"action", // classification
+			`{"skill":"Fight","type":"attack","description":"swing sword","target":"Goblin","difficulty":"Good"}`, // action parse
+			"You swing your sword!", // narrative
+		},
+	}
+	engine, err := NewWithLLM(client)
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	sm.roller = dice.NewSeededRoller(12345)
+	testScene := scene.NewScene("arena", "Arena", "A fighting arena")
+
+	player := character.NewCharacter("player-1", "Hero")
+	player.SetSkill("Fight", 2)
+	enemy := character.NewCharacter("goblin-1", "Goblin")
+	enemy.SetSkill("Fight", 1)
+
+	engine.AddCharacter(player)
+	engine.AddCharacter(enemy)
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(enemy.ID)
+	sm.currentScene = testScene
+	sm.player = player
+
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	result, err := sm.HandleInput(context.Background(), "I swing my sword at the goblin")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// Action path uses sm.ui directly — events list is empty
+	assert.Empty(t, result.Events)
+
+	// But the UI should have received Display* calls directly
+	assert.NotEmpty(t, mockUI.displayedMessages, "action path should have rendered via sm.ui")
+	assert.False(t, result.SceneEnded)
+}
+
+func TestHandleInput_ClassificationFallbackToDialog(t *testing.T) {
+	// LLM returns garbage for classification — should fallback to dialog
+	client := &sequentialMockLLMClient{
+		responses: []string{"xyzzy_invalid", "The room is quiet."},
+	}
+	engine, err := NewWithLLM(client)
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	testScene := scene.NewScene("room", "Room", "A quiet room")
+	sm.currentScene = testScene
+	sm.player = character.NewCharacter("player-1", "Hero")
+
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	result, err := sm.HandleInput(context.Background(), "I look around")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// Should fallback to dialog and return a DialogEvent
+	require.Len(t, result.Events, 1)
+	_, ok := result.Events[0].(DialogEvent)
+	assert.True(t, ok, "fallback should produce DialogEvent, got %T", result.Events[0])
+}
+
+func TestHandleInput_RenderEventsDialog(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	events := []GameEvent{
+		DialogEvent{PlayerInput: "hello", GMResponse: "hi there"},
+		SystemMessageEvent{Message: "something happened"},
+		NarrativeEvent{Text: "The wind howls."},
+		SceneTransitionEvent{Narrative: "", NewSceneHint: "next scene"},
+	}
+
+	sm.renderEvents(events)
+
+	require.Len(t, mockUI.displayedMessages, 4)
+	assert.Equal(t, "Dialog: hello -> hi there", mockUI.displayedMessages[0])
+	assert.Equal(t, "System: something happened", mockUI.displayedMessages[1])
+	assert.Equal(t, "Narrative: The wind howls.", mockUI.displayedMessages[2])
+	assert.Equal(t, "SCENE TRANSITION: ", mockUI.displayedMessages[3])
 }

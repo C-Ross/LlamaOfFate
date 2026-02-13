@@ -185,10 +185,6 @@ func TestSceneManager_InitiateConflict(t *testing.T) {
 	assert.Equal(t, scene.PhysicalConflict, sm.currentScene.ConflictState.Type)
 	assert.Equal(t, enemy.ID, sm.currentScene.ConflictState.InitiatingCharacter)
 	assert.Len(t, sm.currentScene.ConflictState.Participants, 2)
-
-	// Verify UI was called
-	require.Len(t, mockUI.conflictStartCalls, 1)
-	assert.Contains(t, mockUI.conflictStartCalls[0], "physical")
 }
 
 func TestSceneManager_InitiateConflict_AlreadyInConflict(t *testing.T) {

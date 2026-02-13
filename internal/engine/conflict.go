@@ -94,14 +94,6 @@ func (sm *SceneManager) initiateConflict(conflictType scene.ConflictType, initia
 
 	sm.currentScene.StartConflictWithInitiator(conflictType, participants, initiatorID)
 
-	// Display conflict start
-	initiatorName := initiatorID
-	if char := sm.engine.GetCharacter(initiatorID); char != nil {
-		initiatorName = char.Name
-	}
-
-	sm.ui.DisplayConflictStart(string(conflictType), initiatorName, sm.getParticipantInfo())
-
 	slog.Info("Conflict initiated",
 		"component", componentSceneManager,
 		"type", conflictType,
@@ -112,9 +104,9 @@ func (sm *SceneManager) initiateConflict(conflictType scene.ConflictType, initia
 }
 
 // resolveConflictPeacefully ends a conflict through non-violent means
-func (sm *SceneManager) resolveConflictPeacefully(reason string) {
+func (sm *SceneManager) resolveConflictPeacefully(reason string) string {
 	if !sm.currentScene.IsConflict {
-		return
+		return ""
 	}
 
 	// Format reason for display
@@ -132,15 +124,14 @@ func (sm *SceneManager) resolveConflictPeacefully(reason string) {
 		reasonMessage = "The conflict ends!"
 	}
 
-	sm.ui.DisplaySystemMessage("\n=== Conflict Resolved ===")
-	sm.ui.DisplaySystemMessage(reasonMessage)
-
 	sm.clearConflictStress()
 	sm.currentScene.EndConflict()
 
 	slog.Info("Conflict resolved peacefully",
 		"component", componentSceneManager,
 		"reason", reason)
+
+	return reasonMessage
 }
 
 // clearConflictStress clears stress for all conflict participants.
@@ -276,6 +267,8 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 				slog.Warn("Failed to auto-initiate conflict",
 					"component", componentSceneManager,
 					"error", err)
+			} else {
+				sm.ui.DisplayConflictStart(string(actionConflictType), sm.player.Name, sm.getParticipantInfo())
 			}
 		} else if sm.currentScene.ConflictState.Type != actionConflictType {
 			// Escalate conflict if type changes

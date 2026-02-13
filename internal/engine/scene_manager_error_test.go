@@ -282,9 +282,9 @@ func TestProcessInput_ClassificationFallback(t *testing.T) {
 	sm.SetUI(mockUI)
 
 	// This should fail classification but still handle as dialog
-	sm.processInput(context.Background(), "hello")
+	result, err := sm.HandleInput(context.Background(), "hello")
+	require.NoError(t, err)
 
-	// The mock UI should have been called (dialog handler attempted)
-	// We can't easily verify the exact flow without more sophisticated mocking,
-	// but the test passing means no panic occurred
+	// HandleInput should return a DialogEvent (fallback to dialog on classification failure)
+	assert.NotNil(t, result)
 }
