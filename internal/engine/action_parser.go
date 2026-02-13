@@ -35,20 +35,29 @@ type ActionParseResponse struct {
 	Confidence  int    `json:"confidence"`  // 1-10 scale of how confident the LLM is
 }
 
-// ActionParser handles parsing user input into structured actions using LLM
-type ActionParser struct {
+// ActionParser is the interface for parsing user input into structured actions.
+// This enables dependency injection and testability by allowing mock implementations.
+type ActionParser interface {
+	ParseAction(ctx context.Context, req ActionParseRequest) (*action.Action, error)
+}
+
+// Compile-time check that LLMActionParser satisfies ActionParser.
+var _ ActionParser = (*LLMActionParser)(nil)
+
+// LLMActionParser handles parsing user input into structured actions using LLM
+type LLMActionParser struct {
 	llmClient llm.LLMClient
 }
 
-// NewActionParser creates a new action parser with the given LLM client
-func NewActionParser(llmClient llm.LLMClient) *ActionParser {
-	return &ActionParser{
+// NewActionParser creates a new LLM-backed action parser with the given LLM client
+func NewActionParser(llmClient llm.LLMClient) *LLMActionParser {
+	return &LLMActionParser{
 		llmClient: llmClient,
 	}
 }
 
 // ParseAction analyzes user input and returns a structured action using LLM
-func (ap *ActionParser) ParseAction(ctx context.Context, req ActionParseRequest) (*action.Action, error) {
+func (ap *LLMActionParser) ParseAction(ctx context.Context, req ActionParseRequest) (*action.Action, error) {
 	// Build the LLM prompt using templates
 	systemPrompt, err := ap.buildSystemPrompt()
 	if err != nil {
@@ -130,12 +139,12 @@ func (ap *ActionParser) ParseAction(ctx context.Context, req ActionParseRequest)
 }
 
 // buildSystemPrompt creates the system prompt using templates
-func (ap *ActionParser) buildSystemPrompt() (string, error) {
+func (ap *LLMActionParser) buildSystemPrompt() (string, error) {
 	return prompt.RenderActionParseSystem()
 }
 
 // buildUserPrompt creates the user prompt using templates with pre-computed difficulty guidance
-func (ap *ActionParser) buildUserPrompt(req ActionParseRequest) (string, error) {
+func (ap *LLMActionParser) buildUserPrompt(req ActionParseRequest) (string, error) {
 	// Compute difficulty range based on character's highest skill
 	highestSkill := dice.Mediocre
 	for _, level := range req.Character.Skills {

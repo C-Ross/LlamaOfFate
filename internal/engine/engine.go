@@ -10,7 +10,7 @@ import (
 
 // Engine represents the core game engine
 type Engine struct {
-	actionParser      *ActionParser
+	actionParser      ActionParser
 	sceneManager      *SceneManager
 	llmClient         llm.LLMClient
 	characterRegistry map[string]*character.Character
@@ -52,7 +52,7 @@ func (e *Engine) GetVersion() string {
 }
 
 // GetActionParser returns the action parser instance
-func (e *Engine) GetActionParser() *ActionParser {
+func (e *Engine) GetActionParser() ActionParser {
 	return e.actionParser
 }
 

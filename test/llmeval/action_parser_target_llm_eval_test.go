@@ -276,7 +276,7 @@ func getNonPatternTargetTestCases() []TargetTestCase {
 }
 
 // evaluateTargetTestCase runs a single targeting test case
-func evaluateTargetTestCase(ctx context.Context, parser *engine.ActionParser, char *character.Character, tc TargetTestCase) TargetEvalResult {
+func evaluateTargetTestCase(ctx context.Context, parser engine.ActionParser, char *character.Character, tc TargetTestCase) TargetEvalResult {
 	req := engine.ActionParseRequest{
 		Character:       char,
 		RawInput:        tc.RawInput,
