@@ -155,8 +155,6 @@ func (sm *SceneManager) RunSceneLoop(ctx context.Context) (*SceneEndResult, erro
 		sm.ui.DisplaySystemMessage("--- End of recap ---")
 	}
 
-	sm.ui.DisplaySystemMessage("Type 'help' for commands, 'exit' to end.")
-
 	for !sm.shouldExit {
 		input, isExit, err := sm.ui.ReadInput()
 		if err != nil {
@@ -207,11 +205,6 @@ func (sm *SceneManager) processInput(ctx context.Context, input string) {
 		sm.sessionLogger.Log("player_input", map[string]any{"input": input})
 	}
 
-	// Handle meta-commands locally (no LLM round-trip)
-	if sm.handleMetaCommand(input) {
-		return
-	}
-
 	// Check for concession command during conflict (before any roll per Fate Core rules)
 	if sm.currentScene.IsConflict && sm.isConcedeCommand(input) {
 		sm.handleConcession(ctx)
@@ -250,50 +243,6 @@ func (sm *SceneManager) processInput(ctx context.Context, input string) {
 		// Default to dialog if classification is unclear
 		sm.handleDialog(ctx, input)
 	}
-}
-
-// handleMetaCommand checks for local commands that don't need the LLM.
-// Returns true if the input was handled as a meta-command.
-func (sm *SceneManager) handleMetaCommand(input string) bool {
-	lower := strings.ToLower(strings.TrimSpace(input))
-	switch lower {
-	case "help", "?":
-		sm.displayHelp()
-	case "scene":
-		sm.ui.DisplaySystemMessage(fmt.Sprintf("=== %s ===", sm.currentScene.Name))
-		sm.ui.DisplayNarrative(sm.currentScene.Description)
-		if len(sm.currentScene.SituationAspects) > 0 {
-			sm.ui.DisplaySystemMessage("Situation Aspects:")
-			for _, a := range sm.currentScene.SituationAspects {
-				sm.ui.DisplaySystemMessage(fmt.Sprintf("  - \"%s\"", a.Aspect))
-			}
-		}
-	case "character", "char", "me":
-		sm.ui.DisplayCharacter()
-	case "status":
-		sm.ui.DisplayCharacter()
-		if sm.currentScene.IsConflict {
-			sm.ui.DisplaySystemMessage("You are in a conflict.")
-		}
-	default:
-		return false
-	}
-	return true
-}
-
-// displayHelp shows available commands
-func (sm *SceneManager) displayHelp() {
-	sm.ui.DisplaySystemMessage("Commands:")
-	sm.ui.DisplaySystemMessage("  help, ?      - Show this help message")
-	sm.ui.DisplaySystemMessage("  scene        - Redisplay the current scene")
-	sm.ui.DisplaySystemMessage("  character    - Show your character sheet")
-	sm.ui.DisplaySystemMessage("  status       - Show character and scene status")
-	sm.ui.DisplaySystemMessage("  exit, quit   - Leave the game")
-	if sm.currentScene.IsConflict {
-		sm.ui.DisplaySystemMessage("  concede      - Concede the current conflict")
-	}
-	sm.ui.DisplaySystemMessage("")
-	sm.ui.DisplaySystemMessage("Or type naturally to interact with the scene.")
 }
 
 // classifyInput uses LLM to determine if input is dialog, clarification, or action

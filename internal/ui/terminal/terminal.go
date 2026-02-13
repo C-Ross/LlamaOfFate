@@ -9,10 +9,14 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
 )
 
+// compile-time check
+var _ uicontract.UI = (*TerminalUI)(nil)
+
 // TerminalUI implements the UI interface for terminal-based interaction
 type TerminalUI struct {
 	reader    *bufio.Reader
 	sceneInfo uicontract.SceneInfo
+	shownHint bool // true after the initial help hint has been displayed
 }
 
 // NewTerminalUI creates a new terminal UI instance
@@ -22,13 +26,18 @@ func NewTerminalUI() *TerminalUI {
 	}
 }
 
-// SetSceneInfo sets the scene information for command handling
+// SetSceneInfo sets the scene information for display methods such as DisplayCharacter.
 func (ui *TerminalUI) SetSceneInfo(sceneInfo uicontract.SceneInfo) {
 	ui.sceneInfo = sceneInfo
 }
 
-// ReadInput reads input from the terminal and returns cleaned input, exit status, and error
+// ReadInput reads input from the terminal and returns cleaned input, exit status, and error.
+// Meta-commands (help, scene, etc.) are handled here so the engine never sees them.
 func (ui *TerminalUI) ReadInput() (input string, isExit bool, err error) {
+	if !ui.shownHint {
+		fmt.Println("Type 'help' for commands, 'exit' to end.")
+		ui.shownHint = true
+	}
 	fmt.Print("\n> ")
 
 	rawInput, err := ui.reader.ReadString('\n')
@@ -47,9 +56,8 @@ func (ui *TerminalUI) ReadInput() (input string, isExit bool, err error) {
 		return input, true, nil
 	}
 
-	// Handle special commands internally if scene info is available
+	// Handle meta-commands locally; return empty string so the engine skips them
 	if ui.sceneInfo != nil && ui.handleSpecialCommands(input) {
-		// Command was handled, return empty input to indicate no further processing needed
 		return "", false, nil
 	}
 
@@ -161,67 +169,9 @@ func (ui *TerminalUI) PromptForInvoke(available []uicontract.InvokableAspect, fa
 	}
 }
 
-// handleSpecialCommands processes special scene commands and returns true if handled
-func (ui *TerminalUI) handleSpecialCommands(input string) bool {
-	parts := strings.Fields(strings.ToLower(input))
-	if len(parts) == 0 {
-		return false
-	}
-
-	command := parts[0]
-
-	switch command {
-	case "help":
-		ui.showHelp()
-		return true
-	case "scene":
-		ui.displayScene()
-		return true
-	case "character", "char":
-		ui.DisplayCharacter()
-		return true
-	case "status":
-		ui.displayStatus()
-		return true
-	case "aspects":
-		ui.displayAspects()
-		return true
-	case "history", "conversation":
-		ui.displayConversationHistory()
-		return true
-	}
-
-	return false
-}
-
-// Display methods
-func (ui *TerminalUI) displayScene() {
-	if ui.sceneInfo == nil {
-		fmt.Println("No scene information available.")
-		return
-	}
-
-	scene := ui.sceneInfo.GetCurrentScene()
-	if scene == nil {
-		fmt.Println("No active scene.")
-		return
-	}
-
-	fmt.Printf("\n=== %s ===\n", scene.Name)
-	fmt.Printf("%s\n", scene.Description)
-
-	if len(scene.SituationAspects) > 0 {
-		fmt.Println("\nSituation Aspects:")
-		for _, aspect := range scene.SituationAspects {
-			invokes := ""
-			if aspect.FreeInvokes > 0 {
-				invokes = fmt.Sprintf(" (%d free invoke(s))", aspect.FreeInvokes)
-			}
-			fmt.Printf("  - %s%s\n", aspect.Aspect, invokes)
-		}
-	}
-}
-
+// DisplayCharacter displays the player character sheet.
+// The engine calls this via the UI interface; the data comes from the
+// SceneInfo provider injected by SetSceneInfo.
 func (ui *TerminalUI) DisplayCharacter() {
 	if ui.sceneInfo == nil {
 		fmt.Println("No scene information available.")
@@ -250,39 +200,105 @@ func (ui *TerminalUI) DisplayCharacter() {
 	fmt.Printf("Fate Points: %d\n", player.FatePoints)
 }
 
-func (ui *TerminalUI) displayStatus() {
-	if ui.sceneInfo == nil {
-		fmt.Println("No scene information available.")
+// handleSpecialCommands processes meta-commands and returns true if handled.
+func (ui *TerminalUI) handleSpecialCommands(input string) bool {
+	parts := strings.Fields(strings.ToLower(input))
+	if len(parts) == 0 {
+		return false
+	}
+
+	switch parts[0] {
+	case "help", "?":
+		ui.showHelp()
+	case "scene":
+		ui.displayScene()
+	case "character", "char", "me":
+		ui.DisplayCharacter()
+	case "status":
+		ui.displayStatus()
+	case "aspects":
+		ui.displayAspects()
+	case "history", "conversation":
+		ui.displayConversationHistory()
+	default:
+		return false
+	}
+	return true
+}
+
+func (ui *TerminalUI) showHelp() {
+	fmt.Println("\n=== Scene Commands ===")
+	fmt.Println("  help           - Show this help")
+	fmt.Println("  scene          - Show scene description")
+	fmt.Println("  character      - Show character details")
+	fmt.Println("  status         - Show character status (stress, consequences)")
+	fmt.Println("  aspects        - Show all available aspects")
+	fmt.Println("  history        - Show recent conversation history")
+	fmt.Println("  exit/quit      - End the scene")
+	fmt.Println("\n=== Natural Language Input ===")
+	fmt.Println("The system uses AI to understand your intent. You can:")
+	fmt.Println("")
+	fmt.Println("Dialog & Questions:")
+	fmt.Println("  \"What do I see?\" \"Look around\" \"Examine the door\"")
+	fmt.Println("  \"I say 'Hello there'\" \"Ask about the treasure\"")
+	fmt.Println("")
+	fmt.Println("Actions (requiring dice rolls):")
+	fmt.Println("  \"Attack the goblin\" \"Sneak past the guard\"")
+	fmt.Println("  \"Create an advantage by analyzing the situation\"")
+	fmt.Println("  \"Overcome the obstacle by climbing\"")
+	fmt.Println("")
+	fmt.Println("The AI will determine whether you're asking questions,")
+	fmt.Println("taking actions, or having conversations automatically!")
+}
+
+func (ui *TerminalUI) displayScene() {
+	scene := ui.sceneInfo.GetCurrentScene()
+	if scene == nil {
+		fmt.Println("No active scene.")
 		return
 	}
 
+	fmt.Printf("\n=== %s ===\n", scene.Name)
+	fmt.Printf("%s\n", scene.Description)
+
+	if len(scene.SituationAspects) > 0 {
+		fmt.Println("\nSituation Aspects:")
+		for _, aspect := range scene.SituationAspects {
+			invokes := ""
+			if aspect.FreeInvokes > 0 {
+				invokes = fmt.Sprintf(" (%d free invoke(s))", aspect.FreeInvokes)
+			}
+			fmt.Printf("  - %s%s\n", aspect.Aspect, invokes)
+		}
+	}
+}
+
+func (ui *TerminalUI) displayStatus() {
 	player := ui.sceneInfo.GetPlayer()
 	if player == nil {
+		fmt.Println("No active character.")
 		return
 	}
 
 	fmt.Println("\n=== Status ===")
 
-	// Show stress tracks
-	for trackType, track := range player.StressTracks {
-		fmt.Printf("%s: %s\n", strings.ToUpper(trackType[:1])+trackType[1:], track.String())
+	// Stress tracks
+	for _, track := range player.StressTracks {
+		fmt.Println(track.String())
 	}
 
-	// Show consequences
+	// Consequences
 	if len(player.Consequences) > 0 {
 		fmt.Println("\nConsequences:")
-		for _, consequence := range player.Consequences {
-			fmt.Printf("  %s: %s\n", consequence.Type, consequence.Aspect)
+		for _, c := range player.Consequences {
+			fmt.Printf("  %s: %s\n", c.Type, c.Aspect)
 		}
 	}
+
+	fmt.Printf("Fate Points: %d\n", player.FatePoints)
 }
 
 func (ui *TerminalUI) displayAspects() {
-	if ui.sceneInfo == nil {
-		fmt.Println("No scene information available.")
-		return
-	}
-
 	fmt.Println("\n=== Available Aspects ===")
 
 	player := ui.sceneInfo.GetPlayer()
@@ -303,6 +319,28 @@ func (ui *TerminalUI) displayAspects() {
 			}
 			fmt.Printf("  - %s%s\n", aspect.Aspect, invokes)
 		}
+	}
+}
+
+func (ui *TerminalUI) displayConversationHistory() {
+	fmt.Println("\n=== Recent Conversation ===")
+
+	history := ui.sceneInfo.GetConversationHistory()
+	if len(history) == 0 {
+		fmt.Println("No conversation history yet.")
+		return
+	}
+
+	// Show last 5 exchanges
+	start := len(history) - 5
+	if start < 0 {
+		start = 0
+	}
+
+	for i := start; i < len(history); i++ {
+		entry := history[i]
+		fmt.Printf("\n[%s] You: %s\n", entry.Type, entry.PlayerInput)
+		fmt.Printf("GM: %s\n", entry.GMResponse)
 	}
 }
 
@@ -377,58 +415,6 @@ func (ui *TerminalUI) DisplaySceneTransition(narrative string, newSceneHint stri
 	fmt.Println("════════════════════════════════════════════")
 }
 
-func (ui *TerminalUI) showHelp() {
-	fmt.Println("\n=== Scene Commands ===")
-	fmt.Println("  help           - Show this help")
-	fmt.Println("  scene          - Show scene description")
-	fmt.Println("  character      - Show character details")
-	fmt.Println("  status         - Show character status (stress, consequences)")
-	fmt.Println("  aspects        - Show all available aspects")
-	fmt.Println("  history        - Show recent conversation history")
-	fmt.Println("  exit/quit      - End the scene")
-	fmt.Println("\n=== Natural Language Input ===")
-	fmt.Println("The system uses AI to understand your intent. You can:")
-	fmt.Println("")
-	fmt.Println("Dialog & Questions:")
-	fmt.Println("  \"What do I see?\" \"Look around\" \"Examine the door\"")
-	fmt.Println("  \"I say 'Hello there'\" \"Ask about the treasure\"")
-	fmt.Println("")
-	fmt.Println("Actions (requiring dice rolls):")
-	fmt.Println("  \"Attack the goblin\" \"Sneak past the guard\"")
-	fmt.Println("  \"Create an advantage by analyzing the situation\"")
-	fmt.Println("  \"Overcome the obstacle by climbing\"")
-	fmt.Println("")
-	fmt.Println("The AI will determine whether you're asking questions,")
-	fmt.Println("taking actions, or having conversations automatically!")
-}
-
-func (ui *TerminalUI) displayConversationHistory() {
-	if ui.sceneInfo == nil {
-		fmt.Println("No scene information available.")
-		return
-	}
-
-	fmt.Println("\n=== Recent Conversation ===")
-
-	history := ui.sceneInfo.GetConversationHistory()
-	if len(history) == 0 {
-		fmt.Println("No conversation history yet.")
-		return
-	}
-
-	// Show last 5 exchanges
-	start := len(history) - 5
-	if start < 0 {
-		start = 0
-	}
-
-	for i := start; i < len(history); i++ {
-		entry := history[i]
-		fmt.Printf("\n[%s] You: %s\n", entry.Type, entry.PlayerInput)
-		fmt.Printf("GM: %s\n", entry.GMResponse)
-	}
-}
-
 // isExitCommand checks if the input is an exit command
 func (ui *TerminalUI) isExitCommand(input string) bool {
 	exitCommands := []string{"exit", "quit", "end", "leave", "resolve"}
@@ -442,6 +428,3 @@ func (ui *TerminalUI) isExitCommand(input string) bool {
 
 	return false
 }
-
-// Ensure TerminalUI implements the UI interface
-var _ uicontract.UI = (*TerminalUI)(nil)
