@@ -1,12 +1,11 @@
 package prompt
 
 import (
-	"time"
-
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
+	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
 )
 
 // Template data types for LLM prompt generation.
@@ -233,14 +232,9 @@ type RecoveryAttempt struct {
 	Outcome    string // "success" or "failure"
 }
 
-// ConversationEntry represents a single exchange in the conversation history.
-// TODO(#44): Move to ui/types package — this is a domain/UI concept that pulls prompt into the UI dependency chain.
-type ConversationEntry struct {
-	PlayerInput string    `json:"player_input"`
-	GMResponse  string    `json:"gm_response"`
-	Timestamp   time.Time `json:"timestamp"`
-	Type        string    `json:"type"` // "dialog", "action", "clarification"
-}
+// ConversationEntry is a type alias for the canonical definition in uicontract.
+// Existing code can continue using prompt.ConversationEntry without changes.
+type ConversationEntry = uicontract.ConversationEntry
 
 // ActionParseTemplateData holds the data for action parse template
 type ActionParseTemplateData struct {

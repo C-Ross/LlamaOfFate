@@ -6,13 +6,13 @@ import (
 	"os"
 	"strings"
 
-	"github.com/C-Ross/LlamaOfFate/internal/engine"
+	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
 )
 
 // TerminalUI implements the UI interface for terminal-based interaction
 type TerminalUI struct {
 	reader    *bufio.Reader
-	sceneInfo engine.SceneInfo
+	sceneInfo uicontract.SceneInfo
 }
 
 // NewTerminalUI creates a new terminal UI instance
@@ -23,7 +23,7 @@ func NewTerminalUI() *TerminalUI {
 }
 
 // SetSceneInfo sets the scene information for command handling
-func (ui *TerminalUI) SetSceneInfo(sceneInfo engine.SceneInfo) {
+func (ui *TerminalUI) SetSceneInfo(sceneInfo uicontract.SceneInfo) {
 	ui.sceneInfo = sceneInfo
 }
 
@@ -88,9 +88,9 @@ func (ui *TerminalUI) DisplaySystemMessage(message string) {
 }
 
 // PromptForInvoke prompts the player to invoke an aspect after a roll
-func (ui *TerminalUI) PromptForInvoke(available []engine.InvokableAspect, fatePoints int, currentResult string, shiftsNeeded int) *engine.InvokeChoice {
+func (ui *TerminalUI) PromptForInvoke(available []uicontract.InvokableAspect, fatePoints int, currentResult string, shiftsNeeded int) *uicontract.InvokeChoice {
 	// Filter to only show usable aspects (has free invokes OR player has FP)
-	var usable []engine.InvokableAspect
+	var usable []uicontract.InvokableAspect
 	for _, aspect := range available {
 		if aspect.AlreadyUsed {
 			continue
@@ -101,7 +101,7 @@ func (ui *TerminalUI) PromptForInvoke(available []engine.InvokableAspect, fatePo
 	}
 
 	if len(usable) == 0 {
-		return &engine.InvokeChoice{Aspect: nil}
+		return &uicontract.InvokeChoice{Aspect: nil}
 	}
 
 	// Build prompt showing available aspects with numbers
@@ -123,12 +123,12 @@ func (ui *TerminalUI) PromptForInvoke(available []engine.InvokableAspect, fatePo
 	// Read choice
 	input, err := ui.reader.ReadString('\n')
 	if err != nil {
-		return &engine.InvokeChoice{Aspect: nil}
+		return &uicontract.InvokeChoice{Aspect: nil}
 	}
 	input = strings.TrimSpace(input)
 
 	if input == "" {
-		return &engine.InvokeChoice{Aspect: nil}
+		return &uicontract.InvokeChoice{Aspect: nil}
 	}
 
 	// Parse number
@@ -136,7 +136,7 @@ func (ui *TerminalUI) PromptForInvoke(available []engine.InvokableAspect, fatePo
 	_, err = fmt.Sscanf(input, "%d", &choice)
 	if err != nil || choice < 1 || choice > len(usable) {
 		fmt.Println("Invalid choice.")
-		return &engine.InvokeChoice{Aspect: nil}
+		return &uicontract.InvokeChoice{Aspect: nil}
 	}
 
 	selectedAspect := &usable[choice-1]
@@ -148,13 +148,13 @@ func (ui *TerminalUI) PromptForInvoke(available []engine.InvokableAspect, fatePo
 	fmt.Print("+2 or Reroll? (b/r): ")
 	input, err = ui.reader.ReadString('\n')
 	if err != nil {
-		return &engine.InvokeChoice{Aspect: nil}
+		return &uicontract.InvokeChoice{Aspect: nil}
 	}
 	input = strings.TrimSpace(strings.ToLower(input))
 
 	isReroll := input == "r" || input == "reroll"
 
-	return &engine.InvokeChoice{
+	return &uicontract.InvokeChoice{
 		Aspect:   selectedAspect,
 		UseFree:  useFree,
 		IsReroll: isReroll,
@@ -307,7 +307,7 @@ func (ui *TerminalUI) displayAspects() {
 }
 
 // DisplayConflictStart displays the start of a conflict with initiative order
-func (ui *TerminalUI) DisplayConflictStart(conflictType string, initiatorName string, participants []engine.ConflictParticipantInfo) {
+func (ui *TerminalUI) DisplayConflictStart(conflictType string, initiatorName string, participants []uicontract.ConflictParticipantInfo) {
 	fmt.Println("\n╔══════════════════════════════════════════╗")
 	fmt.Printf("║         CONFLICT BEGINS!                 ║\n")
 	fmt.Printf("║         Type: %-25s  ║\n", conflictType)
@@ -444,4 +444,4 @@ func (ui *TerminalUI) isExitCommand(input string) bool {
 }
 
 // Ensure TerminalUI implements the UI interface
-var _ engine.UI = (*TerminalUI)(nil)
+var _ uicontract.UI = (*TerminalUI)(nil)
