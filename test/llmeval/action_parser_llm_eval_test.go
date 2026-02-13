@@ -817,7 +817,7 @@ func TestActionParser_LLMEvaluation(t *testing.T) {
 }
 
 // evaluateTestCase runs a single test case and returns the result
-func evaluateTestCase(ctx context.Context, parser *engine.LLMActionParser, char *character.Character, tc ActionParserTestCase) EvaluationResult {
+func evaluateTestCase(ctx context.Context, parser engine.ActionParser, char *character.Character, tc ActionParserTestCase) EvaluationResult {
 	req := engine.ActionParseRequest{
 		Character: char,
 		RawInput:  tc.RawInput,
