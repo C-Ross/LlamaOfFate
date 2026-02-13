@@ -21,29 +21,29 @@ type AspectGenerationResponse struct {
 	Reasoning   string `json:"reasoning"`    // Explanation of why this aspect was chosen
 }
 
-// AspectGeneratorI is the interface for generating aspects from Create an Advantage actions.
+// AspectGenerator is the interface for generating aspects from Create an Advantage actions.
 // This enables dependency injection and testability by allowing mock implementations.
-type AspectGeneratorI interface {
+type AspectGenerator interface {
 	GenerateAspect(ctx context.Context, req prompt.AspectGenerationRequest) (*AspectGenerationResponse, error)
 }
 
-// Compile-time check that AspectGenerator satisfies AspectGeneratorI.
-var _ AspectGeneratorI = (*AspectGenerator)(nil)
+// Compile-time check that LLMAspectGenerator satisfies AspectGenerator.
+var _ AspectGenerator = (*LLMAspectGenerator)(nil)
 
-// AspectGenerator handles generating aspects based on Create an Advantage attempts
-type AspectGenerator struct {
+// LLMAspectGenerator handles generating aspects based on Create an Advantage attempts
+type LLMAspectGenerator struct {
 	llmClient llm.LLMClient
 }
 
-// NewAspectGenerator creates a new aspect generator
-func NewAspectGenerator(llmClient llm.LLMClient) *AspectGenerator {
-	return &AspectGenerator{
+// NewAspectGenerator creates a new LLM-backed aspect generator
+func NewAspectGenerator(llmClient llm.LLMClient) *LLMAspectGenerator {
+	return &LLMAspectGenerator{
 		llmClient: llmClient,
 	}
 }
 
 // GenerateAspect generates an aspect based on the Create an Advantage attempt and outcome
-func (ag *AspectGenerator) GenerateAspect(ctx context.Context, req prompt.AspectGenerationRequest) (*AspectGenerationResponse, error) {
+func (ag *LLMAspectGenerator) GenerateAspect(ctx context.Context, req prompt.AspectGenerationRequest) (*AspectGenerationResponse, error) {
 	if req.Action.Type != action.CreateAdvantage {
 		return nil, fmt.Errorf("action type must be CreateAdvantage, got %s", req.Action.Type.String())
 	}
@@ -74,7 +74,7 @@ func (ag *AspectGenerator) GenerateAspect(ctx context.Context, req prompt.Aspect
 }
 
 // getSystemPrompt returns the system prompt for aspect generation
-func (ag *AspectGenerator) getSystemPrompt() string {
+func (ag *LLMAspectGenerator) getSystemPrompt() string {
 	promptText, err := prompt.RenderAspectGenerationSystem()
 	if err != nil {
 		// Fallback to hardcoded prompt if template fails
@@ -107,7 +107,7 @@ Your response must be in JSON format with these fields:
 }
 
 // buildPrompt constructs the detailed prompt for aspect generation
-func (ag *AspectGenerator) buildPrompt(req prompt.AspectGenerationRequest) string {
+func (ag *LLMAspectGenerator) buildPrompt(req prompt.AspectGenerationRequest) string {
 	promptText, err := prompt.RenderAspectGeneration(req)
 	if err != nil {
 		// Fallback to the old string building method if template fails
@@ -117,7 +117,7 @@ func (ag *AspectGenerator) buildPrompt(req prompt.AspectGenerationRequest) strin
 }
 
 // buildPromptFallback is the original string building method as a fallback
-func (ag *AspectGenerator) buildPromptFallback(req prompt.AspectGenerationRequest) string {
+func (ag *LLMAspectGenerator) buildPromptFallback(req prompt.AspectGenerationRequest) string {
 	var prompt strings.Builder
 
 	prompt.WriteString("Generate an aspect for a Create an Advantage action with the following details:\n\n")
@@ -181,7 +181,7 @@ func (ag *AspectGenerator) buildPromptFallback(req prompt.AspectGenerationReques
 }
 
 // parseResponse parses the LLM response and extracts aspect information
-func (ag *AspectGenerator) parseResponse(content string, outcome *dice.Outcome) (*AspectGenerationResponse, error) {
+func (ag *LLMAspectGenerator) parseResponse(content string, outcome *dice.Outcome) (*AspectGenerationResponse, error) {
 	// This is a simplified parser. In a production system, you'd want more robust JSON parsing
 	// For now, we'll extract key information and provide defaults based on the outcome
 
