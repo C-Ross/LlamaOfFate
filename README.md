@@ -137,6 +137,14 @@ just validate
 just run
 ```
 
+## Saving and Loading Games
+
+LlamaOfFate automatically saves your game progress at key points during play. When you restart the application, it will automatically resume from your last save.
+
+- **Auto-save**: The game saves automatically at scene transitions and key moments
+- **Auto-resume**: On startup, the game resumes from the last unfinished scenario
+- **Save location**: Game saves are stored as YAML files (configurable via `GameSaver` interface)
+
 ## Package Structure
 
 ```
@@ -154,6 +162,7 @@ LlamaOfFate/
 │   │   └── azure/              # Azure OpenAI implementation
 │   ├── prompt/                 # LLM prompt templates and response parsing
 │   ├── session/                # Session logging for game transcripts
+│   ├── storage/                # Game state persistence (YAML save/load)
 │   ├── logging/                # Application logging
 │   └── ui/
 │       └── terminal/           # Terminal-based interface
@@ -179,6 +188,7 @@ LlamaOfFate/
 - **`internal/llm/`**: LLM integration with Azure OpenAI backend, including retry logic and response handling
 - **`internal/prompt/`**: LLM prompt template rendering and response parsing (template data types, render functions, marker extraction)
 - **`internal/session/`**: Session logging for game transcripts
+- **`internal/storage/`**: Game state persistence with YAML-based save/load
 - **`internal/ui/terminal/`**: Terminal-based user interface implementation
 - **`examples/`**: Example programs demonstrating LLM scene loops, scenario generation, and walkthroughs
 - **`configs/`**: YAML configuration files (azure-llm.yaml)
@@ -197,11 +207,11 @@ LlamaOfFate/
 - ✅ Conflict resolution system with stress and consequences
 - ✅ CLI interface for game interaction
 - ✅ Session logging for game transcripts
+- ✅ Game state persistence (save/load functionality via YAML)
 - ✅ Integration tests and LLM evaluation tests
 
 ### Planned Features
 - 📋 Additional LLM backends (Ollama, OpenAI direct)
-- 📋 Persistence layer (save/load functionality)
 - 📋 Web-based user interface
 - 📋 Public API packages for external integrations
 - 📋 Database backends for long-term storage
