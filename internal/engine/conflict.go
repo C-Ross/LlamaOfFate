@@ -222,12 +222,13 @@ func (sm *SceneManager) advanceConflictTurns(ctx context.Context) {
 
 		// If it's the player's turn, stop and let them act
 		if currentActor == sm.player.ID {
-			sm.ui.DisplayTurnAnnouncement(sm.player.Name, sm.currentScene.ConflictState.Round, true)
+			sm.renderEvents([]GameEvent{TurnAnnouncementEvent{CharacterName: sm.player.Name, TurnNumber: sm.currentScene.ConflictState.Round, IsPlayer: true}})
 			break
 		}
 
-		// Process NPC turn
-		sm.processNPCTurn(ctx, currentActor)
+		// Process NPC turn — events are rendered inline by processNPCTurn
+		npcEvents := sm.processNPCTurn(ctx, currentActor)
+		sm.renderEvents(npcEvents)
 
 		// Advance to next turn
 		sm.currentScene.NextTurn()
