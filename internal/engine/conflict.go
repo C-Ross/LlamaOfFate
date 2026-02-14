@@ -634,9 +634,7 @@ func (sm *SceneManager) generateAspectName(ctx context.Context, parsedAction *ac
 // and returns a DamageResolutionEvent describing everything that happened.
 func (sm *SceneManager) applyDamageToTarget(ctx context.Context, target *character.Character, shifts int, stressType character.StressTrackType) DamageResolutionEvent {
 	dmgEvent := DamageResolutionEvent{
-		TargetName:  target.Name,
-		TotalShifts: shifts,
-		StressType:  string(stressType),
+		TargetName: target.Name,
 	}
 
 	// Try to absorb with stress track
@@ -684,10 +682,9 @@ func (sm *SceneManager) fillTargetStressOverflow(ctx context.Context, target *ch
 	remaining := shifts - absorbed
 
 	dmgEvent.Consequence = &ConsequenceDetail{
-		TargetName: target.Name,
-		Severity:   string(bestConseq.Type),
-		Aspect:     consequence.Aspect,
-		Absorbed:   absorbed,
+		Severity: string(bestConseq.Type),
+		Aspect:   consequence.Aspect,
+		Absorbed: absorbed,
 	}
 
 	// If there's remaining damage, try stress again or take out
@@ -1028,10 +1025,9 @@ func (sm *SceneManager) applyConsequence(ctx context.Context, conseqType charact
 	remaining := shifts - absorbed
 
 	pce := PlayerConsequenceEvent{
-		Severity:        string(conseqType),
-		Aspect:          aspectName,
-		Absorbed:        absorbed,
-		RemainingShifts: remaining,
+		Severity: string(conseqType),
+		Aspect:   aspectName,
+		Absorbed: absorbed,
 	}
 
 	var events []GameEvent

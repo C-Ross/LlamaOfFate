@@ -477,11 +477,10 @@ func (ui *TerminalUI) displaySceneTransition(narrative string, newSceneHint stri
 func (ui *TerminalUI) displayDamageResolution(e uicontract.DamageResolutionEvent) {
 	if e.Absorbed != nil {
 		fmt.Printf("\n%s absorbs the damage with their %s stress track.\n", e.TargetName, e.Absorbed.TrackType)
-		return
 	}
 	if e.Consequence != nil {
 		fmt.Printf("\n%s takes a %s consequence: \"%s\" (absorbs %d shifts)\n",
-			e.Consequence.TargetName, e.Consequence.Severity, e.Consequence.Aspect, e.Consequence.Absorbed)
+			e.TargetName, e.Consequence.Severity, e.Consequence.Aspect, e.Consequence.Absorbed)
 	}
 	if e.RemainingAbsorbed != nil {
 		fmt.Printf("\n%s absorbs remaining %d shifts with stress.\n",
@@ -512,8 +511,12 @@ func (ui *TerminalUI) displayPlayerAttackResult(e uicontract.PlayerAttackResultE
 
 // displayNPCAttack renders an NPCAttackEvent.
 func (ui *TerminalUI) displayNPCAttack(e uicontract.NPCAttackEvent) {
+	defSkillDisplay := e.DefenseSkill
+	if e.FullDefense {
+		defSkillDisplay = fmt.Sprintf("%s+2 (Full Defense)", e.DefenseSkill)
+	}
 	fmt.Printf("\n%s attacks %s with %s (%s) vs %s (%s)\n",
-		e.AttackerName, e.TargetName, e.AttackSkill, e.AttackResult, e.DefenseSkill, e.DefenseResult)
+		e.AttackerName, e.TargetName, e.AttackSkill, e.AttackResult, defSkillDisplay, e.DefenseResult)
 	if e.FinalOutcome != e.InitialOutcome {
 		fmt.Printf("\nFinal outcome: %s\n", e.FinalOutcome)
 	}

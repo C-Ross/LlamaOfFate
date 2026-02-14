@@ -153,18 +153,15 @@ type StressAbsorptionDetail struct {
 
 // ConsequenceDetail describes a consequence taken during damage resolution.
 type ConsequenceDetail struct {
-	TargetName string // Character who took the consequence
-	Severity   string // "mild", "moderate", "severe"
-	Aspect     string // The consequence aspect text
-	Absorbed   int    // Shifts absorbed by this consequence
+	Severity string // "mild", "moderate", "severe"
+	Aspect   string // The consequence aspect text
+	Absorbed int    // Shifts absorbed by this consequence
 }
 
 // DamageResolutionEvent is emitted when damage is applied to a target (NPC).
 // It rolls up stress absorption, consequences, and taken-out into one event.
 type DamageResolutionEvent struct {
 	TargetName        string                  // The defender/target's name
-	TotalShifts       int                     // Shifts of stress dealt
-	StressType        string                  // "physical" or "mental"
 	Absorbed          *StressAbsorptionDetail // Non-nil if stress track absorbed damage
 	Consequence       *ConsequenceDetail      // Non-nil if a consequence was taken
 	RemainingAbsorbed *StressAbsorptionDetail // Non-nil if remaining shifts were absorbed after consequence
@@ -230,11 +227,10 @@ func (PlayerDefendedEvent) gameEvent() {}
 
 // PlayerConsequenceEvent is emitted when the player takes a consequence.
 type PlayerConsequenceEvent struct {
-	Severity        string                  // "mild", "moderate", "severe"
-	Aspect          string                  // The consequence aspect text
-	Absorbed        int                     // Shifts absorbed by the consequence
-	RemainingShifts int                     // Remaining shifts after absorption (0 if fully absorbed)
-	StressAbsorbed  *StressAbsorptionDetail // Non-nil if remaining shifts went to stress
+	Severity       string                  // "mild", "moderate", "severe"
+	Aspect         string                  // The consequence aspect text
+	Absorbed       int                     // Shifts absorbed by the consequence
+	StressAbsorbed *StressAbsorptionDetail // Non-nil if remaining shifts went to stress
 }
 
 func (PlayerConsequenceEvent) gameEvent() {}

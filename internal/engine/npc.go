@@ -356,11 +356,6 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 
 	// Build the composite NPCAttackEvent
 	finalOutcomeStr := outcome.Type.String()
-	defenseDisplay := defenseSkill
-	if fullDefense {
-		defenseDisplay = fmt.Sprintf("%s+2 (Full Defense)", defenseSkill)
-	}
-
 	// Generate narrative for the attack
 	npcNarrative, err := sm.generateNPCAttackNarrative(ctx, npc, attackSkill, outcome)
 	if err != nil {
@@ -381,7 +376,7 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 		TargetName:     target.Name,
 		AttackSkill:    attackSkill,
 		AttackResult:   npcRoll.FinalValue.String(),
-		DefenseSkill:   defenseDisplay,
+		DefenseSkill:   defenseSkill,
 		DefenseResult:  targetDefense.FinalValue.String(),
 		FullDefense:    fullDefense,
 		InitialOutcome: initialOutcome.Type.String(),

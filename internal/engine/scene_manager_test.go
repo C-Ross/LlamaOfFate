@@ -67,7 +67,7 @@ func (m *MockUI) Emit(event GameEvent) {
 			m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("DamageRes: %s absorbs the damage with their %s stress track", e.TargetName, e.Absorbed.TrackType))
 		}
 		if e.Consequence != nil {
-			m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("DamageRes: %s takes a %s consequence: \"%s\" (absorbs %d shifts)", e.Consequence.TargetName, e.Consequence.Severity, e.Consequence.Aspect, e.Consequence.Absorbed))
+			m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("DamageRes: %s takes a %s consequence: \"%s\" (absorbs %d shifts)", e.TargetName, e.Consequence.Severity, e.Consequence.Aspect, e.Consequence.Absorbed))
 		}
 		if e.RemainingAbsorbed != nil {
 			m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("DamageRes: %s absorbs remaining %d shifts with stress", e.TargetName, e.RemainingAbsorbed.Shifts))
@@ -89,7 +89,11 @@ func (m *MockUI) Emit(event GameEvent) {
 	case AspectCreatedEvent:
 		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("AspectCreated: '%s' with %d free invoke(s)", e.AspectName, e.FreeInvokes))
 	case NPCAttackEvent:
-		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("NPCAttack: %s attacks %s with %s (%s) vs %s (%s)", e.AttackerName, e.TargetName, e.AttackSkill, e.AttackResult, e.DefenseSkill, e.DefenseResult))
+		defSkill := e.DefenseSkill
+		if e.FullDefense {
+			defSkill = fmt.Sprintf("%s+2 (Full Defense)", e.DefenseSkill)
+		}
+		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("NPCAttack: %s attacks %s with %s (%s) vs %s (%s)", e.AttackerName, e.TargetName, e.AttackSkill, e.AttackResult, defSkill, e.DefenseResult))
 	case PlayerStressEvent:
 		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("PlayerStress: %d %s stress (%s)", e.Shifts, e.StressType, e.TrackState))
 	case PlayerDefendedEvent:
