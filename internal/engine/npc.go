@@ -323,50 +323,42 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 	targetDefense := sm.roller.RollWithModifier(dice.Mediocre, int(targetDefenseLevel)+defenseBonus)
 
 	// Display the mechanical result
-	defenseDisplay := defenseSkill
-	if defenseBonus > 0 {
-		defenseDisplay = fmt.Sprintf("%s+2 (Full Defense)", defenseSkill)
-	}
-
-	var events []GameEvent
-	events = append(events, SystemMessageEvent{Message: fmt.Sprintf(
-		"%s attacks %s with %s (%s) vs %s (%s)",
-		npc.Name,
-		target.Name,
-		attackSkill,
-		npcRoll.FinalValue.String(),
-		defenseDisplay,
-		targetDefense.FinalValue.String(),
-	)})
+	fullDefense := defenseBonus > 0
 
 	// Initial outcome (before player invokes)
 	initialOutcome := npcRoll.CompareAgainst(targetDefense.FinalValue)
-	events = append(events, SystemMessageEvent{Message: fmt.Sprintf("Initial outcome: %s", initialOutcome.Type.String())})
 
-	// Render events so far before blocking invoke loop
-	sm.renderEvents(events)
-	events = nil
+	var events []GameEvent
 
 	// If target is the player, allow them to invoke aspects to improve defense
+	// NOTE: This still uses the legacy blocking invoke path — will be removed in #70
 	if target.ID == sm.player.ID {
+		// Render initial attack info before blocking invoke loop
+		sm.renderEvents([]GameEvent{
+			SystemMessageEvent{Message: fmt.Sprintf(
+				"%s attacks %s with %s (%s) vs %s (%s)",
+				npc.Name, target.Name, attackSkill,
+				npcRoll.FinalValue.String(), defenseSkill, targetDefense.FinalValue.String(),
+			)},
+			SystemMessageEvent{Message: fmt.Sprintf("Initial outcome: %s", initialOutcome.Type.String())},
+		})
+
 		// Create a temporary action to track invokes for defense
 		defenseAction := action.NewAction("defense-invoke", sm.player.ID, action.Defend, defenseSkill, "Defending against attack")
 
 		// Player can invoke to improve their defense
 		// isDefense=true means skip prompt if attack already fails
 		targetDefense = sm.legacyHandlePostRollInvokes(targetDefense, npcRoll.FinalValue, defenseAction, true)
-
-		// Recalculate outcome with potentially improved defense
-		// Note: For defense, we compare attacker vs defender, so we still use npcRoll.CompareAgainst
-		// but the targetDefense.FinalValue may have increased
 	}
 
 	// Compare results (final)
 	outcome := npcRoll.CompareAgainst(targetDefense.FinalValue)
 
-	// Display updated outcome if it changed
-	if outcome.Type != initialOutcome.Type {
-		events = append(events, SystemMessageEvent{Message: fmt.Sprintf("Final outcome: %s", outcome.Type.String())})
+	// Build the composite NPCAttackEvent
+	finalOutcomeStr := outcome.Type.String()
+	defenseDisplay := defenseSkill
+	if fullDefense {
+		defenseDisplay = fmt.Sprintf("%s+2 (Full Defense)", defenseSkill)
 	}
 
 	// Generate narrative for the attack
@@ -383,10 +375,19 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 			npcNarrative = fmt.Sprintf("%s's attack misses.", npc.Name)
 		}
 	}
-	events = append(events, NarrativeEvent{Text: npcNarrative})
 
-	// Render events before damage application (which may trigger mid-flow prompts)
-	sm.renderEvents(events)
+	events = append(events, NPCAttackEvent{
+		AttackerName:   npc.Name,
+		TargetName:     target.Name,
+		AttackSkill:    attackSkill,
+		AttackResult:   npcRoll.FinalValue.String(),
+		DefenseSkill:   defenseDisplay,
+		DefenseResult:  targetDefense.FinalValue.String(),
+		FullDefense:    fullDefense,
+		InitialOutcome: initialOutcome.Type.String(),
+		FinalOutcome:   finalOutcomeStr,
+		Narrative:      npcNarrative,
+	})
 
 	// Only apply damage if target is the player (for now, NPC vs NPC damage not fully implemented)
 	if target.ID == sm.player.ID {
@@ -396,16 +397,16 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 			Description: npcNarrative,
 			Shifts:      outcome.Shifts,
 		}
-		sm.applyAttackDamageToPlayer(ctx, outcome, npc, attackCtx)
+		damageEvents := sm.applyAttackDamageToPlayer(ctx, outcome, npc, attackCtx)
+		events = append(events, damageEvents...)
 	} else {
 		// For NPC targets, just show the result
 		if outcome.Type == dice.Success || outcome.Type == dice.SuccessWithStyle {
-			sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf("%s takes %d shifts of stress!", target.Name, outcome.Shifts)}})
+			events = append(events, SystemMessageEvent{Message: fmt.Sprintf("%s takes %d shifts of stress!", target.Name, outcome.Shifts)})
 		}
 	}
 
-	// Events already rendered inline — return nil.
-	return nil
+	return events
 }
 
 // generateNPCAttackNarrative generates narrative for an NPC's attack

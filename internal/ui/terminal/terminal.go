@@ -58,6 +58,34 @@ func (ui *TerminalUI) Emit(event uicontract.GameEvent) {
 		ui.displayConflictEnd(e.Reason)
 	case uicontract.CharacterDisplayEvent:
 		ui.displayCharacter()
+
+	// Composite mechanical events
+	case uicontract.DefenseRollEvent:
+		ui.displaySystemMessage(fmt.Sprintf("%s defends with %s (%s)", e.DefenderName, e.Skill, e.Result))
+	case uicontract.DamageResolutionEvent:
+		ui.displayDamageResolution(e)
+	case uicontract.PlayerAttackResultEvent:
+		ui.displayPlayerAttackResult(e)
+	case uicontract.AspectCreatedEvent:
+		ui.displaySystemMessage(fmt.Sprintf("Created situation aspect: '%s' with %d free invoke(s)", e.AspectName, e.FreeInvokes))
+	case uicontract.NPCAttackEvent:
+		ui.displayNPCAttack(e)
+	case uicontract.PlayerStressEvent:
+		ui.displaySystemMessage(fmt.Sprintf("You take %d %s stress! (%s)", e.Shifts, e.StressType, e.TrackState))
+	case uicontract.PlayerDefendedEvent:
+		if e.IsTie {
+			ui.displaySystemMessage("The attack is deflected, but grants a boost!")
+		} else {
+			ui.displaySystemMessage("You successfully defend!")
+		}
+	case uicontract.PlayerConsequenceEvent:
+		ui.displayPlayerConsequence(e)
+	case uicontract.PlayerTakenOutEvent:
+		ui.displayPlayerTakenOut(e)
+	case uicontract.ConcessionEvent:
+		ui.displayConcession(e)
+	case uicontract.OutcomeChangedEvent:
+		ui.displaySystemMessage(fmt.Sprintf("Final outcome: %s", e.FinalOutcome))
 	}
 }
 
@@ -443,6 +471,96 @@ func (ui *TerminalUI) displaySceneTransition(narrative string, newSceneHint stri
 	}
 	fmt.Println()
 	fmt.Println("════════════════════════════════════════════")
+}
+
+// displayDamageResolution renders a DamageResolutionEvent (NPC taking damage).
+func (ui *TerminalUI) displayDamageResolution(e uicontract.DamageResolutionEvent) {
+	if e.Absorbed != nil {
+		fmt.Printf("\n%s absorbs the damage with their %s stress track.\n", e.TargetName, e.Absorbed.TrackType)
+		return
+	}
+	if e.Consequence != nil {
+		fmt.Printf("\n%s takes a %s consequence: \"%s\" (absorbs %d shifts)\n",
+			e.Consequence.TargetName, e.Consequence.Severity, e.Consequence.Aspect, e.Consequence.Absorbed)
+	}
+	if e.RemainingAbsorbed != nil {
+		fmt.Printf("\n%s absorbs remaining %d shifts with stress.\n",
+			e.TargetName, e.RemainingAbsorbed.Shifts)
+	}
+	if e.TakenOut {
+		fmt.Printf("\n=== %s is Taken Out! ===\n", e.TargetName)
+	}
+	if e.VictoryEnd {
+		fmt.Printf("\n=== Victory! All opponents defeated! ===\n")
+	}
+}
+
+// displayPlayerAttackResult renders a PlayerAttackResultEvent.
+func (ui *TerminalUI) displayPlayerAttackResult(e uicontract.PlayerAttackResultEvent) {
+	if e.TargetMissing {
+		fmt.Printf("\nCould not find target '%s' — attack has no effect.\n", e.TargetHint)
+		return
+	}
+	if e.IsTie {
+		fmt.Printf("\nTie! You gain a boost against your opponent.\n")
+		return
+	}
+	if e.Shifts > 0 {
+		fmt.Printf("\nYour attack deals %d shifts to %s!\n", e.Shifts, e.TargetName)
+	}
+}
+
+// displayNPCAttack renders an NPCAttackEvent.
+func (ui *TerminalUI) displayNPCAttack(e uicontract.NPCAttackEvent) {
+	fmt.Printf("\n%s attacks %s with %s (%s) vs %s (%s)\n",
+		e.AttackerName, e.TargetName, e.AttackSkill, e.AttackResult, e.DefenseSkill, e.DefenseResult)
+	if e.FinalOutcome != e.InitialOutcome {
+		fmt.Printf("\nFinal outcome: %s\n", e.FinalOutcome)
+	}
+	if e.Narrative != "" {
+		fmt.Printf("\n%s\n", e.Narrative)
+	}
+}
+
+// displayPlayerConsequence renders a PlayerConsequenceEvent.
+func (ui *TerminalUI) displayPlayerConsequence(e uicontract.PlayerConsequenceEvent) {
+	fmt.Printf("\nYou take a %s consequence: \"%s\"\n", e.Severity, e.Aspect)
+	fmt.Printf("\nThe consequence absorbs %d shifts.\n", e.Absorbed)
+	if e.StressAbsorbed != nil {
+		fmt.Printf("\nYou absorb the remaining %d shifts as stress. (%s)\n",
+			e.StressAbsorbed.Shifts, e.StressAbsorbed.TrackState)
+	}
+}
+
+// displayPlayerTakenOut renders a PlayerTakenOutEvent.
+func (ui *TerminalUI) displayPlayerTakenOut(e uicontract.PlayerTakenOutEvent) {
+	fmt.Printf("\n=== You Are Taken Out! ===\n")
+	fmt.Printf("\n%s decides your fate.\n", e.AttackerName)
+
+	switch e.Outcome {
+	case "game_over":
+		fmt.Printf("\n%s\n", e.Narrative)
+		ui.displayGameOver(fmt.Sprintf("%s has met their end.", e.AttackerName))
+	case "transition":
+		ui.displaySceneTransition(e.Narrative, e.NewSceneHint)
+		fmt.Printf("\nThe scene shifts around you...\n")
+	default: // "continue"
+		fmt.Printf("\n%s\n", e.Narrative)
+		ui.displayConflictEnd(fmt.Sprintf("%s has won the conflict.", e.AttackerName))
+	}
+}
+
+// displayConcession renders a ConcessionEvent.
+func (ui *TerminalUI) displayConcession(e uicontract.ConcessionEvent) {
+	fmt.Printf("\n=== You Concede! ===\n")
+	fmt.Printf("\nYou choose to lose the conflict on your own terms.\n")
+	fmt.Printf("\nYou get to narrate how you exit the scene and avoid the worst consequences.\n")
+	if e.ConsequenceCount > 0 {
+		fmt.Printf("\nYou gain %d Fate Points (1 for conceding + %d for consequences)! (Now: %d)\n",
+			e.FatePointsGained, e.ConsequenceCount, e.CurrentFatePoints)
+	} else {
+		fmt.Printf("\nYou gain a Fate Point for conceding! (Now: %d)\n", e.CurrentFatePoints)
+	}
 }
 
 // isExitCommand checks if the input is an exit command

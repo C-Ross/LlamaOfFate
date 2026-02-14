@@ -234,7 +234,7 @@ func (sm *SceneManager) HandleInput(ctx context.Context, input string) (*InputRe
 
 	// Check for concession command during conflict (before any roll per Fate Core rules).
 	if sm.currentScene.IsConflict && sm.isConcedeCommand(input) {
-		sm.handleConcession(ctx)
+		result.Events = sm.handleConcession(ctx)
 		if sm.pendingMidFlow != nil {
 			result.AwaitingMidFlow = true
 		}

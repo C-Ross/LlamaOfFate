@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -93,15 +92,16 @@ func TestStressOverflowNoConsequences_TakenOut(t *testing.T) {
 
 	ctx := context.Background()
 	attackCtx := prompt.AttackContext{Skill: "Fight", Description: "Slash", Shifts: 3}
-	sm.handleStressOverflow(ctx, 3, character.PhysicalStress, attacker, attackCtx)
+	events := sm.handleStressOverflow(ctx, 3, character.PhysicalStress, attacker, attackCtx)
 
 	// No consequences available → should NOT set pendingMidFlow, should go straight to taken out.
 	assert.Nil(t, sm.pendingMidFlow, "expected no pending mid-flow when no consequences available")
 
-	// Should have displayed "taken out" messages.
+	// Should have returned "taken out" events.
 	foundTakenOut := false
-	for _, msg := range mockUI.displayedMessages {
-		if strings.Contains(msg, "taken out") || strings.Contains(msg, "Taken Out") {
+	for _, evt := range events {
+		if pt, ok := evt.(PlayerTakenOutEvent); ok {
+			_ = pt
 			foundTakenOut = true
 			break
 		}
@@ -189,10 +189,10 @@ func TestProvideMidFlowResponse_TakenOutChoice(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	// Should have displayed "Taken Out" messages.
+	// Should have returned PlayerTakenOutEvent in the result events
 	foundTakenOut := false
-	for _, msg := range mockUI.displayedMessages {
-		if strings.Contains(msg, "Taken Out") {
+	for _, evt := range result.Events {
+		if _, ok := evt.(PlayerTakenOutEvent); ok {
 			foundTakenOut = true
 			break
 		}

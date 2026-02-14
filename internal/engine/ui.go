@@ -33,3 +33,18 @@ type InputRequestEvent = uicontract.InputRequestEvent
 type InputRequestType = uicontract.InputRequestType
 type InputOption = uicontract.InputOption
 type MidFlowResponse = uicontract.MidFlowResponse
+
+// Composite mechanical event aliases
+type DefenseRollEvent = uicontract.DefenseRollEvent
+type StressAbsorptionDetail = uicontract.StressAbsorptionDetail
+type ConsequenceDetail = uicontract.ConsequenceDetail
+type DamageResolutionEvent = uicontract.DamageResolutionEvent
+type PlayerAttackResultEvent = uicontract.PlayerAttackResultEvent
+type AspectCreatedEvent = uicontract.AspectCreatedEvent
+type NPCAttackEvent = uicontract.NPCAttackEvent
+type PlayerStressEvent = uicontract.PlayerStressEvent
+type PlayerDefendedEvent = uicontract.PlayerDefendedEvent
+type PlayerConsequenceEvent = uicontract.PlayerConsequenceEvent
+type PlayerTakenOutEvent = uicontract.PlayerTakenOutEvent
+type ConcessionEvent = uicontract.ConcessionEvent
+type OutcomeChangedEvent = uicontract.OutcomeChangedEvent

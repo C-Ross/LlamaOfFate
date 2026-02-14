@@ -492,13 +492,15 @@ func TestSceneManager_RollTargetDefense(t *testing.T) {
 	target.SetSkill("Will", 1)
 
 	// Test physical attack defense (uses Athletics)
-	defenseResult := sm.rollTargetDefense(target, "Fight")
+	defenseResult, defEvent := sm.rollTargetDefense(target, "Fight")
 	assert.NotNil(t, defenseResult)
+	assert.NotEmpty(t, defEvent.DefenderName)
 	// With seeded roller and Athletics +2, we get a predictable result
 
 	// Test mental attack defense (uses Will)
-	defenseResult = sm.rollTargetDefense(target, "Provoke")
+	defenseResult, defEvent = sm.rollTargetDefense(target, "Provoke")
 	assert.NotNil(t, defenseResult)
+	assert.NotEmpty(t, defEvent.DefenderName)
 }
 
 func TestSceneManager_ApplyDamageToTarget_StressAbsorbed(t *testing.T) {
@@ -512,17 +514,11 @@ func TestSceneManager_ApplyDamageToTarget_StressAbsorbed(t *testing.T) {
 	target := character.NewCharacter("target-1", "Goblin")
 	// Default stress track should be able to absorb small hits
 
-	sm.applyDamageToTarget(context.Background(), target, 1, character.PhysicalStress)
+	dmgEvent := sm.applyDamageToTarget(context.Background(), target, 1, character.PhysicalStress)
 
-	// Check that stress was absorbed message was displayed
-	found := false
-	for _, msg := range mockUI.displayedMessages {
-		if strings.Contains(msg, "absorbs the damage") {
-			found = true
-			break
-		}
-	}
-	assert.True(t, found, "Expected stress absorption message")
+	// Check that stress was absorbed
+	assert.NotNil(t, dmgEvent.Absorbed, "Expected stress absorption")
+	assert.Equal(t, "physical", dmgEvent.Absorbed.TrackType)
 }
 
 func TestHandleTargetStressOverflow_ConsequenceSelection(t *testing.T) {
@@ -628,7 +624,9 @@ func TestSceneManager_HandleTargetTakenOut(t *testing.T) {
 	require.NoError(t, err)
 
 	// Take out the target
-	sm.handleTargetTakenOut(context.Background(), target)
+	dmgEvent := &DamageResolutionEvent{TargetName: target.Name}
+	sm.applyTargetTakenOut(context.Background(), target, dmgEvent)
+	assert.True(t, dmgEvent.TakenOut)
 
 	// Check that target is marked as taken out (conflict still active because of otherEnemy)
 	participant := sm.currentScene.GetParticipant(target.ID)
@@ -637,6 +635,7 @@ func TestSceneManager_HandleTargetTakenOut(t *testing.T) {
 
 	// Conflict should still be active since otherEnemy remains
 	assert.True(t, sm.currentScene.IsConflict)
+	assert.False(t, dmgEvent.VictoryEnd)
 }
 
 func TestSceneManager_HandleTargetTakenOut_ConflictEnds(t *testing.T) {
@@ -664,20 +663,14 @@ func TestSceneManager_HandleTargetTakenOut_ConflictEnds(t *testing.T) {
 	require.NoError(t, err)
 
 	// Take out the only target
-	sm.handleTargetTakenOut(context.Background(), target)
+	dmgEvent := &DamageResolutionEvent{TargetName: target.Name}
+	sm.applyTargetTakenOut(context.Background(), target, dmgEvent)
 
 	// Conflict should end since no active opponents remain
 	assert.False(t, sm.currentScene.IsConflict)
 
-	// Check victory message was displayed
-	found := false
-	for _, msg := range mockUI.displayedMessages {
-		if strings.Contains(msg, "Victory") {
-			found = true
-			break
-		}
-	}
-	assert.True(t, found, "Expected victory message")
+	// Check victory via event
+	assert.True(t, dmgEvent.VictoryEnd, "Expected victory end")
 }
 
 func TestSceneManager_HandleTargetTakenOut_MarksSceneLevelTakenOut(t *testing.T) {
@@ -705,7 +698,8 @@ func TestSceneManager_HandleTargetTakenOut_MarksSceneLevelTakenOut(t *testing.T)
 	require.NoError(t, err)
 
 	// Take out the target
-	sm.handleTargetTakenOut(context.Background(), target)
+	dmgEvent := &DamageResolutionEvent{TargetName: target.Name}
+	sm.applyTargetTakenOut(context.Background(), target, dmgEvent)
 
 	// Conflict ends, but character should still be marked as taken out at scene level
 	assert.False(t, sm.currentScene.IsConflict)
@@ -739,7 +733,8 @@ func TestSceneManager_InitiateConflict_ExcludesTakenOutCharacters(t *testing.T) 
 	err = sm.initiateConflict(scene.PhysicalConflict, enemy1.ID)
 	require.NoError(t, err)
 
-	sm.handleTargetTakenOut(context.Background(), enemy1)
+	dmgEvent := &DamageResolutionEvent{TargetName: enemy1.Name}
+	sm.applyTargetTakenOut(context.Background(), enemy1, dmgEvent)
 	// Conflict still ongoing because enemy2 is active
 	assert.True(t, sm.currentScene.IsConflict)
 
@@ -784,7 +779,8 @@ func TestSceneManager_InitiateConflict_TakenOutInitiatorFails(t *testing.T) {
 	err = sm.initiateConflict(scene.PhysicalConflict, enemy.ID)
 	require.NoError(t, err)
 
-	sm.handleTargetTakenOut(context.Background(), enemy)
+	dmgEvent := &DamageResolutionEvent{TargetName: enemy.Name}
+	sm.applyTargetTakenOut(context.Background(), enemy, dmgEvent)
 	assert.False(t, sm.currentScene.IsConflict) // Conflict ended
 
 	// Enemy is marked as taken out at scene level
@@ -835,17 +831,17 @@ func TestSceneManager_ApplyActionEffects_Attack(t *testing.T) {
 		Shifts: 3,
 	}
 
-	sm.applyActionEffects(context.Background(), testAction, target)
+	events := sm.applyActionEffects(context.Background(), testAction, target)
 
-	// Check that damage message was displayed
-	found := false
-	for _, msg := range mockUI.displayedMessages {
-		if strings.Contains(msg, "deals") && strings.Contains(msg, "shifts") {
-			found = true
+	// Check that events contain attack result with shifts
+	foundAttackResult := false
+	for _, evt := range events {
+		if ar, ok := evt.(PlayerAttackResultEvent); ok && ar.Shifts > 0 {
+			foundAttackResult = true
 			break
 		}
 	}
-	assert.True(t, found, "Expected damage message")
+	assert.True(t, foundAttackResult, "Expected PlayerAttackResultEvent with shifts")
 }
 
 func TestSceneManager_IsConcedeCommand(t *testing.T) {
@@ -910,7 +906,7 @@ func TestSceneManager_HandleConcession(t *testing.T) {
 
 	// Handle concession
 	ctx := context.Background()
-	sm.handleConcession(ctx)
+	events := sm.handleConcession(ctx)
 
 	// Check fate point was awarded (1 base + 1 for conceding = 2)
 	assert.Equal(t, 2, player.FatePoints, "Expected fate point for conceding")
@@ -918,19 +914,17 @@ func TestSceneManager_HandleConcession(t *testing.T) {
 	// Check conflict ended
 	assert.False(t, sm.currentScene.IsConflict, "Expected conflict to end")
 
-	// Check appropriate messages were displayed
-	foundConcedeMsg := false
-	foundFatePointMsg := false
-	for _, msg := range mockUI.displayedMessages {
-		if strings.Contains(msg, "Concede") {
-			foundConcedeMsg = true
-		}
-		if strings.Contains(msg, "Fate Point") {
-			foundFatePointMsg = true
+	// Check events contain ConcessionEvent
+	foundConcession := false
+	for _, evt := range events {
+		if ce, ok := evt.(ConcessionEvent); ok {
+			foundConcession = true
+			assert.Equal(t, 1, ce.FatePointsGained)
+			assert.Equal(t, 2, ce.CurrentFatePoints)
+			break
 		}
 	}
-	assert.True(t, foundConcedeMsg, "Expected concede message")
-	assert.True(t, foundFatePointMsg, "Expected fate point message")
+	assert.True(t, foundConcession, "Expected ConcessionEvent")
 }
 
 func TestSceneManager_HandleConcession_WithConsequences(t *testing.T) {
@@ -970,20 +964,22 @@ func TestSceneManager_HandleConcession_WithConsequences(t *testing.T) {
 
 	// Handle concession
 	ctx := context.Background()
-	sm.handleConcession(ctx)
+	events := sm.handleConcession(ctx)
 
 	// Check fate points: 1 base + 1 for conceding + 2 for consequences = 4
 	assert.Equal(t, 4, player.FatePoints, "Expected fate points for conceding with consequences")
 
-	// Check message mentions consequences
+	// Check ConcessionEvent mentions consequences
 	foundConsequenceBonus := false
-	for _, msg := range mockUI.displayedMessages {
-		if strings.Contains(msg, "consequences") {
+	for _, evt := range events {
+		if ce, ok := evt.(ConcessionEvent); ok && ce.ConsequenceCount > 0 {
 			foundConsequenceBonus = true
+			assert.Equal(t, 3, ce.FatePointsGained)
+			assert.Equal(t, 2, ce.ConsequenceCount)
 			break
 		}
 	}
-	assert.True(t, foundConsequenceBonus, "Expected message about bonus fate points for consequences")
+	assert.True(t, foundConsequenceBonus, "Expected ConcessionEvent with consequence count")
 }
 
 func TestSceneManager_ApplyActionEffects_Attack_NilTarget_ShowsError(t *testing.T) {
@@ -1015,17 +1011,18 @@ func TestSceneManager_ApplyActionEffects_Attack_NilTarget_ShowsError(t *testing.
 	}
 
 	// Call with nil target (simulating failed resolution)
-	sm.applyActionEffects(context.Background(), testAction, nil)
+	events := sm.applyActionEffects(context.Background(), testAction, nil)
 
-	// Should display an error message to the player, not silently skip
+	// Should return a PlayerAttackResultEvent with TargetMissing
 	found := false
-	for _, msg := range mockUI.displayedMessages {
-		if strings.Contains(msg, "Could not find target") && strings.Contains(msg, "Bart the Outlaw") {
+	for _, evt := range events {
+		if ar, ok := evt.(PlayerAttackResultEvent); ok && ar.TargetMissing {
 			found = true
+			assert.Equal(t, "Bart the Outlaw", ar.TargetHint)
 			break
 		}
 	}
-	assert.True(t, found, "Expected error message about missing target, got: %v", mockUI.displayedMessages)
+	assert.True(t, found, "Expected PlayerAttackResultEvent with TargetMissing, got: %v", events)
 }
 
 func TestSceneManager_ApplyActionEffects_Attack_DealsDamage(t *testing.T) {
@@ -1065,25 +1062,25 @@ func TestSceneManager_ApplyActionEffects_Attack_DealsDamage(t *testing.T) {
 		Shifts: 1,
 	}
 
-	sm.applyActionEffects(context.Background(), testAction, target)
+	events := sm.applyActionEffects(context.Background(), testAction, target)
 
 	// Verify stress was actually applied
 	afterAvailable := target.GetStressTrack(character.PhysicalStress).AvailableBoxes()
 	assert.Less(t, afterAvailable, initialAvailable, "Target should have taken stress")
 
-	// Verify damage message was displayed
+	// Verify events contain attack result and damage resolution
 	foundDamageMsg := false
 	foundAbsorbMsg := false
-	for _, msg := range mockUI.displayedMessages {
-		if strings.Contains(msg, "deals") && strings.Contains(msg, "shifts") {
+	for _, evt := range events {
+		if ar, ok := evt.(PlayerAttackResultEvent); ok && ar.Shifts > 0 {
 			foundDamageMsg = true
 		}
-		if strings.Contains(msg, "absorbs the damage") {
+		if dr, ok := evt.(DamageResolutionEvent); ok && dr.Absorbed != nil {
 			foundAbsorbMsg = true
 		}
 	}
-	assert.True(t, foundDamageMsg, "Expected damage message")
-	assert.True(t, foundAbsorbMsg, "Expected stress absorption message")
+	assert.True(t, foundDamageMsg, "Expected PlayerAttackResultEvent with shifts")
+	assert.True(t, foundAbsorbMsg, "Expected DamageResolutionEvent with absorption")
 }
 
 func TestSceneManager_ApplyActionEffects_Attack_Tie_GrantsBoost(t *testing.T) {
@@ -1120,17 +1117,17 @@ func TestSceneManager_ApplyActionEffects_Attack_Tie_GrantsBoost(t *testing.T) {
 		Shifts: 0,
 	}
 
-	sm.applyActionEffects(context.Background(), testAction, target)
+	events := sm.applyActionEffects(context.Background(), testAction, target)
 
-	// Verify boost message was displayed
+	// Verify boost event was returned
 	found := false
-	for _, msg := range mockUI.displayedMessages {
-		if strings.Contains(msg, "boost") {
+	for _, evt := range events {
+		if ar, ok := evt.(PlayerAttackResultEvent); ok && ar.IsTie {
 			found = true
 			break
 		}
 	}
-	assert.True(t, found, "Expected boost message on tie, got: %v", mockUI.displayedMessages)
+	assert.True(t, found, "Expected PlayerAttackResultEvent with IsTie, got: %v", events)
 }
 
 func TestSceneManager_ResolveAction_TargetByName(t *testing.T) {
@@ -1171,26 +1168,26 @@ func TestSceneManager_ResolveAction_TargetByName(t *testing.T) {
 	testAction.Difficulty = dice.Fair
 
 	ctx := context.Background()
-	sm.resolveAction(ctx, testAction)
+	events, _ := sm.resolveAction(ctx, testAction)
 
 	// The attack should have resolved against Bart — check defense was rolled
 	// and damage was applied (if target wasn't found, no damage messages would appear)
 	foundDefenseResult := false
 	foundDamageApplied := false
-	for _, msg := range mockUI.displayedMessages {
-		if strings.Contains(msg, "Bart the Outlaw") && strings.Contains(msg, "defends") {
+	for _, evt := range events {
+		if def, ok := evt.(DefenseRollEvent); ok && def.DefenderName == "Bart the Outlaw" {
 			foundDefenseResult = true
 		}
-		if strings.Contains(msg, "shifts") && strings.Contains(msg, "Bart the Outlaw") {
+		if atk, ok := evt.(PlayerAttackResultEvent); ok && atk.TargetName == "Bart the Outlaw" {
 			foundDamageApplied = true
 		}
 	}
 	assert.True(t, foundDefenseResult,
-		"Expected defense roll against 'Bart the Outlaw' via name lookup, got: %v",
-		mockUI.displayedMessages)
+		"Expected DefenseRollEvent for 'Bart the Outlaw' via name lookup, got: %v",
+		events)
 	assert.True(t, foundDamageApplied,
-		"Expected damage applied to 'Bart the Outlaw', got: %v",
-		mockUI.displayedMessages)
+		"Expected PlayerAttackResultEvent for 'Bart the Outlaw', got: %v",
+		events)
 }
 
 func TestSceneManager_ResolveAction_UnknownTarget_AbortsWithoutConsumingTurn(t *testing.T) {

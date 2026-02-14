@@ -129,3 +129,138 @@ type InputRequestEvent struct {
 }
 
 func (InputRequestEvent) gameEvent() {}
+
+// ---------------------------------------------------------------------------
+// Composite mechanical events — structured game-state events that replace
+// ad-hoc SystemMessageEvent calls in the conflict resolution pipeline.
+// ---------------------------------------------------------------------------
+
+// DefenseRollEvent is emitted when a target rolls an active defense.
+type DefenseRollEvent struct {
+	DefenderName string // Name of the defending character
+	Skill        string // Defense skill used
+	Result       string // Roll result (e.g. "Good (+3)")
+}
+
+func (DefenseRollEvent) gameEvent() {}
+
+// StressAbsorptionDetail describes how stress was absorbed by a track.
+type StressAbsorptionDetail struct {
+	TrackType  string // "physical" or "mental"
+	Shifts     int    // Shifts absorbed
+	TrackState string // String representation of the stress track after absorption
+}
+
+// ConsequenceDetail describes a consequence taken during damage resolution.
+type ConsequenceDetail struct {
+	TargetName string // Character who took the consequence
+	Severity   string // "mild", "moderate", "severe"
+	Aspect     string // The consequence aspect text
+	Absorbed   int    // Shifts absorbed by this consequence
+}
+
+// DamageResolutionEvent is emitted when damage is applied to a target (NPC).
+// It rolls up stress absorption, consequences, and taken-out into one event.
+type DamageResolutionEvent struct {
+	TargetName        string                  // The defender/target's name
+	TotalShifts       int                     // Shifts of stress dealt
+	StressType        string                  // "physical" or "mental"
+	Absorbed          *StressAbsorptionDetail // Non-nil if stress track absorbed damage
+	Consequence       *ConsequenceDetail      // Non-nil if a consequence was taken
+	RemainingAbsorbed *StressAbsorptionDetail // Non-nil if remaining shifts were absorbed after consequence
+	TakenOut          bool                    // True if the target was taken out
+	VictoryEnd        bool                    // True if this caused the conflict to end via victory
+}
+
+func (DamageResolutionEvent) gameEvent() {}
+
+// PlayerAttackResultEvent is emitted when the player's attack resolves.
+// Rolls up the shifts dealt, tie boost, or failure message into one event.
+type PlayerAttackResultEvent struct {
+	TargetName    string // Name of the target hit
+	Shifts        int    // Shifts dealt (0 on tie/failure)
+	IsTie         bool   // Attack resulted in a tie (boost granted)
+	TargetMissing bool   // True if the target could not be found
+	TargetHint    string // Name hint for missing target
+}
+
+func (PlayerAttackResultEvent) gameEvent() {}
+
+// AspectCreatedEvent is emitted when Create an Advantage succeeds.
+type AspectCreatedEvent struct {
+	AspectName  string // The new situation aspect
+	FreeInvokes int    // Number of free invokes granted
+}
+
+func (AspectCreatedEvent) gameEvent() {}
+
+// NPCAttackEvent is emitted after an NPC's full attack sequence resolves
+// (attack roll, defense roll, initial outcome, optional narrative).
+type NPCAttackEvent struct {
+	AttackerName   string // NPC name
+	TargetName     string // Target name (usually the player)
+	AttackSkill    string // Skill used for the attack
+	AttackResult   string // Attack roll result
+	DefenseSkill   string // Skill used for defense
+	DefenseResult  string // Defense roll result
+	FullDefense    bool   // Whether full defense bonus was applied
+	InitialOutcome string // Outcome before invokes (e.g. "Success")
+	FinalOutcome   string // Outcome after invokes (may differ from initial)
+	Narrative      string // LLM-generated narrative for the attack
+}
+
+func (NPCAttackEvent) gameEvent() {}
+
+// PlayerStressEvent is emitted when the player absorbs stress from an attack.
+type PlayerStressEvent struct {
+	Shifts     int    // Shifts of stress absorbed
+	StressType string // "physical" or "mental"
+	TrackState string // Stress track display after absorption
+}
+
+func (PlayerStressEvent) gameEvent() {}
+
+// PlayerDefendedEvent is emitted when the player successfully defends (failure
+// or tie result on the attacker's roll).
+type PlayerDefendedEvent struct {
+	IsTie bool // True if attacker tied (grants a boost)
+}
+
+func (PlayerDefendedEvent) gameEvent() {}
+
+// PlayerConsequenceEvent is emitted when the player takes a consequence.
+type PlayerConsequenceEvent struct {
+	Severity        string                  // "mild", "moderate", "severe"
+	Aspect          string                  // The consequence aspect text
+	Absorbed        int                     // Shifts absorbed by the consequence
+	RemainingShifts int                     // Remaining shifts after absorption (0 if fully absorbed)
+	StressAbsorbed  *StressAbsorptionDetail // Non-nil if remaining shifts went to stress
+}
+
+func (PlayerConsequenceEvent) gameEvent() {}
+
+// PlayerTakenOutEvent is emitted when the player is taken out of a conflict.
+type PlayerTakenOutEvent struct {
+	AttackerName string // Who took the player out
+	Narrative    string // LLM-generated narrative for being taken out
+	Outcome      string // "game_over", "transition", or "continue"
+	NewSceneHint string // Hint for scene transition (when outcome is "transition")
+}
+
+func (PlayerTakenOutEvent) gameEvent() {}
+
+// ConcessionEvent is emitted when the player concedes a conflict.
+type ConcessionEvent struct {
+	FatePointsGained  int // Total fate points gained
+	ConsequenceCount  int // Number of consequences that contributed extra FP
+	CurrentFatePoints int // Player's fate points after gain
+}
+
+func (ConcessionEvent) gameEvent() {}
+
+// OutcomeChangedEvent is emitted when invokes change the final outcome of a roll.
+type OutcomeChangedEvent struct {
+	FinalOutcome string // The new outcome after invokes (e.g. "Success")
+}
+
+func (OutcomeChangedEvent) gameEvent() {}

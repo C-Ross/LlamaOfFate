@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
@@ -57,6 +58,54 @@ func (m *MockUI) Emit(event GameEvent) {
 		m.displayedMessages = append(m.displayedMessages, "SCENE TRANSITION: "+e.Narrative)
 	case CharacterDisplayEvent:
 		m.displayedMessages = append(m.displayedMessages, "CHARACTER")
+
+	// Composite mechanical events
+	case DefenseRollEvent:
+		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("Defense: %s defends with %s (%s)", e.DefenderName, e.Skill, e.Result))
+	case DamageResolutionEvent:
+		if e.Absorbed != nil {
+			m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("DamageRes: %s absorbs the damage with their %s stress track", e.TargetName, e.Absorbed.TrackType))
+		}
+		if e.Consequence != nil {
+			m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("DamageRes: %s takes a %s consequence: \"%s\" (absorbs %d shifts)", e.Consequence.TargetName, e.Consequence.Severity, e.Consequence.Aspect, e.Consequence.Absorbed))
+		}
+		if e.RemainingAbsorbed != nil {
+			m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("DamageRes: %s absorbs remaining %d shifts with stress", e.TargetName, e.RemainingAbsorbed.Shifts))
+		}
+		if e.TakenOut {
+			m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("DamageRes: %s is Taken Out!", e.TargetName))
+		}
+		if e.VictoryEnd {
+			m.displayedMessages = append(m.displayedMessages, "DamageRes: Victory! All opponents defeated!")
+		}
+	case PlayerAttackResultEvent:
+		if e.TargetMissing {
+			m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("AttackResult: Could not find target '%s'", e.TargetHint))
+		} else if e.IsTie {
+			m.displayedMessages = append(m.displayedMessages, "AttackResult: Tie! boost")
+		} else {
+			m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("AttackResult: deals %d shifts to %s", e.Shifts, e.TargetName))
+		}
+	case AspectCreatedEvent:
+		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("AspectCreated: '%s' with %d free invoke(s)", e.AspectName, e.FreeInvokes))
+	case NPCAttackEvent:
+		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("NPCAttack: %s attacks %s with %s (%s) vs %s (%s)", e.AttackerName, e.TargetName, e.AttackSkill, e.AttackResult, e.DefenseSkill, e.DefenseResult))
+	case PlayerStressEvent:
+		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("PlayerStress: %d %s stress (%s)", e.Shifts, e.StressType, e.TrackState))
+	case PlayerDefendedEvent:
+		if e.IsTie {
+			m.displayedMessages = append(m.displayedMessages, "PlayerDefended: deflected, boost")
+		} else {
+			m.displayedMessages = append(m.displayedMessages, "PlayerDefended: successfully defend")
+		}
+	case PlayerConsequenceEvent:
+		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("PlayerConsequence: %s \"%s\" absorbs %d", e.Severity, e.Aspect, e.Absorbed))
+	case PlayerTakenOutEvent:
+		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("PlayerTakenOut: by %s outcome=%s", e.AttackerName, e.Outcome))
+	case ConcessionEvent:
+		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("Concession: gained %d FP (now %d)", e.FatePointsGained, e.CurrentFatePoints))
+	case OutcomeChangedEvent:
+		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("OutcomeChanged: %s", e.FinalOutcome))
 	}
 }
 
@@ -203,7 +252,7 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage(t *testing.T) {
 	testAction.Outcome = result.CompareAgainst(dice.Fair)
 
 	initialAspectCount := len(sm.currentScene.SituationAspects)
-	sm.applyActionEffects(context.Background(), testAction, nil) // nil target for create advantage
+	events := sm.applyActionEffects(context.Background(), testAction, nil) // nil target for create advantage
 
 	assert.Equal(t, initialAspectCount+1, len(sm.currentScene.SituationAspects))
 
@@ -212,9 +261,16 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage(t *testing.T) {
 	assert.Equal(t, player.ID, newAspect.CreatedBy)
 	assert.True(t, newAspect.FreeInvokes > 0)
 
-	// Verify UI was called
-	assert.True(t, len(mockUI.displayedMessages) > 0)
-	assert.Contains(t, mockUI.displayedMessages[0], "Created situation aspect")
+	// Verify AspectCreatedEvent was returned
+	found := false
+	for _, evt := range events {
+		if ac, ok := evt.(AspectCreatedEvent); ok {
+			assert.Contains(t, ac.AspectName, "Advantage from")
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "Expected AspectCreatedEvent in returned events, got: %v", events)
 }
 
 func TestSceneManager_ApplyActionEffects_CreateAdvantage_WithLLM(t *testing.T) {
@@ -253,7 +309,7 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage_WithLLM(t *testing.T) {
 	testAction.Outcome = result.CompareAgainst(dice.Fair)
 
 	initialAspectCount := len(sm.currentScene.SituationAspects)
-	sm.applyActionEffects(context.Background(), testAction, nil)
+	events := sm.applyActionEffects(context.Background(), testAction, nil)
 
 	assert.Equal(t, initialAspectCount+1, len(sm.currentScene.SituationAspects))
 
@@ -263,9 +319,16 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage_WithLLM(t *testing.T) {
 	assert.Equal(t, player.ID, newAspect.CreatedBy)
 	assert.True(t, newAspect.FreeInvokes > 0)
 
-	// Verify UI was called with the creative name
-	assert.True(t, len(mockUI.displayedMessages) > 0)
-	assert.Contains(t, mockUI.displayedMessages[0], "Perfect Vantage Point")
+	// Verify AspectCreatedEvent was returned with the creative name
+	found := false
+	for _, evt := range events {
+		if ac, ok := evt.(AspectCreatedEvent); ok {
+			assert.Equal(t, "Perfect Vantage Point", ac.AspectName)
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "Expected AspectCreatedEvent in returned events, got: %v", events)
 }
 
 func TestSceneManager_GetCurrentScene(t *testing.T) {
