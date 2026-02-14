@@ -130,6 +130,10 @@ func (m *MockUI) Emit(event GameEvent) {
 		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("Recovery: %s \"%s\" %s", e.Action, e.Aspect, e.Severity))
 	case StressOverflowEvent:
 		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("StressOverflow: %d shifts", e.Shifts))
+	case MilestoneEvent:
+		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("Milestone: %s fp=%d", e.Type, e.FatePoints))
+	case GameResumedEvent:
+		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("Resumed: %s scene=%s", e.ScenarioTitle, e.SceneName))
 	}
 }
 

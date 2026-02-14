@@ -880,3 +880,136 @@ func TestScenarioManager_BestRecoverySkill(t *testing.T) {
 	assert.NotEmpty(t, skill)
 	assert.True(t, rating >= 0, "Rating should be >= 0, got %d", rating)
 }
+
+func TestScenarioManager_HandleBetweenSceneRecovery_NoConsequences(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	events := sm.handleBetweenSceneRecovery(context.Background())
+
+	assert.Empty(t, events)
+}
+
+func TestScenarioManager_HandleBetweenSceneRecovery_HealedConsequence(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	// Add a recovering mild consequence that should heal (recovery was started at scene 0)
+	player.Consequences = []character.Consequence{
+		{
+			ID:                    "c1",
+			Type:                  character.MildConsequence,
+			Aspect:                "Bruised Ribs",
+			Recovering:            true,
+			RecoveryStartScene:    0,
+			RecoveryStartScenario: 0,
+		},
+	}
+	sm := NewScenarioManager(engine, player)
+	sm.sceneCount = 2 // Mild consequences heal after 1 scene
+
+	events := sm.handleBetweenSceneRecovery(context.Background())
+
+	// Should have a healed event
+	require.NotEmpty(t, events)
+	recovery, ok := events[0].(RecoveryEvent)
+	require.True(t, ok, "expected RecoveryEvent, got %T", events[0])
+	assert.Equal(t, "healed", recovery.Action)
+	assert.Equal(t, "Bruised Ribs", recovery.Aspect)
+	assert.Equal(t, "mild", recovery.Severity)
+}
+
+func TestScenarioManager_HandleBetweenSceneRecovery_RollEvents(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	player.SetSkill("Will", 2)
+	// Add a non-recovering consequence that needs a recovery roll
+	player.Consequences = []character.Consequence{
+		{
+			ID:         "c1",
+			Type:       character.MildConsequence,
+			Aspect:     "Scratched Up",
+			Recovering: false,
+		},
+	}
+	sm := NewScenarioManager(engine, player)
+	sm.sceneCount = 1
+
+	events := sm.handleBetweenSceneRecovery(context.Background())
+
+	// Should have at least one roll event (no LLM client = no narrative events)
+	require.NotEmpty(t, events)
+	recovery, ok := events[0].(RecoveryEvent)
+	require.True(t, ok, "expected RecoveryEvent, got %T", events[0])
+	assert.Equal(t, "roll", recovery.Action)
+	assert.Equal(t, "Scratched Up", recovery.Aspect)
+	assert.Equal(t, "mild", recovery.Severity)
+	assert.NotEmpty(t, recovery.Skill)
+	assert.NotEmpty(t, recovery.Difficulty)
+}
+
+func TestScenarioManager_BuildRecoveryNarrativeEvents_Empty(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	events := sm.buildRecoveryNarrativeEvents(context.Background(), nil)
+
+	assert.Nil(t, events)
+}
+
+func TestScenarioManager_BuildRecoveryNarrativeEvents_ReturnsRollEvents(t *testing.T) {
+	engine, err := NewWithLLM(nil) // nil LLM so no narrative generation
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	attempts := []prompt.RecoveryAttempt{
+		{
+			Severity:   "mild",
+			Aspect:     "Scratched Up",
+			Difficulty: "Great (+4)",
+			Skill:      "Will",
+			RollResult: 3,
+			Outcome:    "failure",
+		},
+		{
+			Severity:   "moderate",
+			Aspect:     "Broken Arm",
+			Difficulty: "Fantastic (+6)",
+			Skill:      "Lore",
+			RollResult: 6,
+			Outcome:    "success",
+		},
+	}
+
+	events := sm.buildRecoveryNarrativeEvents(context.Background(), attempts)
+
+	require.Len(t, events, 2)
+
+	roll1, ok := events[0].(RecoveryEvent)
+	require.True(t, ok)
+	assert.Equal(t, "roll", roll1.Action)
+	assert.Equal(t, "Scratched Up", roll1.Aspect)
+	assert.Equal(t, "mild", roll1.Severity)
+	assert.Equal(t, "Will", roll1.Skill)
+	assert.Equal(t, 3, roll1.RollResult)
+	assert.Equal(t, "Great (+4)", roll1.Difficulty)
+	assert.False(t, roll1.Success)
+
+	roll2, ok := events[1].(RecoveryEvent)
+	require.True(t, ok)
+	assert.Equal(t, "roll", roll2.Action)
+	assert.Equal(t, "Broken Arm", roll2.Aspect)
+	assert.Equal(t, "moderate", roll2.Severity)
+	assert.True(t, roll2.Success)
+}

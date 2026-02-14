@@ -121,7 +121,8 @@ func (g *GameManager) Run(ctx context.Context) error {
 	// Handle milestone if scenario was resolved
 	if result != nil && result.Reason == ScenarioEndResolved {
 		g.scenarioCount++
-		g.handleMilestone()
+		events := g.handleMilestone()
+		g.renderEvents(events)
 	}
 
 	return nil
@@ -149,8 +150,10 @@ func (g *GameManager) resumeFromSave(ctx context.Context, state *GameState) erro
 		"scenario", state.Scenario.Scenario.Title,
 	)
 	g.renderEvents([]GameEvent{
-		SystemMessageEvent{Message: "=== Resuming saved game ==="},
-		SystemMessageEvent{Message: fmt.Sprintf("Scenario: %s", state.Scenario.Scenario.Title)},
+		GameResumedEvent{
+			ScenarioTitle: state.Scenario.Scenario.Title,
+			SceneName:     state.Scene.CurrentScene.Name,
+		},
 	})
 
 	if g.sessionLogger != nil {
@@ -169,7 +172,8 @@ func (g *GameManager) resumeFromSave(ctx context.Context, state *GameState) erro
 
 	if result != nil && result.Reason == ScenarioEndResolved {
 		g.scenarioCount++
-		g.handleMilestone()
+		events := g.handleMilestone()
+		g.renderEvents(events)
 	}
 
 	return nil
@@ -211,26 +215,31 @@ func (g *GameManager) RunWithInitialScene(ctx context.Context, initialScene *Ini
 	// Handle milestone if scenario was resolved
 	if result != nil && result.Reason == ScenarioEndResolved {
 		g.scenarioCount++
-		g.handleMilestone()
+		events := g.handleMilestone()
+		g.renderEvents(events)
 	}
 
 	return nil
 }
 
-// handleMilestone processes a scenario milestone (fate point refresh, consequence recovery, etc.)
-func (g *GameManager) handleMilestone() {
+// handleMilestone processes a scenario milestone and returns the events
+// for the caller to render. Performs fate point refresh and consequence
+// recovery per Fate Core rules.
+func (g *GameManager) handleMilestone() []GameEvent {
 	// Refresh fate points per Fate Core rules
 	g.player.RefreshFatePoints()
+
+	var events []GameEvent
 
 	// Check for consequence recovery at scenario boundary
 	// Moderate and severe consequences that are recovering clear after a whole scenario
 	cleared := g.player.CheckConsequenceRecovery(0, g.scenarioCount)
 	for _, conseq := range cleared {
-		g.renderEvents([]GameEvent{RecoveryEvent{
+		events = append(events, RecoveryEvent{
 			Action:   "healed",
 			Severity: string(conseq.Type),
 			Aspect:   conseq.Aspect,
-		}})
+		})
 		if g.sessionLogger != nil {
 			g.sessionLogger.Log("consequence_healed", map[string]any{
 				"type":      conseq.Type,
@@ -240,10 +249,15 @@ func (g *GameManager) handleMilestone() {
 		}
 	}
 
-	// Display milestone message
-	g.renderEvents([]GameEvent{
-		SystemMessageEvent{Message: "\n=== MILESTONE: Scenario Complete! ==="},
-		SystemMessageEvent{Message: "Your fate points have been refreshed.\n"},
+	// Milestone event
+	scenarioTitle := ""
+	if g.scenario != nil {
+		scenarioTitle = g.scenario.Title
+	}
+	events = append(events, MilestoneEvent{
+		Type:          "scenario_complete",
+		ScenarioTitle: scenarioTitle,
+		FatePoints:    g.player.FatePoints,
 	})
 
 	// Log the milestone
@@ -252,9 +266,11 @@ func (g *GameManager) handleMilestone() {
 			"type":           "scenario_complete",
 			"fate_points":    g.player.FatePoints,
 			"player":         g.player.Name,
-			"scenario_title": g.scenario.Title,
+			"scenario_title": scenarioTitle,
 		})
 	}
+
+	return events
 }
 
 // renderEvents dispatches events to the UI for display (terminal path).

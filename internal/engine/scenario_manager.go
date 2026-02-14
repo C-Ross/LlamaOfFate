@@ -232,21 +232,23 @@ func (m *ScenarioManager) Run(ctx context.Context) (*ScenarioResult, error) {
 				return nil, fmt.Errorf("failed to start scene: %w", err)
 			}
 
-			// Display scene purpose and opening hook to the player
-			if m.lastGeneratedPurpose != "" {
-				m.renderEvents([]GameEvent{SystemMessageEvent{Message: "Scene Purpose: " + m.lastGeneratedPurpose}})
+			// Emit scene purpose and opening hook as a single NarrativeEvent
+			if m.lastGeneratedPurpose != "" || m.lastGeneratedHook != "" {
+				m.renderEvents([]GameEvent{NarrativeEvent{
+					Purpose: m.lastGeneratedPurpose,
+					Text:    m.lastGeneratedHook,
+				}})
 				if m.sessionLogger != nil {
-					m.sessionLogger.Log("scene_purpose", map[string]any{
-						"purpose": m.lastGeneratedPurpose,
-					})
-				}
-			}
-			if m.lastGeneratedHook != "" {
-				m.renderEvents([]GameEvent{NarrativeEvent{Text: m.lastGeneratedHook}})
-				if m.sessionLogger != nil {
-					m.sessionLogger.Log("opening_hook", map[string]any{
-						"hook": m.lastGeneratedHook,
-					})
+					if m.lastGeneratedPurpose != "" {
+						m.sessionLogger.Log("scene_purpose", map[string]any{
+							"purpose": m.lastGeneratedPurpose,
+						})
+					}
+					if m.lastGeneratedHook != "" {
+						m.sessionLogger.Log("opening_hook", map[string]any{
+							"hook": m.lastGeneratedHook,
+						})
+					}
 				}
 			}
 
@@ -343,7 +345,8 @@ func (m *ScenarioManager) Run(ctx context.Context) (*ScenarioResult, error) {
 
 		// Increment scene count and handle between-scene recovery
 		m.sceneCount++
-		m.handleBetweenSceneRecovery(ctx)
+		recoveryEvents := m.handleBetweenSceneRecovery(ctx)
+		m.renderEvents(recoveryEvents)
 
 		// Save state at scene transition (summaries updated, NPC attitudes refreshed)
 		m.triggerSave("scene_transition")
@@ -548,18 +551,21 @@ func (m *ScenarioManager) extractComplications() []string {
 	return complications
 }
 
-// handleBetweenSceneRecovery handles consequence recovery between scenes.
+// handleBetweenSceneRecovery handles consequence recovery between scenes
+// and returns the events for the caller to render.
 // Per Fate Core, recovery requires an overcome action, then waiting.
 // This performs automatic rolls and generates LLM narrative.
-func (m *ScenarioManager) handleBetweenSceneRecovery(ctx context.Context) {
+func (m *ScenarioManager) handleBetweenSceneRecovery(ctx context.Context) []GameEvent {
+	var events []GameEvent
+
 	// First, check if any already-recovering consequences have healed
 	cleared := m.player.CheckConsequenceRecovery(m.sceneCount, m.scenarioCount)
 	for _, conseq := range cleared {
-		m.renderEvents([]GameEvent{RecoveryEvent{
+		events = append(events, RecoveryEvent{
 			Action:   "healed",
 			Aspect:   conseq.Aspect,
 			Severity: string(conseq.Type),
-		}})
+		})
 		if m.sessionLogger != nil {
 			m.sessionLogger.Log("consequence_healed", map[string]any{
 				"type":        conseq.Type,
@@ -577,7 +583,7 @@ func (m *ScenarioManager) handleBetweenSceneRecovery(ctx context.Context) {
 		}
 	}
 	if len(needsRecovery) == 0 {
-		return
+		return events
 	}
 
 	// Attempt automatic recovery rolls
@@ -628,7 +634,9 @@ func (m *ScenarioManager) handleBetweenSceneRecovery(ctx context.Context) {
 	}
 
 	// Generate LLM narrative for recovery
-	m.displayRecoveryNarrative(ctx, attempts)
+	events = append(events, m.buildRecoveryNarrativeEvents(ctx, attempts)...)
+
+	return events
 }
 
 // bestRecoverySkill determines the best skill and its level for recovery.
@@ -666,15 +674,18 @@ func (m *ScenarioManager) bestRecoverySkill(conseq character.Consequence) (strin
 	return bestSkill, bestLevel
 }
 
-// displayRecoveryNarrative generates and displays LLM-driven narrative for recovery
-func (m *ScenarioManager) displayRecoveryNarrative(ctx context.Context, attempts []prompt.RecoveryAttempt) {
+// buildRecoveryNarrativeEvents generates recovery roll events and LLM-driven
+// narrative events, returning them for the caller to render.
+func (m *ScenarioManager) buildRecoveryNarrativeEvents(ctx context.Context, attempts []prompt.RecoveryAttempt) []GameEvent {
 	if len(attempts) == 0 {
-		return
+		return nil
 	}
 
-	// Display mechanical results — the terminal UI renders a header automatically.
+	var events []GameEvent
+
+	// Mechanical results — the terminal UI renders a header automatically.
 	for _, a := range attempts {
-		m.renderEvents([]GameEvent{RecoveryEvent{
+		events = append(events, RecoveryEvent{
 			Action:     "roll",
 			Aspect:     a.Aspect,
 			Severity:   a.Severity,
@@ -682,12 +693,12 @@ func (m *ScenarioManager) displayRecoveryNarrative(ctx context.Context, attempts
 			RollResult: a.RollResult,
 			Difficulty: a.Difficulty,
 			Success:    a.Outcome == "success",
-		}})
+		})
 	}
 
 	// Generate LLM narrative
 	if m.engine.llmClient == nil {
-		return
+		return events
 	}
 
 	setting := ""
@@ -707,7 +718,7 @@ func (m *ScenarioManager) displayRecoveryNarrative(ctx context.Context, attempts
 			"component", componentScenarioManager,
 			"error", err,
 		)
-		return
+		return events
 	}
 
 	content, err := llm.SimpleCompletion(ctx, m.engine.llmClient, promptText, 200, 0.6)
@@ -716,7 +727,7 @@ func (m *ScenarioManager) displayRecoveryNarrative(ctx context.Context, attempts
 			"component", componentScenarioManager,
 			"error", err,
 		)
-		return
+		return events
 	}
 
 	// Try to parse JSON response for narrative and renamed aspects
@@ -727,11 +738,11 @@ func (m *ScenarioManager) displayRecoveryNarrative(ctx context.Context, attempts
 
 	var parsed recoveryResponse
 	if parseErr := json.Unmarshal([]byte(content), &parsed); parseErr != nil {
-		// If parsing fails, display raw content
-		m.renderEvents([]GameEvent{NarrativeEvent{Text: content}})
+		// If parsing fails, use raw content
+		events = append(events, NarrativeEvent{Text: content})
 	} else {
 		if parsed.Narrative != "" {
-			m.renderEvents([]GameEvent{NarrativeEvent{Text: parsed.Narrative}})
+			events = append(events, NarrativeEvent{Text: parsed.Narrative})
 		}
 		// Apply renamed aspects to recovering consequences
 		for oldAspect, newAspect := range parsed.RenamedAspects {
@@ -753,6 +764,8 @@ func (m *ScenarioManager) displayRecoveryNarrative(ctx context.Context, attempts
 			"attempts": attempts,
 		})
 	}
+
+	return events
 }
 
 // updateNPCAttitudes updates the NPC registry with attitude changes from a scene summary

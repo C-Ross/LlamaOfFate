@@ -51,3 +51,5 @@ type InvokeEvent = uicontract.InvokeEvent
 type NPCActionResultEvent = uicontract.NPCActionResultEvent
 type RecoveryEvent = uicontract.RecoveryEvent
 type StressOverflowEvent = uicontract.StressOverflowEvent
+type MilestoneEvent = uicontract.MilestoneEvent
+type GameResumedEvent = uicontract.GameResumedEvent

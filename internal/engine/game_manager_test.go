@@ -120,3 +120,108 @@ func TestInitialSceneConfig_Fields(t *testing.T) {
 	assert.Equal(t, testScene, config.Scene)
 	assert.Len(t, config.NPCs, 2)
 }
+
+func TestGameManager_HandleMilestone_ReturnsMilestoneEvent(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	gm := NewGameManager(engine)
+	player := character.NewCharacter("player1", "Test Hero")
+	player.FatePoints = 1
+	player.Refresh = 3
+	gm.SetPlayer(player)
+	gm.SetScenario(&scene.Scenario{Title: "The Heist"})
+	gm.scenarioCount = 1
+
+	events := gm.handleMilestone()
+
+	require.NotEmpty(t, events)
+
+	// Last event should be a MilestoneEvent
+	milestone, ok := events[len(events)-1].(MilestoneEvent)
+	require.True(t, ok, "last event should be MilestoneEvent")
+	assert.Equal(t, "scenario_complete", milestone.Type)
+	assert.Equal(t, "The Heist", milestone.ScenarioTitle)
+	assert.Equal(t, 3, milestone.FatePoints) // Should be refreshed to 3
+
+	// Fate points should be refreshed
+	assert.Equal(t, 3, player.FatePoints)
+}
+
+func TestGameManager_HandleMilestone_WithConsequenceRecovery(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	gm := NewGameManager(engine)
+	player := character.NewCharacter("player1", "Test Hero")
+	player.FatePoints = 2
+	player.Refresh = 3
+	// Add a recovering moderate consequence that should heal at scenario milestone
+	player.Consequences = []character.Consequence{
+		{
+			ID:                    "c1",
+			Type:                  character.ModerateConsequence,
+			Aspect:                "Broken Arm",
+			Recovering:            true,
+			RecoveryStartScene:    0,
+			RecoveryStartScenario: 0,
+		},
+	}
+	gm.SetPlayer(player)
+	gm.SetScenario(&scene.Scenario{Title: "The Heist"})
+	gm.scenarioCount = 1
+
+	events := gm.handleMilestone()
+
+	require.Len(t, events, 2) // RecoveryEvent + MilestoneEvent
+
+	// First event should be RecoveryEvent for the healed consequence
+	recovery, ok := events[0].(RecoveryEvent)
+	require.True(t, ok, "first event should be RecoveryEvent")
+	assert.Equal(t, "healed", recovery.Action)
+	assert.Equal(t, "Broken Arm", recovery.Aspect)
+	assert.Equal(t, "moderate", recovery.Severity)
+
+	// Second event should be MilestoneEvent
+	milestone, ok := events[1].(MilestoneEvent)
+	require.True(t, ok, "second event should be MilestoneEvent")
+	assert.Equal(t, "scenario_complete", milestone.Type)
+}
+
+func TestGameManager_HandleMilestone_NilScenario(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	gm := NewGameManager(engine)
+	player := character.NewCharacter("player1", "Test Hero")
+	player.Refresh = 3
+	gm.SetPlayer(player)
+	// No scenario set
+
+	events := gm.handleMilestone()
+
+	require.NotEmpty(t, events)
+	milestone, ok := events[len(events)-1].(MilestoneEvent)
+	require.True(t, ok)
+	assert.Equal(t, "", milestone.ScenarioTitle)
+}
+
+func TestMilestoneEvent_Fields(t *testing.T) {
+	event := MilestoneEvent{
+		Type:          "scenario_complete",
+		ScenarioTitle: "The Great Heist",
+		FatePoints:    5,
+	}
+	assert.Equal(t, "scenario_complete", event.Type)
+	assert.Equal(t, "The Great Heist", event.ScenarioTitle)
+	assert.Equal(t, 5, event.FatePoints)
+}
+
+func TestGameResumedEvent_Fields(t *testing.T) {
+	event := GameResumedEvent{
+		ScenarioTitle: "The Great Heist",
+		SceneName:     "The Vault",
+	}
+	assert.Equal(t, "The Great Heist", event.ScenarioTitle)
+	assert.Equal(t, "The Vault", event.SceneName)
+}

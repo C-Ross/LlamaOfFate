@@ -16,6 +16,7 @@ type GameEvent interface {
 type NarrativeEvent struct {
 	Text      string
 	SceneName string // Optional: scene name for header display
+	Purpose   string // Optional: scene purpose/dramatic question for this scene
 }
 
 func (NarrativeEvent) gameEvent() {}
@@ -316,3 +317,21 @@ type StressOverflowEvent struct {
 }
 
 func (StressOverflowEvent) gameEvent() {}
+
+// MilestoneEvent is emitted when the player reaches a scenario milestone
+// (scenario complete). Contains mechanical results for the UI to present.
+type MilestoneEvent struct {
+	Type          string // "scenario_complete" (future: "session", "major")
+	ScenarioTitle string // Title of the completed scenario
+	FatePoints    int    // Player's fate points after refresh
+}
+
+func (MilestoneEvent) gameEvent() {}
+
+// GameResumedEvent is emitted when a saved game is loaded and resumed.
+type GameResumedEvent struct {
+	ScenarioTitle string // Title of the scenario being resumed
+	SceneName     string // Name of the scene being resumed
+}
+
+func (GameResumedEvent) gameEvent() {}

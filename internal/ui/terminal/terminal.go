@@ -98,6 +98,10 @@ func (ui *TerminalUI) Emit(event uicontract.GameEvent) {
 		ui.displayRecovery(e)
 	case uicontract.StressOverflowEvent:
 		ui.displayStressOverflow(e)
+	case uicontract.MilestoneEvent:
+		ui.displayMilestone(e)
+	case uicontract.GameResumedEvent:
+		ui.displayGameResumed(e)
 	}
 }
 
@@ -154,6 +158,9 @@ func (ui *TerminalUI) displayActionResult(skill string, skillLevel string, bonus
 func (ui *TerminalUI) displayNarrative(e uicontract.NarrativeEvent) {
 	if e.SceneName != "" {
 		fmt.Printf("\n=== %s ===\n", e.SceneName)
+	}
+	if e.Purpose != "" {
+		fmt.Printf("\nScene Purpose: %s\n", e.Purpose)
 	}
 	if e.Text != "" {
 		fmt.Printf("\n%s\n", e.Text)
@@ -704,4 +711,17 @@ func (ui *TerminalUI) displayStressOverflow(e uicontract.StressOverflowEvent) {
 		return
 	}
 	fmt.Printf("\nYou cannot absorb %d shifts with your stress track!\n", e.Shifts)
+}
+
+// displayMilestone renders a MilestoneEvent.
+func (ui *TerminalUI) displayMilestone(e uicontract.MilestoneEvent) {
+	ui.closeRecovery()
+	fmt.Println("\n=== MILESTONE: Scenario Complete! ===")
+	fmt.Println("Your fate points have been refreshed.")
+}
+
+// displayGameResumed renders a GameResumedEvent.
+func (ui *TerminalUI) displayGameResumed(e uicontract.GameResumedEvent) {
+	fmt.Println("\n=== Resuming saved game ===")
+	fmt.Printf("Scenario: %s\n", e.ScenarioTitle)
 }
