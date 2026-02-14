@@ -60,9 +60,6 @@ func (m *MockUI) Emit(event GameEvent) {
 		m.displayedMessages = append(m.displayedMessages, "GAME OVER: "+e.Reason)
 	case SceneTransitionEvent:
 		m.displayedMessages = append(m.displayedMessages, "SCENE TRANSITION: "+e.Narrative)
-	case CharacterDisplayEvent:
-		m.displayedMessages = append(m.displayedMessages, "CHARACTER")
-
 	// Composite mechanical events
 	case DefenseRollEvent:
 		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("Defense: %s defends with %s (%s)", e.DefenderName, e.Skill, e.Result))

@@ -104,11 +104,6 @@ type ConflictEndEvent struct {
 
 func (ConflictEndEvent) gameEvent() {}
 
-// CharacterDisplayEvent corresponds to UI.DisplayCharacter.
-type CharacterDisplayEvent struct{}
-
-func (CharacterDisplayEvent) gameEvent() {}
-
 // InvokePromptEvent is emitted when the engine needs the player to decide
 // whether to invoke an aspect after a roll. The UI renders this and collects
 // an InvokeResponse.

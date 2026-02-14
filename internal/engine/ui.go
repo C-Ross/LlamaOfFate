@@ -25,7 +25,6 @@ type ConflictStartEvent = uicontract.ConflictStartEvent
 type ConflictEscalationEvent = uicontract.ConflictEscalationEvent
 type TurnAnnouncementEvent = uicontract.TurnAnnouncementEvent
 type ConflictEndEvent = uicontract.ConflictEndEvent
-type CharacterDisplayEvent = uicontract.CharacterDisplayEvent
 type InvokePromptEvent = uicontract.InvokePromptEvent
 type InvokeResponse = uicontract.InvokeResponse
 type InputRequestEvent = uicontract.InputRequestEvent

@@ -60,8 +60,6 @@ func (ui *TerminalUI) Emit(event uicontract.GameEvent) {
 		ui.displayTurnAnnouncement(e.CharacterName, e.TurnNumber, e.IsPlayer)
 	case uicontract.ConflictEndEvent:
 		ui.displayConflictEnd(e.Reason)
-	case uicontract.CharacterDisplayEvent:
-		ui.displayCharacter()
 
 	// Composite mechanical events
 	case uicontract.DefenseRollEvent:
@@ -278,10 +276,9 @@ func (ui *TerminalUI) PromptForInvoke(available []uicontract.InvokableAspect, fa
 	}
 }
 
-// displayCharacter displays the player character sheet.
-// The engine calls this via Emit(CharacterDisplayEvent{}); the data comes from the
-// SceneInfo provider injected by SetSceneInfo.
-func (ui *TerminalUI) displayCharacter() {
+// DisplayCharacter displays the player character sheet.
+// Data comes from the SceneInfo provider injected by SetSceneInfo.
+func (ui *TerminalUI) DisplayCharacter() {
 	if ui.sceneInfo == nil {
 		fmt.Println("No scene information available.")
 		return
@@ -322,7 +319,7 @@ func (ui *TerminalUI) handleSpecialCommands(input string) bool {
 	case "scene":
 		ui.displayScene()
 	case "character", "char", "me":
-		ui.displayCharacter()
+		ui.DisplayCharacter()
 	case "status":
 		ui.displayStatus()
 	case "aspects":
