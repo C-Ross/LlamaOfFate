@@ -31,6 +31,36 @@ func (ui *TerminalUI) SetSceneInfo(sceneInfo uicontract.SceneInfo) {
 	ui.sceneInfo = sceneInfo
 }
 
+// Emit renders a structured GameEvent to the terminal.
+func (ui *TerminalUI) Emit(event uicontract.GameEvent) {
+	switch e := event.(type) {
+	case uicontract.NarrativeEvent:
+		ui.displayNarrative(e.Text)
+	case uicontract.DialogEvent:
+		ui.displayDialog(e.PlayerInput, e.GMResponse)
+	case uicontract.SystemMessageEvent:
+		ui.displaySystemMessage(e.Message)
+	case uicontract.ActionAttemptEvent:
+		ui.displayActionAttempt(e.Description)
+	case uicontract.ActionResultEvent:
+		ui.displayActionResult(e.Skill, e.SkillLevel, e.Bonuses, e.Result, e.Outcome)
+	case uicontract.SceneTransitionEvent:
+		ui.displaySceneTransition(e.Narrative, e.NewSceneHint)
+	case uicontract.GameOverEvent:
+		ui.displayGameOver(e.Reason)
+	case uicontract.ConflictStartEvent:
+		ui.displayConflictStart(e.ConflictType, e.InitiatorName, e.Participants)
+	case uicontract.ConflictEscalationEvent:
+		ui.displayConflictEscalation(e.FromType, e.ToType, e.TriggerCharName)
+	case uicontract.TurnAnnouncementEvent:
+		ui.displayTurnAnnouncement(e.CharacterName, e.TurnNumber, e.IsPlayer)
+	case uicontract.ConflictEndEvent:
+		ui.displayConflictEnd(e.Reason)
+	case uicontract.CharacterDisplayEvent:
+		ui.displayCharacter()
+	}
+}
+
 // ReadInput reads input from the terminal and returns cleaned input, exit status, and error.
 // Meta-commands (help, scene, etc.) are handled here so the engine never sees them.
 func (ui *TerminalUI) ReadInput() (input string, isExit bool, err error) {
@@ -64,13 +94,13 @@ func (ui *TerminalUI) ReadInput() (input string, isExit bool, err error) {
 	return input, false, nil
 }
 
-// DisplayActionAttempt displays that the player is attempting an action
-func (ui *TerminalUI) DisplayActionAttempt(description string) {
+// displayActionAttempt displays that the player is attempting an action
+func (ui *TerminalUI) displayActionAttempt(description string) {
 	fmt.Printf("\nYou attempt to: %s\n", description)
 }
 
-// DisplayActionResult displays the mechanical result of an action (dice roll, bonuses, outcome)
-func (ui *TerminalUI) DisplayActionResult(skill string, skillLevel string, bonuses int, result string, outcome string) {
+// displayActionResult displays the mechanical result of an action (dice roll, bonuses, outcome)
+func (ui *TerminalUI) displayActionResult(skill string, skillLevel string, bonuses int, result string, outcome string) {
 	fmt.Printf("Skill (%s): %s\n", skill, skillLevel)
 	if bonuses != 0 {
 		fmt.Printf("Bonuses: %+d\n", bonuses)
@@ -79,19 +109,19 @@ func (ui *TerminalUI) DisplayActionResult(skill string, skillLevel string, bonus
 	fmt.Printf("Outcome: %s\n", outcome)
 }
 
-// DisplayNarrative displays narrative text from the GM
-func (ui *TerminalUI) DisplayNarrative(narrative string) {
+// displayNarrative displays narrative text from the GM
+func (ui *TerminalUI) displayNarrative(narrative string) {
 	fmt.Printf("\n%s\n", narrative)
 }
 
-// DisplayDialog displays a dialog exchange between player and GM
-func (ui *TerminalUI) DisplayDialog(playerInput, gmResponse string) {
+// displayDialog displays a dialog exchange between player and GM
+func (ui *TerminalUI) displayDialog(playerInput, gmResponse string) {
 	fmt.Printf("\nYou: %s\n", playerInput)
 	fmt.Printf("\nGM: %s\n", gmResponse)
 }
 
-// DisplaySystemMessage displays system messages to the player
-func (ui *TerminalUI) DisplaySystemMessage(message string) {
+// displaySystemMessage displays system messages to the player
+func (ui *TerminalUI) displaySystemMessage(message string) {
 	fmt.Printf("\n%s\n", message)
 }
 
@@ -169,10 +199,10 @@ func (ui *TerminalUI) PromptForInvoke(available []uicontract.InvokableAspect, fa
 	}
 }
 
-// DisplayCharacter displays the player character sheet.
-// The engine calls this via the UI interface; the data comes from the
+// displayCharacter displays the player character sheet.
+// The engine calls this via Emit(CharacterDisplayEvent{}); the data comes from the
 // SceneInfo provider injected by SetSceneInfo.
-func (ui *TerminalUI) DisplayCharacter() {
+func (ui *TerminalUI) displayCharacter() {
 	if ui.sceneInfo == nil {
 		fmt.Println("No scene information available.")
 		return
@@ -213,7 +243,7 @@ func (ui *TerminalUI) handleSpecialCommands(input string) bool {
 	case "scene":
 		ui.displayScene()
 	case "character", "char", "me":
-		ui.DisplayCharacter()
+		ui.displayCharacter()
 	case "status":
 		ui.displayStatus()
 	case "aspects":
@@ -344,8 +374,8 @@ func (ui *TerminalUI) displayConversationHistory() {
 	}
 }
 
-// DisplayConflictStart displays the start of a conflict with initiative order
-func (ui *TerminalUI) DisplayConflictStart(conflictType string, initiatorName string, participants []uicontract.ConflictParticipantInfo) {
+// displayConflictStart displays the start of a conflict with initiative order
+func (ui *TerminalUI) displayConflictStart(conflictType string, initiatorName string, participants []uicontract.ConflictParticipantInfo) {
 	fmt.Println("\n╔══════════════════════════════════════════╗")
 	fmt.Printf("║         CONFLICT BEGINS!                 ║\n")
 	fmt.Printf("║         Type: %-25s  ║\n", conflictType)
@@ -363,8 +393,8 @@ func (ui *TerminalUI) DisplayConflictStart(conflictType string, initiatorName st
 	fmt.Println("------------------------")
 }
 
-// DisplayConflictEscalation displays when a conflict escalates to a different type
-func (ui *TerminalUI) DisplayConflictEscalation(fromType, toType, triggerCharName string) {
+// displayConflictEscalation displays when a conflict escalates to a different type
+func (ui *TerminalUI) displayConflictEscalation(fromType, toType, triggerCharName string) {
 	fmt.Println("\n┌──────────────────────────────────────────┐")
 	fmt.Printf("│  CONFLICT ESCALATES!                     │\n")
 	fmt.Printf("│  %s → %s\n", fromType, toType)
@@ -373,8 +403,8 @@ func (ui *TerminalUI) DisplayConflictEscalation(fromType, toType, triggerCharNam
 	fmt.Println("\nInitiative is being recalculated...")
 }
 
-// DisplayTurnAnnouncement displays whose turn it is in the conflict
-func (ui *TerminalUI) DisplayTurnAnnouncement(characterName string, turnNumber int, isPlayer bool) {
+// displayTurnAnnouncement displays whose turn it is in the conflict
+func (ui *TerminalUI) displayTurnAnnouncement(characterName string, turnNumber int, isPlayer bool) {
 	if isPlayer {
 		fmt.Printf("\n=== Turn %d: Your turn, %s! ===\n", turnNumber, characterName)
 	} else {
@@ -382,16 +412,16 @@ func (ui *TerminalUI) DisplayTurnAnnouncement(characterName string, turnNumber i
 	}
 }
 
-// DisplayConflictEnd displays the end of a conflict
-func (ui *TerminalUI) DisplayConflictEnd(reason string) {
+// displayConflictEnd displays the end of a conflict
+func (ui *TerminalUI) displayConflictEnd(reason string) {
 	fmt.Println("\n╔══════════════════════════════════════════╗")
 	fmt.Printf("║         CONFLICT ENDS                    ║\n")
 	fmt.Println("╚══════════════════════════════════════════╝")
 	fmt.Printf("\n%s\n", reason)
 }
 
-// DisplayGameOver displays the game over screen
-func (ui *TerminalUI) DisplayGameOver(reason string) {
+// displayGameOver displays the game over screen
+func (ui *TerminalUI) displayGameOver(reason string) {
 	fmt.Println()
 	fmt.Println("╔══════════════════════════════════════════╗")
 	fmt.Println("║              GAME OVER                   ║")
@@ -401,8 +431,8 @@ func (ui *TerminalUI) DisplayGameOver(reason string) {
 	fmt.Println("Thank you for playing!")
 }
 
-// DisplaySceneTransition displays a transition to a new scene
-func (ui *TerminalUI) DisplaySceneTransition(narrative string, newSceneHint string) {
+// displaySceneTransition displays a transition to a new scene
+func (ui *TerminalUI) displaySceneTransition(narrative string, newSceneHint string) {
 	fmt.Println()
 	fmt.Println("════════════════════════════════════════════")
 	fmt.Println("              Scene Transition              ")

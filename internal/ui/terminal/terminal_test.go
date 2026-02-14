@@ -107,30 +107,30 @@ func TestTerminalUI_isExitCommand(t *testing.T) {
 	}
 }
 
-func TestTerminalUI_DisplayMethods(t *testing.T) {
+func TestTerminalUI_EmitMethods(t *testing.T) {
 	ui := NewTerminalUI()
 
-	// These methods should not panic when called
+	// These events should not panic when emitted
 	// We can't easily test the actual output without mocking stdout
 	// but we can ensure they execute without errors
 	require.NotPanics(t, func() {
-		ui.DisplayActionAttempt("Attack the goblin")
+		ui.Emit(uicontract.ActionAttemptEvent{Description: "Attack the goblin"})
 	})
 
 	require.NotPanics(t, func() {
-		ui.DisplayActionResult("Fight", "Good (+3)", 2, "Fair (+2)", "Success")
+		ui.Emit(uicontract.ActionResultEvent{Skill: "Fight", SkillLevel: "Good (+3)", Bonuses: 2, Result: "Fair (+2)", Outcome: "Success"})
 	})
 
 	require.NotPanics(t, func() {
-		ui.DisplayNarrative("You successfully strike the goblin!")
+		ui.Emit(uicontract.NarrativeEvent{Text: "You successfully strike the goblin!"})
 	})
 
 	require.NotPanics(t, func() {
-		ui.DisplayDialog("Hello there", "The goblin grunts in response")
+		ui.Emit(uicontract.DialogEvent{PlayerInput: "Hello there", GMResponse: "The goblin grunts in response"})
 	})
 
 	require.NotPanics(t, func() {
-		ui.DisplaySystemMessage("Scene started")
+		ui.Emit(uicontract.SystemMessageEvent{Message: "Scene started"})
 	})
 }
 

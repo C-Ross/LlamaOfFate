@@ -197,8 +197,8 @@ func (sm *SceneManager) handleConflictEscalation(newType scene.ConflictType) {
 		return
 	}
 
-	sm.ui.DisplaySystemMessage(fmt.Sprintf(
-		"The conflict escalates from %s to %s!", currentType, newType))
+	sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
+		"The conflict escalates from %s to %s!", currentType, newType)}})
 
 	sm.currentScene.EscalateConflict(newType)
 	sm.recalculateInitiative(newType)
@@ -222,12 +222,13 @@ func (sm *SceneManager) advanceConflictTurns(ctx context.Context) {
 
 		// If it's the player's turn, stop and let them act
 		if currentActor == sm.player.ID {
-			sm.ui.DisplayTurnAnnouncement(sm.player.Name, sm.currentScene.ConflictState.Round, true)
+			sm.renderEvents([]GameEvent{TurnAnnouncementEvent{CharacterName: sm.player.Name, TurnNumber: sm.currentScene.ConflictState.Round, IsPlayer: true}})
 			break
 		}
 
-		// Process NPC turn
-		sm.processNPCTurn(ctx, currentActor)
+		// Process NPC turn — events are rendered inline by processNPCTurn
+		npcEvents := sm.processNPCTurn(ctx, currentActor)
+		sm.renderEvents(npcEvents)
 
 		// Advance to next turn
 		sm.currentScene.NextTurn()
@@ -431,9 +432,9 @@ func (sm *SceneManager) rollTargetDefense(target *character.Character, attackSki
 	// Roll defense
 	defenseRoll := sm.roller.RollWithModifier(dice.Mediocre, int(defenseLevel))
 
-	sm.ui.DisplaySystemMessage(fmt.Sprintf(
+	sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
 		"%s defends with %s (%s)",
-		target.Name, defenseSkill, defenseRoll.FinalValue.String()))
+		target.Name, defenseSkill, defenseRoll.FinalValue.String())}})
 
 	return defenseRoll
 }
@@ -506,8 +507,8 @@ func (sm *SceneManager) applyActionEffects(ctx context.Context, parsedAction *ac
 			)
 
 			sm.currentScene.AddSituationAspect(situationAspect)
-			sm.ui.DisplaySystemMessage(fmt.Sprintf("Created situation aspect: '%s' with %d free invoke(s)",
-				aspectName, freeInvokes))
+			sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf("Created situation aspect: '%s' with %d free invoke(s)",
+				aspectName, freeInvokes)}})
 		}
 
 	case action.Attack:
@@ -516,8 +517,8 @@ func (sm *SceneManager) applyActionEffects(ctx context.Context, parsedAction *ac
 				"component", componentSceneManager,
 				"action_id", parsedAction.ID,
 				"target", parsedAction.Target)
-			sm.ui.DisplaySystemMessage(fmt.Sprintf(
-				"Could not find target '%s' — attack has no effect.", parsedAction.Target))
+			sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
+				"Could not find target '%s' — attack has no effect.", parsedAction.Target)}})
 			return
 		}
 
@@ -530,15 +531,15 @@ func (sm *SceneManager) applyActionEffects(ctx context.Context, parsedAction *ac
 			// Determine stress type based on attack skill
 			stressType := core.StressTypeForAttack(parsedAction.Skill)
 
-			sm.ui.DisplaySystemMessage(fmt.Sprintf(
+			sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
 				"Your attack deals %d shifts to %s!",
-				shifts, target.Name))
+				shifts, target.Name)}})
 
 			// Apply stress to target
 			sm.applyDamageToTarget(ctx, target, shifts, stressType)
 		} else if parsedAction.Outcome.Type == dice.Tie {
 			// On a tie, attacker gets a boost
-			sm.ui.DisplaySystemMessage("Tie! You gain a boost against your opponent.")
+			sm.renderEvents([]GameEvent{SystemMessageEvent{Message: "Tie! You gain a boost against your opponent."}})
 		}
 	}
 }
@@ -614,9 +615,9 @@ func (sm *SceneManager) applyDamageToTarget(ctx context.Context, target *charact
 	// Try to absorb with stress track
 	absorbed := target.TakeStress(stressType, shifts)
 	if absorbed {
-		sm.ui.DisplaySystemMessage(fmt.Sprintf(
+		sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
 			"%s absorbs the damage with their %s stress track.",
-			target.Name, stressType))
+			target.Name, stressType)}})
 		return
 	}
 
@@ -651,16 +652,16 @@ func (sm *SceneManager) handleTargetStressOverflow(ctx context.Context, target *
 	absorbed := bestConseq.Value
 	remaining := shifts - absorbed
 
-	sm.ui.DisplaySystemMessage(fmt.Sprintf(
+	sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
 		"%s takes a %s consequence: \"%s\" (absorbs %d shifts)",
-		target.Name, bestConseq.Type, consequence.Aspect, absorbed))
+		target.Name, bestConseq.Type, consequence.Aspect, absorbed)}})
 
 	// If there's remaining damage, try stress again or take out
 	if remaining > 0 {
 		if target.TakeStress(stressType, remaining) {
-			sm.ui.DisplaySystemMessage(fmt.Sprintf(
+			sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
 				"%s absorbs remaining %d shifts with stress.",
-				target.Name, remaining))
+				target.Name, remaining)}})
 		} else {
 			sm.handleTargetTakenOut(ctx, target)
 		}
@@ -669,8 +670,8 @@ func (sm *SceneManager) handleTargetStressOverflow(ctx context.Context, target *
 
 // handleTargetTakenOut handles when a target is taken out of the conflict
 func (sm *SceneManager) handleTargetTakenOut(ctx context.Context, target *character.Character) {
-	sm.ui.DisplaySystemMessage(fmt.Sprintf(
-		"\n=== %s is Taken Out! ===", target.Name))
+	sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
+		"\n=== %s is Taken Out! ===", target.Name)}})
 
 	// Track this character as taken out during this scene
 	sm.takenOutChars = append(sm.takenOutChars, target.ID)
@@ -701,7 +702,7 @@ func (sm *SceneManager) handleTargetTakenOut(ctx context.Context, target *charac
 		}
 
 		if activeOpponents == 0 {
-			sm.ui.DisplaySystemMessage("\n=== Victory! All opponents defeated! ===")
+			sm.renderEvents([]GameEvent{SystemMessageEvent{Message: "\n=== Victory! All opponents defeated! ==="}})
 			sm.promptPlayerForFates(ctx)
 			sm.clearConflictStress()
 			sm.currentScene.EndConflict()
@@ -877,36 +878,36 @@ func (sm *SceneManager) applyAttackDamageToPlayer(ctx context.Context, outcome *
 		// Try to absorb with stress track
 		absorbed := sm.player.TakeStress(stressType, shifts)
 		if absorbed {
-			sm.ui.DisplaySystemMessage(fmt.Sprintf(
+			sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
 				"You take %d %s stress! (%s)",
 				shifts,
 				stressType,
 				sm.player.StressTracks[string(stressType)].String(),
-			))
+			)}})
 		} else {
 			// Cannot absorb - need consequence or taken out
 			sm.handleStressOverflow(ctx, shifts, stressType, attacker, attackCtx)
 		}
 	case dice.Tie:
-		sm.ui.DisplaySystemMessage("The attack is deflected, but grants a boost!")
+		sm.renderEvents([]GameEvent{SystemMessageEvent{Message: "The attack is deflected, but grants a boost!"}})
 	default:
-		sm.ui.DisplaySystemMessage("You successfully defend!")
+		sm.renderEvents([]GameEvent{SystemMessageEvent{Message: "You successfully defend!"}})
 	}
 }
 
 // handleStressOverflow handles when the player cannot absorb stress with their stress track
 func (sm *SceneManager) handleStressOverflow(ctx context.Context, shifts int, stressType character.StressTrackType, attacker *character.Character, attackCtx prompt.AttackContext) {
-	sm.ui.DisplaySystemMessage(fmt.Sprintf(
+	sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
 		"You cannot absorb %d shifts with your stress track!",
 		shifts,
-	))
+	)}})
 
 	// Determine available consequences
 	availableConsequences := sm.player.AvailableConsequenceSlots()
 
 	if len(availableConsequences) == 0 {
 		// No consequences available - taken out
-		sm.ui.DisplaySystemMessage("You have no available consequences! You are taken out!")
+		sm.renderEvents([]GameEvent{SystemMessageEvent{Message: "You have no available consequences! You are taken out!"}})
 		sm.handleTakenOut(ctx, attacker, attackCtx)
 		return
 	}
@@ -949,7 +950,7 @@ func (sm *SceneManager) handleStressOverflow(ctx context.Context, shifts int, st
 			if resp.ChoiceIndex >= 0 && resp.ChoiceIndex < takenOutIdx {
 				sm.applyConsequence(ctx, capturedConsequences[resp.ChoiceIndex].Type, capturedShifts, capturedAttacker, capturedAttackCtx)
 			} else {
-				sm.ui.DisplaySystemMessage("You are taken out!")
+				sm.renderEvents([]GameEvent{SystemMessageEvent{Message: "You are taken out!"}})
 				sm.handleTakenOut(ctx, capturedAttacker, capturedAttackCtx)
 			}
 			return nil
@@ -980,14 +981,14 @@ func (sm *SceneManager) applyConsequence(ctx context.Context, conseqType charact
 	absorbed := conseqType.Value()
 	remaining := shifts - absorbed
 
-	sm.ui.DisplaySystemMessage(fmt.Sprintf(
+	sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
 		"\nYou take a %s consequence: \"%s\"",
 		conseqType, aspectName,
-	))
-	sm.ui.DisplaySystemMessage(fmt.Sprintf(
+	)}})
+	sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
 		"The consequence absorbs %d shifts.",
 		absorbed,
-	))
+	)}})
 
 	// If there are remaining shifts, try to absorb with stress
 	if remaining > 0 {
@@ -997,16 +998,16 @@ func (sm *SceneManager) applyConsequence(ctx context.Context, conseqType charact
 		}
 
 		if sm.player.TakeStress(stressType, remaining) {
-			sm.ui.DisplaySystemMessage(fmt.Sprintf(
+			sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
 				"You absorb the remaining %d shifts as stress. (%s)",
 				remaining,
 				sm.player.StressTracks[string(stressType)].String(),
-			))
+			)}})
 		} else {
-			sm.ui.DisplaySystemMessage(fmt.Sprintf(
+			sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
 				"You cannot absorb the remaining %d shifts! You may need another consequence.",
 				remaining,
-			))
+			)}})
 			// Recursively handle remaining damage
 			sm.handleStressOverflow(ctx, remaining, stressType, attacker, attackCtx)
 		}
@@ -1055,9 +1056,11 @@ func (sm *SceneManager) isConcedeCommand(input string) bool {
 
 // handleConcession handles when the player concedes the conflict
 func (sm *SceneManager) handleConcession(ctx context.Context) {
-	sm.ui.DisplaySystemMessage("\n=== You Concede! ===")
-	sm.ui.DisplaySystemMessage("You choose to lose the conflict on your own terms.")
-	sm.ui.DisplaySystemMessage("You get to narrate how you exit the scene and avoid the worst consequences.")
+	sm.renderEvents([]GameEvent{
+		SystemMessageEvent{Message: "\n=== You Concede! ==="},
+		SystemMessageEvent{Message: "You choose to lose the conflict on your own terms."},
+		SystemMessageEvent{Message: "You get to narrate how you exit the scene and avoid the worst consequences."},
+	})
 
 	// Award fate points: 1 for conceding + 1 for each consequence taken in this conflict
 	// Per Fate Core: "you get a fate point for choosing to concede.
@@ -1071,11 +1074,12 @@ func (sm *SceneManager) handleConcession(ctx context.Context) {
 	}
 
 	if consequenceCount > 0 {
-		sm.ui.DisplaySystemMessage(fmt.Sprintf(
+		sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
 			"You gain %d Fate Points (1 for conceding + %d for consequences)! (Now: %d)",
-			fatePointsGained, consequenceCount, sm.player.FatePoints))
+			fatePointsGained, consequenceCount, sm.player.FatePoints)}})
 	} else {
-		sm.ui.DisplaySystemMessage(fmt.Sprintf("You gain a Fate Point for conceding! (Now: %d)", sm.player.FatePoints))
+		sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
+			"You gain a Fate Point for conceding! (Now: %d)", sm.player.FatePoints)}})
 	}
 
 	// Mark player as conceded and end the conflict
@@ -1083,7 +1087,7 @@ func (sm *SceneManager) handleConcession(ctx context.Context) {
 		sm.currentScene.SetParticipantStatus(sm.player.ID, scene.StatusConceded)
 		sm.clearConflictStress()
 		sm.currentScene.EndConflict()
-		sm.ui.DisplayConflictEnd("You have conceded the conflict.")
+		sm.renderEvents([]GameEvent{ConflictEndEvent{Reason: "You have conceded the conflict."}})
 	}
 
 	// Emit a free-text input request for the concession narration instead of
@@ -1114,8 +1118,10 @@ func (sm *SceneManager) handleConcession(ctx context.Context) {
 
 // handleTakenOut handles when the player is taken out
 func (sm *SceneManager) handleTakenOut(ctx context.Context, attacker *character.Character, attackCtx prompt.AttackContext) {
-	sm.ui.DisplaySystemMessage("\n=== You Are Taken Out! ===")
-	sm.ui.DisplaySystemMessage(fmt.Sprintf("%s decides your fate.", attacker.Name))
+	sm.renderEvents([]GameEvent{
+		SystemMessageEvent{Message: "\n=== You Are Taken Out! ==="},
+		SystemMessageEvent{Message: fmt.Sprintf("%s decides your fate.", attacker.Name)},
+	})
 
 	// Generate narrative and outcome classification for being taken out
 	narrative, outcome, newSceneHint, err := sm.generateTakenOutNarrativeAndOutcome(ctx, attacker, attackCtx)
@@ -1135,15 +1141,19 @@ func (sm *SceneManager) handleTakenOut(ctx context.Context, attacker *character.
 	// Handle based on outcome type
 	switch outcome {
 	case TakenOutGameOver:
-		sm.ui.DisplayNarrative(narrative)
-		sm.ui.DisplayGameOver(fmt.Sprintf("%s has met their end.", sm.player.Name))
+		sm.renderEvents([]GameEvent{
+			NarrativeEvent{Text: narrative},
+			GameOverEvent{Reason: fmt.Sprintf("%s has met their end.", sm.player.Name)},
+		})
 		sm.sceneEndReason = SceneEndPlayerTakenOut
 		sm.playerTakenOutHint = ""
 		sm.shouldExit = true
 
 	case TakenOutTransition:
-		sm.ui.DisplaySceneTransition(narrative, newSceneHint)
-		sm.ui.DisplaySystemMessage("\nThe scene shifts around you...")
+		sm.renderEvents([]GameEvent{
+			SceneTransitionEvent{Narrative: narrative, NewSceneHint: newSceneHint},
+			SystemMessageEvent{Message: "\nThe scene shifts around you..."},
+		})
 		sm.sceneEndReason = SceneEndPlayerTakenOut
 		sm.playerTakenOutHint = newSceneHint
 		if sm.exitOnSceneTransition {
@@ -1152,8 +1162,10 @@ func (sm *SceneManager) handleTakenOut(ctx context.Context, attacker *character.
 		// Scene continues but context has changed
 
 	default: // TakenOutContinue
-		sm.ui.DisplayNarrative(narrative)
-		sm.ui.DisplayConflictEnd(fmt.Sprintf("%s has won the conflict.", attacker.Name))
+		sm.renderEvents([]GameEvent{
+			NarrativeEvent{Text: narrative},
+			ConflictEndEvent{Reason: fmt.Sprintf("%s has won the conflict.", attacker.Name)},
+		})
 		// Don't set sceneEndReason - scene continues
 	}
 }

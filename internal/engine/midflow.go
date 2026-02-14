@@ -85,15 +85,17 @@ func (sm *SceneManager) resolveMidFlowBlocking(ctx context.Context) (*InputResul
 // resolveMidFlowNumberedChoice handles a numbered-choice prompt for the terminal UI.
 func (sm *SceneManager) resolveMidFlowNumberedChoice(ctx context.Context, event InputRequestEvent) (*InputResult, error) {
 	// Display the prompt and options (these mirror the old DisplaySystemMessage calls).
-	sm.ui.DisplaySystemMessage(event.Prompt)
+	var promptEvents []GameEvent
+	promptEvents = append(promptEvents, SystemMessageEvent{Message: event.Prompt})
 	for i, opt := range event.Options {
 		if opt.Description != "" {
-			sm.ui.DisplaySystemMessage(fmt.Sprintf("  %d. %s (%s)", i+1, opt.Label, opt.Description))
+			promptEvents = append(promptEvents, SystemMessageEvent{Message: fmt.Sprintf("  %d. %s (%s)", i+1, opt.Label, opt.Description)})
 		} else {
-			sm.ui.DisplaySystemMessage(fmt.Sprintf("  %d. %s", i+1, opt.Label))
+			promptEvents = append(promptEvents, SystemMessageEvent{Message: fmt.Sprintf("  %d. %s", i+1, opt.Label)})
 		}
 	}
-	sm.ui.DisplaySystemMessage("\nEnter your choice (number):")
+	promptEvents = append(promptEvents, SystemMessageEvent{Message: "\nEnter your choice (number):"})
+	sm.renderEvents(promptEvents)
 
 	input, _, err := sm.ui.ReadInput()
 	if err != nil {
@@ -111,13 +113,13 @@ func (sm *SceneManager) resolveMidFlowNumberedChoice(ctx context.Context, event 
 	}
 
 	// Invalid input — default to last option.
-	sm.ui.DisplaySystemMessage("Invalid choice.")
+	sm.renderEvents([]GameEvent{SystemMessageEvent{Message: "Invalid choice."}})
 	return sm.ProvideMidFlowResponse(ctx, MidFlowResponse{ChoiceIndex: len(event.Options) - 1})
 }
 
 // resolveMidFlowFreeText handles a free-text prompt for the terminal UI.
 func (sm *SceneManager) resolveMidFlowFreeText(ctx context.Context, event InputRequestEvent) (*InputResult, error) {
-	sm.ui.DisplaySystemMessage(event.Prompt)
+	sm.renderEvents([]GameEvent{SystemMessageEvent{Message: event.Prompt}})
 
 	input, _, err := sm.ui.ReadInput()
 	if err != nil {

@@ -234,7 +234,7 @@ func (m *ScenarioManager) Run(ctx context.Context) (*ScenarioResult, error) {
 
 			// Display scene purpose and opening hook to the player
 			if m.lastGeneratedPurpose != "" {
-				m.ui.DisplaySystemMessage("Scene Purpose: " + m.lastGeneratedPurpose)
+				m.renderEvents([]GameEvent{SystemMessageEvent{Message: "Scene Purpose: " + m.lastGeneratedPurpose}})
 				if m.sessionLogger != nil {
 					m.sessionLogger.Log("scene_purpose", map[string]any{
 						"purpose": m.lastGeneratedPurpose,
@@ -242,7 +242,7 @@ func (m *ScenarioManager) Run(ctx context.Context) (*ScenarioResult, error) {
 				}
 			}
 			if m.lastGeneratedHook != "" {
-				m.ui.DisplayNarrative(m.lastGeneratedHook)
+				m.renderEvents([]GameEvent{NarrativeEvent{Text: m.lastGeneratedHook}})
 				if m.sessionLogger != nil {
 					m.sessionLogger.Log("opening_hook", map[string]any{
 						"hook": m.lastGeneratedHook,
@@ -555,10 +555,10 @@ func (m *ScenarioManager) handleBetweenSceneRecovery(ctx context.Context) {
 	// First, check if any already-recovering consequences have healed
 	cleared := m.player.CheckConsequenceRecovery(m.sceneCount, m.scenarioCount)
 	for _, conseq := range cleared {
-		m.ui.DisplaySystemMessage(fmt.Sprintf(
+		m.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
 			"Your %s consequence \"%s\" has fully healed!",
 			conseq.Type, conseq.Aspect,
-		))
+		)}})
 		if m.sessionLogger != nil {
 			m.sessionLogger.Log("consequence_healed", map[string]any{
 				"type":        conseq.Type,
@@ -672,18 +672,18 @@ func (m *ScenarioManager) displayRecoveryNarrative(ctx context.Context, attempts
 	}
 
 	// Display mechanical results
-	m.ui.DisplaySystemMessage("\n--- Between Scenes: Recovery ---")
+	m.renderEvents([]GameEvent{SystemMessageEvent{Message: "\n--- Between Scenes: Recovery ---"}})
 	for _, a := range attempts {
 		if a.Outcome == "success" {
-			m.ui.DisplaySystemMessage(fmt.Sprintf(
+			m.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
 				"Recovery roll for \"%s\" (%s): %s +%d vs %s — Success! Recovery begins.",
 				a.Aspect, a.Severity, a.Skill, a.RollResult, a.Difficulty,
-			))
+			)}})
 		} else {
-			m.ui.DisplaySystemMessage(fmt.Sprintf(
+			m.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
 				"Recovery roll for \"%s\" (%s): %s +%d vs %s — Failed. The wound persists.",
 				a.Aspect, a.Severity, a.Skill, a.RollResult, a.Difficulty,
-			))
+			)}})
 		}
 	}
 
@@ -730,10 +730,10 @@ func (m *ScenarioManager) displayRecoveryNarrative(ctx context.Context, attempts
 	var parsed recoveryResponse
 	if parseErr := json.Unmarshal([]byte(content), &parsed); parseErr != nil {
 		// If parsing fails, display raw content
-		m.ui.DisplayNarrative(content)
+		m.renderEvents([]GameEvent{NarrativeEvent{Text: content}})
 	} else {
 		if parsed.Narrative != "" {
-			m.ui.DisplayNarrative(parsed.Narrative)
+			m.renderEvents([]GameEvent{NarrativeEvent{Text: parsed.Narrative}})
 		}
 		// Apply renamed aspects to recovering consequences
 		for oldAspect, newAspect := range parsed.RenamedAspects {
@@ -923,4 +923,9 @@ func (m *ScenarioManager) checkScenarioResolution(ctx context.Context, latestSum
 	}
 
 	return result.IsResolved, nil
+}
+
+// renderEvents dispatches events to the UI for display (terminal path).
+func (m *ScenarioManager) renderEvents(events []GameEvent) {
+	renderEventsToUI(m.ui, events)
 }

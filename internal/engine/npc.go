@@ -117,16 +117,17 @@ func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character
 }
 
 // processNPCTurn handles an NPC's action during conflict
-func (sm *SceneManager) processNPCTurn(ctx context.Context, npcID string) {
+func (sm *SceneManager) processNPCTurn(ctx context.Context, npcID string) []GameEvent {
 	npc := sm.engine.GetCharacter(npcID)
 	if npc == nil {
 		slog.Warn("NPC not found for turn processing",
 			"component", componentSceneManager,
 			"npc_id", npcID)
-		return
+		return nil
 	}
 
-	sm.ui.DisplayTurnAnnouncement(npc.Name, sm.currentScene.ConflictState.Round, false)
+	var events []GameEvent
+	events = append(events, TurnAnnouncementEvent{CharacterName: npc.Name, TurnNumber: sm.currentScene.ConflictState.Round, IsPlayer: false})
 
 	// Get LLM decision for NPC action
 	decision, err := sm.getNPCActionDecision(ctx, npc)
@@ -147,14 +148,16 @@ func (sm *SceneManager) processNPCTurn(ctx context.Context, npcID string) {
 	// Process the decision based on action type
 	switch strings.ToUpper(decision.ActionType) {
 	case "DEFEND":
-		sm.processNPCDefend(ctx, npc, decision)
+		events = append(events, sm.processNPCDefend(ctx, npc, decision)...)
 	case "CREATE_ADVANTAGE":
-		sm.processNPCCreateAdvantage(ctx, npc, decision)
+		events = append(events, sm.processNPCCreateAdvantage(ctx, npc, decision)...)
 	case "OVERCOME":
-		sm.processNPCOvercome(ctx, npc, decision)
+		events = append(events, sm.processNPCOvercome(ctx, npc, decision)...)
 	default: // ATTACK or unknown
-		sm.processNPCAttack(ctx, npc, decision)
+		events = append(events, sm.processNPCAttack(ctx, npc, decision)...)
 	}
+
+	return events
 }
 
 // getDefaultAttackSkill returns the default attack skill based on conflict type
@@ -163,25 +166,28 @@ func (sm *SceneManager) getDefaultAttackSkill() string {
 }
 
 // processNPCDefend handles an NPC choosing full defense
-func (sm *SceneManager) processNPCDefend(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) {
+func (sm *SceneManager) processNPCDefend(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) []GameEvent {
 	// Set full defense flag
 	sm.currentScene.SetFullDefense(npc.ID)
 
-	sm.ui.DisplaySystemMessage(fmt.Sprintf(
+	var events []GameEvent
+	events = append(events, SystemMessageEvent{Message: fmt.Sprintf(
 		"%s takes a defensive stance! (+2 to all defense rolls this exchange)",
 		npc.Name,
-	))
+	)})
 
 	// Generate narrative
 	narrative := fmt.Sprintf("%s braces for incoming attacks, focusing entirely on defense.", npc.Name)
 	if decision.Description != "" {
 		narrative = decision.Description
 	}
-	sm.ui.DisplayNarrative(narrative)
+	events = append(events, NarrativeEvent{Text: narrative})
+
+	return events
 }
 
 // processNPCCreateAdvantage handles an NPC creating an advantage
-func (sm *SceneManager) processNPCCreateAdvantage(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) {
+func (sm *SceneManager) processNPCCreateAdvantage(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) []GameEvent {
 	skill := decision.Skill
 	if skill == "" {
 		skill = "Notice" // Default
@@ -195,12 +201,13 @@ func (sm *SceneManager) processNPCCreateAdvantage(ctx context.Context, npc *char
 	difficulty := dice.Fair
 	outcome := npcRoll.CompareAgainst(difficulty)
 
-	sm.ui.DisplaySystemMessage(fmt.Sprintf(
+	var events []GameEvent
+	events = append(events, SystemMessageEvent{Message: fmt.Sprintf(
 		"%s attempts to Create an Advantage with %s (%s vs Fair)",
 		npc.Name,
 		skill,
 		npcRoll.FinalValue.String(),
-	))
+	)})
 
 	switch outcome.Type {
 	case dice.Success, dice.SuccessWithStyle:
@@ -222,23 +229,25 @@ func (sm *SceneManager) processNPCCreateAdvantage(ctx context.Context, npc *char
 		aspectID := fmt.Sprintf("npc-advantage-%d", time.Now().UnixNano())
 		situationAspect := scene.NewSituationAspect(aspectID, aspectName, npc.ID, freeInvokes)
 		sm.currentScene.AddSituationAspect(situationAspect)
-		sm.ui.DisplaySystemMessage(fmt.Sprintf(
+		events = append(events, SystemMessageEvent{Message: fmt.Sprintf(
 			"Created aspect: \"%s\" with %d free invoke(s)!",
 			aspectName,
 			freeInvokes,
-		))
-		sm.ui.DisplayNarrative(fmt.Sprintf("%s gains a tactical advantage!", npc.Name))
+		)})
+		events = append(events, NarrativeEvent{Text: fmt.Sprintf("%s gains a tactical advantage!", npc.Name)})
 	case dice.Tie:
-		sm.ui.DisplaySystemMessage("The attempt succeeds but grants a boost to opponents!")
-		sm.ui.DisplayNarrative(fmt.Sprintf("%s's maneuver is partially successful.", npc.Name))
+		events = append(events, SystemMessageEvent{Message: "The attempt succeeds but grants a boost to opponents!"})
+		events = append(events, NarrativeEvent{Text: fmt.Sprintf("%s's maneuver is partially successful.", npc.Name)})
 	default:
-		sm.ui.DisplaySystemMessage("The attempt fails!")
-		sm.ui.DisplayNarrative(fmt.Sprintf("%s's gambit doesn't pay off.", npc.Name))
+		events = append(events, SystemMessageEvent{Message: "The attempt fails!"})
+		events = append(events, NarrativeEvent{Text: fmt.Sprintf("%s's gambit doesn't pay off.", npc.Name)})
 	}
+
+	return events
 }
 
 // processNPCOvercome handles an NPC attempting to overcome an obstacle
-func (sm *SceneManager) processNPCOvercome(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) {
+func (sm *SceneManager) processNPCOvercome(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) []GameEvent {
 	skill := decision.Skill
 	if skill == "" {
 		skill = "Athletics" // Default
@@ -252,32 +261,35 @@ func (sm *SceneManager) processNPCOvercome(ctx context.Context, npc *character.C
 	difficulty := dice.Fair
 	outcome := npcRoll.CompareAgainst(difficulty)
 
-	sm.ui.DisplaySystemMessage(fmt.Sprintf(
+	var events []GameEvent
+	events = append(events, SystemMessageEvent{Message: fmt.Sprintf(
 		"%s attempts to Overcome with %s (%s vs Fair)",
 		npc.Name,
 		skill,
 		npcRoll.FinalValue.String(),
-	))
+	)})
 
 	switch outcome.Type {
 	case dice.Success, dice.SuccessWithStyle:
-		sm.ui.DisplaySystemMessage("The obstacle is overcome!")
+		events = append(events, SystemMessageEvent{Message: "The obstacle is overcome!"})
 		narrative := decision.Description
 		if narrative == "" {
 			narrative = fmt.Sprintf("%s successfully overcomes the challenge.", npc.Name)
 		}
-		sm.ui.DisplayNarrative(narrative)
+		events = append(events, NarrativeEvent{Text: narrative})
 	case dice.Tie:
-		sm.ui.DisplaySystemMessage("Success, but at a minor cost.")
-		sm.ui.DisplayNarrative(fmt.Sprintf("%s manages to push through, but not without difficulty.", npc.Name))
+		events = append(events, SystemMessageEvent{Message: "Success, but at a minor cost."})
+		events = append(events, NarrativeEvent{Text: fmt.Sprintf("%s manages to push through, but not without difficulty.", npc.Name)})
 	default:
-		sm.ui.DisplaySystemMessage("The attempt fails!")
-		sm.ui.DisplayNarrative(fmt.Sprintf("%s is unable to overcome the obstacle.", npc.Name))
+		events = append(events, SystemMessageEvent{Message: "The attempt fails!"})
+		events = append(events, NarrativeEvent{Text: fmt.Sprintf("%s is unable to overcome the obstacle.", npc.Name)})
 	}
+
+	return events
 }
 
 // processNPCAttack handles an NPC attacking a target
-func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) {
+func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) []GameEvent {
 	// Determine target
 	target := sm.player // Default to player
 	targetID := decision.TargetID
@@ -315,7 +327,9 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 	if defenseBonus > 0 {
 		defenseDisplay = fmt.Sprintf("%s+2 (Full Defense)", defenseSkill)
 	}
-	sm.ui.DisplaySystemMessage(fmt.Sprintf(
+
+	var events []GameEvent
+	events = append(events, SystemMessageEvent{Message: fmt.Sprintf(
 		"%s attacks %s with %s (%s) vs %s (%s)",
 		npc.Name,
 		target.Name,
@@ -323,11 +337,15 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 		npcRoll.FinalValue.String(),
 		defenseDisplay,
 		targetDefense.FinalValue.String(),
-	))
+	)})
 
 	// Initial outcome (before player invokes)
 	initialOutcome := npcRoll.CompareAgainst(targetDefense.FinalValue)
-	sm.ui.DisplaySystemMessage(fmt.Sprintf("Initial outcome: %s", initialOutcome.Type.String()))
+	events = append(events, SystemMessageEvent{Message: fmt.Sprintf("Initial outcome: %s", initialOutcome.Type.String())})
+
+	// Render events so far before blocking invoke loop
+	sm.renderEvents(events)
+	events = nil
 
 	// If target is the player, allow them to invoke aspects to improve defense
 	if target.ID == sm.player.ID {
@@ -348,7 +366,7 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 
 	// Display updated outcome if it changed
 	if outcome.Type != initialOutcome.Type {
-		sm.ui.DisplaySystemMessage(fmt.Sprintf("Final outcome: %s", outcome.Type.String()))
+		events = append(events, SystemMessageEvent{Message: fmt.Sprintf("Final outcome: %s", outcome.Type.String())})
 	}
 
 	// Generate narrative for the attack
@@ -365,7 +383,10 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 			npcNarrative = fmt.Sprintf("%s's attack misses.", npc.Name)
 		}
 	}
-	sm.ui.DisplayNarrative(npcNarrative)
+	events = append(events, NarrativeEvent{Text: npcNarrative})
+
+	// Render events before damage application (which may trigger mid-flow prompts)
+	sm.renderEvents(events)
 
 	// Only apply damage if target is the player (for now, NPC vs NPC damage not fully implemented)
 	if target.ID == sm.player.ID {
@@ -379,9 +400,12 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 	} else {
 		// For NPC targets, just show the result
 		if outcome.Type == dice.Success || outcome.Type == dice.SuccessWithStyle {
-			sm.ui.DisplaySystemMessage(fmt.Sprintf("%s takes %d shifts of stress!", target.Name, outcome.Shifts))
+			sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf("%s takes %d shifts of stress!", target.Name, outcome.Shifts)}})
 		}
 	}
+
+	// Events already rendered inline — return nil.
+	return nil
 }
 
 // generateNPCAttackNarrative generates narrative for an NPC's attack

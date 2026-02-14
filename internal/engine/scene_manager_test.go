@@ -31,24 +31,33 @@ func (m *MockUI) ReadInput() (input string, isExit bool, err error) {
 	return m.lastInput, m.lastExit, m.lastError
 }
 
-func (m *MockUI) DisplayActionAttempt(description string) {
-	m.displayedMessages = append(m.displayedMessages, "ActionAttempt: "+description)
-}
-
-func (m *MockUI) DisplayActionResult(skill string, skillLevel string, bonuses int, result string, outcome string) {
-	m.displayedMessages = append(m.displayedMessages, "ActionResult: "+outcome)
-}
-
-func (m *MockUI) DisplayNarrative(narrative string) {
-	m.displayedMessages = append(m.displayedMessages, "Narrative: "+narrative)
-}
-
-func (m *MockUI) DisplayDialog(playerInput, gmResponse string) {
-	m.displayedMessages = append(m.displayedMessages, "Dialog: "+playerInput+" -> "+gmResponse)
-}
-
-func (m *MockUI) DisplaySystemMessage(message string) {
-	m.displayedMessages = append(m.displayedMessages, "System: "+message)
+func (m *MockUI) Emit(event GameEvent) {
+	switch e := event.(type) {
+	case ActionAttemptEvent:
+		m.displayedMessages = append(m.displayedMessages, "ActionAttempt: "+e.Description)
+	case ActionResultEvent:
+		m.displayedMessages = append(m.displayedMessages, "ActionResult: "+e.Outcome)
+	case NarrativeEvent:
+		m.displayedMessages = append(m.displayedMessages, "Narrative: "+e.Text)
+	case DialogEvent:
+		m.displayedMessages = append(m.displayedMessages, "Dialog: "+e.PlayerInput+" -> "+e.GMResponse)
+	case SystemMessageEvent:
+		m.displayedMessages = append(m.displayedMessages, "System: "+e.Message)
+	case ConflictStartEvent:
+		m.conflictStartCalls = append(m.conflictStartCalls, e.ConflictType+":"+e.InitiatorName)
+	case ConflictEscalationEvent:
+		m.conflictEscalateCalls = append(m.conflictEscalateCalls, e.FromType+"->"+e.ToType+":"+e.TriggerCharName)
+	case TurnAnnouncementEvent:
+		m.turnAnnouncementCalls = append(m.turnAnnouncementCalls, e.CharacterName)
+	case ConflictEndEvent:
+		m.conflictEndCalls = append(m.conflictEndCalls, e.Reason)
+	case GameOverEvent:
+		m.displayedMessages = append(m.displayedMessages, "GAME OVER: "+e.Reason)
+	case SceneTransitionEvent:
+		m.displayedMessages = append(m.displayedMessages, "SCENE TRANSITION: "+e.Narrative)
+	case CharacterDisplayEvent:
+		m.displayedMessages = append(m.displayedMessages, "CHARACTER")
+	}
 }
 
 func (m *MockUI) PromptForInvoke(available []InvokableAspect, fatePoints int, currentResult string, shiftsNeeded int) *InvokeChoice {
@@ -57,34 +66,6 @@ func (m *MockUI) PromptForInvoke(available []InvokableAspect, fatePoints int, cu
 	}
 	// Default: skip invokes
 	return &InvokeChoice{Aspect: nil}
-}
-
-func (m *MockUI) DisplayConflictStart(conflictType string, initiatorName string, participants []ConflictParticipantInfo) {
-	m.conflictStartCalls = append(m.conflictStartCalls, conflictType+":"+initiatorName)
-}
-
-func (m *MockUI) DisplayConflictEscalation(fromType, toType, triggerCharName string) {
-	m.conflictEscalateCalls = append(m.conflictEscalateCalls, fromType+"->"+toType+":"+triggerCharName)
-}
-
-func (m *MockUI) DisplayTurnAnnouncement(characterName string, turnNumber int, isPlayer bool) {
-	m.turnAnnouncementCalls = append(m.turnAnnouncementCalls, characterName)
-}
-
-func (m *MockUI) DisplayConflictEnd(reason string) {
-	m.conflictEndCalls = append(m.conflictEndCalls, reason)
-}
-
-func (m *MockUI) DisplayGameOver(reason string) {
-	m.displayedMessages = append(m.displayedMessages, "GAME OVER: "+reason)
-}
-
-func (m *MockUI) DisplaySceneTransition(narrative string, newSceneHint string) {
-	m.displayedMessages = append(m.displayedMessages, "SCENE TRANSITION: "+narrative)
-}
-
-func (m *MockUI) DisplayCharacter() {
-	m.displayedMessages = append(m.displayedMessages, "CHARACTER")
 }
 
 func TestNewSceneManager(t *testing.T) {

@@ -16,6 +16,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/C-Ross/LlamaOfFate/internal/ui/terminal"
+	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
 )
 
 // SceneConfig holds all the data needed to set up a scene
@@ -140,7 +141,7 @@ func main() {
 	}
 
 	// Display final character state
-	terminalUI.DisplayCharacter()
+	terminalUI.Emit(uicontract.CharacterDisplayEvent{})
 	fmt.Printf("\n%s\n", sceneConfig.Farewell)
 }
 
@@ -180,7 +181,7 @@ func runSingleSceneMode(ctx context.Context, gameEngine *engine.Engine, sceneCon
 	terminalUI.SetSceneInfo(sceneManager)
 
 	// Display initial character info
-	terminalUI.DisplayCharacter()
+	terminalUI.Emit(uicontract.CharacterDisplayEvent{})
 
 	if _, err := sceneManager.RunSceneLoop(ctx); err != nil {
 		log.Fatalf("Scene loop error: %v", err)
@@ -207,7 +208,7 @@ func runMultiSceneMode(ctx context.Context, gameEngine *engine.Engine, sceneConf
 	terminalUI.SetSceneInfo(gameEngine.GetSceneManager())
 
 	// Display initial character info
-	terminalUI.DisplayCharacter()
+	terminalUI.Emit(uicontract.CharacterDisplayEvent{})
 
 	// Run with the initial scene
 	initialScene := &engine.InitialSceneConfig{

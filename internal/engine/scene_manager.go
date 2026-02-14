@@ -142,16 +142,20 @@ func (sm *SceneManager) RunSceneLoop(ctx context.Context) (*SceneEndResult, erro
 	sm.resetSceneState()
 
 	// Display the initial scene
-	sm.ui.DisplaySystemMessage(fmt.Sprintf("=== %s ===", sm.currentScene.Name))
-	sm.ui.DisplayNarrative(sm.currentScene.Description)
+	sm.renderEvents([]GameEvent{
+		SystemMessageEvent{Message: fmt.Sprintf("=== %s ===", sm.currentScene.Name)},
+		NarrativeEvent{Text: sm.currentScene.Description},
+	})
 
 	// If resuming with existing conversation, replay it so the player has context
 	if len(sm.conversationHistory) > 0 {
-		sm.ui.DisplaySystemMessage("--- Recap of recent events ---")
+		var recapEvents []GameEvent
+		recapEvents = append(recapEvents, SystemMessageEvent{Message: "--- Recap of recent events ---"})
 		for _, entry := range sm.conversationHistory {
-			sm.ui.DisplayDialog(entry.PlayerInput, entry.GMResponse)
+			recapEvents = append(recapEvents, DialogEvent{PlayerInput: entry.PlayerInput, GMResponse: entry.GMResponse})
 		}
-		sm.ui.DisplaySystemMessage("--- End of recap ---")
+		recapEvents = append(recapEvents, SystemMessageEvent{Message: "--- End of recap ---"})
+		sm.renderEvents(recapEvents)
 	}
 
 	for !sm.shouldExit {
@@ -326,39 +330,15 @@ func (sm *SceneManager) buildSceneEndResult() *SceneEndResult {
 // Used by RunSceneLoop (terminal path). Web/async callers process events directly.
 // InvokePromptEvents are skipped here — they are handled by resolveInvokeBlocking.
 func (sm *SceneManager) renderEvents(events []GameEvent) {
+	renderEventsToUI(sm.ui, events)
+}
+
+// renderEventsToUI dispatches a slice of GameEvent to the given UI for display.
+// This is the shared implementation used by all manager types (SceneManager,
+// ScenarioManager, GameManager) in the synchronous terminal path.
+func renderEventsToUI(ui UI, events []GameEvent) {
 	for _, event := range events {
-		switch e := event.(type) {
-		case NarrativeEvent:
-			sm.ui.DisplayNarrative(e.Text)
-		case DialogEvent:
-			sm.ui.DisplayDialog(e.PlayerInput, e.GMResponse)
-		case SystemMessageEvent:
-			sm.ui.DisplaySystemMessage(e.Message)
-		case ActionAttemptEvent:
-			sm.ui.DisplayActionAttempt(e.Description)
-		case ActionResultEvent:
-			sm.ui.DisplayActionResult(e.Skill, e.SkillLevel, e.Bonuses, e.Result, e.Outcome)
-		case SceneTransitionEvent:
-			sm.ui.DisplaySceneTransition(e.Narrative, e.NewSceneHint)
-		case GameOverEvent:
-			sm.ui.DisplayGameOver(e.Reason)
-		case ConflictStartEvent:
-			sm.ui.DisplayConflictStart(e.ConflictType, e.InitiatorName, e.Participants)
-		case ConflictEscalationEvent:
-			sm.ui.DisplayConflictEscalation(e.FromType, e.ToType, e.TriggerCharName)
-		case TurnAnnouncementEvent:
-			sm.ui.DisplayTurnAnnouncement(e.CharacterName, e.TurnNumber, e.IsPlayer)
-		case ConflictEndEvent:
-			sm.ui.DisplayConflictEnd(e.Reason)
-		case CharacterDisplayEvent:
-			sm.ui.DisplayCharacter()
-		case InvokePromptEvent:
-			// Handled by resolveInvokeBlocking in the terminal path;
-			// web callers process this event directly.
-		case InputRequestEvent:
-			// Handled by resolveMidFlowBlocking in the terminal path;
-			// web callers process this event directly.
-		}
+		ui.Emit(event)
 	}
 }
 

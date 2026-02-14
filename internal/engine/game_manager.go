@@ -148,8 +148,10 @@ func (g *GameManager) resumeFromSave(ctx context.Context, state *GameState) erro
 		"scene", state.Scene.CurrentScene.Name,
 		"scenario", state.Scenario.Scenario.Title,
 	)
-	g.ui.DisplaySystemMessage("=== Resuming saved game ===")
-	g.ui.DisplaySystemMessage(fmt.Sprintf("Scenario: %s", state.Scenario.Scenario.Title))
+	g.renderEvents([]GameEvent{
+		SystemMessageEvent{Message: "=== Resuming saved game ==="},
+		SystemMessageEvent{Message: fmt.Sprintf("Scenario: %s", state.Scenario.Scenario.Title)},
+	})
 
 	if g.sessionLogger != nil {
 		g.sessionLogger.Log("game_resumed", map[string]any{
@@ -224,10 +226,10 @@ func (g *GameManager) handleMilestone() {
 	// Moderate and severe consequences that are recovering clear after a whole scenario
 	cleared := g.player.CheckConsequenceRecovery(0, g.scenarioCount)
 	for _, conseq := range cleared {
-		g.ui.DisplaySystemMessage(fmt.Sprintf(
+		g.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
 			"Your %s consequence \"%s\" has fully healed!",
 			conseq.Type, conseq.Aspect,
-		))
+		)}})
 		if g.sessionLogger != nil {
 			g.sessionLogger.Log("consequence_healed", map[string]any{
 				"type":      conseq.Type,
@@ -238,8 +240,10 @@ func (g *GameManager) handleMilestone() {
 	}
 
 	// Display milestone message
-	g.ui.DisplaySystemMessage("\n=== MILESTONE: Scenario Complete! ===")
-	g.ui.DisplaySystemMessage("Your fate points have been refreshed.\n")
+	g.renderEvents([]GameEvent{
+		SystemMessageEvent{Message: "\n=== MILESTONE: Scenario Complete! ==="},
+		SystemMessageEvent{Message: "Your fate points have been refreshed.\n"},
+	})
 
 	// Log the milestone
 	if g.sessionLogger != nil {
@@ -250,6 +254,11 @@ func (g *GameManager) handleMilestone() {
 			"scenario_title": g.scenario.Title,
 		})
 	}
+}
+
+// renderEvents dispatches events to the UI for display (terminal path).
+func (g *GameManager) renderEvents(events []GameEvent) {
+	renderEventsToUI(g.ui, events)
 }
 
 // InitialSceneConfig holds configuration for starting with a pre-built scene
