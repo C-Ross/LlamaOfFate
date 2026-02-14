@@ -14,10 +14,11 @@ var _ uicontract.UI = (*TerminalUI)(nil)
 
 // TerminalUI implements the UI interface for terminal-based interaction
 type TerminalUI struct {
-	reader    *bufio.Reader
-	sceneInfo uicontract.SceneInfo
-	shownHint bool // true after the initial help hint has been displayed
-	inRecap   bool // true while rendering recap DialogEvents
+	reader     *bufio.Reader
+	sceneInfo  uicontract.SceneInfo
+	shownHint  bool // true after the initial help hint has been displayed
+	inRecap    bool // true while rendering recap DialogEvents
+	inRecovery bool // true while rendering RecoveryEvents (auto-header)
 }
 
 // NewTerminalUI creates a new terminal UI instance
@@ -170,11 +171,18 @@ func (ui *TerminalUI) displayDialog(e uicontract.DialogEvent) {
 }
 
 // closeRecap ends recap mode if active, printing the footer.
+// It also closes recovery mode since a non-recovery event signals the batch ended.
 func (ui *TerminalUI) closeRecap() {
+	ui.closeRecovery()
 	if ui.inRecap {
 		fmt.Println("\n--- End of recap ---")
 		ui.inRecap = false
 	}
+}
+
+// closeRecovery ends recovery mode if active.
+func (ui *TerminalUI) closeRecovery() {
+	ui.inRecovery = false
 }
 
 // displaySystemMessage displays system messages to the player
@@ -658,7 +666,12 @@ func (ui *TerminalUI) displayNPCActionResult(e uicontract.NPCActionResultEvent) 
 }
 
 // displayRecovery renders a RecoveryEvent.
+// On the first RecoveryEvent in a batch, a section header is printed.
 func (ui *TerminalUI) displayRecovery(e uicontract.RecoveryEvent) {
+	if !ui.inRecovery {
+		fmt.Println("\n--- Between Scenes: Recovery ---")
+		ui.inRecovery = true
+	}
 	switch e.Action {
 	case "healed":
 		fmt.Printf("\nYour %s consequence \"%s\" has fully healed!\n", e.Severity, e.Aspect)

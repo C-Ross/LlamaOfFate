@@ -672,8 +672,7 @@ func (m *ScenarioManager) displayRecoveryNarrative(ctx context.Context, attempts
 		return
 	}
 
-	// Display mechanical results
-	m.renderEvents([]GameEvent{SystemMessageEvent{Message: "\n--- Between Scenes: Recovery ---"}})
+	// Display mechanical results — the terminal UI renders a header automatically.
 	for _, a := range attempts {
 		m.renderEvents([]GameEvent{RecoveryEvent{
 			Action:     "roll",

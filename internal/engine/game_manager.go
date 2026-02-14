@@ -226,10 +226,11 @@ func (g *GameManager) handleMilestone() {
 	// Moderate and severe consequences that are recovering clear after a whole scenario
 	cleared := g.player.CheckConsequenceRecovery(0, g.scenarioCount)
 	for _, conseq := range cleared {
-		g.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
-			"Your %s consequence \"%s\" has fully healed!",
-			conseq.Type, conseq.Aspect,
-		)}})
+		g.renderEvents([]GameEvent{RecoveryEvent{
+			Action:   "healed",
+			Severity: string(conseq.Type),
+			Aspect:   conseq.Aspect,
+		}})
 		if g.sessionLogger != nil {
 			g.sessionLogger.Log("consequence_healed", map[string]any{
 				"type":      conseq.Type,
