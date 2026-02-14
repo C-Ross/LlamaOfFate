@@ -260,3 +260,56 @@ type OutcomeChangedEvent struct {
 }
 
 func (OutcomeChangedEvent) gameEvent() {}
+
+// InvokeEvent is emitted when a player invokes an aspect (free or paid).
+type InvokeEvent struct {
+	AspectName     string // Name of the aspect invoked
+	IsFree         bool   // True if using a free invoke
+	IsReroll       bool   // True if rerolling (false = +2)
+	FatePointsLeft int    // Remaining fate points after invocation (0 if free)
+	NewRoll        string // New roll string (reroll only, empty for +2)
+	NewTotal       string // New total after invoke
+	Failed         bool   // True if the invoke failed (not enough FP)
+}
+
+func (InvokeEvent) gameEvent() {}
+
+// NPCActionResultEvent is emitted when an NPC performs a non-attack action
+// (defend, create advantage, overcome) during a conflict.
+type NPCActionResultEvent struct {
+	NPCName    string // Name of the acting NPC
+	ActionType string // "defend", "create_advantage", "overcome"
+	Skill      string // Skill used (empty for defend)
+	RollResult string // Roll result (e.g. "Good (+3)"), empty for defend
+	Difficulty string // Difficulty faced (e.g. "Fair"), empty for defend
+	Outcome    string // "success", "success_with_style", "tie", "failure", empty for defend
+
+	// Create Advantage specific
+	AspectCreated string // Name of aspect created (success only)
+	FreeInvokes   int    // Free invokes granted (success only)
+}
+
+func (NPCActionResultEvent) gameEvent() {}
+
+// RecoveryEvent is emitted for between-scene consequence recovery.
+type RecoveryEvent struct {
+	Action     string // "healed" (consequence fully healed) or "roll" (recovery attempt)
+	Aspect     string // The consequence aspect text
+	Severity   string // "mild", "moderate", "severe"
+	Skill      string // Skill used for recovery roll (roll only)
+	RollResult int    // Roll result value (roll only)
+	Difficulty string // Difficulty faced (roll only)
+	Success    bool   // Whether the recovery roll succeeded (roll only)
+}
+
+func (RecoveryEvent) gameEvent() {}
+
+// StressOverflowEvent is emitted when a character cannot absorb stress
+// with their stress track.
+type StressOverflowEvent struct {
+	Shifts            int  // Shifts that couldn't be absorbed
+	NoConsequences    bool // True if no consequences are available (taken out)
+	RemainingOverflow bool // True if remaining shifts after consequence can't be absorbed
+}
+
+func (StressOverflowEvent) gameEvent() {}

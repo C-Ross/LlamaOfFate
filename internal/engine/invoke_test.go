@@ -241,13 +241,13 @@ func TestProvideInvokeResponse_PlusTwoBonus(t *testing.T) {
 	// Events should include the +2 message
 	hasBonus := false
 	for _, ev := range resp.Events {
-		if sysMsg, ok := ev.(SystemMessageEvent); ok {
-			if assert.ObjectsAreEqual("+2!", sysMsg.Message[:3]) {
+		if invokeEv, ok := ev.(InvokeEvent); ok {
+			if !invokeEv.IsReroll && invokeEv.NewTotal != "" {
 				hasBonus = true
 			}
 		}
 	}
-	assert.True(t, hasBonus, "should see +2 system message")
+	assert.True(t, hasBonus, "should see +2 invoke event")
 
 	// If finish was called, check the result was increased
 	if finishCalled {
@@ -289,13 +289,13 @@ func TestProvideInvokeResponse_Reroll(t *testing.T) {
 	// Events should include reroll message
 	hasReroll := false
 	for _, ev := range resp.Events {
-		if sysMsg, ok := ev.(SystemMessageEvent); ok {
-			if len(sysMsg.Message) >= 8 && sysMsg.Message[:8] == "Rerolled" {
+		if invokeEv, ok := ev.(InvokeEvent); ok {
+			if invokeEv.IsReroll {
 				hasReroll = true
 			}
 		}
 	}
-	assert.True(t, hasReroll, "should see reroll system message")
+	assert.True(t, hasReroll, "should see reroll invoke event")
 }
 
 func TestProvideInvokeResponse_FreeInvoke(t *testing.T) {
@@ -340,13 +340,13 @@ func TestProvideInvokeResponse_FreeInvoke(t *testing.T) {
 	// Events should include free invoke message
 	hasFreeMsg := false
 	for _, ev := range resp.Events {
-		if sysMsg, ok := ev.(SystemMessageEvent); ok {
-			if len(sysMsg.Message) > 17 && sysMsg.Message[:17] == "Using free invoke" {
+		if invokeEv, ok := ev.(InvokeEvent); ok {
+			if invokeEv.IsFree {
 				hasFreeMsg = true
 			}
 		}
 	}
-	assert.True(t, hasFreeMsg, "should see free invoke system message")
+	assert.True(t, hasFreeMsg, "should see free invoke event")
 }
 
 func TestProvideInvokeResponse_InvalidIndex(t *testing.T) {

@@ -110,6 +110,22 @@ func (m *MockUI) Emit(event GameEvent) {
 		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("Concession: gained %d FP (now %d)", e.FatePointsGained, e.CurrentFatePoints))
 	case OutcomeChangedEvent:
 		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("OutcomeChanged: %s", e.FinalOutcome))
+
+	// New structured events
+	case InvokeEvent:
+		if e.Failed {
+			m.displayedMessages = append(m.displayedMessages, "Invoke: not enough FP")
+		} else if e.IsReroll {
+			m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("Invoke: reroll \"%s\" → %s", e.AspectName, e.NewTotal))
+		} else {
+			m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("Invoke: +2 \"%s\" → %s", e.AspectName, e.NewTotal))
+		}
+	case NPCActionResultEvent:
+		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("NPCAction: %s %s outcome=%s", e.NPCName, e.ActionType, e.Outcome))
+	case RecoveryEvent:
+		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("Recovery: %s \"%s\" %s", e.Action, e.Aspect, e.Severity))
+	case StressOverflowEvent:
+		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("StressOverflow: %d shifts", e.Shifts))
 	}
 }
 

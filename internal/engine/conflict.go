@@ -936,17 +936,19 @@ func (sm *SceneManager) applyAttackDamageToPlayer(ctx context.Context, outcome *
 // Returns events emitted immediately; may set pendingMidFlow for consequence choice.
 func (sm *SceneManager) handleStressOverflow(ctx context.Context, shifts int, stressType character.StressTrackType, attacker *character.Character, attackCtx prompt.AttackContext) []GameEvent {
 	var events []GameEvent
-	events = append(events, SystemMessageEvent{Message: fmt.Sprintf(
-		"You cannot absorb %d shifts with your stress track!",
-		shifts,
-	)})
+	events = append(events, StressOverflowEvent{
+		Shifts: shifts,
+	})
 
 	// Determine available consequences
 	availableConsequences := sm.player.AvailableConsequenceSlots()
 
 	if len(availableConsequences) == 0 {
 		// No consequences available - taken out
-		events = append(events, SystemMessageEvent{Message: "You have no available consequences! You are taken out!"})
+		events = append(events, StressOverflowEvent{
+			Shifts:         shifts,
+			NoConsequences: true,
+		})
 		takenOutEvents := sm.handleTakenOut(ctx, attacker, attackCtx)
 		events = append(events, takenOutEvents...)
 		return events
@@ -991,7 +993,6 @@ func (sm *SceneManager) handleStressOverflow(ctx context.Context, shifts int, st
 				return sm.applyConsequence(ctx, capturedConsequences[resp.ChoiceIndex].Type, capturedShifts, capturedAttacker, capturedAttackCtx)
 			}
 			var events []GameEvent
-			events = append(events, SystemMessageEvent{Message: "You are taken out!"})
 			takenOutEvents := sm.handleTakenOut(ctx, capturedAttacker, capturedAttackCtx)
 			events = append(events, takenOutEvents...)
 			return events
@@ -1048,10 +1049,10 @@ func (sm *SceneManager) applyConsequence(ctx context.Context, conseqType charact
 			events = append(events, pce)
 		} else {
 			events = append(events, pce)
-			events = append(events, SystemMessageEvent{Message: fmt.Sprintf(
-				"You cannot absorb the remaining %d shifts! You may need another consequence.",
-				remaining,
-			)})
+			events = append(events, StressOverflowEvent{
+				Shifts:            remaining,
+				RemainingOverflow: true,
+			})
 			// Recursively handle remaining damage
 			overflowEvents := sm.handleStressOverflow(ctx, remaining, stressType, attacker, attackCtx)
 			events = append(events, overflowEvents...)

@@ -86,6 +86,14 @@ func (ui *TerminalUI) Emit(event uicontract.GameEvent) {
 		ui.displayConcession(e)
 	case uicontract.OutcomeChangedEvent:
 		ui.displaySystemMessage(fmt.Sprintf("Final outcome: %s", e.FinalOutcome))
+	case uicontract.InvokeEvent:
+		ui.displayInvoke(e)
+	case uicontract.NPCActionResultEvent:
+		ui.displayNPCActionResult(e)
+	case uicontract.RecoveryEvent:
+		ui.displayRecovery(e)
+	case uicontract.StressOverflowEvent:
+		ui.displayStressOverflow(e)
 	}
 }
 
@@ -578,4 +586,81 @@ func (ui *TerminalUI) isExitCommand(input string) bool {
 	}
 
 	return false
+}
+
+// displayInvoke renders an InvokeEvent.
+func (ui *TerminalUI) displayInvoke(e uicontract.InvokeEvent) {
+	if e.Failed {
+		fmt.Println("\nNot enough Fate Points!")
+		return
+	}
+	if e.IsFree {
+		fmt.Printf("\nUsing free invoke on \"%s\"!\n", e.AspectName)
+	} else {
+		fmt.Printf("\nInvoking \"%s\"! (%d FP remaining)\n", e.AspectName, e.FatePointsLeft)
+	}
+	if e.IsReroll {
+		fmt.Printf("\nRerolled: %s (Total: %s)\n", e.NewRoll, e.NewTotal)
+	} else {
+		fmt.Printf("\n+2! New total: %s\n", e.NewTotal)
+	}
+}
+
+// displayNPCActionResult renders an NPCActionResultEvent.
+func (ui *TerminalUI) displayNPCActionResult(e uicontract.NPCActionResultEvent) {
+	switch e.ActionType {
+	case "defend":
+		fmt.Printf("\n%s takes a defensive stance! (+2 to all defense rolls this exchange)\n", e.NPCName)
+	case "create_advantage":
+		fmt.Printf("\n%s attempts to Create an Advantage with %s (%s vs %s)\n",
+			e.NPCName, e.Skill, e.RollResult, e.Difficulty)
+		switch e.Outcome {
+		case "Success", "Success with Style":
+			fmt.Printf("\nCreated aspect: \"%s\" with %d free invoke(s)!\n", e.AspectCreated, e.FreeInvokes)
+		case "Tie":
+			fmt.Println("\nThe attempt succeeds but grants a boost to opponents!")
+		default:
+			fmt.Println("\nThe attempt fails!")
+		}
+	case "overcome":
+		fmt.Printf("\n%s attempts to Overcome with %s (%s vs %s)\n",
+			e.NPCName, e.Skill, e.RollResult, e.Difficulty)
+		switch e.Outcome {
+		case "Success", "Success with Style":
+			fmt.Println("\nThe obstacle is overcome!")
+		case "Tie":
+			fmt.Println("\nSuccess, but at a minor cost.")
+		default:
+			fmt.Println("\nThe attempt fails!")
+		}
+	}
+}
+
+// displayRecovery renders a RecoveryEvent.
+func (ui *TerminalUI) displayRecovery(e uicontract.RecoveryEvent) {
+	switch e.Action {
+	case "healed":
+		fmt.Printf("\nYour %s consequence \"%s\" has fully healed!\n", e.Severity, e.Aspect)
+	case "roll":
+		if e.Success {
+			fmt.Printf("\nRecovery roll for \"%s\" (%s): %s +%d vs %s — Success! Recovery begins.\n",
+				e.Aspect, e.Severity, e.Skill, e.RollResult, e.Difficulty)
+		} else {
+			fmt.Printf("\nRecovery roll for \"%s\" (%s): %s +%d vs %s — Failed. The wound persists.\n",
+				e.Aspect, e.Severity, e.Skill, e.RollResult, e.Difficulty)
+		}
+	}
+}
+
+// displayStressOverflow renders a StressOverflowEvent.
+func (ui *TerminalUI) displayStressOverflow(e uicontract.StressOverflowEvent) {
+	if e.NoConsequences {
+		fmt.Println("\nYou have no available consequences! You are taken out!")
+		return
+	}
+	if e.RemainingOverflow {
+		fmt.Printf("\nYou cannot absorb the remaining %d shifts! You may need another consequence.\n", e.Shifts)
+		return
+	}
+	fmt.Printf("\nYou cannot absorb %d shifts with your stress track!\n", e.Shifts)
 }

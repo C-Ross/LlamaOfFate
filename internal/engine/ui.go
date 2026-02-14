@@ -48,3 +48,7 @@ type PlayerConsequenceEvent = uicontract.PlayerConsequenceEvent
 type PlayerTakenOutEvent = uicontract.PlayerTakenOutEvent
 type ConcessionEvent = uicontract.ConcessionEvent
 type OutcomeChangedEvent = uicontract.OutcomeChangedEvent
+type InvokeEvent = uicontract.InvokeEvent
+type NPCActionResultEvent = uicontract.NPCActionResultEvent
+type RecoveryEvent = uicontract.RecoveryEvent
+type StressOverflowEvent = uicontract.StressOverflowEvent

@@ -171,10 +171,10 @@ func (sm *SceneManager) processNPCDefend(ctx context.Context, npc *character.Cha
 	sm.currentScene.SetFullDefense(npc.ID)
 
 	var events []GameEvent
-	events = append(events, SystemMessageEvent{Message: fmt.Sprintf(
-		"%s takes a defensive stance! (+2 to all defense rolls this exchange)",
-		npc.Name,
-	)})
+	events = append(events, NPCActionResultEvent{
+		NPCName:    npc.Name,
+		ActionType: "defend",
+	})
 
 	// Generate narrative
 	narrative := fmt.Sprintf("%s braces for incoming attacks, focusing entirely on defense.", npc.Name)
@@ -202,12 +202,6 @@ func (sm *SceneManager) processNPCCreateAdvantage(ctx context.Context, npc *char
 	outcome := npcRoll.CompareAgainst(difficulty)
 
 	var events []GameEvent
-	events = append(events, SystemMessageEvent{Message: fmt.Sprintf(
-		"%s attempts to Create an Advantage with %s (%s vs Fair)",
-		npc.Name,
-		skill,
-		npcRoll.FinalValue.String(),
-	)})
 
 	switch outcome.Type {
 	case dice.Success, dice.SuccessWithStyle:
@@ -229,17 +223,36 @@ func (sm *SceneManager) processNPCCreateAdvantage(ctx context.Context, npc *char
 		aspectID := fmt.Sprintf("npc-advantage-%d", time.Now().UnixNano())
 		situationAspect := scene.NewSituationAspect(aspectID, aspectName, npc.ID, freeInvokes)
 		sm.currentScene.AddSituationAspect(situationAspect)
-		events = append(events, SystemMessageEvent{Message: fmt.Sprintf(
-			"Created aspect: \"%s\" with %d free invoke(s)!",
-			aspectName,
-			freeInvokes,
-		)})
+		events = append(events, NPCActionResultEvent{
+			NPCName:       npc.Name,
+			ActionType:    "create_advantage",
+			Skill:         skill,
+			RollResult:    npcRoll.FinalValue.String(),
+			Difficulty:    "Fair",
+			Outcome:       outcome.Type.String(),
+			AspectCreated: aspectName,
+			FreeInvokes:   freeInvokes,
+		})
 		events = append(events, NarrativeEvent{Text: fmt.Sprintf("%s gains a tactical advantage!", npc.Name)})
 	case dice.Tie:
-		events = append(events, SystemMessageEvent{Message: "The attempt succeeds but grants a boost to opponents!"})
+		events = append(events, NPCActionResultEvent{
+			NPCName:    npc.Name,
+			ActionType: "create_advantage",
+			Skill:      skill,
+			RollResult: npcRoll.FinalValue.String(),
+			Difficulty: "Fair",
+			Outcome:    outcome.Type.String(),
+		})
 		events = append(events, NarrativeEvent{Text: fmt.Sprintf("%s's maneuver is partially successful.", npc.Name)})
 	default:
-		events = append(events, SystemMessageEvent{Message: "The attempt fails!"})
+		events = append(events, NPCActionResultEvent{
+			NPCName:    npc.Name,
+			ActionType: "create_advantage",
+			Skill:      skill,
+			RollResult: npcRoll.FinalValue.String(),
+			Difficulty: "Fair",
+			Outcome:    outcome.Type.String(),
+		})
 		events = append(events, NarrativeEvent{Text: fmt.Sprintf("%s's gambit doesn't pay off.", npc.Name)})
 	}
 
@@ -262,26 +275,25 @@ func (sm *SceneManager) processNPCOvercome(ctx context.Context, npc *character.C
 	outcome := npcRoll.CompareAgainst(difficulty)
 
 	var events []GameEvent
-	events = append(events, SystemMessageEvent{Message: fmt.Sprintf(
-		"%s attempts to Overcome with %s (%s vs Fair)",
-		npc.Name,
-		skill,
-		npcRoll.FinalValue.String(),
-	)})
+	events = append(events, NPCActionResultEvent{
+		NPCName:    npc.Name,
+		ActionType: "overcome",
+		Skill:      skill,
+		RollResult: npcRoll.FinalValue.String(),
+		Difficulty: "Fair",
+		Outcome:    outcome.Type.String(),
+	})
 
 	switch outcome.Type {
 	case dice.Success, dice.SuccessWithStyle:
-		events = append(events, SystemMessageEvent{Message: "The obstacle is overcome!"})
 		narrative := decision.Description
 		if narrative == "" {
 			narrative = fmt.Sprintf("%s successfully overcomes the challenge.", npc.Name)
 		}
 		events = append(events, NarrativeEvent{Text: narrative})
 	case dice.Tie:
-		events = append(events, SystemMessageEvent{Message: "Success, but at a minor cost."})
 		events = append(events, NarrativeEvent{Text: fmt.Sprintf("%s manages to push through, but not without difficulty.", npc.Name)})
 	default:
-		events = append(events, SystemMessageEvent{Message: "The attempt fails!"})
 		events = append(events, NarrativeEvent{Text: fmt.Sprintf("%s is unable to overcome the obstacle.", npc.Name)})
 	}
 

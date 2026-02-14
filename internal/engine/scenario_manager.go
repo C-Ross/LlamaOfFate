@@ -555,10 +555,11 @@ func (m *ScenarioManager) handleBetweenSceneRecovery(ctx context.Context) {
 	// First, check if any already-recovering consequences have healed
 	cleared := m.player.CheckConsequenceRecovery(m.sceneCount, m.scenarioCount)
 	for _, conseq := range cleared {
-		m.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
-			"Your %s consequence \"%s\" has fully healed!",
-			conseq.Type, conseq.Aspect,
-		)}})
+		m.renderEvents([]GameEvent{RecoveryEvent{
+			Action:   "healed",
+			Aspect:   conseq.Aspect,
+			Severity: string(conseq.Type),
+		}})
 		if m.sessionLogger != nil {
 			m.sessionLogger.Log("consequence_healed", map[string]any{
 				"type":        conseq.Type,
@@ -674,17 +675,15 @@ func (m *ScenarioManager) displayRecoveryNarrative(ctx context.Context, attempts
 	// Display mechanical results
 	m.renderEvents([]GameEvent{SystemMessageEvent{Message: "\n--- Between Scenes: Recovery ---"}})
 	for _, a := range attempts {
-		if a.Outcome == "success" {
-			m.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
-				"Recovery roll for \"%s\" (%s): %s +%d vs %s — Success! Recovery begins.",
-				a.Aspect, a.Severity, a.Skill, a.RollResult, a.Difficulty,
-			)}})
-		} else {
-			m.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf(
-				"Recovery roll for \"%s\" (%s): %s +%d vs %s — Failed. The wound persists.",
-				a.Aspect, a.Severity, a.Skill, a.RollResult, a.Difficulty,
-			)}})
-		}
+		m.renderEvents([]GameEvent{RecoveryEvent{
+			Action:     "roll",
+			Aspect:     a.Aspect,
+			Severity:   a.Severity,
+			Skill:      a.Skill,
+			RollResult: a.RollResult,
+			Difficulty: a.Difficulty,
+			Success:    a.Outcome == "success",
+		}})
 	}
 
 	// Generate LLM narrative
