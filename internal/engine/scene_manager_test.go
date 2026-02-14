@@ -26,7 +26,6 @@ type MockUI struct {
 	conflictEscalateCalls []string
 	turnAnnouncementCalls []string
 	conflictEndCalls      []string
-	invokeChoice          *InvokeChoice // Pre-configured invoke response
 }
 
 func (m *MockUI) ReadInput() (input string, isExit bool, err error) {
@@ -132,14 +131,6 @@ func (m *MockUI) Emit(event GameEvent) {
 	case StressOverflowEvent:
 		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("StressOverflow: %d shifts", e.Shifts))
 	}
-}
-
-func (m *MockUI) PromptForInvoke(available []InvokableAspect, fatePoints int, currentResult string, shiftsNeeded int) *InvokeChoice {
-	if m.invokeChoice != nil {
-		return m.invokeChoice
-	}
-	// Default: skip invokes
-	return &InvokeChoice{Aspect: nil}
 }
 
 func TestNewSceneManager(t *testing.T) {

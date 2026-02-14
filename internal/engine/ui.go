@@ -13,7 +13,6 @@ type SceneInfo = uicontract.SceneInfo
 type SceneInfoSetter = uicontract.SceneInfoSetter
 type ConflictParticipantInfo = uicontract.ConflictParticipantInfo
 type InvokableAspect = uicontract.InvokableAspect
-type InvokeChoice = uicontract.InvokeChoice
 type GameEvent = uicontract.GameEvent
 type NarrativeEvent = uicontract.NarrativeEvent
 type DialogEvent = uicontract.DialogEvent

@@ -116,14 +116,16 @@ func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character
 	return &decision, nil
 }
 
-// processNPCTurn handles an NPC's action during conflict
-func (sm *SceneManager) processNPCTurn(ctx context.Context, npcID string) []GameEvent {
+// processNPCTurn handles an NPC's action during conflict.
+// Returns (events, awaitingInvoke) where awaitingInvoke is true if the player
+// needs to respond to a defense invoke prompt.
+func (sm *SceneManager) processNPCTurn(ctx context.Context, npcID string) ([]GameEvent, bool) {
 	npc := sm.engine.GetCharacter(npcID)
 	if npc == nil {
 		slog.Warn("NPC not found for turn processing",
 			"component", componentSceneManager,
 			"npc_id", npcID)
-		return nil
+		return nil, false
 	}
 
 	var events []GameEvent
@@ -154,10 +156,12 @@ func (sm *SceneManager) processNPCTurn(ctx context.Context, npcID string) []Game
 	case "OVERCOME":
 		events = append(events, sm.processNPCOvercome(ctx, npc, decision)...)
 	default: // ATTACK or unknown
-		events = append(events, sm.processNPCAttack(ctx, npc, decision)...)
+		attackEvents, awaiting := sm.processNPCAttack(ctx, npc, decision)
+		events = append(events, attackEvents...)
+		return events, awaiting
 	}
 
-	return events
+	return events, false
 }
 
 // getDefaultAttackSkill returns the default attack skill based on conflict type
@@ -300,8 +304,13 @@ func (sm *SceneManager) processNPCOvercome(ctx context.Context, npc *character.C
 	return events
 }
 
-// processNPCAttack handles an NPC attacking a target
-func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) []GameEvent {
+// processNPCAttack handles an NPC attacking a target.
+// Returns (events, awaitingInvoke).
+// When the target is the player and defense
+// invokes are available, sm.pendingInvoke is set and awaitingInvoke is true.
+// The invoke continuation finishes the attack (narrative, damage) and resumes
+// processing remaining NPC turns via advanceConflictTurns.
+func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) ([]GameEvent, bool) {
 	// Determine target
 	target := sm.player // Default to player
 	targetID := decision.TargetID
@@ -334,48 +343,57 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 	}
 	targetDefense := sm.roller.RollWithModifier(dice.Mediocre, int(targetDefenseLevel)+defenseBonus)
 
-	// Display the mechanical result
 	fullDefense := defenseBonus > 0
 
 	// Initial outcome (before player invokes)
 	initialOutcome := npcRoll.CompareAgainst(targetDefense.FinalValue)
 
-	var events []GameEvent
-
-	// If target is the player, allow them to invoke aspects to improve defense
-	// NOTE: This still uses the legacy blocking invoke path — will be removed in #70
+	// If target is the player, use the event-driven invoke path for defense
 	if target.ID == sm.player.ID {
-		// Render initial attack info before blocking invoke loop
-		sm.renderEvents([]GameEvent{
-			SystemMessageEvent{Message: fmt.Sprintf(
-				"%s attacks %s with %s (%s) vs %s (%s)",
-				npc.Name, target.Name, attackSkill,
-				npcRoll.FinalValue.String(), defenseSkill, targetDefense.FinalValue.String(),
-			)},
-			SystemMessageEvent{Message: fmt.Sprintf("Initial outcome: %s", initialOutcome.Type.String())},
-		})
+		// Show attack setup before the invoke prompt
+		preEvents := []GameEvent{
+			NPCAttackEvent{
+				AttackerName:   npc.Name,
+				TargetName:     target.Name,
+				AttackSkill:    attackSkill,
+				AttackResult:   npcRoll.FinalValue.String(),
+				DefenseSkill:   defenseSkill,
+				DefenseResult:  targetDefense.FinalValue.String(),
+				FullDefense:    fullDefense,
+				InitialOutcome: initialOutcome.Type.String(),
+				FinalOutcome:   initialOutcome.Type.String(),
+			},
+		}
 
-		// Create a temporary action to track invokes for defense
 		defenseAction := action.NewAction("defense-invoke", sm.player.ID, action.Defend, defenseSkill, "Defending against attack")
 
-		// Player can invoke to improve their defense
-		// isDefense=true means skip prompt if attack already fails
-		targetDefense = sm.legacyHandlePostRollInvokes(targetDefense, npcRoll.FinalValue, defenseAction, true)
+		// Capture variables for the continuation closure
+		capturedNPC := npc
+		capturedAttackSkill := attackSkill
+		capturedNPCRoll := npcRoll
+		capturedInitialOutcome := initialOutcome
+
+		finish := func(finishCtx context.Context, result *dice.CheckResult, accEvents []GameEvent) []GameEvent {
+			return sm.finishNPCAttackOnPlayer(finishCtx, result, accEvents, capturedNPC, capturedAttackSkill, capturedNPCRoll, capturedInitialOutcome)
+		}
+
+		evts, awaiting := sm.beginInvokeLoop(ctx, targetDefense, npcRoll.FinalValue, defenseAction, true, preEvents, finish)
+		// Mark the pending invoke for NPC turn resumption after it resolves.
+		if awaiting && sm.pendingInvoke != nil {
+			sm.pendingInvoke.resumeTurns = true
+		}
+		return evts, awaiting
 	}
 
-	// Compare results (final)
+	// Non-player target: compute outcome directly (no invoke opportunity)
 	outcome := npcRoll.CompareAgainst(targetDefense.FinalValue)
 
-	// Build the composite NPCAttackEvent
-	finalOutcomeStr := outcome.Type.String()
-	// Generate narrative for the attack
 	npcNarrative, err := sm.generateNPCAttackNarrative(ctx, npc, attackSkill, outcome)
 	if err != nil {
 		slog.Error("Failed to generate NPC attack narrative",
 			"component", componentSceneManager,
 			"npc_id", npc.ID,
 			"error", err)
-		// Fallback narrative
 		if outcome.Type == dice.Success || outcome.Type == dice.SuccessWithStyle {
 			npcNarrative = fmt.Sprintf("%s's attack hits!", npc.Name)
 		} else {
@@ -383,6 +401,7 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 		}
 	}
 
+	var events []GameEvent
 	events = append(events, NPCAttackEvent{
 		AttackerName:   npc.Name,
 		TargetName:     target.Name,
@@ -391,27 +410,67 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 		DefenseSkill:   defenseSkill,
 		DefenseResult:  targetDefense.FinalValue.String(),
 		FullDefense:    fullDefense,
-		InitialOutcome: initialOutcome.Type.String(),
-		FinalOutcome:   finalOutcomeStr,
+		InitialOutcome: outcome.Type.String(),
+		FinalOutcome:   outcome.Type.String(),
 		Narrative:      npcNarrative,
 	})
 
-	// Only apply damage if target is the player (for now, NPC vs NPC damage not fully implemented)
-	if target.ID == sm.player.ID {
-		// Create attack context with the skill, narrative, and shifts
-		attackCtx := prompt.AttackContext{
-			Skill:       attackSkill,
-			Description: npcNarrative,
-			Shifts:      outcome.Shifts,
-		}
-		damageEvents := sm.applyAttackDamageToPlayer(ctx, outcome, npc, attackCtx)
-		events = append(events, damageEvents...)
-	} else {
-		// For NPC targets, just show the result
+	if outcome.Type == dice.Success || outcome.Type == dice.SuccessWithStyle {
+		events = append(events, SystemMessageEvent{Message: fmt.Sprintf("%s takes %d shifts of stress!", target.Name, outcome.Shifts)})
+	}
+
+	return events, false
+}
+
+// finishNPCAttackOnPlayer is the invoke continuation for NPC attacks against
+// the player. It computes the final outcome after defense invokes, generates
+// narrative, and applies damage. NPC turn resumption is handled separately
+// by maybeResumeConflictTurns in ProvideInvokeResponse.
+func (sm *SceneManager) finishNPCAttackOnPlayer(
+	ctx context.Context,
+	defenseResult *dice.CheckResult,
+	accEvents []GameEvent,
+	npc *character.Character,
+	attackSkill string,
+	npcRoll *dice.CheckResult,
+	initialOutcome *dice.Outcome,
+) []GameEvent {
+	var events []GameEvent
+	events = append(events, accEvents...)
+
+	// Compare final defense against NPC attack
+	outcome := npcRoll.CompareAgainst(defenseResult.FinalValue)
+
+	// Show outcome change if invokes altered the result
+	if outcome.Type != initialOutcome.Type {
+		events = append(events, OutcomeChangedEvent{
+			FinalOutcome: outcome.Type.String(),
+		})
+	}
+
+	// Generate narrative for the final outcome
+	npcNarrative, err := sm.generateNPCAttackNarrative(ctx, npc, attackSkill, outcome)
+	if err != nil {
+		slog.Error("Failed to generate NPC attack narrative",
+			"component", componentSceneManager,
+			"npc_id", npc.ID,
+			"error", err)
 		if outcome.Type == dice.Success || outcome.Type == dice.SuccessWithStyle {
-			events = append(events, SystemMessageEvent{Message: fmt.Sprintf("%s takes %d shifts of stress!", target.Name, outcome.Shifts)})
+			npcNarrative = fmt.Sprintf("%s's attack hits!", npc.Name)
+		} else {
+			npcNarrative = fmt.Sprintf("%s's attack misses.", npc.Name)
 		}
 	}
+	events = append(events, NarrativeEvent{Text: npcNarrative})
+
+	// Apply damage to the player
+	attackCtx := prompt.AttackContext{
+		Skill:       attackSkill,
+		Description: npcNarrative,
+		Shifts:      outcome.Shifts,
+	}
+	damageEvents := sm.applyAttackDamageToPlayer(ctx, outcome, npc, attackCtx)
+	events = append(events, damageEvents...)
 
 	return events
 }

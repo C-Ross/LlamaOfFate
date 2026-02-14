@@ -19,6 +19,7 @@ type invokeState struct {
 	usedAspects  map[string]bool   // Aspects already invoked this roll
 	available    []InvokableAspect // Aspects offered in the current prompt
 	continuation invokeFinishFunc  // Called when the invoke loop completes
+	resumeTurns  bool              // True when NPC turns should resume after invoke resolves
 }
 
 // invokeFinishFunc is called when the invoke loop completes (player skips or
@@ -46,7 +47,9 @@ func (sm *SceneManager) beginInvokeLoop(
 	if promptEvent == nil {
 		// No invoke possible — finish immediately.
 		events := finish(ctx, result, preEvents)
-		return events, false
+		// The continuation may have started its own invoke loop
+		// (e.g. NPC defense invoke inside advanceConflictTurns).
+		return events, sm.pendingInvoke != nil
 	}
 
 	sm.pendingInvoke = &invokeState{
@@ -79,6 +82,8 @@ func (sm *SceneManager) ProvideInvokeResponse(ctx context.Context, resp InvokeRe
 		// Pass empty events since preEvents were already rendered by the caller.
 		sm.pendingInvoke = nil
 		events = is.continuation(ctx, is.result, nil)
+		// If this invoke was for a defense roll during NPC turns, resume turns.
+		events = sm.maybeResumeConflictTurns(ctx, is, events)
 		return sm.wrapInvokeResult(events), nil
 	}
 
@@ -127,6 +132,8 @@ func (sm *SceneManager) ProvideInvokeResponse(ctx context.Context, resp InvokeRe
 		// Pass only the invoke events from this round (prior events already rendered).
 		sm.pendingInvoke = nil
 		events = is.continuation(ctx, is.result, invokeEvents)
+		// If this invoke was for a defense roll during NPC turns, resume turns.
+		events = sm.maybeResumeConflictTurns(ctx, is, events)
 		return sm.wrapInvokeResult(events), nil
 	}
 
@@ -140,14 +147,37 @@ func (sm *SceneManager) ProvideInvokeResponse(ctx context.Context, resp InvokeRe
 }
 
 // wrapInvokeResult packages the final events after invoke completion, detecting
-// whether the scene ended.
+// whether the scene ended or a nested invoke loop was started by the
+// continuation (e.g. NPC defense invoke inside advanceConflictTurns).
 func (sm *SceneManager) wrapInvokeResult(events []GameEvent) *InputResult {
 	result := &InputResult{Events: events}
+	if sm.pendingInvoke != nil {
+		result.AwaitingInvoke = true
+	}
 	if sm.shouldExit {
 		result.SceneEnded = true
 		result.EndResult = sm.buildSceneEndResult()
 	}
 	return result
+}
+
+// maybeResumeConflictTurns resumes NPC turn processing after a defense invoke
+// resolves. Only called when is.resumeTurns is true and no nested invoke was
+// started by the continuation.
+func (sm *SceneManager) maybeResumeConflictTurns(ctx context.Context, is *invokeState, events []GameEvent) []GameEvent {
+	if !is.resumeTurns {
+		return events
+	}
+	if sm.pendingInvoke != nil {
+		// A nested invoke was started (shouldn't happen for the continuation,
+		// but guard against it). Turn resumption will happen when that resolves.
+		return events
+	}
+	if !sm.currentScene.IsConflict {
+		return events
+	}
+	turnEvents, _ := sm.advanceConflictTurns(ctx)
+	return append(events, turnEvents...)
 }
 
 // buildInvokePrompt determines whether the player can invoke an aspect and
@@ -260,111 +290,4 @@ func (sm *SceneManager) applyInvokeChoice(is *invokeState, selected *InvokableAs
 // HasPendingInvoke returns true when the engine is waiting for an InvokeResponse.
 func (sm *SceneManager) HasPendingInvoke() bool {
 	return sm.pendingInvoke != nil
-}
-
-// legacyHandlePostRollInvokes is the original blocking invoke loop, used
-// only by the synchronous terminal path until callers are fully migrated.
-func (sm *SceneManager) legacyHandlePostRollInvokes(result *dice.CheckResult, difficulty dice.Ladder, parsedAction *action.Action, isDefense bool) *dice.CheckResult {
-	usedAspects := make(map[string]bool)
-
-	for {
-		// Calculate outcome and shifts needed
-		outcome := result.CompareAgainst(difficulty)
-		shiftsNeeded := 0
-
-		if isDefense {
-			if outcome.Shifts >= 0 {
-				break
-			}
-			shiftsNeeded = -outcome.Shifts
-		} else {
-			if outcome.Type == dice.SuccessWithStyle {
-				break
-			}
-			if outcome.Shifts < 0 {
-				shiftsNeeded = -outcome.Shifts
-			} else if outcome.Shifts < 3 {
-				shiftsNeeded = 3 - outcome.Shifts
-			}
-		}
-
-		available := sm.gatherInvokableAspects(usedAspects)
-
-		canInvoke := false
-		for _, aspect := range available {
-			if aspect.AlreadyUsed {
-				continue
-			}
-			if aspect.FreeInvokes > 0 || sm.player.FatePoints > 0 {
-				canInvoke = true
-				break
-			}
-		}
-		if !canInvoke {
-			break
-		}
-
-		choice := sm.ui.PromptForInvoke(available, sm.player.FatePoints, result.FinalValue.String(), shiftsNeeded)
-
-		if choice.Aspect == nil {
-			break
-		}
-
-		if choice.UseFree {
-			for i := range sm.currentScene.SituationAspects {
-				if sm.currentScene.SituationAspects[i].Aspect == choice.Aspect.Name {
-					sm.currentScene.SituationAspects[i].UseFreeInvoke()
-					break
-				}
-			}
-		} else {
-			if !sm.player.SpendFatePoint() {
-				sm.renderEvents([]GameEvent{InvokeEvent{AspectName: choice.Aspect.Name, Failed: true}})
-				continue
-			}
-		}
-
-		usedAspects[choice.Aspect.Name] = true
-
-		var newRoll, newTotal string
-		if choice.IsReroll {
-			result = sm.roller.Reroll(result)
-			newRoll = result.Roll.String()
-			newTotal = result.FinalValue.String()
-		} else {
-			result.ApplyInvokeBonus(2)
-			newTotal = result.FinalValue.String()
-		}
-
-		sm.renderEvents([]GameEvent{InvokeEvent{
-			AspectName:     choice.Aspect.Name,
-			IsFree:         choice.UseFree,
-			IsReroll:       choice.IsReroll,
-			FatePointsLeft: sm.player.FatePoints,
-			NewRoll:        newRoll,
-			NewTotal:       newTotal,
-		}})
-
-		parsedAction.AddAspectInvoke(action.AspectInvoke{
-			AspectText: choice.Aspect.Name,
-			Source:     choice.Aspect.Source,
-			SourceID:   choice.Aspect.SourceID,
-			IsFree:     choice.UseFree,
-			FatePointCost: func() int {
-				if choice.UseFree {
-					return 0
-				}
-				return 1
-			}(),
-			Bonus: func() int {
-				if choice.IsReroll {
-					return 0
-				}
-				return 2
-			}(),
-			IsReroll: choice.IsReroll,
-		})
-	}
-
-	return result
 }

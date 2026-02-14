@@ -276,13 +276,16 @@ End conditions:
    - **Create Advantage success**: `generateAspectName()` via `AspectGenerator` → add situation aspect
    - **Overcome/Defend**: narrative only (for now)
 
-### Post-roll invocation (`handlePostRollInvokes`)
+### Post-roll invocation (`beginInvokeLoop` / `ProvideInvokeResponse`)
 
-After rolling, the player can invoke aspects to improve their result:
+After rolling, the player can invoke aspects to improve their result.
+This uses the event-driven path for both player attacks and NPC defense:
 1. `gatherInvokableAspects()` — collects character aspects, situation aspects (with free invokes), consequence aspects
-2. `ui.PromptForInvoke()` — shows available aspects, fate points, current result, shifts needed
-3. Apply +2 bonus or reroll; spend fate point or use free invoke
-4. Loop until player declines or no aspects/points remain
+2. `beginInvokeLoop()` — emits `InvokePromptEvent` and populates `sm.pendingInvoke`
+3. Terminal path: `resolveInvokeBlocking()` — type-asserts UI to `InvokePrompter`, calls `PromptForInvoke`, feeds response back via `ProvideInvokeResponse`
+4. Apply +2 bonus or reroll; spend fate point or use free invoke
+5. Loop until player declines or no aspects/points remain
+6. For NPC defense invokes: `resumeTurns` flag on `invokeState` triggers `maybeResumeConflictTurns` to continue NPC turn processing after the invoke resolves
 
 ### Damage resolution
 
@@ -350,12 +353,11 @@ The `UI` interface decouples engine from presentation. The terminal implementati
 
 Key interface groups:
 - **Input**: `ReadInput() (string, bool, error)` — returns input and exit flag
-- **Display**: `DisplayNarrative()`, `DisplayDialog()`, `DisplaySystemMessage()`, `DisplayActionResult()`
-- **Conflict**: `DisplayConflictStart()`, `DisplayTurnAnnouncement()`, `DisplayConflictEnd()`
-- **Invocation**: `PromptForInvoke(available, fatePoints, currentResult, shiftsNeeded) *InvokeChoice`
-- **Flow**: `DisplayGameOver()`, `DisplaySceneTransition()`, `DisplayCharacter()`
+- **Output**: `Emit(event GameEvent)` — single output channel for all events
 
-Optional: `SceneInfoSetter` — if the UI implements this, `SceneManager.SetUI()` calls `SetSceneInfo(sm)` to provide access to scene/player/conversation data.
+Optional interfaces:
+- `InvokePrompter` — blocking UIs implement `PromptForInvoke(available, fatePoints, currentResult, shiftsNeeded) InvokeResponse` for synchronous invoke prompts
+- `SceneInfoSetter` — if the UI implements this, `SceneManager.SetUI()` calls `SetSceneInfo(sm)` to provide access to scene/player/conversation data.
 
 ## Where to Add New Features
 
