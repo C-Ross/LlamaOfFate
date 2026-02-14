@@ -31,6 +31,7 @@ type InputRequestEvent = uicontract.InputRequestEvent
 type InputRequestType = uicontract.InputRequestType
 type InputOption = uicontract.InputOption
 type MidFlowResponse = uicontract.MidFlowResponse
+type MidFlowPrompter = uicontract.MidFlowPrompter
 
 // Composite mechanical event aliases
 type DefenseRollEvent = uicontract.DefenseRollEvent

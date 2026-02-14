@@ -26,10 +26,15 @@ type MockUI struct {
 	conflictEscalateCalls []string
 	turnAnnouncementCalls []string
 	conflictEndCalls      []string
+	midFlowResponse       MidFlowResponse // preconfigured response for PromptForMidFlow
 }
 
 func (m *MockUI) ReadInput() (input string, isExit bool, err error) {
 	return m.lastInput, m.lastExit, m.lastError
+}
+
+func (m *MockUI) PromptForMidFlow(_ InputRequestEvent) MidFlowResponse {
+	return m.midFlowResponse
 }
 
 func (m *MockUI) Emit(event GameEvent) {

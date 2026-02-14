@@ -541,6 +541,121 @@ func TestResolveMidFlowBlocking_NoPending(t *testing.T) {
 	assert.Empty(t, result.Events)
 }
 
+func TestResolveMidFlowBlocking_NumberedChoice(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	mockLLM := &capturingMockLLMClient{
+		response: `[CONSEQUENCE_ASPECT:Bruised Ribs]`,
+	}
+	engine.llmClient = mockLLM
+
+	sm := NewSceneManager(engine)
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	player := character.NewCharacter("player-1", "Hero")
+	attacker := character.NewCharacter("enemy-1", "Orc")
+	engine.AddCharacter(player)
+	engine.AddCharacter(attacker)
+
+	testScene := scene.NewScene("test-scene", "Arena", "A dusty arena.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(attacker.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	// Trigger stress overflow to set pendingMidFlow with a numbered choice.
+	ctx := context.Background()
+	attackCtx := prompt.AttackContext{Skill: "Fight", Description: "Slash", Shifts: 2}
+	sm.handleStressOverflow(ctx, 2, character.PhysicalStress, attacker, attackCtx)
+	require.NotNil(t, sm.pendingMidFlow)
+	assert.Equal(t, uicontract.InputRequestNumberedChoice, sm.pendingMidFlow.event.Type)
+
+	// Configure MockUI to choose the first option (mild consequence).
+	mockUI.midFlowResponse = MidFlowResponse{ChoiceIndex: 0}
+
+	result, err := sm.resolveMidFlowBlocking(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// Mild consequence should have been applied.
+	assert.Len(t, player.Consequences, 1)
+	assert.Equal(t, character.MildConsequence, player.Consequences[0].Type)
+}
+
+func TestResolveMidFlowBlocking_FreeText(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+	mockUI := &MockUI{}
+	sm.SetUI(mockUI)
+
+	player := character.NewCharacter("player-1", "Hero")
+	enemy := character.NewCharacter("enemy-1", "Goblin")
+	player.FatePoints = 1
+	engine.AddCharacter(player)
+	engine.AddCharacter(enemy)
+
+	testScene := scene.NewScene("test-scene", "Room", "A room.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(enemy.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	err = sm.initiateConflict(scene.PhysicalConflict, enemy.ID)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	sm.handleConcession(ctx)
+	require.NotNil(t, sm.pendingMidFlow)
+	assert.Equal(t, uicontract.InputRequestFreeText, sm.pendingMidFlow.event.Type)
+
+	// Configure MockUI to provide narration text.
+	mockUI.midFlowResponse = MidFlowResponse{Text: "I drop my weapon and back away."}
+
+	result, err := sm.resolveMidFlowBlocking(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// Should have a NarrativeEvent with the player's narration.
+	require.Len(t, result.Events, 1)
+	narr, ok := result.Events[0].(NarrativeEvent)
+	require.True(t, ok, "expected NarrativeEvent, got %T", result.Events[0])
+	assert.Contains(t, narr.Text, "drop my weapon")
+}
+
+func TestResolveMidFlowBlocking_UIDoesNotImplementPrompter(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine)
+
+	// Use a minimal UI that does NOT implement MidFlowPrompter.
+	sm.ui = &minimalUI{}
+
+	// Set a pending mid-flow so we exercise the type-assertion path.
+	sm.pendingMidFlow = &midFlowState{
+		event: InputRequestEvent{
+			Type:   uicontract.InputRequestFreeText,
+			Prompt: "test",
+		},
+		continuation: func(_ context.Context, _ MidFlowResponse) []GameEvent { return nil },
+	}
+
+	ctx := context.Background()
+	_, err = sm.resolveMidFlowBlocking(ctx)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "MidFlowPrompter")
+}
+
+// minimalUI implements only the UI interface (not MidFlowPrompter).
+type minimalUI struct{}
+
+func (m *minimalUI) ReadInput() (string, bool, error) { return "", false, nil }
+func (m *minimalUI) Emit(_ GameEvent)                 {}
+
 // --- midFlowState helpers ---
 
 func TestStressOverflowContextFields(t *testing.T) {

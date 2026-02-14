@@ -62,83 +62,19 @@ func (sm *SceneManager) ProvideMidFlowResponse(ctx context.Context, resp MidFlow
 }
 
 // resolveMidFlowBlocking bridges the event-driven mid-flow system with the
-// blocking terminal UI. It reads the pending InputRequestEvent, displays the
-// prompt, collects input via ReadInput, and feeds it back via
+// blocking terminal UI. It type-asserts the UI to MidFlowPrompter, calls
+// PromptForMidFlow to collect a response, and feeds it back via
 // ProvideMidFlowResponse.
 func (sm *SceneManager) resolveMidFlowBlocking(ctx context.Context) (*InputResult, error) {
 	if sm.pendingMidFlow == nil {
 		return &InputResult{}, nil
 	}
 
-	event := sm.pendingMidFlow.event
-
-	switch event.Type {
-	case uicontract.InputRequestNumberedChoice:
-		return sm.resolveMidFlowNumberedChoice(ctx, event)
-	case uicontract.InputRequestFreeText:
-		return sm.resolveMidFlowFreeText(ctx, event)
-	default:
-		return nil, fmt.Errorf("resolveMidFlowBlocking: unknown request type %q", event.Type)
-	}
-}
-
-// resolveMidFlowNumberedChoice handles a numbered-choice prompt for the terminal UI.
-func (sm *SceneManager) resolveMidFlowNumberedChoice(ctx context.Context, event InputRequestEvent) (*InputResult, error) {
-	// Display the prompt and options (these mirror the old DisplaySystemMessage calls).
-	var promptEvents []GameEvent
-	promptEvents = append(promptEvents, SystemMessageEvent{Message: event.Prompt})
-	for i, opt := range event.Options {
-		if opt.Description != "" {
-			promptEvents = append(promptEvents, SystemMessageEvent{Message: fmt.Sprintf("  %d. %s (%s)", i+1, opt.Label, opt.Description)})
-		} else {
-			promptEvents = append(promptEvents, SystemMessageEvent{Message: fmt.Sprintf("  %d. %s", i+1, opt.Label)})
-		}
-	}
-	promptEvents = append(promptEvents, SystemMessageEvent{Message: "\nEnter your choice (number):"})
-	sm.renderEvents(promptEvents)
-
-	input, _, err := sm.ui.ReadInput()
-	if err != nil {
-		slog.Error("Failed to read mid-flow choice", "error", err)
-		// Default to last option (typically "taken out" / worst outcome).
-		return sm.ProvideMidFlowResponse(ctx, MidFlowResponse{ChoiceIndex: len(event.Options) - 1})
+	prompter, ok := sm.ui.(uicontract.MidFlowPrompter)
+	if !ok {
+		return nil, fmt.Errorf("resolveMidFlowBlocking: UI does not implement MidFlowPrompter")
 	}
 
-	// Parse the 1-based number to 0-based index.
-	input = trimSpace(input)
-	for i := range event.Options {
-		if input == fmt.Sprintf("%d", i+1) {
-			return sm.ProvideMidFlowResponse(ctx, MidFlowResponse{ChoiceIndex: i})
-		}
-	}
-
-	// Invalid input — default to last option.
-	sm.renderEvents([]GameEvent{SystemMessageEvent{Message: "Invalid choice."}})
-	return sm.ProvideMidFlowResponse(ctx, MidFlowResponse{ChoiceIndex: len(event.Options) - 1})
-}
-
-// resolveMidFlowFreeText handles a free-text prompt for the terminal UI.
-func (sm *SceneManager) resolveMidFlowFreeText(ctx context.Context, event InputRequestEvent) (*InputResult, error) {
-	sm.renderEvents([]GameEvent{SystemMessageEvent{Message: event.Prompt}})
-
-	input, _, err := sm.ui.ReadInput()
-	if err != nil {
-		slog.Error("Failed to read mid-flow free text", "error", err)
-		return sm.ProvideMidFlowResponse(ctx, MidFlowResponse{Text: ""})
-	}
-
-	return sm.ProvideMidFlowResponse(ctx, MidFlowResponse{Text: trimSpace(input)})
-}
-
-// trimSpace is a small helper to keep the import list clean in this file.
-func trimSpace(s string) string {
-	// Trim leading/trailing whitespace.
-	start, end := 0, len(s)
-	for start < end && (s[start] == ' ' || s[start] == '\t' || s[start] == '\n' || s[start] == '\r') {
-		start++
-	}
-	for end > start && (s[end-1] == ' ' || s[end-1] == '\t' || s[end-1] == '\n' || s[end-1] == '\r') {
-		end--
-	}
-	return s[start:end]
+	resp := prompter.PromptForMidFlow(sm.pendingMidFlow.event)
+	return sm.ProvideMidFlowResponse(ctx, resp)
 }

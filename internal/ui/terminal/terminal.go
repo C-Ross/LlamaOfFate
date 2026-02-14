@@ -9,9 +9,10 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
 )
 
-// compile-time check
+// compile-time checks
 var _ uicontract.UI = (*TerminalUI)(nil)
 var _ uicontract.InvokePrompter = (*TerminalUI)(nil)
+var _ uicontract.MidFlowPrompter = (*TerminalUI)(nil)
 
 // TerminalUI implements the UI interface for terminal-based interaction
 type TerminalUI struct {
@@ -274,6 +275,61 @@ func (ui *TerminalUI) PromptForInvoke(available []uicontract.InvokableAspect, fa
 		AspectIndex: aspectIndex,
 		IsReroll:    isReroll,
 	}
+}
+
+// PromptForMidFlow handles a mid-flow input request from the engine.
+// Implements uicontract.MidFlowPrompter for the blocking terminal path.
+func (ui *TerminalUI) PromptForMidFlow(event uicontract.InputRequestEvent) uicontract.MidFlowResponse {
+	switch event.Type {
+	case uicontract.InputRequestNumberedChoice:
+		return ui.promptNumberedChoice(event)
+	case uicontract.InputRequestFreeText:
+		return ui.promptFreeText(event)
+	default:
+		fmt.Printf("\n%s\n", event.Prompt)
+		return uicontract.MidFlowResponse{}
+	}
+}
+
+// promptNumberedChoice renders a numbered list and reads the player's choice.
+func (ui *TerminalUI) promptNumberedChoice(event uicontract.InputRequestEvent) uicontract.MidFlowResponse {
+	fmt.Printf("\n%s\n", event.Prompt)
+	for i, opt := range event.Options {
+		if opt.Description != "" {
+			fmt.Printf("  %d. %s (%s)\n", i+1, opt.Label, opt.Description)
+		} else {
+			fmt.Printf("  %d. %s\n", i+1, opt.Label)
+		}
+	}
+	fmt.Print("\nEnter your choice (number): ")
+
+	input, err := ui.reader.ReadString('\n')
+	if err != nil {
+		return uicontract.MidFlowResponse{ChoiceIndex: len(event.Options) - 1}
+	}
+	input = strings.TrimSpace(input)
+
+	var choice int
+	_, err = fmt.Sscanf(input, "%d", &choice)
+	if err != nil || choice < 1 || choice > len(event.Options) {
+		fmt.Println("Invalid choice.")
+		return uicontract.MidFlowResponse{ChoiceIndex: len(event.Options) - 1}
+	}
+
+	return uicontract.MidFlowResponse{ChoiceIndex: choice - 1}
+}
+
+// promptFreeText renders a prompt and reads free-form text input.
+func (ui *TerminalUI) promptFreeText(event uicontract.InputRequestEvent) uicontract.MidFlowResponse {
+	fmt.Printf("\n%s\n", event.Prompt)
+	fmt.Print("> ")
+
+	input, err := ui.reader.ReadString('\n')
+	if err != nil {
+		return uicontract.MidFlowResponse{Text: ""}
+	}
+
+	return uicontract.MidFlowResponse{Text: strings.TrimSpace(input)}
 }
 
 // DisplayCharacter displays the player character sheet.

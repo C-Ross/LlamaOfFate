@@ -1,6 +1,8 @@
 package terminal
 
 import (
+	"bufio"
+	"strings"
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
@@ -204,4 +206,171 @@ func TestHandleSpecialCommands_CaseInsensitive(t *testing.T) {
 	assert.True(t, ui.handleSpecialCommands("Status"))
 	assert.True(t, ui.handleSpecialCommands("ASPECTS"))
 	assert.True(t, ui.handleSpecialCommands("History"))
+}
+
+// --- PromptForMidFlow tests ---
+
+func newUIWithInput(input string) *TerminalUI {
+	ui := NewTerminalUI()
+	ui.reader = bufio.NewReader(strings.NewReader(input))
+	return ui
+}
+
+func TestPromptForMidFlow_NumberedChoice_ValidSelection(t *testing.T) {
+	ui := newUIWithInput("2\n")
+
+	event := uicontract.InputRequestEvent{
+		Type:   uicontract.InputRequestNumberedChoice,
+		Prompt: "Choose how to handle 3 shifts:",
+		Options: []uicontract.InputOption{
+			{Label: "Take a mild consequence", Description: "absorbs 2 shifts"},
+			{Label: "Take a moderate consequence", Description: "absorbs 4 shifts"},
+			{Label: "Be Taken Out"},
+		},
+	}
+
+	resp := ui.PromptForMidFlow(event)
+	assert.Equal(t, 1, resp.ChoiceIndex, "input '2' should map to 0-based index 1")
+}
+
+func TestPromptForMidFlow_NumberedChoice_FirstOption(t *testing.T) {
+	ui := newUIWithInput("1\n")
+
+	event := uicontract.InputRequestEvent{
+		Type:   uicontract.InputRequestNumberedChoice,
+		Prompt: "Choose:",
+		Options: []uicontract.InputOption{
+			{Label: "Option A"},
+			{Label: "Option B"},
+		},
+	}
+
+	resp := ui.PromptForMidFlow(event)
+	assert.Equal(t, 0, resp.ChoiceIndex)
+}
+
+func TestPromptForMidFlow_NumberedChoice_LastOption(t *testing.T) {
+	ui := newUIWithInput("3\n")
+
+	event := uicontract.InputRequestEvent{
+		Type:   uicontract.InputRequestNumberedChoice,
+		Prompt: "Choose:",
+		Options: []uicontract.InputOption{
+			{Label: "Option A"},
+			{Label: "Option B"},
+			{Label: "Option C"},
+		},
+	}
+
+	resp := ui.PromptForMidFlow(event)
+	assert.Equal(t, 2, resp.ChoiceIndex)
+}
+
+func TestPromptForMidFlow_NumberedChoice_InvalidInput_DefaultsToLast(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"out of range high", "99\n"},
+		{"zero", "0\n"},
+		{"negative", "-1\n"},
+		{"non-numeric", "abc\n"},
+		{"empty", "\n"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ui := newUIWithInput(tt.input)
+
+			event := uicontract.InputRequestEvent{
+				Type:   uicontract.InputRequestNumberedChoice,
+				Prompt: "Choose:",
+				Options: []uicontract.InputOption{
+					{Label: "Option A"},
+					{Label: "Option B"},
+					{Label: "Be Taken Out"},
+				},
+			}
+
+			resp := ui.PromptForMidFlow(event)
+			assert.Equal(t, 2, resp.ChoiceIndex, "invalid input should default to last option")
+		})
+	}
+}
+
+func TestPromptForMidFlow_NumberedChoice_ReadError_DefaultsToLast(t *testing.T) {
+	// Empty reader simulates a read error (EOF).
+	ui := newUIWithInput("")
+
+	event := uicontract.InputRequestEvent{
+		Type:   uicontract.InputRequestNumberedChoice,
+		Prompt: "Choose:",
+		Options: []uicontract.InputOption{
+			{Label: "Option A"},
+			{Label: "Option B"},
+		},
+	}
+
+	resp := ui.PromptForMidFlow(event)
+	assert.Equal(t, 1, resp.ChoiceIndex, "read error should default to last option")
+}
+
+func TestPromptForMidFlow_FreeText(t *testing.T) {
+	ui := newUIWithInput("I surrender and drop my sword.\n")
+
+	event := uicontract.InputRequestEvent{
+		Type:   uicontract.InputRequestFreeText,
+		Prompt: "Describe how you concede:",
+	}
+
+	resp := ui.PromptForMidFlow(event)
+	assert.Equal(t, "I surrender and drop my sword.", resp.Text)
+}
+
+func TestPromptForMidFlow_FreeText_TrimsWhitespace(t *testing.T) {
+	ui := newUIWithInput("  some text with spaces  \n")
+
+	event := uicontract.InputRequestEvent{
+		Type:   uicontract.InputRequestFreeText,
+		Prompt: "Enter text:",
+	}
+
+	resp := ui.PromptForMidFlow(event)
+	assert.Equal(t, "some text with spaces", resp.Text)
+}
+
+func TestPromptForMidFlow_FreeText_Empty(t *testing.T) {
+	ui := newUIWithInput("\n")
+
+	event := uicontract.InputRequestEvent{
+		Type:   uicontract.InputRequestFreeText,
+		Prompt: "Enter text:",
+	}
+
+	resp := ui.PromptForMidFlow(event)
+	assert.Equal(t, "", resp.Text)
+}
+
+func TestPromptForMidFlow_FreeText_ReadError(t *testing.T) {
+	ui := newUIWithInput("")
+
+	event := uicontract.InputRequestEvent{
+		Type:   uicontract.InputRequestFreeText,
+		Prompt: "Enter text:",
+	}
+
+	resp := ui.PromptForMidFlow(event)
+	assert.Equal(t, "", resp.Text)
+}
+
+func TestPromptForMidFlow_UnknownType_ReturnsZeroValue(t *testing.T) {
+	ui := newUIWithInput("")
+
+	event := uicontract.InputRequestEvent{
+		Type:   "unknown_type",
+		Prompt: "Something:",
+	}
+
+	resp := ui.PromptForMidFlow(event)
+	assert.Equal(t, uicontract.MidFlowResponse{}, resp)
 }
