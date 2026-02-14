@@ -29,3 +29,7 @@ type ConflictEndEvent = uicontract.ConflictEndEvent
 type CharacterDisplayEvent = uicontract.CharacterDisplayEvent
 type InvokePromptEvent = uicontract.InvokePromptEvent
 type InvokeResponse = uicontract.InvokeResponse
+type InputRequestEvent = uicontract.InputRequestEvent
+type InputRequestType = uicontract.InputRequestType
+type InputOption = uicontract.InputOption
+type MidFlowResponse = uicontract.MidFlowResponse

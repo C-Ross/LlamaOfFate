@@ -18,6 +18,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
+	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
 )
 
 // TakenOutResult represents the outcome classification of being taken out
@@ -744,17 +745,48 @@ func (sm *SceneManager) promptPlayerForFates(ctx context.Context) {
 
 	// Build the prompt for the player
 	nameList := strings.Join(npcNames, ", ")
-	sm.ui.DisplaySystemMessage(fmt.Sprintf(
-		"You decide their fate! What happens to %s?", nameList))
 
-	input, _, err := sm.ui.ReadInput()
-	if err != nil || strings.TrimSpace(input) == "" {
-		slog.Warn("Failed to read fate narration input",
-			"component", componentSceneManager,
-			"error", err)
-		return
+	// Build NPC name list for context.
+	npcContextList := make([]map[string]string, 0, len(takenOutNPCs))
+	for _, npc := range takenOutNPCs {
+		npcContextList = append(npcContextList, map[string]string{
+			"id":           npc.ID,
+			"name":         npc.Name,
+			"high_concept": npc.HighConcept,
+		})
 	}
 
+	event := InputRequestEvent{
+		Type:   uicontract.InputRequestFreeText,
+		Prompt: fmt.Sprintf("You decide their fate! What happens to %s?", nameList),
+		Context: map[string]any{
+			"request_type": "fate_narration",
+			"npc_names":    npcNames,
+			"npcs":         npcContextList,
+		},
+	}
+
+	// Capture variables for the continuation closure.
+	capturedNPCs := takenOutNPCs
+
+	sm.pendingMidFlow = &midFlowState{
+		event: event,
+		continuation: func(ctx context.Context, resp MidFlowResponse) []GameEvent {
+			if strings.TrimSpace(resp.Text) == "" {
+				slog.Warn("Empty fate narration input",
+					"component", componentSceneManager)
+				return nil
+			}
+
+			return sm.processFateNarration(ctx, resp.Text, capturedNPCs)
+		},
+	}
+}
+
+// processFateNarration sends the player's fate narration to the LLM for parsing
+// and applies the results. Extracted from promptPlayerForFates to serve as the
+// mid-flow continuation.
+func (sm *SceneManager) processFateNarration(ctx context.Context, input string, takenOutNPCs []prompt.FateNarrationNPC) []GameEvent {
 	// Determine conflict type for context
 	conflictType := "physical"
 	if sm.currentScene.ConflictState != nil && sm.currentScene.ConflictState.Type == scene.MentalConflict {
@@ -775,7 +807,7 @@ func (sm *SceneManager) promptPlayerForFates(ctx context.Context) {
 		slog.Error("Failed to render fate narration prompt",
 			"component", componentSceneManager,
 			"error", err)
-		return
+		return nil
 	}
 
 	content, err := llm.SimpleCompletion(ctx, sm.engine.llmClient, rendered, 400, 0.4)
@@ -783,7 +815,7 @@ func (sm *SceneManager) promptPlayerForFates(ctx context.Context) {
 		slog.Error("Failed to get fate narration from LLM",
 			"component", componentSceneManager,
 			"error", err)
-		return
+		return nil
 	}
 
 	result, err := prompt.ParseFateNarration(content)
@@ -791,7 +823,7 @@ func (sm *SceneManager) promptPlayerForFates(ctx context.Context) {
 		slog.Error("Failed to parse fate narration response",
 			"component", componentSceneManager,
 			"error", err)
-		return
+		return nil
 	}
 
 	// Apply fates to characters
@@ -816,9 +848,6 @@ func (sm *SceneManager) promptPlayerForFates(ctx context.Context) {
 			"permanent", fate.Permanent)
 	}
 
-	// Display the narrative
-	sm.ui.DisplayNarrative(result.Narrative)
-
 	// Log the fate narration
 	if sm.sessionLogger != nil {
 		sm.sessionLogger.Log("fate_narration", map[string]any{
@@ -827,6 +856,8 @@ func (sm *SceneManager) promptPlayerForFates(ctx context.Context) {
 			"narrative":    result.Narrative,
 		})
 	}
+
+	return []GameEvent{NarrativeEvent{Text: result.Narrative}}
 }
 
 // applyAttackDamageToPlayer applies attack damage to the player
@@ -880,46 +911,50 @@ func (sm *SceneManager) handleStressOverflow(ctx context.Context, shifts int, st
 		return
 	}
 
-	// Display options (concession is not available here - per Fate Core rules,
-	// you must concede BEFORE the roll, not after taking shifts)
-	sm.ui.DisplaySystemMessage("\nYou must choose how to handle this:")
-
-	for i, conseq := range availableConsequences {
-		sm.ui.DisplaySystemMessage(fmt.Sprintf(
-			"  %d. Take a %s consequence (absorbs %d shifts)",
-			i+1, conseq.Type, conseq.Value,
-		))
+	// Build numbered-choice options.
+	options := make([]InputOption, 0, len(availableConsequences)+1)
+	for _, conseq := range availableConsequences {
+		options = append(options, InputOption{
+			Label:       fmt.Sprintf("Take a %s consequence", conseq.Type),
+			Description: fmt.Sprintf("absorbs %d shifts", conseq.Value),
+		})
 	}
-	sm.ui.DisplaySystemMessage(fmt.Sprintf("  %d. Be Taken Out - Your opponent decides your fate", len(availableConsequences)+1))
+	options = append(options, InputOption{
+		Label:       "Be Taken Out",
+		Description: "Your opponent decides your fate",
+	})
 
-	// Read player choice
-	sm.ui.DisplaySystemMessage("\nEnter your choice (number):")
-	input, _, err := sm.ui.ReadInput()
-	if err != nil {
-		slog.Error("Failed to read consequence choice", "error", err)
-		sm.handleTakenOut(ctx, attacker, attackCtx)
-		return
-	}
-
-	choice := strings.TrimSpace(input)
-
-	// Check for consequence choices
-	for i, conseq := range availableConsequences {
-		if choice == fmt.Sprintf("%d", i+1) {
-			sm.applyConsequence(ctx, conseq.Type, shifts, attacker, attackCtx)
-			return
-		}
+	event := InputRequestEvent{
+		Type:    uicontract.InputRequestNumberedChoice,
+		Prompt:  "\nYou must choose how to handle this:",
+		Options: options,
+		Context: map[string]any{
+			"request_type": "consequence_choice",
+			"shifts":       shifts,
+			"stress_type":  string(stressType),
+		},
 	}
 
-	// Check for taken out choice
-	if choice == fmt.Sprintf("%d", len(availableConsequences)+1) {
-		sm.handleTakenOut(ctx, attacker, attackCtx)
-		return
-	}
+	// Capture variables for the continuation closure.
+	capturedConsequences := availableConsequences
+	capturedShifts := shifts
+	capturedAttacker := attacker
+	capturedAttackCtx := attackCtx
 
-	// Invalid choice - default to taken out
-	sm.ui.DisplaySystemMessage("Invalid choice. You are taken out!")
-	sm.handleTakenOut(ctx, attacker, attackCtx)
+	sm.pendingMidFlow = &midFlowState{
+		event: event,
+		continuation: func(ctx context.Context, resp MidFlowResponse) []GameEvent {
+			takenOutIdx := len(capturedConsequences)
+
+			if resp.ChoiceIndex >= 0 && resp.ChoiceIndex < takenOutIdx {
+				sm.applyConsequence(ctx, capturedConsequences[resp.ChoiceIndex].Type, capturedShifts, capturedAttacker, capturedAttackCtx)
+			} else {
+				sm.ui.DisplaySystemMessage("You are taken out!")
+				sm.handleTakenOut(ctx, capturedAttacker, capturedAttackCtx)
+			}
+			return nil
+		},
+	}
 }
 
 // applyConsequence applies a consequence to the player character
@@ -1051,18 +1086,29 @@ func (sm *SceneManager) handleConcession(ctx context.Context) {
 		sm.ui.DisplayConflictEnd("You have conceded the conflict.")
 	}
 
-	// Read and display the concession narrative (no roll required - this is pure narration)
-	sm.ui.DisplaySystemMessage("\nDescribe how you concede and exit the conflict:")
-	input, _, err := sm.ui.ReadInput()
-	if err != nil {
-		slog.Error("Failed to read concession description", "error", err)
-		return
+	// Emit a free-text input request for the concession narration instead of
+	// blocking on ReadInput.
+	event := InputRequestEvent{
+		Type:   uicontract.InputRequestFreeText,
+		Prompt: "\nDescribe how you concede and exit the conflict:",
+		Context: map[string]any{
+			"request_type": "concession_narration",
+			"player_name":  sm.player.Name,
+		},
 	}
 
-	if input != "" {
-		// Display the player's narration and acknowledge it without any mechanical resolution
-		sm.ui.DisplayNarrative(fmt.Sprintf("%s %s", sm.player.Name, input))
-		sm.addToConversationHistory(input, "You exit the conflict on your own terms.", inputTypeDialog)
+	sm.pendingMidFlow = &midFlowState{
+		event: event,
+		continuation: func(_ context.Context, resp MidFlowResponse) []GameEvent {
+			var events []GameEvent
+			if resp.Text != "" {
+				events = append(events, NarrativeEvent{
+					Text: fmt.Sprintf("%s %s", sm.player.Name, resp.Text),
+				})
+				sm.addToConversationHistory(resp.Text, "You exit the conflict on your own terms.", inputTypeDialog)
+			}
+			return events
+		},
 	}
 }
 

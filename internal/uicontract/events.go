@@ -116,3 +116,16 @@ type InvokePromptEvent struct {
 }
 
 func (InvokePromptEvent) gameEvent() {}
+
+// InputRequestEvent is emitted when the engine needs mid-flow input from the
+// player (e.g. consequence choice after stress overflow, concession narration).
+// The UI renders the appropriate control based on Type and collects a
+// MidFlowResponse.
+type InputRequestEvent struct {
+	Type    InputRequestType // "numbered_choice" or "free_text"
+	Prompt  string           // Human-readable prompt text
+	Options []InputOption    // For numbered_choice only; empty for free_text
+	Context map[string]any   // Additional context (NPC names, consequence types, etc.)
+}
+
+func (InputRequestEvent) gameEvent() {}

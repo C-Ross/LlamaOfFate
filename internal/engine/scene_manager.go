@@ -49,6 +49,7 @@ type SceneManager struct {
 	playerTakenOutHint    string         // Transition hint if player was taken out
 	scenePurpose          string         // Dramatic question driving the current scene
 	pendingInvoke         *invokeState   // Non-nil when awaiting an InvokeResponse
+	pendingMidFlow        *midFlowState  // Non-nil when awaiting a MidFlowResponse
 }
 
 // SetScenePurpose sets the dramatic question driving the current scene,
@@ -187,6 +188,16 @@ func (sm *SceneManager) RunSceneLoop(ctx context.Context) (*SceneEndResult, erro
 			sm.renderEvents(result.Events)
 		}
 
+		// If the engine is awaiting a mid-flow response, run the blocking
+		// mid-flow loop via the terminal adapter and render subsequent events.
+		for result.AwaitingMidFlow {
+			result, err = sm.resolveMidFlowBlocking(ctx)
+			if err != nil {
+				return nil, err
+			}
+			sm.renderEvents(result.Events)
+		}
+
 		if result.SceneEnded {
 			return result.EndResult, nil
 		}
@@ -206,6 +217,9 @@ func (sm *SceneManager) HandleInput(ctx context.Context, input string) (*InputRe
 	if sm.pendingInvoke != nil {
 		return nil, fmt.Errorf("HandleInput called while awaiting invoke response; call ProvideInvokeResponse instead")
 	}
+	if sm.pendingMidFlow != nil {
+		return nil, fmt.Errorf("HandleInput called while awaiting mid-flow response; call ProvideMidFlowResponse instead")
+	}
 
 	result := &InputResult{}
 
@@ -217,7 +231,10 @@ func (sm *SceneManager) HandleInput(ctx context.Context, input string) (*InputRe
 	// Check for concession command during conflict (before any roll per Fate Core rules).
 	if sm.currentScene.IsConflict && sm.isConcedeCommand(input) {
 		sm.handleConcession(ctx)
-		if sm.shouldExit {
+		if sm.pendingMidFlow != nil {
+			result.AwaitingMidFlow = true
+		}
+		if sm.shouldExit && !result.AwaitingMidFlow {
 			result.SceneEnded = true
 			result.EndResult = sm.buildSceneEndResult()
 		}
@@ -258,7 +275,12 @@ func (sm *SceneManager) HandleInput(ctx context.Context, input string) (*InputRe
 		result.Events = sm.handleDialog(ctx, input)
 	}
 
-	if !result.AwaitingInvoke && sm.shouldExit {
+	// Check if a mid-flow prompt was emitted during processing.
+	if sm.pendingMidFlow != nil {
+		result.AwaitingMidFlow = true
+	}
+
+	if !result.AwaitingInvoke && !result.AwaitingMidFlow && sm.shouldExit {
 		result.SceneEnded = true
 		result.EndResult = sm.buildSceneEndResult()
 	}
@@ -274,6 +296,7 @@ func (sm *SceneManager) resetSceneState() {
 	sm.lastTransition = nil
 	sm.shouldExit = false
 	sm.pendingInvoke = nil
+	sm.pendingMidFlow = nil
 }
 
 // buildSceneEndResult constructs a SceneEndResult from the current state.
@@ -331,6 +354,9 @@ func (sm *SceneManager) renderEvents(events []GameEvent) {
 			sm.ui.DisplayCharacter()
 		case InvokePromptEvent:
 			// Handled by resolveInvokeBlocking in the terminal path;
+			// web callers process this event directly.
+		case InputRequestEvent:
+			// Handled by resolveMidFlowBlocking in the terminal path;
 			// web callers process this event directly.
 		}
 	}

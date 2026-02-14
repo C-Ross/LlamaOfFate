@@ -96,3 +96,27 @@ type ConversationEntry struct {
 	Timestamp   time.Time `json:"timestamp"`
 	Type        string    `json:"type"` // "dialog", "action", "clarification"
 }
+
+// InputRequestType identifies what kind of mid-flow input the engine needs.
+type InputRequestType string
+
+const (
+	// InputRequestNumberedChoice requests the player to select from a numbered list.
+	InputRequestNumberedChoice InputRequestType = "numbered_choice"
+	// InputRequestFreeText requests free-form text input from the player.
+	InputRequestFreeText InputRequestType = "free_text"
+)
+
+// InputOption represents one selectable option in a numbered-choice request.
+type InputOption struct {
+	Label       string // Short label (e.g. "Take a mild consequence")
+	Description string // Longer explanation (e.g. "absorbs 2 shifts")
+}
+
+// MidFlowResponse is the player's answer to an InputRequestEvent.
+// For numbered_choice: ChoiceIndex is the 0-based index into InputRequestEvent.Options.
+// For free_text: Text contains the player's input.
+type MidFlowResponse struct {
+	ChoiceIndex int    // 0-based option index (ignored for free_text)
+	Text        string // Free-form text (ignored for numbered_choice)
+}
