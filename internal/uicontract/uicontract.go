@@ -37,7 +37,7 @@ type UI interface {
 
 // InvokePrompter is an optional interface that blocking (terminal) UIs
 // implement to support synchronous invoke prompts. The engine type-asserts
-// the UI to this interface in the blocking resolution path (RunSceneLoop).
+// the UI to this interface in the blocking resolution path (GameManager.Run).
 // Event-driven UIs (web) use InvokePromptEvent/InvokeResponse instead.
 type InvokePrompter interface {
 	PromptForInvoke(available []InvokableAspect, fatePoints int, currentResult string, shiftsNeeded int) InvokeResponse
@@ -46,7 +46,7 @@ type InvokePrompter interface {
 // MidFlowPrompter is an optional interface that blocking (terminal) UIs
 // implement to support synchronous mid-flow prompts (e.g. consequence
 // choice, concession narration). The engine type-asserts the UI to this
-// interface in the blocking resolution path (RunSceneLoop).
+// interface in the blocking resolution path (GameManager.Run).
 // Event-driven UIs (web) use InputRequestEvent/MidFlowResponse instead.
 type MidFlowPrompter interface {
 	PromptForMidFlow(event InputRequestEvent) MidFlowResponse

@@ -154,9 +154,7 @@ func TestSceneManager_InitiateConflict(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
 
-	mockUI := &MockUI{}
 	sm := NewSceneManager(engine)
-	sm.SetUI(mockUI)
 
 	// Create player and enemy
 	player := character.NewCharacter("player1", "Hero")
@@ -191,9 +189,7 @@ func TestSceneManager_InitiateConflict_AlreadyInConflict(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
 
-	mockUI := &MockUI{}
 	sm := NewSceneManager(engine)
-	sm.SetUI(mockUI)
 
 	// Create characters
 	player := character.NewCharacter("player1", "Hero")
@@ -222,9 +218,7 @@ func TestSceneManager_InitiateConflict_NotEnoughParticipants(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
 
-	mockUI := &MockUI{}
 	sm := NewSceneManager(engine)
-	sm.SetUI(mockUI)
 
 	// Create only one character
 	player := character.NewCharacter("player1", "Hero")
@@ -246,9 +240,7 @@ func TestSceneManager_InitiateConflict_UnknownInitiator(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
 
-	mockUI := &MockUI{}
 	sm := NewSceneManager(engine)
-	sm.SetUI(mockUI)
 
 	// Create player and enemy
 	player := character.NewCharacter("player1", "Hero")
@@ -270,16 +262,13 @@ func TestSceneManager_InitiateConflict_UnknownInitiator(t *testing.T) {
 
 	// Verify no conflict was started
 	assert.False(t, sm.currentScene.IsConflict)
-	assert.Empty(t, OfType[ConflictStartEvent](&mockUI.EventRecorder))
 }
 
 func TestSceneManager_HandleConflictEscalation(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
 
-	mockUI := &MockUI{}
 	sm := NewSceneManager(engine)
-	sm.SetUI(mockUI)
 
 	// Create characters
 	player := character.NewCharacter("player1", "Hero")
@@ -383,8 +372,6 @@ func TestSceneManager_ResolveConflictPeacefully(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine)
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	// Create test characters
 	player := character.NewCharacter("player-1", "Hero")
@@ -419,8 +406,6 @@ func TestSceneManager_ResolveConflictPeacefully_ClearsStress(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine)
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	// Create test characters
 	player := character.NewCharacter("player-1", "Hero")
@@ -464,8 +449,6 @@ func TestSceneManager_ResolveConflictPeacefully_NotInConflict(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine)
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	// Setup scene (no conflict)
 	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
@@ -484,8 +467,6 @@ func TestSceneManager_RollTargetDefense(t *testing.T) {
 
 	sm := NewSceneManager(engine)
 	sm.roller = dice.NewSeededRoller(12345) // Predictable rolls
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	target := character.NewCharacter("target-1", "Goblin")
 	target.SetSkill("Athletics", 2)
@@ -508,8 +489,6 @@ func TestSceneManager_ApplyDamageToTarget_StressAbsorbed(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine)
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	target := character.NewCharacter("target-1", "Goblin")
 	// Default stress track should be able to absorb small hits
@@ -601,8 +580,6 @@ func TestSceneManager_HandleTargetTakenOut(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine)
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	player := character.NewCharacter("player-1", "Hero")
 	target := character.NewCharacter("target-1", "Goblin")
@@ -643,8 +620,6 @@ func TestSceneManager_HandleTargetTakenOut_ConflictEnds(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine)
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	player := character.NewCharacter("player-1", "Hero")
 	target := character.NewCharacter("target-1", "Goblin")
@@ -678,8 +653,6 @@ func TestSceneManager_HandleTargetTakenOut_MarksSceneLevelTakenOut(t *testing.T)
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine)
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	player := character.NewCharacter("player-1", "Hero")
 	target := character.NewCharacter("target-1", "Goblin")
@@ -711,8 +684,6 @@ func TestSceneManager_InitiateConflict_ExcludesTakenOutCharacters(t *testing.T) 
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine)
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	player := character.NewCharacter("player-1", "Hero")
 	enemy1 := character.NewCharacter("enemy-1", "Goblin")
@@ -760,8 +731,6 @@ func TestSceneManager_InitiateConflict_TakenOutInitiatorFails(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine)
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	player := character.NewCharacter("player-1", "Hero")
 	enemy := character.NewCharacter("enemy-1", "Goblin")
@@ -797,8 +766,6 @@ func TestSceneManager_ApplyActionEffects_Attack(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine)
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	player := character.NewCharacter("player-1", "Hero")
 	target := character.NewCharacter("target-1", "Goblin")
@@ -877,8 +844,6 @@ func TestSceneManager_HandleConcession(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine)
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	player := character.NewCharacter("player-1", "Hero")
 	enemy := character.NewCharacter("enemy-1", "Goblin")
@@ -919,8 +884,6 @@ func TestSceneManager_HandleConcession_WithConsequences(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine)
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	player := character.NewCharacter("player-1", "Hero")
 	enemy := character.NewCharacter("enemy-1", "Goblin")
@@ -976,8 +939,6 @@ func TestSceneManager_ApplyActionEffects_Attack_NilTarget_ShowsError(t *testing.
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine)
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	player := character.NewCharacter("player-1", "Hero")
 	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
@@ -1013,8 +974,6 @@ func TestSceneManager_ApplyActionEffects_Attack_DealsDamage(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine)
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	player := character.NewCharacter("player-1", "Hero")
 	target := character.NewCharacter("target-1", "Goblin")
@@ -1066,8 +1025,6 @@ func TestSceneManager_ApplyActionEffects_Attack_Tie_GrantsBoost(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine)
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	player := character.NewCharacter("player-1", "Hero")
 	target := character.NewCharacter("target-1", "Goblin")
@@ -1110,8 +1067,6 @@ func TestSceneManager_ResolveAction_TargetByName(t *testing.T) {
 
 	sm := engine.GetSceneManager()
 	sm.roller = dice.NewSeededRoller(42)
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	// Create player and NPC with different ID and name
 	player := character.NewCharacter("player-1", "Hero")
@@ -1178,8 +1133,6 @@ func TestSceneManager_ResolveAction_UnknownTarget_AbortsWithoutConsumingTurn(t *
 
 	sm := engine.GetSceneManager()
 	sm.roller = dice.NewSeededRoller(42)
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	player := character.NewCharacter("player-1", "Hero")
 	player.SetSkill("Fight", dice.Good)
@@ -1244,8 +1197,6 @@ func TestSceneManager_HandleAction_ExcludesTakenOutFromTargets(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine)
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	player := character.NewCharacter("player-1", "Hero")
 	player.SetSkill("Fight", dice.Good)

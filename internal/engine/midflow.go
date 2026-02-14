@@ -60,21 +60,3 @@ func (sm *SceneManager) ProvideMidFlowResponse(ctx context.Context, resp MidFlow
 
 	return result, nil
 }
-
-// resolveMidFlowBlocking bridges the event-driven mid-flow system with the
-// blocking terminal UI. It type-asserts the UI to MidFlowPrompter, calls
-// PromptForMidFlow to collect a response, and feeds it back via
-// ProvideMidFlowResponse.
-func (sm *SceneManager) resolveMidFlowBlocking(ctx context.Context) (*InputResult, error) {
-	if sm.pendingMidFlow == nil {
-		return &InputResult{}, nil
-	}
-
-	prompter, ok := sm.ui.(uicontract.MidFlowPrompter)
-	if !ok {
-		return nil, fmt.Errorf("resolveMidFlowBlocking: UI does not implement MidFlowPrompter")
-	}
-
-	resp := prompter.PromptForMidFlow(sm.pendingMidFlow.event)
-	return sm.ProvideMidFlowResponse(ctx, resp)
-}

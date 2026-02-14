@@ -127,12 +127,11 @@ func main() {
 	terminalUI := terminal.NewTerminalUI()
 
 	if *multiFlag {
-		// Multi-scene mode: use GameManager for continuous play
-		runMultiSceneMode(ctx, gameEngine, sceneConfig, terminalUI, sessionLogger, selectedScene)
-	} else {
-		// Single-scene mode: original behavior
-		runSingleSceneMode(ctx, gameEngine, sceneConfig, terminalUI, sessionLogger)
+		fmt.Println("*** Multi-scene mode enabled - scenes will continue on transition ***")
+		fmt.Println()
 	}
+
+	runGame(ctx, gameEngine, sceneConfig, terminalUI, sessionLogger, selectedScene, *multiFlag)
 
 	// Stop the engine
 	if err := gameEngine.Stop(); err != nil {
@@ -144,54 +143,10 @@ func main() {
 	fmt.Printf("\n%s\n", sceneConfig.Farewell)
 }
 
-// runSingleSceneMode runs the original single-scene behavior
-func runSingleSceneMode(ctx context.Context, gameEngine *engine.Engine, sceneConfig SceneConfig, terminalUI *terminal.TerminalUI, sessionLogger *session.Logger) {
-	// Register all characters with the engine
-	gameEngine.AddCharacter(sceneConfig.Player)
-	for _, npc := range sceneConfig.NPCs {
-		gameEngine.AddCharacter(npc)
-	}
-
-	// Add all characters to the scene
-	sceneConfig.Scene.AddCharacter(sceneConfig.Player.ID)
-	for _, npc := range sceneConfig.NPCs {
-		sceneConfig.Scene.AddCharacter(npc.ID)
-	}
-
-	// Get the scene manager
-	sceneManager := gameEngine.GetSceneManager()
-	if sceneManager == nil {
-		log.Fatal("Scene manager not available")
-	}
-
-	if sessionLogger != nil {
-		sceneManager.SetSessionLogger(sessionLogger)
-	}
-
-	// Start the scene with the pre-configured scene
-	err := sceneManager.StartScene(sceneConfig.Scene, sceneConfig.Player)
-	if err != nil {
-		log.Fatalf("Failed to start scene: %v", err)
-	}
-
-	// Run the scene loop
-	sceneManager.SetUI(terminalUI)
-	sceneManager.SetExitOnSceneTransition(true)
-	terminalUI.SetSceneInfo(sceneManager)
-
-	// Display initial character info
-	terminalUI.DisplayCharacter()
-
-	if _, err := sceneManager.RunSceneLoop(ctx); err != nil {
-		log.Fatalf("Scene loop error: %v", err)
-	}
-}
-
-// runMultiSceneMode uses GameManager for multi-scene continuous play
-func runMultiSceneMode(ctx context.Context, gameEngine *engine.Engine, sceneConfig SceneConfig, terminalUI *terminal.TerminalUI, sessionLogger *session.Logger, sceneName string) {
-	fmt.Println("*** Multi-scene mode enabled - scenes will continue on transition ***")
-	fmt.Println()
-
+// runGame sets up a GameManager and runs the game. In single-scene mode
+// (multi=false), ExitAfterScene causes the game to end when the first scene
+// completes. In multi-scene mode, scenes continue to be generated on transition.
+func runGame(ctx context.Context, gameEngine *engine.Engine, sceneConfig SceneConfig, terminalUI *terminal.TerminalUI, sessionLogger *session.Logger, sceneName string, multi bool) {
 	// Create and configure the game manager
 	gameManager := engine.NewGameManager(gameEngine)
 	gameManager.SetPlayer(sceneConfig.Player)
@@ -211,8 +166,9 @@ func runMultiSceneMode(ctx context.Context, gameEngine *engine.Engine, sceneConf
 
 	// Run with the initial scene
 	initialScene := &engine.InitialSceneConfig{
-		Scene: sceneConfig.Scene,
-		NPCs:  sceneConfig.NPCs,
+		Scene:          sceneConfig.Scene,
+		NPCs:           sceneConfig.NPCs,
+		ExitAfterScene: !multi,
 	}
 
 	if err := gameManager.RunWithInitialScene(ctx, initialScene); err != nil {

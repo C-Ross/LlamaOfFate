@@ -16,10 +16,11 @@ type GameManager struct {
 	player          *character.Character
 	ui              UI
 	sessionLogger   *session.Logger
-	scenario        *scene.Scenario  // The scenario to run (can be provided or generated)
-	scenarioCount   int              // Number of scenarios completed
-	saver           GameStateSaver   // Persistence interface (defaults to noopSaver)
-	scenarioManager *ScenarioManager // Current scenario manager (stored for Save access)
+	scenario        *scene.Scenario     // The scenario to run (can be provided or generated)
+	initialScene    *InitialSceneConfig // Optional pre-configured starting scene (for demos/tests)
+	scenarioCount   int                 // Number of scenarios completed
+	saver           GameStateSaver      // Persistence interface (defaults to noopSaver)
+	scenarioManager *ScenarioManager    // Current scenario manager (stored for Save access)
 }
 
 // NewGameManager creates a new game manager
@@ -73,7 +74,172 @@ func (g *GameManager) Save() error {
 	})
 }
 
-// Run starts the game loop
+// Start initializes the game and returns the opening events. This is the async
+// entry point for event-driven UIs (web). After Start, the caller drives the
+// game by calling HandleInput for each player input.
+//
+// Start checks for saved games, configures the scenario manager, and delegates
+// to ScenarioManager.Start. If resuming a saved game, a GameResumedEvent is
+// prepended to the returned events.
+func (g *GameManager) Start(ctx context.Context) ([]GameEvent, error) {
+	if g.engine == nil {
+		return nil, fmt.Errorf("engine is required")
+	}
+	if g.player == nil {
+		return nil, fmt.Errorf("player character is required")
+	}
+
+	// Check for a saved game to resume (skip when an initial scene is
+	// explicitly configured — RunWithInitialScene always starts fresh).
+	var savedState *GameState
+	if g.initialScene == nil {
+		var err error
+		savedState, err = g.saver.Load()
+		if err != nil {
+			slog.Warn("Failed to load saved game, starting fresh",
+				"error", err,
+			)
+			savedState = nil
+		}
+	}
+
+	// Resume from save if a valid, unfinished game exists
+	if savedState != nil && savedState.Scene.CurrentScene != nil {
+		if savedState.Scenario.Scenario == nil || !savedState.Scenario.Scenario.IsResolved {
+			return g.startFromSave(ctx, savedState)
+		}
+		slog.Info("Previous scenario was completed, starting fresh")
+	}
+
+	// Fresh start
+	g.scenarioManager = NewScenarioManager(g.engine, g.player)
+	g.scenarioManager.SetScenario(g.scenario)
+	g.scenarioManager.SetScenarioCount(g.scenarioCount)
+	g.scenarioManager.SetSaveFunc(g.Save)
+	if g.initialScene != nil {
+		g.scenarioManager.SetInitialScene(g.initialScene.Scene, g.initialScene.NPCs)
+		g.scenarioManager.SetExitAfterScene(g.initialScene.ExitAfterScene)
+	}
+	if g.sessionLogger != nil {
+		g.scenarioManager.SetSessionLogger(g.sessionLogger)
+	}
+
+	return g.scenarioManager.Start(ctx)
+}
+
+// startFromSave restores game state and returns opening events with GameResumedEvent prepended.
+func (g *GameManager) startFromSave(ctx context.Context, state *GameState) ([]GameEvent, error) {
+	g.player = state.Scenario.Player
+
+	g.scenarioManager = NewScenarioManager(g.engine, g.player)
+	g.scenarioManager.SetSaveFunc(g.Save)
+	if g.sessionLogger != nil {
+		g.scenarioManager.SetSessionLogger(g.sessionLogger)
+	}
+
+	g.scenarioManager.Restore(state.Scenario, state.Scene)
+
+	slog.Info("Resuming saved game",
+		"scene", state.Scene.CurrentScene.Name,
+		"scenario", state.Scenario.Scenario.Title,
+	)
+
+	if g.sessionLogger != nil {
+		g.sessionLogger.Log("game_resumed", map[string]any{
+			"scene_name":     state.Scene.CurrentScene.Name,
+			"scenario_title": state.Scenario.Scenario.Title,
+			"scene_count":    state.Scenario.SceneCount,
+		})
+	}
+
+	scenarioEvents, err := g.scenarioManager.Start(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("scenario start error: %w", err)
+	}
+
+	// Prepend the GameResumedEvent
+	events := make([]GameEvent, 0, 1+len(scenarioEvents))
+	events = append(events, GameResumedEvent{
+		ScenarioTitle: state.Scenario.Scenario.Title,
+		SceneName:     state.Scene.CurrentScene.Name,
+	})
+	events = append(events, scenarioEvents...)
+
+	return events, nil
+}
+
+// HandleInput processes a single player input through the game manager layer.
+// It delegates to ScenarioManager.HandleInput and, when a scenario ends with
+// resolution, appends milestone events (fate point refresh, consequence recovery).
+//
+// This is the primary entry point for event-driven UIs (web via WebSocket).
+// Terminal UIs use Run() which drives the game in a blocking loop.
+func (g *GameManager) HandleInput(ctx context.Context, input string) (*InputResult, error) {
+	if g.scenarioManager == nil {
+		return nil, fmt.Errorf("HandleInput called before Start")
+	}
+
+	result, err := g.scenarioManager.HandleInput(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	// If the scenario resolved, append milestone events
+	if result.GameOver && result.ScenarioResult != nil && result.ScenarioResult.Reason == ScenarioEndResolved {
+		g.scenarioCount++
+		milestoneEvents := g.handleMilestone()
+		result.Events = append(result.Events, milestoneEvents...)
+	}
+
+	return result, nil
+}
+
+// ProvideInvokeResponse forwards an invoke response and handles milestone if scenario ends.
+func (g *GameManager) ProvideInvokeResponse(ctx context.Context, resp InvokeResponse) (*InputResult, error) {
+	if g.scenarioManager == nil {
+		return nil, fmt.Errorf("ProvideInvokeResponse called before Start")
+	}
+
+	result, err := g.scenarioManager.ProvideInvokeResponse(ctx, resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if result.GameOver && result.ScenarioResult != nil && result.ScenarioResult.Reason == ScenarioEndResolved {
+		g.scenarioCount++
+		result.Events = append(result.Events, g.handleMilestone()...)
+	}
+
+	return result, nil
+}
+
+// ProvideMidFlowResponse forwards a mid-flow response and handles milestone if scenario ends.
+func (g *GameManager) ProvideMidFlowResponse(ctx context.Context, resp MidFlowResponse) (*InputResult, error) {
+	if g.scenarioManager == nil {
+		return nil, fmt.Errorf("ProvideMidFlowResponse called before Start")
+	}
+
+	result, err := g.scenarioManager.ProvideMidFlowResponse(ctx, resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if result.GameOver && result.ScenarioResult != nil && result.ScenarioResult.Reason == ScenarioEndResolved {
+		g.scenarioCount++
+		result.Events = append(result.Events, g.handleMilestone()...)
+	}
+
+	return result, nil
+}
+
+// Run starts the game loop.
+// This is the terminal-only blocking convenience. Event-driven UIs (web)
+// should use Start + HandleInput instead.
+//
+// Run delegates to Start for initialization, then drives the game in a
+// blocking loop: ReadInput → HandleInput → render events → repeat.
+// Invoke and mid-flow prompts are resolved synchronously by type-asserting
+// the UI to InvokePrompter / MidFlowPrompter.
 func (g *GameManager) Run(ctx context.Context) error {
 	if g.engine == nil {
 		return fmt.Errorf("engine is required")
@@ -85,141 +251,119 @@ func (g *GameManager) Run(ctx context.Context) error {
 		return fmt.Errorf("UI is required")
 	}
 
-	// Check for a saved game to resume
-	savedState, err := g.saver.Load()
+	events, err := g.Start(ctx)
 	if err != nil {
-		slog.Warn("Failed to load saved game, starting fresh",
-			"error", err,
-		)
-		savedState = nil
+		return err
 	}
+	g.renderEvents(events)
 
-	// Resume from save if a valid, unfinished game exists
-	if savedState != nil && savedState.Scene.CurrentScene != nil {
-		if savedState.Scenario.Scenario == nil || !savedState.Scenario.Scenario.IsResolved {
-			return g.resumeFromSave(ctx, savedState)
+	for {
+		input, isExit, err := g.ui.ReadInput()
+		if err != nil {
+			return fmt.Errorf("failed to read input: %w", err)
 		}
-		slog.Info("Previous scenario was completed, starting fresh")
-	}
 
-	// Fresh start
-	g.scenarioManager = NewScenarioManager(g.engine, g.player)
-	g.scenarioManager.SetUI(g.ui)
-	g.scenarioManager.SetScenario(g.scenario)
-	g.scenarioManager.SetScenarioCount(g.scenarioCount)
-	g.scenarioManager.SetSaveFunc(g.Save)
-	if g.sessionLogger != nil {
-		g.scenarioManager.SetSessionLogger(g.sessionLogger)
-	}
+		if input == "" {
+			continue
+		}
 
-	// Run the scenario
-	result, err := g.scenarioManager.Run(ctx)
-	if err != nil {
-		return fmt.Errorf("scenario error: %w", err)
-	}
+		if isExit {
+			if g.sessionLogger != nil {
+				g.sessionLogger.Log("player_quit", nil)
+			}
+			_ = g.Save()
+			return nil
+		}
 
-	// Handle milestone if scenario was resolved
-	if result != nil && result.Reason == ScenarioEndResolved {
-		g.scenarioCount++
-		events := g.handleMilestone()
-		g.renderEvents(events)
-	}
+		result, err := g.HandleInput(ctx, input)
+		if err != nil {
+			return err
+		}
+		g.renderEvents(result.Events)
 
-	return nil
+		// Resolve any pending invoke / mid-flow prompts via blocking UI
+		result, err = g.driveBlockingPrompts(ctx, result)
+		if err != nil {
+			return err
+		}
+
+		if result.GameOver {
+			return nil
+		}
+	}
 }
 
-// resumeFromSave restores game state from a saved snapshot and resumes
-// the scene loop where the player left off.
-func (g *GameManager) resumeFromSave(ctx context.Context, state *GameState) error {
-	// Use the saved player (has updated stress, consequences, fate points, etc.)
-	g.player = state.Scenario.Player
-
-	// Create and configure ScenarioManager
-	g.scenarioManager = NewScenarioManager(g.engine, g.player)
-	g.scenarioManager.SetUI(g.ui)
-	g.scenarioManager.SetSaveFunc(g.Save)
-	if g.sessionLogger != nil {
-		g.scenarioManager.SetSessionLogger(g.sessionLogger)
-	}
-
-	// Restore full state — this also restores the SceneManager and marks resumed
-	g.scenarioManager.Restore(state.Scenario, state.Scene)
-
-	slog.Info("Resuming saved game",
-		"scene", state.Scene.CurrentScene.Name,
-		"scenario", state.Scenario.Scenario.Title,
-	)
-	g.renderEvents([]GameEvent{
-		GameResumedEvent{
-			ScenarioTitle: state.Scenario.Scenario.Title,
-			SceneName:     state.Scene.CurrentScene.Name,
-		},
-	})
-
-	if g.sessionLogger != nil {
-		g.sessionLogger.Log("game_resumed", map[string]any{
-			"scene_name":     state.Scene.CurrentScene.Name,
-			"scenario_title": state.Scenario.Scenario.Title,
-			"scene_count":    state.Scenario.SceneCount,
-		})
-	}
-
-	// Run the scenario — ScenarioManager.Run() will skip initial scene generation
-	result, err := g.scenarioManager.Run(ctx)
-	if err != nil {
-		return fmt.Errorf("scenario error: %w", err)
-	}
-
-	if result != nil && result.Reason == ScenarioEndResolved {
-		g.scenarioCount++
-		events := g.handleMilestone()
-		g.renderEvents(events)
-	}
-
-	return nil
-}
-
-// RunWithInitialScene runs the game starting from a pre-configured scene
-// This is useful for demos and testing specific scenarios
+// RunWithInitialScene runs the game starting from a pre-configured scene.
+// This is useful for demos and testing specific scenarios.
 func (g *GameManager) RunWithInitialScene(ctx context.Context, initialScene *InitialSceneConfig) error {
-	if g.engine == nil {
-		return fmt.Errorf("engine is required")
-	}
-	if g.player == nil {
-		return fmt.Errorf("player character is required")
-	}
-	if g.ui == nil {
-		return fmt.Errorf("UI is required")
-	}
 	if initialScene == nil {
 		return fmt.Errorf("initial scene config is required")
 	}
+	g.initialScene = initialScene
+	return g.Run(ctx)
+}
 
-	// Create and configure the scenario manager
-	g.scenarioManager = NewScenarioManager(g.engine, g.player)
-	g.scenarioManager.SetUI(g.ui)
-	g.scenarioManager.SetScenario(g.scenario)
-	g.scenarioManager.SetScenarioCount(g.scenarioCount)
-	g.scenarioManager.SetInitialScene(initialScene.Scene, initialScene.NPCs)
-	g.scenarioManager.SetSaveFunc(g.Save)
-	if g.sessionLogger != nil {
-		g.scenarioManager.SetSessionLogger(g.sessionLogger)
+// driveBlockingPrompts resolves pending invoke and mid-flow prompts in a
+// synchronous loop for terminal UIs. It type-asserts the UI to the optional
+// InvokePrompter / MidFlowPrompter interfaces, collects responses, and feeds
+// them back via ProvideInvokeResponse / ProvideMidFlowResponse.
+func (g *GameManager) driveBlockingPrompts(ctx context.Context, result *InputResult) (*InputResult, error) {
+	for result.AwaitingInvoke {
+		prompter, ok := g.ui.(InvokePrompter)
+		if !ok {
+			return nil, fmt.Errorf("UI does not implement InvokePrompter")
+		}
+
+		// Find the InvokePromptEvent in the last batch of events
+		var prompt *InvokePromptEvent
+		for i := len(result.Events) - 1; i >= 0; i-- {
+			if p, ok := result.Events[i].(InvokePromptEvent); ok {
+				prompt = &p
+				break
+			}
+		}
+		if prompt == nil {
+			return nil, fmt.Errorf("AwaitingInvoke set but no InvokePromptEvent in events")
+		}
+
+		resp := prompter.PromptForInvoke(prompt.Available, prompt.FatePoints, prompt.CurrentResult, prompt.ShiftsNeeded)
+
+		var err error
+		result, err = g.ProvideInvokeResponse(ctx, resp)
+		if err != nil {
+			return nil, err
+		}
+		g.renderEvents(result.Events)
 	}
 
-	// Run the scenario
-	result, err := g.scenarioManager.Run(ctx)
-	if err != nil {
-		return fmt.Errorf("scenario error: %w", err)
+	for result.AwaitingMidFlow {
+		prompter, ok := g.ui.(MidFlowPrompter)
+		if !ok {
+			return nil, fmt.Errorf("UI does not implement MidFlowPrompter")
+		}
+
+		var prompt *InputRequestEvent
+		for i := len(result.Events) - 1; i >= 0; i-- {
+			if p, ok := result.Events[i].(InputRequestEvent); ok {
+				prompt = &p
+				break
+			}
+		}
+		if prompt == nil {
+			return nil, fmt.Errorf("AwaitingMidFlow set but no InputRequestEvent in events")
+		}
+
+		resp := prompter.PromptForMidFlow(*prompt)
+
+		var err error
+		result, err = g.ProvideMidFlowResponse(ctx, resp)
+		if err != nil {
+			return nil, err
+		}
+		g.renderEvents(result.Events)
 	}
 
-	// Handle milestone if scenario was resolved
-	if result != nil && result.Reason == ScenarioEndResolved {
-		g.scenarioCount++
-		events := g.handleMilestone()
-		g.renderEvents(events)
-	}
-
-	return nil
+	return result, nil
 }
 
 // handleMilestone processes a scenario milestone and returns the events
@@ -280,6 +424,7 @@ func (g *GameManager) renderEvents(events []GameEvent) {
 
 // InitialSceneConfig holds configuration for starting with a pre-built scene
 type InitialSceneConfig struct {
-	Scene *scene.Scene
-	NPCs  []*character.Character
+	Scene          *scene.Scene
+	NPCs           []*character.Character
+	ExitAfterScene bool // Exit the game after the initial scene ends instead of generating next scenes
 }

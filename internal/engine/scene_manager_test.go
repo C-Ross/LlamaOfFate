@@ -117,40 +117,11 @@ func TestSceneManager_BuildContexts(t *testing.T) {
 	assert.Contains(t, aspectsContext, "Quick to Anger")
 }
 
-func TestSceneManager_RunSceneLoop_RequiresLLM(t *testing.T) {
-	engine, err := New()
-	require.NoError(t, err)
-
-	sm := NewSceneManager(engine)
-	player := character.NewCharacter("player1", "Test Character")
-
-	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
-	err = sm.StartScene(testScene, player)
-	require.NoError(t, err)
-
-	ctx := context.Background()
-
-	// Should fail because no LLM client is configured
-	_, err = sm.RunSceneLoop(ctx)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "LLM client is required")
-
-	// Even with LLM client, should fail because no UI is configured
-	mockClient := &MockLLMClient{}
-	engine.llmClient = mockClient
-
-	_, err = sm.RunSceneLoop(ctx)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "UI is required")
-}
-
 func TestSceneManager_ApplyActionEffects_CreateAdvantage(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine)
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	player := character.NewCharacter("player1", "Test Character")
 	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
@@ -198,8 +169,6 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage_WithLLM(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := engine.GetSceneManager()
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	player := character.NewCharacter("player1", "Test Character")
 	player.SetSkill("Athletics", dice.Good)
@@ -490,40 +459,6 @@ func TestEngine_GetCharacterByName_IDDoesNotMatch(t *testing.T) {
 	assert.Equal(t, "scene-abc_npc_0", byName.ID)
 }
 
-// MockSceneInfoAwareUI implements both UI and SceneInfoSetter for testing
-type MockSceneInfoAwareUI struct {
-	MockUI
-	sceneInfo SceneInfo
-}
-
-func (m *MockSceneInfoAwareUI) SetSceneInfo(info SceneInfo) {
-	m.sceneInfo = info
-}
-
-func TestSetUI_CallsSetSceneInfo_WhenUIImplementsSceneInfoSetter(t *testing.T) {
-	engine, err := New()
-	require.NoError(t, err)
-
-	sm := NewSceneManager(engine)
-	mockUI := &MockSceneInfoAwareUI{}
-
-	sm.SetUI(mockUI)
-
-	assert.Equal(t, SceneInfo(sm), mockUI.sceneInfo, "SetUI should call SetSceneInfo on UIs that implement SceneInfoSetter")
-}
-
-func TestSetUI_DoesNotPanic_WhenUIDoesNotImplementSceneInfoSetter(t *testing.T) {
-	engine, err := New()
-	require.NoError(t, err)
-
-	sm := NewSceneManager(engine)
-	mockUI := &MockUI{}
-
-	// Should not panic
-	sm.SetUI(mockUI)
-	assert.NotNil(t, sm.ui)
-}
-
 // --- classifyInput unit tests (complement scene_manager_error_test.go) ---
 
 func TestClassifyInput_TrimsExtraText(t *testing.T) {
@@ -576,9 +511,6 @@ func TestProcessInput_NarrativeRoutesToDialog(t *testing.T) {
 	player := character.NewCharacter("player-1", "Test Player")
 	sm.player = player
 
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
-
 	result, err := sm.HandleInput(context.Background(), "I walk to the table")
 	require.NoError(t, err)
 
@@ -617,72 +549,6 @@ func (s *sequentialMockLLMClient) ChatCompletionStream(ctx context.Context, req 
 
 func (s *sequentialMockLLMClient) GetModelInfo() llm.ModelInfo {
 	return llm.ModelInfo{Name: "test", MaxTokens: 4096}
-}
-
-func TestSceneManager_RunSceneLoop_RecapsConversationOnResume(t *testing.T) {
-	gameEngine, err := New()
-	require.NoError(t, err)
-	gameEngine.llmClient = &MockLLMClient{}
-
-	sm := NewSceneManager(gameEngine)
-	mockUI := &MockUI{lastInput: "quit", lastExit: true} // Exit immediately
-	sm.SetUI(mockUI)
-
-	player := character.NewCharacter("player1", "Test Character")
-	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
-
-	// Restore state with existing conversation history
-	sm.Restore(SceneState{
-		CurrentScene: testScene,
-		ConversationHistory: []prompt.ConversationEntry{
-			{PlayerInput: "I look around the room", GMResponse: "You see a dusty old tavern"},
-			{PlayerInput: "I approach the bartender", GMResponse: "He eyes you warily"},
-		},
-		ScenePurpose: "Gather information",
-	}, player)
-
-	ctx := context.Background()
-	_, err = sm.RunSceneLoop(ctx)
-	require.NoError(t, err)
-
-	// Should contain both conversation entries tagged as recaps (no SystemMessageEvent delimiters)
-	recaps := OfType[DialogEvent](&mockUI.EventRecorder)
-	recapTexts := make([]string, len(recaps))
-	for i, r := range recaps {
-		recapTexts[i] = r.PlayerInput
-	}
-	assert.Contains(t, recapTexts, "I look around the room")
-	assert.Contains(t, recapTexts, "I approach the bartender")
-	for _, r := range recaps {
-		assert.True(t, r.IsRecap, "expected IsRecap=true")
-	}
-}
-
-func TestSceneManager_RunSceneLoop_NoRecapWithoutConversation(t *testing.T) {
-	gameEngine, err := New()
-	require.NoError(t, err)
-	gameEngine.llmClient = &MockLLMClient{}
-
-	sm := NewSceneManager(gameEngine)
-	mockUI := &MockUI{lastInput: "quit", lastExit: true} // Exit immediately
-	sm.SetUI(mockUI)
-
-	player := character.NewCharacter("player1", "Test Character")
-	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
-
-	err = sm.StartScene(testScene, player)
-	require.NoError(t, err)
-
-	ctx := context.Background()
-	_, err = sm.RunSceneLoop(ctx)
-	require.NoError(t, err)
-
-	// Should NOT contain any recap-tagged events
-	for _, evt := range mockUI.Events {
-		if de, ok := evt.(DialogEvent); ok {
-			assert.False(t, de.IsRecap, "unexpected recap event: %s", de.PlayerInput)
-		}
-	}
 }
 
 func TestSceneManager_StartScene_ClearsConversationHistory(t *testing.T) {
@@ -725,9 +591,6 @@ func TestHandleInput_DialogReturnsDialogEvent(t *testing.T) {
 	sm.currentScene = testScene
 	sm.player = character.NewCharacter("player-1", "Hero")
 
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
-
 	result, err := sm.HandleInput(context.Background(), "I greet the bartender")
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -757,9 +620,6 @@ func TestHandleInput_DialogWithSceneTransition(t *testing.T) {
 	testScene := scene.NewScene("tavern", "Tavern", "A dimly lit tavern")
 	sm.currentScene = testScene
 	sm.player = character.NewCharacter("player-1", "Hero")
-
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	result, err := sm.HandleInput(context.Background(), "I leave the tavern")
 	require.NoError(t, err)
@@ -811,9 +671,6 @@ func TestHandleInput_ActionPath_ReturnsEvents(t *testing.T) {
 	sm.currentScene = testScene
 	sm.player = player
 
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
-
 	result, err := sm.HandleInput(context.Background(), "I swing my sword at the goblin")
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -836,9 +693,6 @@ func TestHandleInput_ClassificationFallbackToDialog(t *testing.T) {
 	sm.currentScene = testScene
 	sm.player = character.NewCharacter("player-1", "Hero")
 
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
-
 	result, err := sm.HandleInput(context.Background(), "I look around")
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -847,32 +701,4 @@ func TestHandleInput_ClassificationFallbackToDialog(t *testing.T) {
 	require.Len(t, result.Events, 1)
 	_, ok := result.Events[0].(DialogEvent)
 	assert.True(t, ok, "fallback should produce DialogEvent, got %T", result.Events[0])
-}
-
-func TestHandleInput_RenderEventsDialog(t *testing.T) {
-	engine, err := New()
-	require.NoError(t, err)
-
-	sm := NewSceneManager(engine)
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
-
-	events := []GameEvent{
-		DialogEvent{PlayerInput: "hello", GMResponse: "hi there"},
-		SystemMessageEvent{Message: "something happened"},
-		NarrativeEvent{Text: "The wind howls."},
-		SceneTransitionEvent{Narrative: "", NewSceneHint: "next scene"},
-	}
-
-	sm.renderEvents(events)
-
-	require.Len(t, mockUI.Events, 4)
-	de := RequireFirst[DialogEvent](t, &mockUI.EventRecorder)
-	assert.Equal(t, "hello", de.PlayerInput)
-	assert.Equal(t, "hi there", de.GMResponse)
-	sm2 := RequireFirst[SystemMessageEvent](t, &mockUI.EventRecorder)
-	assert.Equal(t, "something happened", sm2.Message)
-	narr := RequireFirst[NarrativeEvent](t, &mockUI.EventRecorder)
-	assert.Equal(t, "The wind howls.", narr.Text)
-	AssertHasEvent[SceneTransitionEvent](t, &mockUI.EventRecorder)
 }

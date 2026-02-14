@@ -278,9 +278,6 @@ func TestProcessInput_ClassificationFallback(t *testing.T) {
 	sm.currentScene = testScene
 	engine.AddCharacter(player)
 
-	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
-
 	// This should fail classification but still handle as dialog
 	result, err := sm.HandleInput(context.Background(), "hello")
 	require.NoError(t, err)

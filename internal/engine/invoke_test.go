@@ -40,7 +40,6 @@ func buildInvokeTestSM(t *testing.T, fatePoints int) (*SceneManager, *MockUI) {
 	sm.player = player
 
 	mockUI := &MockUI{}
-	sm.SetUI(mockUI)
 
 	return sm, mockUI
 }

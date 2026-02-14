@@ -31,6 +31,8 @@ type InputResult struct {
 	EndResult       *SceneEndResult // Non-nil when SceneEnded is true
 	AwaitingInvoke  bool            // True when the last event is InvokePromptEvent; call ProvideInvokeResponse next
 	AwaitingMidFlow bool            // True when the last event is InputRequestEvent; call ProvideMidFlowResponse next
+	GameOver        bool            // True when the game/scenario has ended (quit, resolved, player taken out)
+	ScenarioResult  *ScenarioResult // Non-nil when GameOver is true
 }
 
 // ScenarioEndReason indicates why a scenario ended
@@ -43,6 +45,8 @@ const (
 	ScenarioEndQuit ScenarioEndReason = "quit"
 	// ScenarioEndPlayerTakenOut indicates the player was taken out permanently
 	ScenarioEndPlayerTakenOut ScenarioEndReason = "player_taken_out"
+	// ScenarioEndSceneComplete indicates the game exited after a single scene completed
+	ScenarioEndSceneComplete ScenarioEndReason = "scene_complete"
 )
 
 // ScenarioResult contains information about how and why a scenario ended

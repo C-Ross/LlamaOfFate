@@ -14,7 +14,6 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
-	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
 )
 
 const (
@@ -38,7 +37,6 @@ type SceneManager struct {
 	player                *character.Character
 	roller                *dice.Roller
 	conversationHistory   []prompt.ConversationEntry
-	ui                    UI
 	shouldExit            bool                    // Set to true when the game should end
 	exitOnSceneTransition bool                    // Set to true to exit the loop on scene transition
 	lastTransition        *prompt.SceneTransition // Captured transition hint when scene ends
@@ -70,16 +68,6 @@ func NewSceneManager(engine *Engine) *SceneManager {
 		sm.aspectGenerator = NewAspectGenerator(engine.llmClient)
 	}
 	return sm
-}
-
-// SetUI sets the UI for the scene manager.
-// If the UI implements SceneInfoSetter, it also sets the scene info
-// so the UI can display character and scene status.
-func (sm *SceneManager) SetUI(ui UI) {
-	sm.ui = ui
-	if setter, ok := ui.(SceneInfoSetter); ok {
-		setter.SetSceneInfo(sm)
-	}
 }
 
 // SetSessionLogger sets the session logger for recording game transcripts
@@ -122,89 +110,6 @@ func (sm *SceneManager) StartScene(scene *scene.Scene, player *character.Charact
 	// Scene description will be displayed by the terminal UI when needed
 
 	return nil
-}
-
-// RunSceneLoop starts the interactive scene loop
-func (sm *SceneManager) RunSceneLoop(ctx context.Context) (*SceneEndResult, error) {
-	if sm.currentScene == nil {
-		return nil, fmt.Errorf("no active scene")
-	}
-
-	if sm.engine.llmClient == nil {
-		return nil, fmt.Errorf("LLM client is required for scene loop functionality")
-	}
-
-	if sm.ui == nil {
-		return nil, fmt.Errorf("UI is required for scene loop functionality")
-	}
-
-	// Reset scene-specific state
-	sm.resetSceneState()
-
-	// Display the initial scene
-	sm.renderEvents([]GameEvent{
-		NarrativeEvent{SceneName: sm.currentScene.Name, Text: sm.currentScene.Description},
-	})
-
-	// If resuming with existing conversation, replay it so the player has context
-	if len(sm.conversationHistory) > 0 {
-		var recapEvents []GameEvent
-		for _, entry := range sm.conversationHistory {
-			recapEvents = append(recapEvents, DialogEvent{PlayerInput: entry.PlayerInput, GMResponse: entry.GMResponse, IsRecap: true})
-		}
-		sm.renderEvents(recapEvents)
-	}
-
-	for !sm.shouldExit {
-		input, isExit, err := sm.ui.ReadInput()
-		if err != nil {
-			return nil, fmt.Errorf("failed to read input: %w", err)
-		}
-
-		if input == "" {
-			continue
-		}
-
-		// Check for scene exit
-		if isExit {
-			sm.sceneEndReason = SceneEndQuit
-			break
-		}
-
-		result, err := sm.HandleInput(ctx, input)
-		if err != nil {
-			return nil, err
-		}
-
-		// Render any events produced by this input
-		sm.renderEvents(result.Events)
-
-		// If the engine is awaiting an invoke response, run the blocking
-		// invoke loop via the terminal adapter and render subsequent events.
-		for result.AwaitingInvoke {
-			result, err = sm.resolveInvokeBlocking(ctx)
-			if err != nil {
-				return nil, err
-			}
-			sm.renderEvents(result.Events)
-		}
-
-		// If the engine is awaiting a mid-flow response, run the blocking
-		// mid-flow loop via the terminal adapter and render subsequent events.
-		for result.AwaitingMidFlow {
-			result, err = sm.resolveMidFlowBlocking(ctx)
-			if err != nil {
-				return nil, err
-			}
-			sm.renderEvents(result.Events)
-		}
-
-		if result.SceneEnded {
-			return result.EndResult, nil
-		}
-	}
-
-	return sm.buildSceneEndResult(), nil
 }
 
 // HandleInput processes a single player input and returns the resulting events.
@@ -323,66 +228,13 @@ func (sm *SceneManager) buildSceneEndResult() *SceneEndResult {
 	return result
 }
 
-// renderEvents dispatches a slice of GameEvent to the UI for display.
-// Used by RunSceneLoop (terminal path). Web/async callers process events directly.
-// InvokePromptEvents are skipped here — they are handled by resolveInvokeBlocking.
-func (sm *SceneManager) renderEvents(events []GameEvent) {
-	renderEventsToUI(sm.ui, events)
-}
-
 // renderEventsToUI dispatches a slice of GameEvent to the given UI for display.
-// This is the shared implementation used by all manager types (SceneManager,
-// ScenarioManager, GameManager) in the synchronous terminal path.
+// This is the shared implementation used by all manager types (ScenarioManager,
+// GameManager) in the synchronous terminal path.
 func renderEventsToUI(ui UI, events []GameEvent) {
 	for _, event := range events {
 		ui.Emit(event)
 	}
-}
-
-// resolveInvokeBlocking bridges the event-driven invoke system with the
-// blocking terminal UI. It type-asserts the UI to InvokePrompter, calls
-// PromptForInvoke to get an InvokeResponse, and feeds it back via
-// ProvideInvokeResponse.
-func (sm *SceneManager) resolveInvokeBlocking(ctx context.Context) (*InputResult, error) {
-	if sm.pendingInvoke == nil {
-		return &InputResult{}, nil
-	}
-
-	prompter, ok := sm.ui.(uicontract.InvokePrompter)
-	if !ok {
-		return nil, fmt.Errorf("resolveInvokeBlocking: UI does not implement InvokePrompter")
-	}
-
-	is := sm.pendingInvoke
-	resp := prompter.PromptForInvoke(is.available, sm.player.FatePoints, is.result.FinalValue.String(), sm.invokeShiftsNeeded())
-
-	result, err := sm.ProvideInvokeResponse(ctx, resp)
-	if err != nil {
-		return nil, fmt.Errorf("resolveInvokeBlocking: %w", err)
-	}
-	return result, nil
-}
-
-// invokeShiftsNeeded calculates shifts needed from the current pending invoke state.
-func (sm *SceneManager) invokeShiftsNeeded() int {
-	is := sm.pendingInvoke
-	if is == nil {
-		return 0
-	}
-	outcome := is.result.CompareAgainst(is.difficulty)
-	if is.isDefense {
-		if outcome.Shifts >= 0 {
-			return 0
-		}
-		return -outcome.Shifts
-	}
-	if outcome.Shifts < 0 {
-		return -outcome.Shifts
-	}
-	if outcome.Shifts < 3 {
-		return 3 - outcome.Shifts
-	}
-	return 0
 }
 
 // classifyInput uses LLM to determine if input is dialog, clarification, or action

@@ -63,51 +63,6 @@ func TestNewScenarioManager(t *testing.T) {
 	assert.Equal(t, player, sm.player)
 }
 
-func TestScenarioManager_Run_RequiresEngine(t *testing.T) {
-	sm := &ScenarioManager{}
-	_, err := sm.Run(context.Background())
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "engine is required")
-}
-
-func TestScenarioManager_Run_RequiresLLM(t *testing.T) {
-	engine, err := New() // No LLM
-	require.NoError(t, err)
-
-	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player)
-
-	_, err = sm.Run(context.Background())
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "LLM client is required")
-}
-
-func TestScenarioManager_Run_RequiresUI(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
-	require.NoError(t, err)
-
-	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player)
-
-	_, err = sm.Run(context.Background())
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "UI is required")
-}
-
-func TestScenarioManager_Run_RequiresPlayer(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
-	require.NoError(t, err)
-
-	sm := &ScenarioManager{
-		engine: engine,
-		ui:     &MockUI{},
-	}
-
-	_, err = sm.Run(context.Background())
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "player character is required")
-}
-
 func TestScenarioManager_SetScenario(t *testing.T) {
 	engine, err := NewWithLLM(&MockLLMClientForScenario{})
 	require.NoError(t, err)
@@ -1012,4 +967,199 @@ func TestScenarioManager_BuildRecoveryNarrativeEvents_ReturnsRollEvents(t *testi
 	assert.Equal(t, "Broken Arm", roll2.Aspect)
 	assert.Equal(t, "moderate", roll2.Severity)
 	assert.True(t, roll2.Success)
+}
+
+// --- ScenarioManager.Start tests ---
+
+func TestScenarioManager_Start_RequiresEngine(t *testing.T) {
+	sm := &ScenarioManager{}
+	_, err := sm.Start(context.Background())
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "engine is required")
+}
+
+func TestScenarioManager_Start_RequiresLLM(t *testing.T) {
+	engine, err := New() // No LLM
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	_, err = sm.Start(context.Background())
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "LLM client is required")
+}
+
+func TestScenarioManager_Start_RequiresPlayer(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	sm := &ScenarioManager{engine: engine}
+
+	_, err = sm.Start(context.Background())
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "player character is required")
+}
+
+func TestScenarioManager_Start_WithInitialScene(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	testScene := scene.NewScene("scene1", "The Dusty Trail", "A winding desert path")
+	sm.SetInitialScene(testScene, nil)
+
+	events, err := sm.Start(context.Background())
+	require.NoError(t, err)
+
+	// Should have a NarrativeEvent with the scene name and description
+	require.NotEmpty(t, events)
+	narrative := events[0].(NarrativeEvent)
+	assert.Equal(t, "The Dusty Trail", narrative.SceneName)
+	assert.Equal(t, "A winding desert path", narrative.Text)
+
+	// Should be marked as started
+	assert.True(t, sm.started)
+}
+
+func TestScenarioManager_Start_WithPurposeAndHook(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	// Set up a mock LLM that returns scene generation with purpose and hook
+	sm.SetScenario(&scene.Scenario{Title: "Test", Genre: "Fantasy"})
+
+	// Use initial scene and manually set purpose/hook to avoid LLM dependency
+	testScene := scene.NewScene("scene1", "The Tavern", "A cozy tavern")
+	sm.SetInitialScene(testScene, nil)
+	sm.lastGeneratedPurpose = "Can the hero find allies?"
+	sm.lastGeneratedHook = "A stranger beckons from the corner."
+
+	events, err := sm.Start(context.Background())
+	require.NoError(t, err)
+
+	// First event: scene name/description
+	require.Len(t, events, 2)
+	sceneNarrative := events[0].(NarrativeEvent)
+	assert.Equal(t, "The Tavern", sceneNarrative.SceneName)
+
+	// Second event: purpose/hook
+	hookNarrative := events[1].(NarrativeEvent)
+	assert.Equal(t, "Can the hero find allies?", hookNarrative.Purpose)
+	assert.Equal(t, "A stranger beckons from the corner.", hookNarrative.Text)
+}
+
+func TestScenarioManager_Start_Resume(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	// Set up a scene in the SceneManager and mark as resumed
+	testScene := scene.NewScene("scene1", "The Vault", "A bank vault")
+	sceneManager := engine.GetSceneManager()
+	require.NoError(t, sceneManager.StartScene(testScene, player))
+
+	sm.Restore(ScenarioState{
+		Player:   player,
+		Scenario: &scene.Scenario{Title: "The Heist"},
+	}, SceneState{
+		CurrentScene: testScene,
+	})
+
+	events, err := sm.Start(context.Background())
+	require.NoError(t, err)
+
+	// Should have the scene narrative
+	require.NotEmpty(t, events)
+	narrative := events[0].(NarrativeEvent)
+	assert.Equal(t, "The Vault", narrative.SceneName)
+	assert.Equal(t, "A bank vault", narrative.Text)
+}
+
+func TestScenarioManager_HandleInput_BeforeStart(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	_, err = sm.HandleInput(context.Background(), "hello")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "HandleInput called before Start")
+}
+
+func TestScenarioManager_ProvideInvokeResponse_BeforeStart(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	_, err = sm.ProvideInvokeResponse(context.Background(), InvokeResponse{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "ProvideInvokeResponse called before Start")
+}
+
+func TestScenarioManager_ProvideMidFlowResponse_BeforeStart(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+
+	_, err = sm.ProvideMidFlowResponse(context.Background(), MidFlowResponse{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "ProvideMidFlowResponse called before Start")
+}
+
+func TestScenarioManager_HandleSceneEnd_Quit(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+	sm.scenario = &scene.Scenario{Title: "Test"}
+
+	sceneManager := engine.GetSceneManager()
+	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
+	require.NoError(t, sceneManager.StartScene(testScene, player))
+	sm.currentScene = testScene
+
+	events, result, err := sm.handleSceneEnd(context.Background(), sceneManager, &SceneEndResult{
+		Reason: SceneEndQuit,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, ScenarioEndQuit, result.Reason)
+	assert.Empty(t, events) // No extra events on quit
+}
+
+func TestScenarioManager_HandleSceneEnd_PlayerTakenOut(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	sm := NewScenarioManager(engine, player)
+	sm.scenario = &scene.Scenario{Title: "Test"}
+
+	sceneManager := engine.GetSceneManager()
+	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
+	require.NoError(t, sceneManager.StartScene(testScene, player))
+	sm.currentScene = testScene
+
+	// Player taken out with no transition hint = game over
+	events, result, err := sm.handleSceneEnd(context.Background(), sceneManager, &SceneEndResult{
+		Reason: SceneEndPlayerTakenOut,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, ScenarioEndPlayerTakenOut, result.Reason)
+	assert.Empty(t, events)
 }

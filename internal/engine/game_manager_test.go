@@ -225,3 +225,144 @@ func TestGameResumedEvent_Fields(t *testing.T) {
 	assert.Equal(t, "The Great Heist", event.ScenarioTitle)
 	assert.Equal(t, "The Vault", event.SceneName)
 }
+
+// --- GameManager.Start tests ---
+
+func TestGameManager_Start_RequiresEngine(t *testing.T) {
+	gm := &GameManager{saver: noopSaver{}}
+	_, err := gm.Start(context.Background())
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "engine is required")
+}
+
+func TestGameManager_Start_RequiresPlayer(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	gm := NewGameManager(engine)
+
+	_, err = gm.Start(context.Background())
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "player character is required")
+}
+
+func TestGameManager_Start_FreshStart(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	player.Aspects.HighConcept = "Brave Knight"
+
+	gm := NewGameManager(engine)
+	gm.SetPlayer(player)
+
+	gm.SetScenario(&scene.Scenario{Title: "The Tournament", Genre: "Fantasy"})
+
+	// Start creates the scenario manager, which will call getInitialScene
+	// which generates via LLM. The mock returns a valid scene.
+	events, err := gm.Start(context.Background())
+	require.NoError(t, err)
+
+	// Should have opening events (scene narrative)
+	require.NotEmpty(t, events)
+	narrative := events[0].(NarrativeEvent)
+	assert.NotEmpty(t, narrative.SceneName)
+}
+
+func TestGameManager_HandleInput_BeforeStart(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	gm := NewGameManager(engine)
+	gm.SetPlayer(character.NewCharacter("player1", "Test Hero"))
+
+	_, err = gm.HandleInput(context.Background(), "hello")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "HandleInput called before Start")
+}
+
+func TestGameManager_ProvideInvokeResponse_BeforeStart(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	gm := NewGameManager(engine)
+
+	_, err = gm.ProvideInvokeResponse(context.Background(), InvokeResponse{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "ProvideInvokeResponse called before Start")
+}
+
+func TestGameManager_ProvideMidFlowResponse_BeforeStart(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	gm := NewGameManager(engine)
+
+	_, err = gm.ProvideMidFlowResponse(context.Background(), MidFlowResponse{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "ProvideMidFlowResponse called before Start")
+}
+
+func TestGameManager_Start_ResumeFromSave(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	player.FatePoints = 3
+
+	testScene := scene.NewScene("scene1", "The Vault", "A bank vault")
+	testScenario := &scene.Scenario{Title: "The Heist", Genre: "Crime"}
+
+	savedState := &GameState{
+		Scenario: ScenarioState{
+			Player:   player,
+			Scenario: testScenario,
+		},
+		Scene: SceneState{
+			CurrentScene: testScene,
+		},
+	}
+
+	gm := NewGameManager(engine)
+	gm.SetPlayer(player)
+	gm.SetSaver(&mockSaver{savedState: savedState})
+
+	events, err := gm.Start(context.Background())
+	require.NoError(t, err)
+
+	// Should have GameResumedEvent prepended
+	require.NotEmpty(t, events)
+	resumed, ok := events[0].(GameResumedEvent)
+	require.True(t, ok, "first event should be GameResumedEvent, got %T", events[0])
+	assert.Equal(t, "The Heist", resumed.ScenarioTitle)
+	assert.Equal(t, "The Vault", resumed.SceneName)
+
+	// Rest should include scene narrative
+	require.True(t, len(events) >= 2, "expected at least 2 events (resumed + narrative)")
+}
+
+func TestInputResult_GameOverFields(t *testing.T) {
+	result := InputResult{
+		GameOver: true,
+		ScenarioResult: &ScenarioResult{
+			Reason: ScenarioEndResolved,
+		},
+	}
+	assert.True(t, result.GameOver)
+	assert.Equal(t, ScenarioEndResolved, result.ScenarioResult.Reason)
+}
+
+// mockSaver implements GameStateSaver for testing
+type mockSaver struct {
+	savedState *GameState
+	lastSaved  *GameState
+}
+
+func (m *mockSaver) Save(state GameState) error {
+	m.lastSaved = &state
+	return nil
+}
+
+func (m *mockSaver) Load() (*GameState, error) {
+	return m.savedState, nil
+}
