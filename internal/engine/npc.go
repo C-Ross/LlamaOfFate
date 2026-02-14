@@ -394,11 +394,7 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 			"component", componentSceneManager,
 			"npc_id", npc.ID,
 			"error", err)
-		if outcome.Type == dice.Success || outcome.Type == dice.SuccessWithStyle {
-			npcNarrative = fmt.Sprintf("%s's attack hits!", npc.Name)
-		} else {
-			npcNarrative = fmt.Sprintf("%s's attack misses.", npc.Name)
-		}
+		npcNarrative = npcAttackFallbackNarrative(npc.Name, outcome)
 	}
 
 	var events []GameEvent
@@ -416,7 +412,7 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 	})
 
 	if outcome.Type == dice.Success || outcome.Type == dice.SuccessWithStyle {
-		events = append(events, SystemMessageEvent{Message: fmt.Sprintf("%s takes %d shifts of stress!", target.Name, outcome.Shifts)})
+		events = append(events, NarrativeEvent{Text: fmt.Sprintf("%s takes %d shifts of stress!", target.Name, outcome.Shifts)})
 	}
 
 	return events, false
@@ -455,11 +451,7 @@ func (sm *SceneManager) finishNPCAttackOnPlayer(
 			"component", componentSceneManager,
 			"npc_id", npc.ID,
 			"error", err)
-		if outcome.Type == dice.Success || outcome.Type == dice.SuccessWithStyle {
-			npcNarrative = fmt.Sprintf("%s's attack hits!", npc.Name)
-		} else {
-			npcNarrative = fmt.Sprintf("%s's attack misses.", npc.Name)
-		}
+		npcNarrative = npcAttackFallbackNarrative(npc.Name, outcome)
 	}
 	events = append(events, NarrativeEvent{Text: npcNarrative})
 
@@ -527,4 +519,13 @@ func (sm *SceneManager) generateNPCAttackNarrative(ctx context.Context, npc *cha
 	}
 
 	return llm.SimpleCompletion(ctx, sm.engine.llmClient, promptText, 100, 0.8)
+}
+
+// npcAttackFallbackNarrative returns a simple hit/miss narrative when LLM
+// narrative generation is unavailable.
+func npcAttackFallbackNarrative(npcName string, outcome *dice.Outcome) string {
+	if outcome.Type == dice.Success || outcome.Type == dice.SuccessWithStyle {
+		return npcName + "'s attack hits!"
+	}
+	return npcName + "'s attack misses."
 }
