@@ -315,23 +315,23 @@ func (sm *SceneManager) legacyHandlePostRollInvokes(result *dice.CheckResult, di
 					break
 				}
 			}
-			sm.ui.DisplaySystemMessage(fmt.Sprintf("Using free invoke on \"%s\"!", choice.Aspect.Name))
+			sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf("Using free invoke on \"%s\"!", choice.Aspect.Name)}})
 		} else {
 			if !sm.player.SpendFatePoint() {
-				sm.ui.DisplaySystemMessage("Not enough Fate Points!")
+				sm.renderEvents([]GameEvent{SystemMessageEvent{Message: "Not enough Fate Points!"}})
 				continue
 			}
-			sm.ui.DisplaySystemMessage(fmt.Sprintf("Invoking \"%s\"! (%d FP remaining)", choice.Aspect.Name, sm.player.FatePoints))
+			sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf("Invoking \"%s\"! (%d FP remaining)", choice.Aspect.Name, sm.player.FatePoints)}})
 		}
 
 		usedAspects[choice.Aspect.Name] = true
 
 		if choice.IsReroll {
 			result = sm.roller.Reroll(result)
-			sm.ui.DisplaySystemMessage(fmt.Sprintf("Rerolled: %s (Total: %s)", result.Roll.String(), result.FinalValue.String()))
+			sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf("Rerolled: %s (Total: %s)", result.Roll.String(), result.FinalValue.String())}})
 		} else {
 			result.ApplyInvokeBonus(2)
-			sm.ui.DisplaySystemMessage(fmt.Sprintf("+2! New total: %s", result.FinalValue.String()))
+			sm.renderEvents([]GameEvent{SystemMessageEvent{Message: fmt.Sprintf("+2! New total: %s", result.FinalValue.String())}})
 		}
 
 		parsedAction.AddAspectInvoke(action.AspectInvoke{
