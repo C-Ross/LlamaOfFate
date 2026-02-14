@@ -1232,24 +1232,29 @@ func TestSceneManager_ResolveAction_UnknownTarget_AbortsWithoutConsumingTurn(t *
 	testAction.Difficulty = dice.Fair
 
 	ctx := context.Background()
-	sm.resolveAction(ctx, testAction)
+	events, awaiting := sm.resolveAction(ctx, testAction)
+	assert.False(t, awaiting, "unknown target should not await invoke")
 
-	// Should see the "try again" message
+	// Should see the "try again" message in events
 	foundTryAgain := false
-	for _, msg := range mockUI.displayedMessages {
-		if strings.Contains(msg, "Could not find target") && strings.Contains(msg, "try again") {
-			foundTryAgain = true
+	for _, event := range events {
+		if sysMsg, ok := event.(SystemMessageEvent); ok {
+			if strings.Contains(sysMsg.Message, "Could not find target") && strings.Contains(sysMsg.Message, "try again") {
+				foundTryAgain = true
+			}
 		}
 	}
 	assert.True(t, foundTryAgain,
-		"Expected 'try again' message for unknown target, got: %v", mockUI.displayedMessages)
+		"Expected 'try again' message for unknown target, got events: %v", events)
 
-	// Should NOT see any dice results, narratives, or damage messages
-	for _, msg := range mockUI.displayedMessages {
-		assert.False(t, strings.HasPrefix(msg, "ActionResult:"),
-			"Should not roll dice when target is unknown, got: %v", mockUI.displayedMessages)
-		assert.False(t, strings.HasPrefix(msg, "Narrative:"),
-			"Should not generate narrative when target is unknown, got: %v", mockUI.displayedMessages)
+	// Should NOT see any dice results or narratives in events
+	for _, event := range events {
+		_, isActionResult := event.(ActionResultEvent)
+		assert.False(t, isActionResult,
+			"Should not roll dice when target is unknown")
+		_, isNarrative := event.(NarrativeEvent)
+		assert.False(t, isNarrative,
+			"Should not generate narrative when target is unknown")
 	}
 }
 

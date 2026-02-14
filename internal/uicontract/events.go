@@ -104,3 +104,15 @@ func (ConflictEndEvent) gameEvent() {}
 type CharacterDisplayEvent struct{}
 
 func (CharacterDisplayEvent) gameEvent() {}
+
+// InvokePromptEvent is emitted when the engine needs the player to decide
+// whether to invoke an aspect after a roll. The UI renders this and collects
+// an InvokeResponse.
+type InvokePromptEvent struct {
+	Available     []InvokableAspect // Aspects the player may invoke
+	FatePoints    int               // Player's current fate points
+	CurrentResult string            // Current roll result (e.g. "Good (+3)")
+	ShiftsNeeded  int               // Shifts needed to improve outcome
+}
+
+func (InvokePromptEvent) gameEvent() {}

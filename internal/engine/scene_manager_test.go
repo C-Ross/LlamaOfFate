@@ -837,8 +837,8 @@ func TestHandleInput_DialogWithSceneTransition(t *testing.T) {
 	assert.Equal(t, "The rainy streets", result.EndResult.TransitionHint)
 }
 
-func TestHandleInput_ActionPath_NoEvents(t *testing.T) {
-	// Classification returns "action"; action/conflict path uses sm.ui directly
+func TestHandleInput_ActionPath_ReturnsEvents(t *testing.T) {
+	// Classification returns "action"; the action path now returns events.
 	client := &sequentialMockLLMClient{
 		responses: []string{
 			"action", // classification
@@ -872,11 +872,8 @@ func TestHandleInput_ActionPath_NoEvents(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	// Action path uses sm.ui directly — events list is empty
-	assert.Empty(t, result.Events)
-
-	// But the UI should have received Display* calls directly
-	assert.NotEmpty(t, mockUI.displayedMessages, "action path should have rendered via sm.ui")
+	// Action path now returns events
+	assert.NotEmpty(t, result.Events, "action path should produce events")
 	assert.False(t, result.SceneEnded)
 }
 

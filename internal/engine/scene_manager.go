@@ -14,6 +14,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
+	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
 )
 
 const (
@@ -47,6 +48,7 @@ type SceneManager struct {
 	sceneEndReason        SceneEndReason // Why the scene ended
 	playerTakenOutHint    string         // Transition hint if player was taken out
 	scenePurpose          string         // Dramatic question driving the current scene
+	pendingInvoke         *invokeState   // Non-nil when awaiting an InvokeResponse
 }
 
 // SetScenePurpose sets the dramatic question driving the current scene,
@@ -175,6 +177,16 @@ func (sm *SceneManager) RunSceneLoop(ctx context.Context) (*SceneEndResult, erro
 		// Render any events produced by this input
 		sm.renderEvents(result.Events)
 
+		// If the engine is awaiting an invoke response, run the blocking
+		// invoke loop via the terminal adapter and render subsequent events.
+		for result.AwaitingInvoke {
+			result, err = sm.resolveInvokeBlocking(ctx)
+			if err != nil {
+				return nil, err
+			}
+			sm.renderEvents(result.Events)
+		}
+
 		if result.SceneEnded {
 			return result.EndResult, nil
 		}
@@ -186,7 +198,15 @@ func (sm *SceneManager) RunSceneLoop(ctx context.Context) (*SceneEndResult, erro
 // HandleInput processes a single player input and returns the resulting events.
 // The caller (UI) is responsible for driving the loop and rendering events.
 // This is the primary entry point for event-driven UIs (e.g. web via WebSocket).
+//
+// If the returned InputResult has AwaitingInvoke == true, the caller must
+// collect an InvokeResponse and call ProvideInvokeResponse before sending
+// another HandleInput.
 func (sm *SceneManager) HandleInput(ctx context.Context, input string) (*InputResult, error) {
+	if sm.pendingInvoke != nil {
+		return nil, fmt.Errorf("HandleInput called while awaiting invoke response; call ProvideInvokeResponse instead")
+	}
+
 	result := &InputResult{}
 
 	// Log player input
@@ -195,7 +215,6 @@ func (sm *SceneManager) HandleInput(ctx context.Context, input string) (*InputRe
 	}
 
 	// Check for concession command during conflict (before any roll per Fate Core rules).
-	// Concession involves mid-flow ReadInput — still uses sm.ui directly (#63).
 	if sm.currentScene.IsConflict && sm.isConcedeCommand(input) {
 		sm.handleConcession(ctx)
 		if sm.shouldExit {
@@ -232,14 +251,14 @@ func (sm *SceneManager) HandleInput(ctx context.Context, input string) (*InputRe
 	case inputTypeDialog, inputTypeClarification, inputTypeNarrative:
 		result.Events = sm.handleDialog(ctx, input)
 	case inputTypeAction:
-		// Action/conflict path still uses sm.ui directly for Display* and
-		// PromptForInvoke — full event conversion deferred to #63/#64.
-		sm.handleAction(ctx, input)
+		events, awaiting := sm.handleAction(ctx, input)
+		result.Events = events
+		result.AwaitingInvoke = awaiting
 	default:
 		result.Events = sm.handleDialog(ctx, input)
 	}
 
-	if sm.shouldExit {
+	if !result.AwaitingInvoke && sm.shouldExit {
 		result.SceneEnded = true
 		result.EndResult = sm.buildSceneEndResult()
 	}
@@ -254,6 +273,7 @@ func (sm *SceneManager) resetSceneState() {
 	sm.playerTakenOutHint = ""
 	sm.lastTransition = nil
 	sm.shouldExit = false
+	sm.pendingInvoke = nil
 }
 
 // buildSceneEndResult constructs a SceneEndResult from the current state.
@@ -281,6 +301,7 @@ func (sm *SceneManager) buildSceneEndResult() *SceneEndResult {
 
 // renderEvents dispatches a slice of GameEvent to the UI for display.
 // Used by RunSceneLoop (terminal path). Web/async callers process events directly.
+// InvokePromptEvents are skipped here — they are handled by resolveInvokeBlocking.
 func (sm *SceneManager) renderEvents(events []GameEvent) {
 	for _, event := range events {
 		switch e := event.(type) {
@@ -308,8 +329,71 @@ func (sm *SceneManager) renderEvents(events []GameEvent) {
 			sm.ui.DisplayConflictEnd(e.Reason)
 		case CharacterDisplayEvent:
 			sm.ui.DisplayCharacter()
+		case InvokePromptEvent:
+			// Handled by resolveInvokeBlocking in the terminal path;
+			// web callers process this event directly.
 		}
 	}
+}
+
+// resolveInvokeBlocking bridges the event-driven invoke system with the
+// blocking terminal UI. It extracts the pending InvokePromptEvent, calls the
+// UI's PromptForInvoke, translates the InvokeChoice into an InvokeResponse,
+// and feeds it back via ProvideInvokeResponse.
+func (sm *SceneManager) resolveInvokeBlocking(ctx context.Context) (*InputResult, error) {
+	if sm.pendingInvoke == nil {
+		return &InputResult{}, nil
+	}
+
+	is := sm.pendingInvoke
+	choice := sm.ui.PromptForInvoke(is.available, sm.player.FatePoints, is.result.FinalValue.String(), sm.invokeShiftsNeeded())
+
+	resp := invokeChoiceToResponse(choice, is.available)
+	result, err := sm.ProvideInvokeResponse(ctx, resp)
+	if err != nil {
+		return nil, fmt.Errorf("resolveInvokeBlocking: %w", err)
+	}
+	return result, nil
+}
+
+// invokeShiftsNeeded calculates shifts needed from the current pending invoke state.
+func (sm *SceneManager) invokeShiftsNeeded() int {
+	is := sm.pendingInvoke
+	if is == nil {
+		return 0
+	}
+	outcome := is.result.CompareAgainst(is.difficulty)
+	if is.isDefense {
+		if outcome.Shifts >= 0 {
+			return 0
+		}
+		return -outcome.Shifts
+	}
+	if outcome.Shifts < 0 {
+		return -outcome.Shifts
+	}
+	if outcome.Shifts < 3 {
+		return 3 - outcome.Shifts
+	}
+	return 0
+}
+
+// invokeChoiceToResponse converts a legacy InvokeChoice (from terminal UI)
+// into the new InvokeResponse by finding the matching aspect index.
+func invokeChoiceToResponse(choice *InvokeChoice, available []InvokableAspect) InvokeResponse {
+	if choice.Aspect == nil {
+		return InvokeResponse{AspectIndex: uicontract.InvokeSkip}
+	}
+	for i, a := range available {
+		if a.Name == choice.Aspect.Name {
+			return InvokeResponse{
+				AspectIndex: i,
+				IsReroll:    choice.IsReroll,
+			}
+		}
+	}
+	// Aspect not found in available list — treat as skip.
+	return InvokeResponse{AspectIndex: uicontract.InvokeSkip}
 }
 
 // classifyInput uses LLM to determine if input is dialog, clarification, or action
@@ -453,9 +537,10 @@ func (sm *SceneManager) GetLastTransition() *prompt.SceneTransition {
 	return sm.lastTransition
 }
 
-// handleAction processes player actions
-func (sm *SceneManager) handleAction(ctx context.Context, input string) {
-	sm.ui.DisplayActionAttempt(input)
+// handleAction processes player actions and returns (events, awaitingInvoke).
+func (sm *SceneManager) handleAction(ctx context.Context, input string) ([]GameEvent, bool) {
+	var events []GameEvent
+	events = append(events, ActionAttemptEvent{Description: input})
 
 	// Parse the action using the action parser
 	if sm.engine.actionParser != nil {
@@ -482,8 +567,10 @@ func (sm *SceneManager) handleAction(ctx context.Context, input string) {
 		})
 
 		if err != nil {
-			sm.ui.DisplaySystemMessage(fmt.Sprintf("Failed to parse action: %v", err))
-			return
+			events = append(events, SystemMessageEvent{
+				Message: fmt.Sprintf("Failed to parse action: %v", err),
+			})
+			return events, false
 		}
 
 		// Log the parsed action
@@ -491,10 +578,13 @@ func (sm *SceneManager) handleAction(ctx context.Context, input string) {
 			sm.sessionLogger.Log("action_parse", action)
 		}
 
-		sm.resolveAction(ctx, action)
-	} else {
-		sm.ui.DisplaySystemMessage("Action parser not available - LLM client required for action processing.")
+		return sm.resolveAction(ctx, action)
 	}
+
+	events = append(events, SystemMessageEvent{
+		Message: "Action parser not available - LLM client required for action processing.",
+	})
+	return events, false
 }
 
 // generateSceneResponse generates an LLM response for dialog/clarification

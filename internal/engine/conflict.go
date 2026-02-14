@@ -256,7 +256,9 @@ func (sm *SceneManager) getParticipantInfo() []ConflictParticipantInfo {
 }
 
 // resolveAction fully resolves a parsed action
-func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.Action) {
+func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.Action) ([]GameEvent, bool) {
+	var events []GameEvent
+
 	// Check if this action should initiate or escalate a conflict
 	if parsedAction.Type == action.Attack {
 		actionConflictType := core.ConflictTypeForSkill(parsedAction.Skill)
@@ -268,11 +270,21 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 					"component", componentSceneManager,
 					"error", err)
 			} else {
-				sm.ui.DisplayConflictStart(string(actionConflictType), sm.player.Name, sm.getParticipantInfo())
+				events = append(events, ConflictStartEvent{
+					ConflictType:  string(actionConflictType),
+					InitiatorName: sm.player.Name,
+					Participants:  sm.getParticipantInfo(),
+				})
 			}
 		} else if sm.currentScene.ConflictState.Type != actionConflictType {
 			// Escalate conflict if type changes
+			oldType := sm.currentScene.ConflictState.Type
 			sm.handleConflictEscalation(actionConflictType)
+			events = append(events, ConflictEscalationEvent{
+				FromType:        string(oldType),
+				ToType:          string(actionConflictType),
+				TriggerCharName: sm.player.Name,
+			})
 		}
 	}
 
@@ -294,9 +306,10 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 			slog.Warn("Attack target not found, action aborted",
 				"component", componentSceneManager,
 				"target", parsedAction.Target)
-			sm.ui.DisplaySystemMessage(fmt.Sprintf(
-				"Could not find target '%s' — try again.", parsedAction.Target))
-			return
+			events = append(events, SystemMessageEvent{
+				Message: fmt.Sprintf("Could not find target '%s' — try again.", parsedAction.Target),
+			})
+			return events, false
 		}
 		defenseResult = sm.rollTargetDefense(targetChar, parsedAction.Skill)
 		parsedAction.Difficulty = defenseResult.FinalValue
@@ -312,11 +325,13 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 			result.String(), result.FinalValue.String(), parsedAction.Difficulty.String())
 	}
 	initialOutcome := result.CompareAgainst(parsedAction.Difficulty)
-	sm.ui.DisplayActionResult(parsedAction.Skill,
-		fmt.Sprintf("%s (%+d)", skillLevel.String(), int(skillLevel)),
-		parsedAction.CalculateBonus(),
-		resultString,
-		initialOutcome.Type.String())
+	events = append(events, ActionResultEvent{
+		Skill:      parsedAction.Skill,
+		SkillLevel: fmt.Sprintf("%s (%+d)", skillLevel.String(), int(skillLevel)),
+		Bonuses:    parsedAction.CalculateBonus(),
+		Result:     resultString,
+		Outcome:    initialOutcome.Type.String(),
+	})
 
 	// Log the dice roll
 	if sm.sessionLogger != nil {
@@ -332,8 +347,31 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 		})
 	}
 
-	// Post-roll invoke opportunity
-	result = sm.handlePostRollInvokes(result, parsedAction.Difficulty, parsedAction, false)
+	// Build the continuation that runs after invokes complete.
+	// Capture the variables needed by the post-invoke logic.
+	capturedInitialOutcome := initialOutcome
+	capturedTargetChar := targetChar
+	capturedParsedAction := parsedAction
+
+	finish := func(finishCtx context.Context, finalResult *dice.CheckResult, accEvents []GameEvent) []GameEvent {
+		return sm.finishResolveAction(finishCtx, finalResult, capturedParsedAction, capturedInitialOutcome, capturedTargetChar, accEvents)
+	}
+
+	// Post-roll invoke opportunity via event-driven loop
+	return sm.beginInvokeLoop(ctx, result, parsedAction.Difficulty, parsedAction, false, events, finish)
+}
+
+// finishResolveAction is the continuation called after the invoke loop completes.
+// It determines the final outcome, generates narrative, applies effects, and
+// advances conflict turns.
+func (sm *SceneManager) finishResolveAction(
+	ctx context.Context,
+	result *dice.CheckResult,
+	parsedAction *action.Action,
+	initialOutcome *dice.Outcome,
+	targetChar *character.Character,
+	events []GameEvent,
+) []GameEvent {
 	parsedAction.CheckResult = result
 
 	// Determine final outcome after invokes
@@ -342,7 +380,9 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 
 	// Display updated outcome if it changed
 	if outcome.Type != initialOutcome.Type {
-		sm.ui.DisplaySystemMessage(fmt.Sprintf("Final outcome: %s", outcome.Type.String()))
+		events = append(events, SystemMessageEvent{
+			Message: fmt.Sprintf("Final outcome: %s", outcome.Type.String()),
+		})
 	}
 
 	// Generate narrative with error handling
@@ -352,10 +392,9 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 			"component", componentSceneManager,
 			"action_id", parsedAction.ID,
 			"error", err)
-		// Provide mechanical fallback
 		narrative = sm.buildMechanicalNarrative(parsedAction)
 	}
-	sm.ui.DisplayNarrative(narrative)
+	events = append(events, NarrativeEvent{Text: narrative})
 
 	// Log the narrative
 	if sm.sessionLogger != nil {
@@ -366,6 +405,10 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 		})
 	}
 
+	// Render accumulated events (ActionResult, Narrative, etc.) NOW so they
+	// appear before effects and turn processing that use direct sm.ui calls.
+	sm.renderEvents(events)
+
 	// Apply mechanical effects based on action type and outcome
 	sm.applyActionEffects(ctx, parsedAction, targetChar)
 
@@ -373,6 +416,9 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 	if sm.currentScene.IsConflict {
 		sm.advanceConflictTurns(ctx)
 	}
+
+	// Events already rendered — return nil so callers don't re-render.
+	return nil
 }
 
 // rollTargetDefense rolls an active defense for a target character
@@ -438,120 +484,6 @@ func (sm *SceneManager) gatherInvokableAspects(usedAspects map[string]bool) []In
 	}
 
 	return aspects
-}
-
-// handlePostRollInvokes prompts the player to invoke aspects after seeing their roll result.
-// Returns the final CheckResult after any invokes/rerolls.
-// For attacks: skips if already success with style.
-// For defense: skips if attack already fails (defender wins).
-// Always skips if no fate points AND no free invokes available.
-func (sm *SceneManager) handlePostRollInvokes(result *dice.CheckResult, difficulty dice.Ladder, parsedAction *action.Action, isDefense bool) *dice.CheckResult {
-	usedAspects := make(map[string]bool)
-
-	for {
-		// Calculate outcome and shifts needed
-		outcome := result.CompareAgainst(difficulty)
-		shiftsNeeded := 0
-
-		if isDefense {
-			// For defense: positive shifts = attack fails (good for player)
-			// Skip if attack already fails (shifts >= 0)
-			if outcome.Shifts >= 0 {
-				break
-			}
-			// Need enough to at least tie (make shifts = 0)
-			shiftsNeeded = -outcome.Shifts
-		} else {
-			// For attacks/overcome: skip if already success with style
-			if outcome.Type == dice.SuccessWithStyle {
-				break
-			}
-			if outcome.Shifts < 0 {
-				shiftsNeeded = -outcome.Shifts // Need this many to tie
-			} else if outcome.Shifts < 3 {
-				shiftsNeeded = 3 - outcome.Shifts // Need this many for success with style
-			}
-		}
-
-		// Gather available aspects
-		available := sm.gatherInvokableAspects(usedAspects)
-
-		// Check if player has any way to invoke
-		canInvoke := false
-		for _, aspect := range available {
-			if aspect.AlreadyUsed {
-				continue
-			}
-			if aspect.FreeInvokes > 0 || sm.player.FatePoints > 0 {
-				canInvoke = true
-				break
-			}
-		}
-		if !canInvoke {
-			break
-		}
-
-		// Prompt player
-		choice := sm.ui.PromptForInvoke(available, sm.player.FatePoints, result.FinalValue.String(), shiftsNeeded)
-
-		// Player chose to skip
-		if choice.Aspect == nil {
-			break
-		}
-
-		// Spend fate point or use free invoke
-		if choice.UseFree {
-			// Find and decrement free invoke on situation aspect
-			for i := range sm.currentScene.SituationAspects {
-				if sm.currentScene.SituationAspects[i].Aspect == choice.Aspect.Name {
-					sm.currentScene.SituationAspects[i].UseFreeInvoke()
-					break
-				}
-			}
-			sm.ui.DisplaySystemMessage(fmt.Sprintf("Using free invoke on \"%s\"!", choice.Aspect.Name))
-		} else {
-			if !sm.player.SpendFatePoint() {
-				sm.ui.DisplaySystemMessage("Not enough Fate Points!")
-				continue
-			}
-			sm.ui.DisplaySystemMessage(fmt.Sprintf("Invoking \"%s\"! (%d FP remaining)", choice.Aspect.Name, sm.player.FatePoints))
-		}
-
-		// Mark aspect as used for this roll
-		usedAspects[choice.Aspect.Name] = true
-
-		// Apply the invoke
-		if choice.IsReroll {
-			result = sm.roller.Reroll(result)
-			sm.ui.DisplaySystemMessage(fmt.Sprintf("Rerolled: %s (Total: %s)", result.Roll.String(), result.FinalValue.String()))
-		} else {
-			result.ApplyInvokeBonus(2)
-			sm.ui.DisplaySystemMessage(fmt.Sprintf("+2! New total: %s", result.FinalValue.String()))
-		}
-
-		// Track invoke on the action
-		parsedAction.AddAspectInvoke(action.AspectInvoke{
-			AspectText: choice.Aspect.Name,
-			Source:     choice.Aspect.Source,
-			SourceID:   choice.Aspect.SourceID,
-			IsFree:     choice.UseFree,
-			FatePointCost: func() int {
-				if choice.UseFree {
-					return 0
-				}
-				return 1
-			}(),
-			Bonus: func() int {
-				if choice.IsReroll {
-					return 0
-				}
-				return 2
-			}(),
-			IsReroll: choice.IsReroll,
-		})
-	}
-
-	return result
 }
 
 // applyActionEffects applies mechanical effects based on action results

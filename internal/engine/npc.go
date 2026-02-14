@@ -336,7 +336,7 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 
 		// Player can invoke to improve their defense
 		// isDefense=true means skip prompt if attack already fails
-		targetDefense = sm.handlePostRollInvokes(targetDefense, npcRoll.FinalValue, defenseAction, true)
+		targetDefense = sm.legacyHandlePostRollInvokes(targetDefense, npcRoll.FinalValue, defenseAction, true)
 
 		// Recalculate outcome with potentially improved defense
 		// Note: For defense, we compare attacker vs defender, so we still use npcRoll.CompareAgainst
