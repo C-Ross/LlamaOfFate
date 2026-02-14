@@ -208,16 +208,18 @@ func (sm *SceneManager) handleConflictEscalation(newType scene.ConflictType) []G
 	}}
 }
 
-// advanceConflictTurns advances through turns and processes NPC actions until it's the player's turn.
-// Returns all events generated during NPC turns.
-func (sm *SceneManager) advanceConflictTurns(ctx context.Context) []GameEvent {
+// advanceConflictTurns advances through turns and processes NPC actions until
+// it's the player's turn or a defense invoke pauses the loop.
+// Returns (events, awaitingInvoke). When awaitingInvoke is true,
+// sm.pendingInvoke is set; the invoke continuation will resume NPC turns.
+func (sm *SceneManager) advanceConflictTurns(ctx context.Context) ([]GameEvent, bool) {
 	if !sm.currentScene.IsConflict || sm.currentScene.ConflictState == nil {
-		return nil
+		return nil, false
 	}
 
 	var events []GameEvent
 
-	// Advance past the player's turn
+	// Advance past the current actor's turn
 	sm.currentScene.NextTurn()
 
 	// Process NPC turns until we get back to the player or conflict ends
@@ -234,14 +236,20 @@ func (sm *SceneManager) advanceConflictTurns(ctx context.Context) []GameEvent {
 		}
 
 		// Process NPC turn
-		npcEvents := sm.processNPCTurn(ctx, currentActor)
+		npcEvents, awaiting := sm.processNPCTurn(ctx, currentActor)
 		events = append(events, npcEvents...)
+
+		// If a defense invoke paused the loop, return immediately.
+		// The invoke continuation will resume remaining NPC turns.
+		if awaiting {
+			return events, true
+		}
 
 		// Advance to next turn
 		sm.currentScene.NextTurn()
 	}
 
-	return events
+	return events, false
 }
 
 // getParticipantInfo returns information about all conflict participants for display
@@ -419,7 +427,7 @@ func (sm *SceneManager) finishResolveAction(
 
 	// If we're in a conflict, advance turn and process NPC turns
 	if sm.currentScene.IsConflict {
-		turnEvents := sm.advanceConflictTurns(ctx)
+		turnEvents, _ := sm.advanceConflictTurns(ctx)
 		events = append(events, turnEvents...)
 	}
 

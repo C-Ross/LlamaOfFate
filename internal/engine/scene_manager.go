@@ -340,18 +340,22 @@ func renderEventsToUI(ui UI, events []GameEvent) {
 }
 
 // resolveInvokeBlocking bridges the event-driven invoke system with the
-// blocking terminal UI. It extracts the pending InvokePromptEvent, calls the
-// UI's PromptForInvoke, translates the InvokeChoice into an InvokeResponse,
-// and feeds it back via ProvideInvokeResponse.
+// blocking terminal UI. It type-asserts the UI to InvokePrompter, calls
+// PromptForInvoke to get an InvokeResponse, and feeds it back via
+// ProvideInvokeResponse.
 func (sm *SceneManager) resolveInvokeBlocking(ctx context.Context) (*InputResult, error) {
 	if sm.pendingInvoke == nil {
 		return &InputResult{}, nil
 	}
 
-	is := sm.pendingInvoke
-	choice := sm.ui.PromptForInvoke(is.available, sm.player.FatePoints, is.result.FinalValue.String(), sm.invokeShiftsNeeded())
+	prompter, ok := sm.ui.(uicontract.InvokePrompter)
+	if !ok {
+		return nil, fmt.Errorf("resolveInvokeBlocking: UI does not implement InvokePrompter")
+	}
 
-	resp := invokeChoiceToResponse(choice, is.available)
+	is := sm.pendingInvoke
+	resp := prompter.PromptForInvoke(is.available, sm.player.FatePoints, is.result.FinalValue.String(), sm.invokeShiftsNeeded())
+
 	result, err := sm.ProvideInvokeResponse(ctx, resp)
 	if err != nil {
 		return nil, fmt.Errorf("resolveInvokeBlocking: %w", err)
@@ -379,24 +383,6 @@ func (sm *SceneManager) invokeShiftsNeeded() int {
 		return 3 - outcome.Shifts
 	}
 	return 0
-}
-
-// invokeChoiceToResponse converts a legacy InvokeChoice (from terminal UI)
-// into the new InvokeResponse by finding the matching aspect index.
-func invokeChoiceToResponse(choice *InvokeChoice, available []InvokableAspect) InvokeResponse {
-	if choice.Aspect == nil {
-		return InvokeResponse{AspectIndex: uicontract.InvokeSkip}
-	}
-	for i, a := range available {
-		if a.Name == choice.Aspect.Name {
-			return InvokeResponse{
-				AspectIndex: i,
-				IsReroll:    choice.IsReroll,
-			}
-		}
-	}
-	// Aspect not found in available list — treat as skip.
-	return InvokeResponse{AspectIndex: uicontract.InvokeSkip}
 }
 
 // classifyInput uses LLM to determine if input is dialog, clarification, or action

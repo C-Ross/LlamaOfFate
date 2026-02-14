@@ -33,10 +33,14 @@ type UI interface {
 	// Emit sends a structured game event to the UI for rendering.
 	// This is the single output channel replacing the legacy Display* methods.
 	Emit(event GameEvent)
+}
 
-	// Invoke methods — used by the synchronous terminal path (RunSceneLoop).
-	// Event-driven UIs (web) use InvokePromptEvent/InvokeResponse instead.
-	PromptForInvoke(available []InvokableAspect, fatePoints int, currentResult string, shiftsNeeded int) *InvokeChoice
+// InvokePrompter is an optional interface that blocking (terminal) UIs
+// implement to support synchronous invoke prompts. The engine type-asserts
+// the UI to this interface in the blocking resolution path (RunSceneLoop).
+// Event-driven UIs (web) use InvokePromptEvent/InvokeResponse instead.
+type InvokePrompter interface {
+	PromptForInvoke(available []InvokableAspect, fatePoints int, currentResult string, shiftsNeeded int) InvokeResponse
 }
 
 // ConflictParticipantInfo provides display information about a conflict participant.
@@ -54,13 +58,6 @@ type InvokableAspect struct {
 	SourceID    string // ID of the source (character ID, aspect ID, etc.)
 	FreeInvokes int    // Number of free invokes available (0 = requires fate point)
 	AlreadyUsed bool   // True if already invoked on this roll
-}
-
-// InvokeChoice represents the player's invoke decision.
-type InvokeChoice struct {
-	Aspect   *InvokableAspect // nil if player chose to skip
-	UseFree  bool             // true = use free invoke, false = spend fate point
-	IsReroll bool             // true = reroll dice, false = +2 bonus
 }
 
 const (

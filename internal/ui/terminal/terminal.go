@@ -11,6 +11,7 @@ import (
 
 // compile-time check
 var _ uicontract.UI = (*TerminalUI)(nil)
+var _ uicontract.InvokePrompter = (*TerminalUI)(nil)
 
 // TerminalUI implements the UI interface for terminal-based interaction
 type TerminalUI struct {
@@ -190,8 +191,9 @@ func (ui *TerminalUI) displaySystemMessage(message string) {
 	fmt.Printf("\n%s\n", message)
 }
 
-// PromptForInvoke prompts the player to invoke an aspect after a roll
-func (ui *TerminalUI) PromptForInvoke(available []uicontract.InvokableAspect, fatePoints int, currentResult string, shiftsNeeded int) *uicontract.InvokeChoice {
+// PromptForInvoke prompts the player to invoke an aspect after a roll.
+// Implements uicontract.InvokePrompter for the blocking terminal path.
+func (ui *TerminalUI) PromptForInvoke(available []uicontract.InvokableAspect, fatePoints int, currentResult string, shiftsNeeded int) uicontract.InvokeResponse {
 	// Filter to only show usable aspects (has free invokes OR player has FP)
 	var usable []uicontract.InvokableAspect
 	for _, aspect := range available {
@@ -204,7 +206,7 @@ func (ui *TerminalUI) PromptForInvoke(available []uicontract.InvokableAspect, fa
 	}
 
 	if len(usable) == 0 {
-		return &uicontract.InvokeChoice{Aspect: nil}
+		return uicontract.InvokeResponse{AspectIndex: uicontract.InvokeSkip}
 	}
 
 	// Build prompt showing available aspects with numbers
@@ -226,12 +228,12 @@ func (ui *TerminalUI) PromptForInvoke(available []uicontract.InvokableAspect, fa
 	// Read choice
 	input, err := ui.reader.ReadString('\n')
 	if err != nil {
-		return &uicontract.InvokeChoice{Aspect: nil}
+		return uicontract.InvokeResponse{AspectIndex: uicontract.InvokeSkip}
 	}
 	input = strings.TrimSpace(input)
 
 	if input == "" {
-		return &uicontract.InvokeChoice{Aspect: nil}
+		return uicontract.InvokeResponse{AspectIndex: uicontract.InvokeSkip}
 	}
 
 	// Parse number
@@ -239,28 +241,33 @@ func (ui *TerminalUI) PromptForInvoke(available []uicontract.InvokableAspect, fa
 	_, err = fmt.Sscanf(input, "%d", &choice)
 	if err != nil || choice < 1 || choice > len(usable) {
 		fmt.Println("Invalid choice.")
-		return &uicontract.InvokeChoice{Aspect: nil}
+		return uicontract.InvokeResponse{AspectIndex: uicontract.InvokeSkip}
 	}
 
-	selectedAspect := &usable[choice-1]
+	selectedAspect := usable[choice-1]
 
-	// Determine if using free invoke or fate point
-	useFree := selectedAspect.FreeInvokes > 0
+	// Find the index of the selected aspect in the original available list
+	aspectIndex := uicontract.InvokeSkip
+	for i, a := range available {
+		if a.Name == selectedAspect.Name {
+			aspectIndex = i
+			break
+		}
+	}
 
 	// Ask +2 or reroll
 	fmt.Print("+2 or Reroll? (b/r): ")
 	input, err = ui.reader.ReadString('\n')
 	if err != nil {
-		return &uicontract.InvokeChoice{Aspect: nil}
+		return uicontract.InvokeResponse{AspectIndex: uicontract.InvokeSkip}
 	}
 	input = strings.TrimSpace(strings.ToLower(input))
 
 	isReroll := input == "r" || input == "reroll"
 
-	return &uicontract.InvokeChoice{
-		Aspect:   selectedAspect,
-		UseFree:  useFree,
-		IsReroll: isReroll,
+	return uicontract.InvokeResponse{
+		AspectIndex: aspectIndex,
+		IsReroll:    isReroll,
 	}
 }
 

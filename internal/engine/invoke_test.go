@@ -390,40 +390,6 @@ func TestHandleInput_RejectsDuringPendingInvoke(t *testing.T) {
 	assert.Contains(t, err.Error(), "awaiting invoke response")
 }
 
-// --- invokeChoiceToResponse tests ---
-
-func TestInvokeChoiceToResponse_Nil(t *testing.T) {
-	choice := &InvokeChoice{Aspect: nil}
-	resp := invokeChoiceToResponse(choice, nil)
-	assert.Equal(t, uicontract.InvokeSkip, resp.AspectIndex)
-}
-
-func TestInvokeChoiceToResponse_MatchesAspect(t *testing.T) {
-	available := []InvokableAspect{
-		{Name: "Alpha", Source: "character"},
-		{Name: "Beta", Source: "situation"},
-		{Name: "Gamma", Source: "consequence"},
-	}
-	choice := &InvokeChoice{
-		Aspect:   &InvokableAspect{Name: "Beta"},
-		IsReroll: true,
-	}
-	resp := invokeChoiceToResponse(choice, available)
-	assert.Equal(t, 1, resp.AspectIndex)
-	assert.True(t, resp.IsReroll)
-}
-
-func TestInvokeChoiceToResponse_NotFound(t *testing.T) {
-	available := []InvokableAspect{
-		{Name: "Alpha", Source: "character"},
-	}
-	choice := &InvokeChoice{
-		Aspect: &InvokableAspect{Name: "Unknown"},
-	}
-	resp := invokeChoiceToResponse(choice, available)
-	assert.Equal(t, uicontract.InvokeSkip, resp.AspectIndex)
-}
-
 // --- HasPendingInvoke tests ---
 
 func TestHasPendingInvoke_False(t *testing.T) {
