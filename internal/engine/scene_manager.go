@@ -338,38 +338,7 @@ func (sm *SceneManager) renderEvents(events []GameEvent) {
 // ScenarioManager, GameManager) in the synchronous terminal path.
 func renderEventsToUI(ui UI, events []GameEvent) {
 	for _, event := range events {
-		switch e := event.(type) {
-		case NarrativeEvent:
-			ui.DisplayNarrative(e.Text)
-		case DialogEvent:
-			ui.DisplayDialog(e.PlayerInput, e.GMResponse)
-		case SystemMessageEvent:
-			ui.DisplaySystemMessage(e.Message)
-		case ActionAttemptEvent:
-			ui.DisplayActionAttempt(e.Description)
-		case ActionResultEvent:
-			ui.DisplayActionResult(e.Skill, e.SkillLevel, e.Bonuses, e.Result, e.Outcome)
-		case SceneTransitionEvent:
-			ui.DisplaySceneTransition(e.Narrative, e.NewSceneHint)
-		case GameOverEvent:
-			ui.DisplayGameOver(e.Reason)
-		case ConflictStartEvent:
-			ui.DisplayConflictStart(e.ConflictType, e.InitiatorName, e.Participants)
-		case ConflictEscalationEvent:
-			ui.DisplayConflictEscalation(e.FromType, e.ToType, e.TriggerCharName)
-		case TurnAnnouncementEvent:
-			ui.DisplayTurnAnnouncement(e.CharacterName, e.TurnNumber, e.IsPlayer)
-		case ConflictEndEvent:
-			ui.DisplayConflictEnd(e.Reason)
-		case CharacterDisplayEvent:
-			ui.DisplayCharacter()
-		case InvokePromptEvent:
-			// Handled by resolveInvokeBlocking in the terminal path;
-			// web callers process this event directly.
-		case InputRequestEvent:
-			// Handled by resolveMidFlowBlocking in the terminal path;
-			// web callers process this event directly.
-		}
+		ui.Emit(event)
 	}
 }
 

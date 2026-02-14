@@ -30,27 +30,13 @@ type UI interface {
 	// Input methods - returns the cleaned input and whether it's an exit command
 	ReadInput() (input string, isExit bool, err error)
 
-	// Scene interaction feedback
-	DisplayActionAttempt(description string)
-	DisplayActionResult(skill string, skillLevel string, bonuses int, result string, outcome string)
-	DisplayNarrative(narrative string)
-	DisplayDialog(playerInput, gmResponse string)
-	DisplaySystemMessage(message string)
+	// Emit sends a structured game event to the UI for rendering.
+	// This is the single output channel replacing the legacy Display* methods.
+	Emit(event GameEvent)
 
 	// Invoke methods — used by the synchronous terminal path (RunSceneLoop).
 	// Event-driven UIs (web) use InvokePromptEvent/InvokeResponse instead.
 	PromptForInvoke(available []InvokableAspect, fatePoints int, currentResult string, shiftsNeeded int) *InvokeChoice
-
-	// Conflict display methods
-	DisplayConflictStart(conflictType string, initiatorName string, participants []ConflictParticipantInfo)
-	DisplayConflictEscalation(fromType, toType, triggerCharName string)
-	DisplayTurnAnnouncement(characterName string, turnNumber int, isPlayer bool)
-	DisplayConflictEnd(reason string)
-
-	// Game flow methods
-	DisplayGameOver(reason string)
-	DisplaySceneTransition(narrative string, newSceneHint string)
-	DisplayCharacter()
 }
 
 // ConflictParticipantInfo provides display information about a conflict participant.
