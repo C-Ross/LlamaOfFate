@@ -255,6 +255,12 @@ func (g *GameManager) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	// Wire up SceneInfo so the UI can handle special commands (help, character, etc.)
+	if setter, ok := g.ui.(SceneInfoSetter); ok {
+		setter.SetSceneInfo(g.engine.GetSceneManager())
+	}
+
 	g.renderEvents(events)
 
 	for {
