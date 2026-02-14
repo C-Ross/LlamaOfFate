@@ -143,18 +143,15 @@ func (sm *SceneManager) RunSceneLoop(ctx context.Context) (*SceneEndResult, erro
 
 	// Display the initial scene
 	sm.renderEvents([]GameEvent{
-		SystemMessageEvent{Message: fmt.Sprintf("=== %s ===", sm.currentScene.Name)},
-		NarrativeEvent{Text: sm.currentScene.Description},
+		NarrativeEvent{SceneName: sm.currentScene.Name, Text: sm.currentScene.Description},
 	})
 
 	// If resuming with existing conversation, replay it so the player has context
 	if len(sm.conversationHistory) > 0 {
 		var recapEvents []GameEvent
-		recapEvents = append(recapEvents, SystemMessageEvent{Message: "--- Recap of recent events ---"})
 		for _, entry := range sm.conversationHistory {
-			recapEvents = append(recapEvents, DialogEvent{PlayerInput: entry.PlayerInput, GMResponse: entry.GMResponse})
+			recapEvents = append(recapEvents, DialogEvent{PlayerInput: entry.PlayerInput, GMResponse: entry.GMResponse, IsRecap: true})
 		}
-		recapEvents = append(recapEvents, SystemMessageEvent{Message: "--- End of recap ---"})
 		sm.renderEvents(recapEvents)
 	}
 
@@ -500,10 +497,7 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) []GameEv
 	if conflictResolution != nil && sm.currentScene.IsConflict {
 		reasonMessage := sm.resolveConflictPeacefully(conflictResolution.Reason)
 		if reasonMessage != "" {
-			events = append(events,
-				SystemMessageEvent{Message: "\n=== Conflict Resolved ==="},
-				SystemMessageEvent{Message: reasonMessage},
-			)
+			events = append(events, ConflictEndEvent{Reason: reasonMessage})
 		}
 	}
 

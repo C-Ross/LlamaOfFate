@@ -12,8 +12,10 @@ type GameEvent interface {
 }
 
 // NarrativeEvent corresponds to UI.DisplayNarrative.
+// When SceneName is set, the UI renders a scene header before the text.
 type NarrativeEvent struct {
-	Text string
+	Text      string
+	SceneName string // Optional: scene name for header display
 }
 
 func (NarrativeEvent) gameEvent() {}
@@ -22,6 +24,7 @@ func (NarrativeEvent) gameEvent() {}
 type DialogEvent struct {
 	PlayerInput string
 	GMResponse  string
+	IsRecap     bool // True when replaying prior conversation on resume
 }
 
 func (DialogEvent) gameEvent() {}

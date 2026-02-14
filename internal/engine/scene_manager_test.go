@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
@@ -41,7 +42,11 @@ func (m *MockUI) Emit(event GameEvent) {
 	case NarrativeEvent:
 		m.displayedMessages = append(m.displayedMessages, "Narrative: "+e.Text)
 	case DialogEvent:
-		m.displayedMessages = append(m.displayedMessages, "Dialog: "+e.PlayerInput+" -> "+e.GMResponse)
+		prefix := "Dialog"
+		if e.IsRecap {
+			prefix = "Recap"
+		}
+		m.displayedMessages = append(m.displayedMessages, prefix+": "+e.PlayerInput+" -> "+e.GMResponse)
 	case SystemMessageEvent:
 		m.displayedMessages = append(m.displayedMessages, "System: "+e.Message)
 	case ConflictStartEvent:
@@ -770,11 +775,9 @@ func TestSceneManager_RunSceneLoop_RecapsConversationOnResume(t *testing.T) {
 	_, err = sm.RunSceneLoop(ctx)
 	require.NoError(t, err)
 
-	// Should contain the recap markers and both conversation entries
-	assert.Contains(t, mockUI.displayedMessages, "System: --- Recap of recent events ---")
-	assert.Contains(t, mockUI.displayedMessages, "Dialog: I look around the room -> You see a dusty old tavern")
-	assert.Contains(t, mockUI.displayedMessages, "Dialog: I approach the bartender -> He eyes you warily")
-	assert.Contains(t, mockUI.displayedMessages, "System: --- End of recap ---")
+	// Should contain both conversation entries tagged as recaps (no SystemMessageEvent delimiters)
+	assert.Contains(t, mockUI.displayedMessages, "Recap: I look around the room -> You see a dusty old tavern")
+	assert.Contains(t, mockUI.displayedMessages, "Recap: I approach the bartender -> He eyes you warily")
 }
 
 func TestSceneManager_RunSceneLoop_NoRecapWithoutConversation(t *testing.T) {
@@ -796,10 +799,9 @@ func TestSceneManager_RunSceneLoop_NoRecapWithoutConversation(t *testing.T) {
 	_, err = sm.RunSceneLoop(ctx)
 	require.NoError(t, err)
 
-	// Should NOT contain recap markers
+	// Should NOT contain any recap-tagged events
 	for _, msg := range mockUI.displayedMessages {
-		assert.NotContains(t, msg, "Recap of recent events")
-		assert.NotContains(t, msg, "End of recap")
+		assert.False(t, strings.HasPrefix(msg, "Recap:"), "unexpected recap event: %s", msg)
 	}
 }
 

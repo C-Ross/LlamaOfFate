@@ -17,6 +17,7 @@ type TerminalUI struct {
 	reader    *bufio.Reader
 	sceneInfo uicontract.SceneInfo
 	shownHint bool // true after the initial help hint has been displayed
+	inRecap   bool // true while rendering recap DialogEvents
 }
 
 // NewTerminalUI creates a new terminal UI instance
@@ -35,9 +36,10 @@ func (ui *TerminalUI) SetSceneInfo(sceneInfo uicontract.SceneInfo) {
 func (ui *TerminalUI) Emit(event uicontract.GameEvent) {
 	switch e := event.(type) {
 	case uicontract.NarrativeEvent:
-		ui.displayNarrative(e.Text)
+		ui.closeRecap()
+		ui.displayNarrative(e)
 	case uicontract.DialogEvent:
-		ui.displayDialog(e.PlayerInput, e.GMResponse)
+		ui.displayDialog(e)
 	case uicontract.SystemMessageEvent:
 		ui.displaySystemMessage(e.Message)
 	case uicontract.ActionAttemptEvent:
@@ -145,15 +147,34 @@ func (ui *TerminalUI) displayActionResult(skill string, skillLevel string, bonus
 	fmt.Printf("Outcome: %s\n", outcome)
 }
 
-// displayNarrative displays narrative text from the GM
-func (ui *TerminalUI) displayNarrative(narrative string) {
-	fmt.Printf("\n%s\n", narrative)
+// displayNarrative displays narrative text from the GM.
+// When SceneName is set, a banner is rendered above the text.
+func (ui *TerminalUI) displayNarrative(e uicontract.NarrativeEvent) {
+	if e.SceneName != "" {
+		fmt.Printf("\n=== %s ===\n", e.SceneName)
+	}
+	if e.Text != "" {
+		fmt.Printf("\n%s\n", e.Text)
+	}
 }
 
-// displayDialog displays a dialog exchange between player and GM
-func (ui *TerminalUI) displayDialog(playerInput, gmResponse string) {
-	fmt.Printf("\nYou: %s\n", playerInput)
-	fmt.Printf("\nGM: %s\n", gmResponse)
+// displayDialog displays a dialog exchange between player and GM.
+// Recap dialogs get a header on the first entry and a footer on the last.
+func (ui *TerminalUI) displayDialog(e uicontract.DialogEvent) {
+	if e.IsRecap && !ui.inRecap {
+		fmt.Println("\n--- Recap of recent events ---")
+		ui.inRecap = true
+	}
+	fmt.Printf("\nYou: %s\n", e.PlayerInput)
+	fmt.Printf("\nGM: %s\n", e.GMResponse)
+}
+
+// closeRecap ends recap mode if active, printing the footer.
+func (ui *TerminalUI) closeRecap() {
+	if ui.inRecap {
+		fmt.Println("\n--- End of recap ---")
+		ui.inRecap = false
+	}
 }
 
 // displaySystemMessage displays system messages to the player
