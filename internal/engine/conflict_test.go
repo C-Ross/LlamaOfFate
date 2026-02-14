@@ -270,7 +270,7 @@ func TestSceneManager_InitiateConflict_UnknownInitiator(t *testing.T) {
 
 	// Verify no conflict was started
 	assert.False(t, sm.currentScene.IsConflict)
-	assert.Empty(t, mockUI.conflictStartCalls)
+	assert.Empty(t, OfType[ConflictStartEvent](&mockUI.EventRecorder))
 }
 
 func TestSceneManager_HandleConflictEscalation(t *testing.T) {
@@ -834,14 +834,8 @@ func TestSceneManager_ApplyActionEffects_Attack(t *testing.T) {
 	events := sm.applyActionEffects(context.Background(), testAction, target)
 
 	// Check that events contain attack result with shifts
-	foundAttackResult := false
-	for _, evt := range events {
-		if ar, ok := evt.(PlayerAttackResultEvent); ok && ar.Shifts > 0 {
-			foundAttackResult = true
-			break
-		}
-	}
-	assert.True(t, foundAttackResult, "Expected PlayerAttackResultEvent with shifts")
+	ar := RequireFirstFrom[PlayerAttackResultEvent](t, events)
+	assert.Greater(t, ar.Shifts, 0)
 }
 
 func TestSceneManager_IsConcedeCommand(t *testing.T) {
@@ -915,16 +909,9 @@ func TestSceneManager_HandleConcession(t *testing.T) {
 	assert.False(t, sm.currentScene.IsConflict, "Expected conflict to end")
 
 	// Check events contain ConcessionEvent
-	foundConcession := false
-	for _, evt := range events {
-		if ce, ok := evt.(ConcessionEvent); ok {
-			foundConcession = true
-			assert.Equal(t, 1, ce.FatePointsGained)
-			assert.Equal(t, 2, ce.CurrentFatePoints)
-			break
-		}
-	}
-	assert.True(t, foundConcession, "Expected ConcessionEvent")
+	ce := RequireFirstFrom[ConcessionEvent](t, events)
+	assert.Equal(t, 1, ce.FatePointsGained)
+	assert.Equal(t, 2, ce.CurrentFatePoints)
 }
 
 func TestSceneManager_HandleConcession_WithConsequences(t *testing.T) {
@@ -970,9 +957,11 @@ func TestSceneManager_HandleConcession_WithConsequences(t *testing.T) {
 	assert.Equal(t, 4, player.FatePoints, "Expected fate points for conceding with consequences")
 
 	// Check ConcessionEvent mentions consequences
-	foundConsequenceBonus := false
-	for _, evt := range events {
-		if ce, ok := evt.(ConcessionEvent); ok && ce.ConsequenceCount > 0 {
+	concessions := SliceOfType[ConcessionEvent](events)
+	require.NotEmpty(t, concessions, "Expected ConcessionEvent with consequence count")
+	var foundConsequenceBonus bool
+	for _, ce := range concessions {
+		if ce.ConsequenceCount > 0 {
 			foundConsequenceBonus = true
 			assert.Equal(t, 3, ce.FatePointsGained)
 			assert.Equal(t, 2, ce.ConsequenceCount)
@@ -1014,15 +1003,9 @@ func TestSceneManager_ApplyActionEffects_Attack_NilTarget_ShowsError(t *testing.
 	events := sm.applyActionEffects(context.Background(), testAction, nil)
 
 	// Should return a PlayerAttackResultEvent with TargetMissing
-	found := false
-	for _, evt := range events {
-		if ar, ok := evt.(PlayerAttackResultEvent); ok && ar.TargetMissing {
-			found = true
-			assert.Equal(t, "Bart the Outlaw", ar.TargetHint)
-			break
-		}
-	}
-	assert.True(t, found, "Expected PlayerAttackResultEvent with TargetMissing, got: %v", events)
+	ar := RequireFirstFrom[PlayerAttackResultEvent](t, events)
+	assert.True(t, ar.TargetMissing)
+	assert.Equal(t, "Bart the Outlaw", ar.TargetHint)
 }
 
 func TestSceneManager_ApplyActionEffects_Attack_DealsDamage(t *testing.T) {
@@ -1069,18 +1052,13 @@ func TestSceneManager_ApplyActionEffects_Attack_DealsDamage(t *testing.T) {
 	assert.Less(t, afterAvailable, initialAvailable, "Target should have taken stress")
 
 	// Verify events contain attack result and damage resolution
-	foundDamageMsg := false
-	foundAbsorbMsg := false
-	for _, evt := range events {
-		if ar, ok := evt.(PlayerAttackResultEvent); ok && ar.Shifts > 0 {
-			foundDamageMsg = true
-		}
-		if dr, ok := evt.(DamageResolutionEvent); ok && dr.Absorbed != nil {
-			foundAbsorbMsg = true
-		}
-	}
-	assert.True(t, foundDamageMsg, "Expected PlayerAttackResultEvent with shifts")
-	assert.True(t, foundAbsorbMsg, "Expected DamageResolutionEvent with absorption")
+	attackResults := SliceOfType[PlayerAttackResultEvent](events)
+	require.NotEmpty(t, attackResults, "Expected PlayerAttackResultEvent with shifts")
+	assert.Greater(t, attackResults[0].Shifts, 0)
+
+	damageResults := SliceOfType[DamageResolutionEvent](events)
+	require.NotEmpty(t, damageResults, "Expected DamageResolutionEvent with absorption")
+	assert.NotNil(t, damageResults[0].Absorbed)
 }
 
 func TestSceneManager_ApplyActionEffects_Attack_Tie_GrantsBoost(t *testing.T) {
@@ -1120,14 +1098,8 @@ func TestSceneManager_ApplyActionEffects_Attack_Tie_GrantsBoost(t *testing.T) {
 	events := sm.applyActionEffects(context.Background(), testAction, target)
 
 	// Verify boost event was returned
-	found := false
-	for _, evt := range events {
-		if ar, ok := evt.(PlayerAttackResultEvent); ok && ar.IsTie {
-			found = true
-			break
-		}
-	}
-	assert.True(t, found, "Expected PlayerAttackResultEvent with IsTie, got: %v", events)
+	ar := RequireFirstFrom[PlayerAttackResultEvent](t, events)
+	assert.True(t, ar.IsTie, "Expected PlayerAttackResultEvent with IsTie")
 }
 
 func TestSceneManager_ResolveAction_TargetByName(t *testing.T) {
@@ -1172,19 +1144,26 @@ func TestSceneManager_ResolveAction_TargetByName(t *testing.T) {
 
 	// The attack should have resolved against Bart — check defense was rolled
 	// and damage was applied (if target wasn't found, no damage messages would appear)
-	foundDefenseResult := false
-	foundDamageApplied := false
-	for _, evt := range events {
-		if def, ok := evt.(DefenseRollEvent); ok && def.DefenderName == "Bart the Outlaw" {
+	defenses := SliceOfType[DefenseRollEvent](events)
+	var foundDefenseResult bool
+	for _, def := range defenses {
+		if def.DefenderName == "Bart the Outlaw" {
 			foundDefenseResult = true
-		}
-		if atk, ok := evt.(PlayerAttackResultEvent); ok && atk.TargetName == "Bart the Outlaw" {
-			foundDamageApplied = true
+			break
 		}
 	}
 	assert.True(t, foundDefenseResult,
 		"Expected DefenseRollEvent for 'Bart the Outlaw' via name lookup, got: %v",
 		events)
+
+	attacks := SliceOfType[PlayerAttackResultEvent](events)
+	var foundDamageApplied bool
+	for _, atk := range attacks {
+		if atk.TargetName == "Bart the Outlaw" {
+			foundDamageApplied = true
+			break
+		}
+	}
 	assert.True(t, foundDamageApplied,
 		"Expected PlayerAttackResultEvent for 'Bart the Outlaw', got: %v",
 		events)
@@ -1233,26 +1212,19 @@ func TestSceneManager_ResolveAction_UnknownTarget_AbortsWithoutConsumingTurn(t *
 	assert.False(t, awaiting, "unknown target should not await invoke")
 
 	// Should see the "try again" message in events
+	sysMsgs := SliceOfType[SystemMessageEvent](events)
 	foundTryAgain := false
-	for _, event := range events {
-		if sysMsg, ok := event.(SystemMessageEvent); ok {
-			if strings.Contains(sysMsg.Message, "Could not find target") && strings.Contains(sysMsg.Message, "try again") {
-				foundTryAgain = true
-			}
+	for _, sysMsg := range sysMsgs {
+		if strings.Contains(sysMsg.Message, "Could not find target") && strings.Contains(sysMsg.Message, "try again") {
+			foundTryAgain = true
 		}
 	}
 	assert.True(t, foundTryAgain,
 		"Expected 'try again' message for unknown target, got events: %v", events)
 
 	// Should NOT see any dice results or narratives in events
-	for _, event := range events {
-		_, isActionResult := event.(ActionResultEvent)
-		assert.False(t, isActionResult,
-			"Should not roll dice when target is unknown")
-		_, isNarrative := event.(NarrativeEvent)
-		assert.False(t, isNarrative,
-			"Should not generate narrative when target is unknown")
-	}
+	AssertNoEventIn[ActionResultEvent](t, events)
+	AssertNoEventIn[NarrativeEvent](t, events)
 }
 
 func TestSceneManager_HandleAction_ExcludesTakenOutFromTargets(t *testing.T) {

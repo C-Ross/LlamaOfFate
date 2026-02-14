@@ -98,15 +98,7 @@ func TestStressOverflowNoConsequences_TakenOut(t *testing.T) {
 	assert.Nil(t, sm.pendingMidFlow, "expected no pending mid-flow when no consequences available")
 
 	// Should have returned "taken out" events.
-	foundTakenOut := false
-	for _, evt := range events {
-		if pt, ok := evt.(PlayerTakenOutEvent); ok {
-			_ = pt
-			foundTakenOut = true
-			break
-		}
-	}
-	assert.True(t, foundTakenOut, "expected taken out message")
+	AssertHasEventIn[PlayerTakenOutEvent](t, events)
 }
 
 func TestProvideMidFlowResponse_ConsequenceChoice(t *testing.T) {
@@ -190,14 +182,7 @@ func TestProvideMidFlowResponse_TakenOutChoice(t *testing.T) {
 	require.NotNil(t, result)
 
 	// Should have returned PlayerTakenOutEvent in the result events
-	foundTakenOut := false
-	for _, evt := range result.Events {
-		if _, ok := evt.(PlayerTakenOutEvent); ok {
-			foundTakenOut = true
-			break
-		}
-	}
-	assert.True(t, foundTakenOut, "expected taken out message after choosing taken out")
+	AssertHasEventIn[PlayerTakenOutEvent](t, result.Events)
 }
 
 // --- promptPlayerForFates tests ---

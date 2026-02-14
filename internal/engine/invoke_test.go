@@ -239,12 +239,11 @@ func TestProvideInvokeResponse_PlusTwoBonus(t *testing.T) {
 	assert.Equal(t, 2, sm.player.FatePoints, "should spend 1 FP")
 
 	// Events should include the +2 message
+	invokeEvts := SliceOfType[InvokeEvent](resp.Events)
 	hasBonus := false
-	for _, ev := range resp.Events {
-		if invokeEv, ok := ev.(InvokeEvent); ok {
-			if !invokeEv.IsReroll && invokeEv.NewTotal != "" {
-				hasBonus = true
-			}
+	for _, invokeEv := range invokeEvts {
+		if !invokeEv.IsReroll && invokeEv.NewTotal != "" {
+			hasBonus = true
 		}
 	}
 	assert.True(t, hasBonus, "should see +2 invoke event")
@@ -287,12 +286,11 @@ func TestProvideInvokeResponse_Reroll(t *testing.T) {
 	assert.Equal(t, 2, sm.player.FatePoints, "should spend 1 FP")
 
 	// Events should include reroll message
+	invokeEvts := SliceOfType[InvokeEvent](resp.Events)
 	hasReroll := false
-	for _, ev := range resp.Events {
-		if invokeEv, ok := ev.(InvokeEvent); ok {
-			if invokeEv.IsReroll {
-				hasReroll = true
-			}
+	for _, invokeEv := range invokeEvts {
+		if invokeEv.IsReroll {
+			hasReroll = true
 		}
 	}
 	assert.True(t, hasReroll, "should see reroll invoke event")
@@ -338,12 +336,11 @@ func TestProvideInvokeResponse_FreeInvoke(t *testing.T) {
 	assert.Equal(t, initialFreeInvokes-1, sm.currentScene.SituationAspects[0].FreeInvokes)
 
 	// Events should include free invoke message
+	invokeEvts := SliceOfType[InvokeEvent](resp.Events)
 	hasFreeMsg := false
-	for _, ev := range resp.Events {
-		if invokeEv, ok := ev.(InvokeEvent); ok {
-			if invokeEv.IsFree {
-				hasFreeMsg = true
-			}
+	for _, invokeEv := range invokeEvts {
+		if invokeEv.IsFree {
+			hasFreeMsg = true
 		}
 	}
 	assert.True(t, hasFreeMsg, "should see free invoke event")

@@ -2,8 +2,6 @@ package engine
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
@@ -16,17 +14,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// MockUI implements the UI interface for testing
+// MockUI implements the UI interface for testing.
+// EventRecorder is embedded — call mockUI.Emit() and query with OfType/RequireFirst/etc.
 type MockUI struct {
-	displayedMessages     []string
-	lastInput             string
-	lastExit              bool
-	lastError             error
-	conflictStartCalls    []string
-	conflictEscalateCalls []string
-	turnAnnouncementCalls []string
-	conflictEndCalls      []string
-	midFlowResponse       MidFlowResponse // preconfigured response for PromptForMidFlow
+	EventRecorder   // Emit + Events
+	lastInput       string
+	lastExit        bool
+	lastError       error
+	midFlowResponse MidFlowResponse // preconfigured response for PromptForMidFlow
 }
 
 func (m *MockUI) ReadInput() (input string, isExit bool, err error) {
@@ -35,108 +30,6 @@ func (m *MockUI) ReadInput() (input string, isExit bool, err error) {
 
 func (m *MockUI) PromptForMidFlow(_ InputRequestEvent) MidFlowResponse {
 	return m.midFlowResponse
-}
-
-func (m *MockUI) Emit(event GameEvent) {
-	switch e := event.(type) {
-	case ActionAttemptEvent:
-		m.displayedMessages = append(m.displayedMessages, "ActionAttempt: "+e.Description)
-	case ActionResultEvent:
-		m.displayedMessages = append(m.displayedMessages, "ActionResult: "+e.Outcome)
-	case NarrativeEvent:
-		m.displayedMessages = append(m.displayedMessages, "Narrative: "+e.Text)
-	case DialogEvent:
-		prefix := "Dialog"
-		if e.IsRecap {
-			prefix = "Recap"
-		}
-		m.displayedMessages = append(m.displayedMessages, prefix+": "+e.PlayerInput+" -> "+e.GMResponse)
-	case SystemMessageEvent:
-		m.displayedMessages = append(m.displayedMessages, "System: "+e.Message)
-	case ConflictStartEvent:
-		m.conflictStartCalls = append(m.conflictStartCalls, e.ConflictType+":"+e.InitiatorName)
-	case ConflictEscalationEvent:
-		m.conflictEscalateCalls = append(m.conflictEscalateCalls, e.FromType+"->"+e.ToType+":"+e.TriggerCharName)
-	case TurnAnnouncementEvent:
-		m.turnAnnouncementCalls = append(m.turnAnnouncementCalls, e.CharacterName)
-	case ConflictEndEvent:
-		m.conflictEndCalls = append(m.conflictEndCalls, e.Reason)
-	case GameOverEvent:
-		m.displayedMessages = append(m.displayedMessages, "GAME OVER: "+e.Reason)
-	case SceneTransitionEvent:
-		m.displayedMessages = append(m.displayedMessages, "SCENE TRANSITION: "+e.Narrative)
-	// Composite mechanical events
-	case DefenseRollEvent:
-		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("Defense: %s defends with %s (%s)", e.DefenderName, e.Skill, e.Result))
-	case DamageResolutionEvent:
-		if e.Absorbed != nil {
-			m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("DamageRes: %s absorbs the damage with their %s stress track", e.TargetName, e.Absorbed.TrackType))
-		}
-		if e.Consequence != nil {
-			m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("DamageRes: %s takes a %s consequence: \"%s\" (absorbs %d shifts)", e.TargetName, e.Consequence.Severity, e.Consequence.Aspect, e.Consequence.Absorbed))
-		}
-		if e.RemainingAbsorbed != nil {
-			m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("DamageRes: %s absorbs remaining %d shifts with stress", e.TargetName, e.RemainingAbsorbed.Shifts))
-		}
-		if e.TakenOut {
-			m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("DamageRes: %s is Taken Out!", e.TargetName))
-		}
-		if e.VictoryEnd {
-			m.displayedMessages = append(m.displayedMessages, "DamageRes: Victory! All opponents defeated!")
-		}
-	case PlayerAttackResultEvent:
-		if e.TargetMissing {
-			m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("AttackResult: Could not find target '%s'", e.TargetHint))
-		} else if e.IsTie {
-			m.displayedMessages = append(m.displayedMessages, "AttackResult: Tie! boost")
-		} else {
-			m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("AttackResult: deals %d shifts to %s", e.Shifts, e.TargetName))
-		}
-	case AspectCreatedEvent:
-		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("AspectCreated: '%s' with %d free invoke(s)", e.AspectName, e.FreeInvokes))
-	case NPCAttackEvent:
-		defSkill := e.DefenseSkill
-		if e.FullDefense {
-			defSkill = fmt.Sprintf("%s+2 (Full Defense)", e.DefenseSkill)
-		}
-		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("NPCAttack: %s attacks %s with %s (%s) vs %s (%s)", e.AttackerName, e.TargetName, e.AttackSkill, e.AttackResult, defSkill, e.DefenseResult))
-	case PlayerStressEvent:
-		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("PlayerStress: %d %s stress (%s)", e.Shifts, e.StressType, e.TrackState))
-	case PlayerDefendedEvent:
-		if e.IsTie {
-			m.displayedMessages = append(m.displayedMessages, "PlayerDefended: deflected, boost")
-		} else {
-			m.displayedMessages = append(m.displayedMessages, "PlayerDefended: successfully defend")
-		}
-	case PlayerConsequenceEvent:
-		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("PlayerConsequence: %s \"%s\" absorbs %d", e.Severity, e.Aspect, e.Absorbed))
-	case PlayerTakenOutEvent:
-		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("PlayerTakenOut: by %s outcome=%s", e.AttackerName, e.Outcome))
-	case ConcessionEvent:
-		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("Concession: gained %d FP (now %d)", e.FatePointsGained, e.CurrentFatePoints))
-	case OutcomeChangedEvent:
-		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("OutcomeChanged: %s", e.FinalOutcome))
-
-	// New structured events
-	case InvokeEvent:
-		if e.Failed {
-			m.displayedMessages = append(m.displayedMessages, "Invoke: not enough FP")
-		} else if e.IsReroll {
-			m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("Invoke: reroll \"%s\" → %s", e.AspectName, e.NewTotal))
-		} else {
-			m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("Invoke: +2 \"%s\" → %s", e.AspectName, e.NewTotal))
-		}
-	case NPCActionResultEvent:
-		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("NPCAction: %s %s outcome=%s", e.NPCName, e.ActionType, e.Outcome))
-	case RecoveryEvent:
-		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("Recovery: %s \"%s\" %s", e.Action, e.Aspect, e.Severity))
-	case StressOverflowEvent:
-		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("StressOverflow: %d shifts", e.Shifts))
-	case MilestoneEvent:
-		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("Milestone: %s fp=%d", e.Type, e.FatePoints))
-	case GameResumedEvent:
-		m.displayedMessages = append(m.displayedMessages, fmt.Sprintf("Resumed: %s scene=%s", e.ScenarioTitle, e.SceneName))
-	}
 }
 
 func TestNewSceneManager(t *testing.T) {
@@ -284,15 +177,8 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage(t *testing.T) {
 	assert.True(t, newAspect.FreeInvokes > 0)
 
 	// Verify AspectCreatedEvent was returned
-	found := false
-	for _, evt := range events {
-		if ac, ok := evt.(AspectCreatedEvent); ok {
-			assert.Contains(t, ac.AspectName, "Advantage from")
-			found = true
-			break
-		}
-	}
-	assert.True(t, found, "Expected AspectCreatedEvent in returned events, got: %v", events)
+	ac := RequireFirstFrom[AspectCreatedEvent](t, events)
+	assert.Contains(t, ac.AspectName, "Advantage from")
 }
 
 func TestSceneManager_ApplyActionEffects_CreateAdvantage_WithLLM(t *testing.T) {
@@ -342,15 +228,8 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage_WithLLM(t *testing.T) {
 	assert.True(t, newAspect.FreeInvokes > 0)
 
 	// Verify AspectCreatedEvent was returned with the creative name
-	found := false
-	for _, evt := range events {
-		if ac, ok := evt.(AspectCreatedEvent); ok {
-			assert.Equal(t, "Perfect Vantage Point", ac.AspectName)
-			found = true
-			break
-		}
-	}
-	assert.True(t, found, "Expected AspectCreatedEvent in returned events, got: %v", events)
+	ac := RequireFirstFrom[AspectCreatedEvent](t, events)
+	assert.Equal(t, "Perfect Vantage Point", ac.AspectName)
 }
 
 func TestSceneManager_GetCurrentScene(t *testing.T) {
@@ -704,13 +583,7 @@ func TestProcessInput_NarrativeRoutesToDialog(t *testing.T) {
 	require.NoError(t, err)
 
 	// Should return a DialogEvent (handleDialog path), not an action result
-	hasDialog := false
-	for _, event := range result.Events {
-		if _, ok := event.(DialogEvent); ok {
-			hasDialog = true
-		}
-	}
-	assert.True(t, hasDialog, "Narrative input should produce a DialogEvent. Got events: %v", result.Events)
+	AssertHasEventIn[DialogEvent](t, result.Events)
 }
 
 // sequentialMockLLMClient returns responses in order, cycling through them
@@ -773,8 +646,16 @@ func TestSceneManager_RunSceneLoop_RecapsConversationOnResume(t *testing.T) {
 	require.NoError(t, err)
 
 	// Should contain both conversation entries tagged as recaps (no SystemMessageEvent delimiters)
-	assert.Contains(t, mockUI.displayedMessages, "Recap: I look around the room -> You see a dusty old tavern")
-	assert.Contains(t, mockUI.displayedMessages, "Recap: I approach the bartender -> He eyes you warily")
+	recaps := OfType[DialogEvent](&mockUI.EventRecorder)
+	recapTexts := make([]string, len(recaps))
+	for i, r := range recaps {
+		recapTexts[i] = r.PlayerInput
+	}
+	assert.Contains(t, recapTexts, "I look around the room")
+	assert.Contains(t, recapTexts, "I approach the bartender")
+	for _, r := range recaps {
+		assert.True(t, r.IsRecap, "expected IsRecap=true")
+	}
 }
 
 func TestSceneManager_RunSceneLoop_NoRecapWithoutConversation(t *testing.T) {
@@ -797,8 +678,10 @@ func TestSceneManager_RunSceneLoop_NoRecapWithoutConversation(t *testing.T) {
 	require.NoError(t, err)
 
 	// Should NOT contain any recap-tagged events
-	for _, msg := range mockUI.displayedMessages {
-		assert.False(t, strings.HasPrefix(msg, "Recap:"), "unexpected recap event: %s", msg)
+	for _, evt := range mockUI.Events {
+		if de, ok := evt.(DialogEvent); ok {
+			assert.False(t, de.IsRecap, "unexpected recap event: %s", de.PlayerInput)
+		}
 	}
 }
 
@@ -983,9 +866,13 @@ func TestHandleInput_RenderEventsDialog(t *testing.T) {
 
 	sm.renderEvents(events)
 
-	require.Len(t, mockUI.displayedMessages, 4)
-	assert.Equal(t, "Dialog: hello -> hi there", mockUI.displayedMessages[0])
-	assert.Equal(t, "System: something happened", mockUI.displayedMessages[1])
-	assert.Equal(t, "Narrative: The wind howls.", mockUI.displayedMessages[2])
-	assert.Equal(t, "SCENE TRANSITION: ", mockUI.displayedMessages[3])
+	require.Len(t, mockUI.Events, 4)
+	de := RequireFirst[DialogEvent](t, &mockUI.EventRecorder)
+	assert.Equal(t, "hello", de.PlayerInput)
+	assert.Equal(t, "hi there", de.GMResponse)
+	sm2 := RequireFirst[SystemMessageEvent](t, &mockUI.EventRecorder)
+	assert.Equal(t, "something happened", sm2.Message)
+	narr := RequireFirst[NarrativeEvent](t, &mockUI.EventRecorder)
+	assert.Equal(t, "The wind howls.", narr.Text)
+	AssertHasEvent[SceneTransitionEvent](t, &mockUI.EventRecorder)
 }
