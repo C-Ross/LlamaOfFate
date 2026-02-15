@@ -13,8 +13,20 @@ graph TB
     CLI --> Session[internal/session]
     CLI --> Scene[internal/core/scene]
 
+    Server[cmd/server] --> Engine
+    Server --> WebUI[internal/ui/web]
+    Server --> LLM
+    Server --> Azure
+    Server --> Logging
+    Server --> Session
+    Server --> Scene
+
+    %% Web Frontend
+    WebFrontend[web/ React+Vite] -.->|WebSocket| Server
+
     %% UI Dependencies
     TerminalUI --> Engine
+    WebUI --> Engine
 
     %% Engine Dependencies
     Engine --> Prompt[internal/prompt]
@@ -49,9 +61,12 @@ graph TB
     classDef infrastructure fill:#fff3e0
     classDef external fill:#e8f5e8
 
-    class CLI,TerminalUI entryPoint
+    classDef frontend fill:#fce4ec
+
+    class CLI,TerminalUI,Server,WebUI entryPoint
     class Engine,Core,Dice,Character,Action,Scene core
     class Prompt infrastructure
     class LLM,Azure infrastructure
     class Session,Logging external
+    class WebFrontend frontend
 ```
