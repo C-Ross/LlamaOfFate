@@ -17,6 +17,7 @@ LlamaOfFate is a text-based RPG that brings the flexibility and narrative focus 
 - **Player Agency**: Natural language input allows for creative problem-solving
 - **LLM Integration**: AI assists but doesn't replace human creativity and decision-making
 - **Fate Core**: Faithful implementation of official Fate Core rules
+- **Event-Driven UI**: Engine emits structured events; UI implementations control presentation
 
 ## Fate Core System
 
@@ -184,12 +185,13 @@ LlamaOfFate/
 
 - **`cmd/cli/`**: Entry point for the command-line application
 - **`internal/core/`**: Core Fate mechanics implementation (character, dice, scene, action, skills)
-- **`internal/engine/`**: Orchestrates core mechanics and LLM services (scene/scenario managers, action parsing, conflict resolution)
+- **`internal/engine/`**: Orchestrates core mechanics and LLM services; emits GameEvents for UI rendering (scene/scenario managers, action parsing, conflict resolution)
 - **`internal/llm/`**: LLM integration with Azure OpenAI backend, including retry logic and response handling
 - **`internal/prompt/`**: LLM prompt template rendering and response parsing (template data types, render functions, marker extraction)
 - **`internal/session/`**: Session logging for game transcripts
 - **`internal/storage/`**: Game state persistence with YAML-based save/load
-- **`internal/ui/terminal/`**: Terminal-based user interface implementation
+- **`internal/uicontract/`**: UI interface contracts (UI, SceneInfo, GameEvent types, etc.) for decoupling engine from UI implementations
+- **`internal/ui/terminal/`**: Terminal UI implementation; handles meta-commands and renders GameEvents to console
 - **`examples/`**: Example programs demonstrating LLM scene loops, scenario generation, and walkthroughs
 - **`configs/`**: YAML configuration files (azure-llm.yaml)
 - **`test/integration/`**: Integration tests for the game system
@@ -208,6 +210,7 @@ LlamaOfFate/
 - ✅ CLI interface for game interaction
 - ✅ Session logging for game transcripts
 - ✅ Game state persistence (save/load functionality via YAML)
+- ✅ Event-driven UI architecture with async invoke/input support
 - ✅ Integration tests and LLM evaluation tests
 
 ### Planned Features
