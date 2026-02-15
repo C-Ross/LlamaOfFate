@@ -1,15 +1,47 @@
 name: Integration Tests
 
 on:
-  push:
-    branches: [main]
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
   pull_request:
     branches: [main]
   workflow_dispatch:
 
 jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      has_changes: ${{ steps.check.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Check for changes in last 24 hours
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" == "schedule" ]; then
+            # Check if there are commits in the last 24 hours
+            COMMITS=$(git log --since="24 hours ago" --oneline | wc -l)
+            if [ "$COMMITS" -gt 0 ]; then
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+              echo "Found $COMMITS commits in the last 24 hours"
+            else
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+              echo "No commits in the last 24 hours"
+            fi
+          else
+            # For non-scheduled runs (PR, workflow_dispatch), default to true
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Not a scheduled run, proceeding with tests"
+          fi
+
   integration:
     runs-on: ubuntu-latest
+    needs: [check-changes]
+    # Run on PR or if there are changes (scheduled/manual runs)
+    if: needs.check-changes.outputs.has_changes == 'true'
 
     steps:
       - uses: actions/checkout@v4
@@ -28,8 +60,11 @@ jobs:
 
   llm-eval:
     runs-on: ubuntu-latest
-    # Only run on main branch pushes, not PRs (to protect secrets)
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: [check-changes]
+    # Run on schedule (if changes) or manual trigger, but NOT on PRs (to protect secrets)
+    if: |
+      needs.check-changes.outputs.has_changes == 'true' && 
+      github.event_name != 'pull_request'
 
     steps:
       - uses: actions/checkout@v4
