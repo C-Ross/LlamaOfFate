@@ -1,10 +1,29 @@
 import { SidebarCard } from "@/components/SidebarCard"
+import { ChatPanel } from "@/components/game/ChatPanel"
+import { ChatInput } from "@/components/game/ChatInput"
+import { useGameSocket } from "@/hooks/useGameSocket"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
+function getWebSocketUrl(): string {
+  if (typeof window === "undefined") return "ws://localhost:8080/ws"
+  const proto = window.location.protocol === "https:" ? "wss:" : "ws:"
+  return `${proto}//${window.location.host}/ws`
+}
+
 function App() {
+  const {
+    events,
+    isConnected,
+    isPending,
+    awaitingInvoke,
+    awaitingMidFlow,
+    gameOver,
+    sendInput,
+  } = useGameSocket(getWebSocketUrl())
+
+  const inputDisabled = !isConnected || isPending || awaitingInvoke || awaitingMidFlow || gameOver
+
   return (
     <div className="flex h-screen w-screen overflow-hidden">
       {/* Chat Panel — left side */}
@@ -14,36 +33,34 @@ function App() {
           <h1 className="text-2xl font-heading font-bold tracking-widest uppercase text-foreground">
             <span className="text-accent-foreground/60">Llama</span> of <span className="text-primary">Fate</span>
           </h1>
-          <Badge variant="outline" className="text-muted-foreground">
-            Not Connected
+          <Badge
+            variant="outline"
+            className={isConnected ? "text-boost border-boost/50" : "text-muted-foreground"}
+          >
+            {isConnected ? "Connected" : "Not Connected"}
           </Badge>
+          {isPending && (
+            <span className="text-xs text-muted-foreground animate-pulse">Thinking...</span>
+          )}
         </header>
 
         {/* Message area */}
-        <ScrollArea className="flex-1 px-6 py-4">
-          <div className="mx-auto max-w-2xl space-y-4">
-            <div className="rounded-lg bg-secondary/50 px-4 py-3 text-sm text-muted-foreground italic font-body">
-              Connect to the server to begin your adventure...
-            </div>
-          </div>
-        </ScrollArea>
+        <ChatPanel events={events} className="flex-1" />
 
         {/* Input area */}
-        <div className="border-t border-border px-6 py-4">
-          <form
-            className="mx-auto flex max-w-2xl gap-2"
-            onSubmit={(e) => e.preventDefault()}
-          >
-            <Input
-              placeholder="What do you do?"
-              disabled
-              className="flex-1 bg-input font-body"
-            />
-            <Button disabled className="font-heading">
-              Send
-            </Button>
-          </form>
-        </div>
+        <ChatInput
+          onSend={sendInput}
+          disabled={inputDisabled}
+          placeholder={
+            gameOver
+              ? "Game over"
+              : awaitingInvoke
+                ? "Awaiting invoke response..."
+                : awaitingMidFlow
+                  ? "Awaiting your choice..."
+                  : "What do you do?"
+          }
+        />
       </div>
 
       {/* Sidebar — right side */}
