@@ -15,6 +15,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/C-Ross/LlamaOfFate/internal/storage"
+	"github.com/C-Ross/LlamaOfFate/internal/syncdriver"
 	"github.com/C-Ross/LlamaOfFate/internal/ui/terminal"
 )
 
@@ -99,11 +100,10 @@ func main() {
 	}
 
 	// Wire everything into the GameManager and run
-	ui := terminal.NewTerminalUI()
+	terminalUI := terminal.NewTerminalUI()
 
 	gm := engine.NewGameManager(gameEngine)
 	gm.SetPlayer(player)
-	gm.SetUI(ui)
 	gm.SetScenario(scenario)
 	gm.SetSaver(newSaver())
 	if sessionLogger != nil {
@@ -114,7 +114,10 @@ func main() {
 	fmt.Println("====================================================")
 
 	ctx := context.Background()
-	if err := gm.Run(ctx); err != nil {
+	onStart := func() {
+		terminalUI.SetSceneInfo(gm.GetEngine().GetSceneManager())
+	}
+	if err := syncdriver.Run(ctx, gm, terminalUI, onStart); err != nil {
 		log.Fatalf("Game error: %v", err)
 	}
 

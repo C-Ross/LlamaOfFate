@@ -6,15 +6,14 @@ import (
 	"os"
 	"strings"
 
+	"github.com/C-Ross/LlamaOfFate/internal/syncdriver"
 	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
 )
 
-// compile-time checks
-var _ uicontract.UI = (*TerminalUI)(nil)
-var _ uicontract.InvokePrompter = (*TerminalUI)(nil)
-var _ uicontract.MidFlowPrompter = (*TerminalUI)(nil)
+// compile-time check — TerminalUI satisfies the syncdriver blocking contract.
+var _ syncdriver.BlockingUI = (*TerminalUI)(nil)
 
-// TerminalUI implements the UI interface for terminal-based interaction
+// TerminalUI implements the blocking UI interface for terminal-based interaction
 type TerminalUI struct {
 	reader     *bufio.Reader
 	sceneInfo  uicontract.SceneInfo
@@ -198,7 +197,6 @@ func (ui *TerminalUI) displaySystemMessage(message string) {
 }
 
 // PromptForInvoke prompts the player to invoke an aspect after a roll.
-// Implements uicontract.InvokePrompter for the blocking terminal path.
 func (ui *TerminalUI) PromptForInvoke(available []uicontract.InvokableAspect, fatePoints int, currentResult string, shiftsNeeded int) uicontract.InvokeResponse {
 	// Filter to only show usable aspects (has free invokes OR player has FP)
 	var usable []uicontract.InvokableAspect
@@ -278,7 +276,6 @@ func (ui *TerminalUI) PromptForInvoke(available []uicontract.InvokableAspect, fa
 }
 
 // PromptForMidFlow handles a mid-flow input request from the engine.
-// Implements uicontract.MidFlowPrompter for the blocking terminal path.
 func (ui *TerminalUI) PromptForMidFlow(event uicontract.InputRequestEvent) uicontract.MidFlowResponse {
 	switch event.Type {
 	case uicontract.InputRequestNumberedChoice:

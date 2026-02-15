@@ -14,22 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// MockUI implements the UI interface for testing.
-// EventRecorder is embedded — call mockUI.Emit() and query with OfType/RequireFirst/etc.
+// MockUI is an event recorder for engine tests.
+// It embeds EventRecorder for Emit() / OfType() / RequireFirst() etc.
 type MockUI struct {
-	EventRecorder   // Emit + Events
-	lastInput       string
-	lastExit        bool
-	lastError       error
-	midFlowResponse MidFlowResponse // preconfigured response for PromptForMidFlow
-}
-
-func (m *MockUI) ReadInput() (input string, isExit bool, err error) {
-	return m.lastInput, m.lastExit, m.lastError
-}
-
-func (m *MockUI) PromptForMidFlow(_ InputRequestEvent) MidFlowResponse {
-	return m.midFlowResponse
+	EventRecorder
 }
 
 func TestNewSceneManager(t *testing.T) {

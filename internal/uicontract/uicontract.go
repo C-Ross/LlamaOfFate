@@ -1,8 +1,11 @@
-// Package uicontract defines the interface and data types that form the
-// contract between the game engine and any UI implementation.
+// Package uicontract defines the data types that form the contract between
+// the game engine and any UI implementation.
 //
 // Both the engine and UI packages import this leaf package; neither imports
 // the other, preserving inversion of control.
+//
+// Blocking UI interface (syncdriver.BlockingUI) lives in the syncdriver
+// package, which wraps the engine's async API for terminal UIs.
 package uicontract
 
 import (
@@ -23,33 +26,6 @@ type SceneInfo interface {
 // a reference back to the SceneInfo provider (e.g., for character/status display).
 type SceneInfoSetter interface {
 	SetSceneInfo(sceneInfo SceneInfo)
-}
-
-// UI defines the interface for user interaction during scene management.
-type UI interface {
-	// Input methods - returns the cleaned input and whether it's an exit command
-	ReadInput() (input string, isExit bool, err error)
-
-	// Emit sends a structured game event to the UI for rendering.
-	// This is the single output channel replacing the legacy Display* methods.
-	Emit(event GameEvent)
-}
-
-// InvokePrompter is an optional interface that blocking (terminal) UIs
-// implement to support synchronous invoke prompts. The engine type-asserts
-// the UI to this interface in the blocking resolution path (GameManager.Run).
-// Event-driven UIs (web) use InvokePromptEvent/InvokeResponse instead.
-type InvokePrompter interface {
-	PromptForInvoke(available []InvokableAspect, fatePoints int, currentResult string, shiftsNeeded int) InvokeResponse
-}
-
-// MidFlowPrompter is an optional interface that blocking (terminal) UIs
-// implement to support synchronous mid-flow prompts (e.g. consequence
-// choice, concession narration). The engine type-asserts the UI to this
-// interface in the blocking resolution path (GameManager.Run).
-// Event-driven UIs (web) use InputRequestEvent/MidFlowResponse instead.
-type MidFlowPrompter interface {
-	PromptForMidFlow(event InputRequestEvent) MidFlowResponse
 }
 
 // ConflictParticipantInfo provides display information about a conflict participant.

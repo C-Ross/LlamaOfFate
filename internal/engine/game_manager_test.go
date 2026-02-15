@@ -32,18 +32,6 @@ func TestGameManager_SetPlayer(t *testing.T) {
 	assert.Equal(t, player, gm.player)
 }
 
-func TestGameManager_SetUI(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
-	require.NoError(t, err)
-
-	gm := NewGameManager(engine)
-	mockUI := &MockUI{}
-
-	gm.SetUI(mockUI)
-
-	assert.Equal(t, mockUI, gm.ui)
-}
-
 func TestGameManager_SetScenario(t *testing.T) {
 	engine, err := NewWithLLM(&MockLLMClientForScenario{})
 	require.NoError(t, err)
@@ -63,48 +51,26 @@ func TestGameManager_SetScenario(t *testing.T) {
 	assert.Equal(t, "A test problem", gm.scenario.Problem)
 }
 
-func TestGameManager_Run_RequiresEngine(t *testing.T) {
-	gm := &GameManager{}
-	err := gm.Run(context.Background())
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "engine is required")
-}
-
-func TestGameManager_Run_RequiresPlayer(t *testing.T) {
+func TestGameManager_SetInitialScene(t *testing.T) {
 	engine, err := NewWithLLM(&MockLLMClientForScenario{})
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine)
-	gm.SetUI(&MockUI{})
 
-	err = gm.Run(context.Background())
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "player character is required")
+	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
+	config := &InitialSceneConfig{Scene: testScene}
+	gm.SetInitialScene(config)
+
+	assert.Equal(t, config, gm.initialScene)
 }
 
-func TestGameManager_Run_RequiresUI(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+func TestGameManager_GetEngine(t *testing.T) {
+	eng, err := NewWithLLM(&MockLLMClientForScenario{})
 	require.NoError(t, err)
 
-	gm := NewGameManager(engine)
-	gm.SetPlayer(character.NewCharacter("player1", "Test Hero"))
+	gm := NewGameManager(eng)
 
-	err = gm.Run(context.Background())
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "UI is required")
-}
-
-func TestGameManager_RunWithInitialScene_RequiresScene(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
-	require.NoError(t, err)
-
-	gm := NewGameManager(engine)
-	gm.SetPlayer(character.NewCharacter("player1", "Test Hero"))
-	gm.SetUI(&MockUI{})
-
-	err = gm.RunWithInitialScene(context.Background(), nil)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "initial scene config is required")
+	assert.Equal(t, eng, gm.GetEngine())
 }
 
 func TestInitialSceneConfig_Fields(t *testing.T) {

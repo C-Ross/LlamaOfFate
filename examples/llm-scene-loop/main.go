@@ -14,6 +14,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
+	"github.com/C-Ross/LlamaOfFate/internal/syncdriver"
 	"github.com/C-Ross/LlamaOfFate/internal/ui/terminal"
 )
 
@@ -153,7 +154,6 @@ func runGame(ctx context.Context, gameEngine *engine.Engine, sceneConfig SceneCo
 	// Create and configure the game manager
 	gameManager := engine.NewGameManager(gameEngine)
 	gameManager.SetPlayer(sceneConfig.Player)
-	gameManager.SetUI(terminalUI)
 	if sessionLogger != nil {
 		gameManager.SetSessionLogger(sessionLogger)
 	}
@@ -161,20 +161,22 @@ func runGame(ctx context.Context, gameEngine *engine.Engine, sceneConfig SceneCo
 	// Set genre-appropriate scenario
 	gameManager.SetScenario(getScenario(sceneName))
 
-	// Set up terminal UI with scene info callback
-	terminalUI.SetSceneInfo(gameEngine.GetSceneManager())
-
-	// Display initial character info
-	terminalUI.DisplayCharacter()
-
-	// Run with the initial scene
-	initialScene := &engine.InitialSceneConfig{
+	// Set up the initial scene
+	gameManager.SetInitialScene(&engine.InitialSceneConfig{
 		Scene:          sceneConfig.Scene,
 		NPCs:           sceneConfig.NPCs,
 		ExitAfterScene: !multi,
-	}
+	})
 
-	if err := gameManager.RunWithInitialScene(ctx, initialScene); err != nil {
+	// Display initial character info
+	terminalUI.SetSceneInfo(gameEngine.GetSceneManager())
+	terminalUI.DisplayCharacter()
+
+	// Run the blocking game loop
+	onStart := func() {
+		terminalUI.SetSceneInfo(gameEngine.GetSceneManager())
+	}
+	if err := syncdriver.Run(ctx, gameManager, terminalUI, onStart); err != nil {
 		log.Fatalf("Game error: %v", err)
 	}
 }

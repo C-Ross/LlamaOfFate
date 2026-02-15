@@ -228,15 +228,6 @@ func (sm *SceneManager) buildSceneEndResult() *SceneEndResult {
 	return result
 }
 
-// renderEventsToUI dispatches a slice of GameEvent to the given UI for display.
-// This is the shared implementation used by all manager types (ScenarioManager,
-// GameManager) in the synchronous terminal path.
-func renderEventsToUI(ui UI, events []GameEvent) {
-	for _, event := range events {
-		ui.Emit(event)
-	}
-}
-
 // classifyInput uses LLM to determine if input is dialog, clarification, or action
 func (sm *SceneManager) classifyInput(ctx context.Context, input string) (string, error) {
 	if sm.engine.llmClient == nil {

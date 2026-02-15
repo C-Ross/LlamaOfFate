@@ -562,9 +562,9 @@ func TestScenarioManager_Restore_RoundTrip(t *testing.T) {
 	assert.Equal(t, "Station", engine2.GetSceneManager().GetCurrentScene().Name)
 }
 
-// --- GameManager.Run load-on-startup tests ---
+// --- GameManager.Start load-on-startup tests ---
 
-func TestGameManager_Run_LoadsOnStartup(t *testing.T) {
+func TestGameManager_Start_LoadsOnStartup(t *testing.T) {
 	engine, err := NewWithLLM(&MockLLMClientForScenario{})
 	require.NoError(t, err)
 
@@ -591,29 +591,30 @@ func TestGameManager_Run_LoadsOnStartup(t *testing.T) {
 		},
 	}
 
-	mockUI := &MockUI{lastInput: "exit", lastExit: true}
 	recorder := &recordingSaver{loadResult: savedState}
 
 	gm := NewGameManager(engine)
 	gm.SetPlayer(character.NewCharacter("different", "Different Player"))
-	gm.SetUI(mockUI)
 	gm.SetSaver(recorder)
 	gm.SetScenario(&scene.Scenario{Title: "Different Scenario"})
 
-	err = gm.Run(context.Background())
+	events, err := gm.Start(context.Background())
 	require.NoError(t, err)
+	require.NotEmpty(t, events)
 
 	// Should have used the saved player, not the one from SetPlayer
 	assert.Equal(t, player, gm.player)
 
-	// Save should have been triggered during Run (player_quit)
+	// Manual save should capture the loaded state
+	err = gm.Save()
+	require.NoError(t, err)
 	require.NotEmpty(t, recorder.savedStates)
 	lastSave := recorder.savedStates[len(recorder.savedStates)-1]
 	assert.Equal(t, "Jesse", lastSave.Scenario.Player.Name)
 	assert.Equal(t, "Saved Scenario", lastSave.Scenario.Scenario.Title)
 }
 
-func TestGameManager_Run_CompletedScenario_StartsFresh(t *testing.T) {
+func TestGameManager_Start_CompletedScenario_StartsFresh(t *testing.T) {
 	engine, err := NewWithLLM(&MockLLMClientForScenario{})
 	require.NoError(t, err)
 
@@ -633,48 +634,54 @@ func TestGameManager_Run_CompletedScenario_StartsFresh(t *testing.T) {
 		},
 	}
 
-	mockUI := &MockUI{lastInput: "exit", lastExit: true}
 	recorder := &recordingSaver{loadResult: savedState}
 
 	gm := NewGameManager(engine)
 	gm.SetPlayer(player)
-	gm.SetUI(mockUI)
 	gm.SetSaver(recorder)
 
-	// RunWithInitialScene to ensure a fresh start (Run would need an LLM for scene gen)
+	// SetInitialScene to ensure a fresh start
 	testScene := scene.NewScene("fresh_scene", "Fresh Start", "A new beginning")
-	err = gm.RunWithInitialScene(context.Background(), &InitialSceneConfig{
+	gm.SetInitialScene(&InitialSceneConfig{
 		Scene: testScene,
 	})
+
+	events, err := gm.Start(context.Background())
 	require.NoError(t, err)
+	require.NotEmpty(t, events)
 
 	// Should NOT have used the completed save — fresh start should use the initial scene
+	err = gm.Save()
+	require.NoError(t, err)
 	require.NotEmpty(t, recorder.savedStates)
 	lastSave := recorder.savedStates[len(recorder.savedStates)-1]
 	assert.Equal(t, "Fresh Start", lastSave.Scene.CurrentScene.Name)
 }
 
-func TestGameManager_Run_NoSave_FreshStart(t *testing.T) {
+func TestGameManager_Start_NoSave_FreshStart(t *testing.T) {
 	engine, err := NewWithLLM(&MockLLMClientForScenario{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
-	mockUI := &MockUI{lastInput: "exit", lastExit: true}
 	recorder := &recordingSaver{loadResult: nil} // No saved state
 
 	gm := NewGameManager(engine)
 	gm.SetPlayer(player)
-	gm.SetUI(mockUI)
 	gm.SetSaver(recorder)
 
-	// Use RunWithInitialScene since we don't have an LLM for scene generation
-	err = gm.RunWithInitialScene(context.Background(), &InitialSceneConfig{
+	// SetInitialScene since we don't have an LLM for scene generation
+	gm.SetInitialScene(&InitialSceneConfig{
 		Scene: testScene,
 	})
+
+	events, err := gm.Start(context.Background())
 	require.NoError(t, err)
+	require.NotEmpty(t, events)
 
 	// Should have started fresh
+	err = gm.Save()
+	require.NoError(t, err)
 	require.NotEmpty(t, recorder.savedStates)
 	lastSave := recorder.savedStates[len(recorder.savedStates)-1]
 	assert.Equal(t, "Saloon", lastSave.Scene.CurrentScene.Name)

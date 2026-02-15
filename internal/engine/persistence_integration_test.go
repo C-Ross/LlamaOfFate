@@ -13,9 +13,9 @@ import (
 )
 
 // TestIntegration_SaveCascade_ThroughGameManagerRun verifies that after
-// GameManager.Run() completes, calling Save() cascades the full snapshot
+// GameManager.Start() completes, calling Save() cascades the full snapshot
 // through ScenarioManager → SceneManager and captures the correct state.
-func TestIntegration_SaveCascade_ThroughGameManagerRun(t *testing.T) {
+func TestIntegration_SaveCascade_ThroughGameManagerStart(t *testing.T) {
 	// Set up engine with mock LLM (not used — initial scene is pre-configured and quit is immediate)
 	mockLLM := &MockLLMClientForScenario{}
 	engine, err := NewWithLLM(mockLLM)
@@ -39,12 +39,6 @@ func TestIntegration_SaveCascade_ThroughGameManagerRun(t *testing.T) {
 	bartender.Aspects.HighConcept = "Grizzled Barkeep"
 	bartender.CharacterType = character.CharacterTypeSupportingNPC
 
-	// UI that quits immediately
-	mockUI := &MockUI{
-		lastInput: "exit",
-		lastExit:  true,
-	}
-
 	// Recording saver to capture save calls
 	recorder := &recordingSaver{}
 
@@ -60,21 +54,22 @@ func TestIntegration_SaveCascade_ThroughGameManagerRun(t *testing.T) {
 	// Wire up GameManager
 	gm := NewGameManager(engine)
 	gm.SetPlayer(player)
-	gm.SetUI(mockUI)
 	gm.SetSaver(recorder)
 	gm.SetScenario(scenario)
 
-	// Run with initial scene — player quits immediately
-	err = gm.RunWithInitialScene(context.Background(), &InitialSceneConfig{
+	// Set initial scene and start — game initializes but doesn't loop
+	gm.SetInitialScene(&InitialSceneConfig{
 		Scene: testScene,
 		NPCs:  []*character.Character{bartender},
 	})
+	events, err := gm.Start(context.Background())
 	require.NoError(t, err)
+	require.NotEmpty(t, events)
 
-	// ScenarioManager should be stored on GameManager after Run
-	require.NotNil(t, gm.scenarioManager, "scenarioManager should be stored after Run")
+	// ScenarioManager should be stored on GameManager after Start
+	require.NotNil(t, gm.scenarioManager, "scenarioManager should be stored after Start")
 
-	// Now explicitly call Save — automatic triggers already saved during Run
+	// Now explicitly call Save
 	err = gm.Save()
 	require.NoError(t, err)
 	require.NotEmpty(t, recorder.savedStates, "expected at least one save call")
@@ -106,9 +101,9 @@ func TestIntegration_SaveCascade_ThroughGameManagerRun(t *testing.T) {
 	assert.Contains(t, saved.Scene.CurrentScene.Characters, "player1")
 }
 
-// TestIntegration_SaveFunc_WiredThroughRun verifies that the saveFunc callback
+// TestIntegration_SaveFunc_WiredThroughStart verifies that the saveFunc callback
 // set by GameManager on ScenarioManager correctly cascades to the recorder saver.
-func TestIntegration_SaveFunc_WiredThroughRun(t *testing.T) {
+func TestIntegration_SaveFunc_WiredThroughStart(t *testing.T) {
 	mockLLM := &MockLLMClientForScenario{}
 	engine, err := NewWithLLM(mockLLM)
 	require.NoError(t, err)
@@ -118,12 +113,10 @@ func TestIntegration_SaveFunc_WiredThroughRun(t *testing.T) {
 
 	testScene := scene.NewScene("scene1", "Test Arena", "A testing ground")
 
-	mockUI := &MockUI{lastInput: "exit", lastExit: true}
 	recorder := &recordingSaver{}
 
 	gm := NewGameManager(engine)
 	gm.SetPlayer(player)
-	gm.SetUI(mockUI)
 	gm.SetSaver(recorder)
 	gm.SetScenario(&scene.Scenario{
 		Title:   "Test Scenario",
@@ -132,16 +125,18 @@ func TestIntegration_SaveFunc_WiredThroughRun(t *testing.T) {
 		Setting: "Arena",
 	})
 
-	// Run the game — player quits immediately
-	err = gm.RunWithInitialScene(context.Background(), &InitialSceneConfig{
+	// Start the game
+	gm.SetInitialScene(&InitialSceneConfig{
 		Scene: testScene,
 		NPCs:  nil,
 	})
+	events, err := gm.Start(context.Background())
 	require.NoError(t, err)
+	require.NotEmpty(t, events)
 
 	// Verify saveFunc was wired: call it through the scenarioManager
 	require.NotNil(t, gm.scenarioManager)
-	require.NotNil(t, gm.scenarioManager.saveFunc, "saveFunc should be wired by GameManager.Run")
+	require.NotNil(t, gm.scenarioManager.saveFunc, "saveFunc should be wired by GameManager.Start")
 
 	// Calling saveFunc should cascade through GameManager.Save to the recorder
 	err = gm.scenarioManager.saveFunc()
@@ -174,22 +169,22 @@ func TestIntegration_SaveCascade_NPCRegistry(t *testing.T) {
 	bartender.Aspects.HighConcept = "Grizzled Barkeep"
 	bartender.CharacterType = character.CharacterTypeSupportingNPC
 
-	mockUI := &MockUI{lastInput: "exit", lastExit: true}
 	recorder := &recordingSaver{}
 
 	gm := NewGameManager(engine)
 	gm.SetPlayer(player)
-	gm.SetUI(mockUI)
 	gm.SetSaver(recorder)
 	gm.SetScenario(&scene.Scenario{
 		Title: "Test", Problem: "Test", Genre: "Western", Setting: "Town",
 	})
 
-	err = gm.RunWithInitialScene(context.Background(), &InitialSceneConfig{
+	gm.SetInitialScene(&InitialSceneConfig{
 		Scene: testScene,
 		NPCs:  []*character.Character{marshal, bartender},
 	})
+	events, err := gm.Start(context.Background())
 	require.NoError(t, err)
+	_ = events
 
 	err = gm.Save()
 	require.NoError(t, err)
@@ -214,24 +209,24 @@ func TestIntegration_SaveCascade_MultipleSaves(t *testing.T) {
 	player.FatePoints = 3
 
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
-	mockUI := &MockUI{lastInput: "exit", lastExit: true}
 	recorder := &recordingSaver{}
 
 	gm := NewGameManager(engine)
 	gm.SetPlayer(player)
-	gm.SetUI(mockUI)
 	gm.SetSaver(recorder)
 	gm.SetScenario(&scene.Scenario{
 		Title: "Test", Problem: "Test", Genre: "Western", Setting: "Town",
 	})
 
-	err = gm.RunWithInitialScene(context.Background(), &InitialSceneConfig{
+	gm.SetInitialScene(&InitialSceneConfig{
 		Scene: testScene,
 		NPCs:  nil,
 	})
+	events, err := gm.Start(context.Background())
 	require.NoError(t, err)
+	_ = events
 
-	// Automatic saves happen during Run (scene_start, player_quit).
+	// Start triggers scene_start auto-save.
 	// Record the baseline count so we can verify our manual saves.
 	baseline := len(recorder.savedStates)
 
@@ -260,18 +255,18 @@ func TestIntegration_SaveCascade_NoopSaverByDefault(t *testing.T) {
 
 	player := character.NewCharacter("player1", "Jesse")
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
-	mockUI := &MockUI{lastInput: "exit", lastExit: true}
 
 	gm := NewGameManager(engine)
 	gm.SetPlayer(player)
-	gm.SetUI(mockUI)
 	// Deliberately NOT calling SetSaver
 
-	err = gm.RunWithInitialScene(context.Background(), &InitialSceneConfig{
+	gm.SetInitialScene(&InitialSceneConfig{
 		Scene: testScene,
 		NPCs:  nil,
 	})
+	events, err := gm.Start(context.Background())
 	require.NoError(t, err)
+	_ = events
 
 	// Save should succeed silently with noop
 	err = gm.Save()
@@ -287,22 +282,22 @@ func TestIntegration_SaveCascade_ConversationHistory(t *testing.T) {
 
 	player := character.NewCharacter("player1", "Jesse")
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
-	mockUI := &MockUI{lastInput: "exit", lastExit: true}
 	recorder := &recordingSaver{}
 
 	gm := NewGameManager(engine)
 	gm.SetPlayer(player)
-	gm.SetUI(mockUI)
 	gm.SetSaver(recorder)
 	gm.SetScenario(&scene.Scenario{
 		Title: "Test", Problem: "Test", Genre: "Western", Setting: "Town",
 	})
 
-	err = gm.RunWithInitialScene(context.Background(), &InitialSceneConfig{
+	gm.SetInitialScene(&InitialSceneConfig{
 		Scene: testScene,
 		NPCs:  nil,
 	})
+	events, err := gm.Start(context.Background())
 	require.NoError(t, err)
+	_ = events
 
 	// Inject conversation history into the scene manager (simulating exchanges
 	// that would happen during a real scene loop before the player quits)
@@ -316,8 +311,6 @@ func TestIntegration_SaveCascade_ConversationHistory(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, recorder.savedStates, "expected at least one save call")
 
-	// Check the most recent save (automatic triggers from the scene loop
-	// produce earlier saves; our manual Save() with injected history is last)
 	saved := recorder.savedStates[len(recorder.savedStates)-1]
 	require.Len(t, saved.Scene.ConversationHistory, 2)
 	assert.Equal(t, "I look around the saloon", saved.Scene.ConversationHistory[0].PlayerInput)
@@ -333,22 +326,22 @@ func TestIntegration_SaveCascade_SceneSummaries(t *testing.T) {
 
 	player := character.NewCharacter("player1", "Jesse")
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
-	mockUI := &MockUI{lastInput: "exit", lastExit: true}
 	recorder := &recordingSaver{}
 
 	gm := NewGameManager(engine)
 	gm.SetPlayer(player)
-	gm.SetUI(mockUI)
 	gm.SetSaver(recorder)
 	gm.SetScenario(&scene.Scenario{
 		Title: "Test", Problem: "Test", Genre: "Western", Setting: "Town",
 	})
 
-	err = gm.RunWithInitialScene(context.Background(), &InitialSceneConfig{
+	gm.SetInitialScene(&InitialSceneConfig{
 		Scene: testScene,
 		NPCs:  nil,
 	})
+	events, err := gm.Start(context.Background())
 	require.NoError(t, err)
+	_ = events
 
 	// Inject scene summaries (simulating multi-scene progression)
 	gm.scenarioManager.sceneSummaries = []prompt.SceneSummary{
@@ -372,8 +365,6 @@ func TestIntegration_SaveCascade_SceneSummaries(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, recorder.savedStates, "expected at least one save call")
 
-	// Check the most recent save (automatic triggers from the scene loop
-	// produce earlier saves; our manual Save() with injected summaries is last)
 	saved := recorder.savedStates[len(recorder.savedStates)-1]
 	require.Len(t, saved.Scenario.SceneSummaries, 2)
 	assert.Equal(t, "The dusty saloon", saved.Scenario.SceneSummaries[0].SceneDescription)
@@ -383,8 +374,8 @@ func TestIntegration_SaveCascade_SceneSummaries(t *testing.T) {
 	assert.Equal(t, "Old Pete", saved.Scenario.SceneSummaries[0].NPCsEncountered[0].Name)
 }
 
-// TestIntegration_AutomaticSaveTriggers verifies that the scene loop
-// automatically triggers saves at scene_start and player_quit.
+// TestIntegration_AutomaticSaveTriggers verifies that Start() triggers
+// an automatic scene_start save.
 func TestIntegration_AutomaticSaveTriggers(t *testing.T) {
 	mockLLM := &MockLLMClientForScenario{}
 	engine, err := NewWithLLM(mockLLM)
@@ -393,39 +384,36 @@ func TestIntegration_AutomaticSaveTriggers(t *testing.T) {
 	player := character.NewCharacter("player1", "Jesse")
 	player.Aspects.HighConcept = "Gunslinger"
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
-	mockUI := &MockUI{lastInput: "exit", lastExit: true}
 	recorder := &recordingSaver{}
 
 	gm := NewGameManager(engine)
 	gm.SetPlayer(player)
-	gm.SetUI(mockUI)
 	gm.SetSaver(recorder)
 	gm.SetScenario(&scene.Scenario{
 		Title: "Test", Problem: "Test", Genre: "Western", Setting: "Town",
 	})
 
-	// Run — player quits immediately, no manual Save() call
-	err = gm.RunWithInitialScene(context.Background(), &InitialSceneConfig{
+	// Start — triggers scene_start auto-save
+	gm.SetInitialScene(&InitialSceneConfig{
 		Scene: testScene,
 		NPCs:  nil,
 	})
+	events, err := gm.Start(context.Background())
 	require.NoError(t, err)
+	_ = events
 
-	// Automatic triggers: scene_start + player_quit = 2 saves
-	require.Len(t, recorder.savedStates, 2, "expected scene_start and player_quit saves")
+	// scene_start auto-save should have fired
+	require.Len(t, recorder.savedStates, 1, "expected scene_start save")
 
-	// Both saves should capture valid state
-	for i, saved := range recorder.savedStates {
-		assert.Equal(t, "Jesse", saved.Scenario.Player.Name, "save %d: player name", i)
-		assert.Equal(t, "Saloon", saved.Scene.CurrentScene.Name, "save %d: scene name", i)
-	}
+	assert.Equal(t, "Jesse", recorder.savedStates[0].Scenario.Player.Name)
+	assert.Equal(t, "Saloon", recorder.savedStates[0].Scene.CurrentScene.Name)
 }
 
 // TestIntegration_SaveThenResume verifies the full save → load → resume flow:
-// play a session (gets saved automatically), then create a new GameManager that
+// play a session (gets saved), then create a new GameManager that
 // loads the save and resumes mid-scene.
 func TestIntegration_SaveThenResume(t *testing.T) {
-	// --- Session 1: Play and quit ---
+	// --- Session 1: Start and save ---
 	engine1, err := NewWithLLM(&MockLLMClientForScenario{})
 	require.NoError(t, err)
 
@@ -442,7 +430,6 @@ func TestIntegration_SaveThenResume(t *testing.T) {
 	bartender.Aspects.HighConcept = "Grizzled Barkeep"
 	bartender.CharacterType = character.CharacterTypeSupportingNPC
 
-	mockUI1 := &MockUI{lastInput: "exit", lastExit: true}
 	recorder1 := &recordingSaver{}
 
 	scenario := &scene.Scenario{
@@ -454,36 +441,40 @@ func TestIntegration_SaveThenResume(t *testing.T) {
 
 	gm1 := NewGameManager(engine1)
 	gm1.SetPlayer(player)
-	gm1.SetUI(mockUI1)
 	gm1.SetSaver(recorder1)
 	gm1.SetScenario(scenario)
 
-	err = gm1.RunWithInitialScene(context.Background(), &InitialSceneConfig{
+	gm1.SetInitialScene(&InitialSceneConfig{
 		Scene: testScene,
 		NPCs:  []*character.Character{bartender},
 	})
+	events, err := gm1.Start(context.Background())
+	require.NoError(t, err)
+	_ = events
+
+	// Manual save to capture state
+	err = gm1.Save()
 	require.NoError(t, err)
 	require.NotEmpty(t, recorder1.savedStates)
 
-	// Get the last saved state (from player_quit trigger)
+	// Get the last saved state
 	lastSave := recorder1.savedStates[len(recorder1.savedStates)-1]
 
 	// --- Session 2: Resume from save ---
 	engine2, err := NewWithLLM(&MockLLMClientForScenario{})
 	require.NoError(t, err)
 
-	mockUI2 := &MockUI{lastInput: "exit", lastExit: true}
 	recorder2 := &recordingSaver{loadResult: &lastSave}
 
 	gm2 := NewGameManager(engine2)
 	gm2.SetPlayer(character.NewCharacter("dummy", "Should Be Overridden"))
-	gm2.SetUI(mockUI2)
 	gm2.SetSaver(recorder2)
 	gm2.SetScenario(&scene.Scenario{Title: "Should Be Overridden"})
 
-	// Run will load the save and resume
-	err = gm2.Run(context.Background())
+	// Start will load the save and resume
+	events, err = gm2.Start(context.Background())
 	require.NoError(t, err)
+	_ = events
 
 	// Player should be the saved one, not the dummy
 	assert.Equal(t, "Jesse Calhoun", gm2.player.Name)
@@ -491,7 +482,9 @@ func TestIntegration_SaveThenResume(t *testing.T) {
 	assert.Equal(t, 5, gm2.player.FatePoints)
 	assert.Equal(t, dice.Great, gm2.player.GetSkill("Shoot"))
 
-	// Saves from session 2 should reference the restored state
+	// Save from session 2 should reference the restored state
+	err = gm2.Save()
+	require.NoError(t, err)
 	require.NotEmpty(t, recorder2.savedStates)
 	session2Save := recorder2.savedStates[len(recorder2.savedStates)-1]
 	assert.Equal(t, "Jesse Calhoun", session2Save.Scenario.Player.Name)
@@ -502,7 +495,7 @@ func TestIntegration_SaveThenResume(t *testing.T) {
 // TestIntegration_Resume_PreservesNPCRegistry verifies that NPCs from the NPC
 // registry are available after resume and appear in subsequent saves.
 func TestIntegration_Resume_PreservesNPCRegistry(t *testing.T) {
-	// Session 1: Play with NPCs
+	// Session 1: Start with NPCs
 	engine1, err := NewWithLLM(&MockLLMClientForScenario{})
 	require.NoError(t, err)
 
@@ -515,19 +508,22 @@ func TestIntegration_Resume_PreservesNPCRegistry(t *testing.T) {
 	marshal.Aspects.HighConcept = "Stern Lawman"
 	marshal.CharacterType = character.CharacterTypeMainNPC
 
-	mockUI := &MockUI{lastInput: "exit", lastExit: true}
 	recorder := &recordingSaver{}
 
 	gm1 := NewGameManager(engine1)
 	gm1.SetPlayer(player)
-	gm1.SetUI(mockUI)
 	gm1.SetSaver(recorder)
 	gm1.SetScenario(&scene.Scenario{Title: "Test", Problem: "Test", Genre: "Western"})
 
-	err = gm1.RunWithInitialScene(context.Background(), &InitialSceneConfig{
+	gm1.SetInitialScene(&InitialSceneConfig{
 		Scene: testScene,
 		NPCs:  []*character.Character{marshal},
 	})
+	events, err := gm1.Start(context.Background())
+	require.NoError(t, err)
+	_ = events
+
+	err = gm1.Save()
 	require.NoError(t, err)
 	require.NotEmpty(t, recorder.savedStates)
 
@@ -540,29 +536,30 @@ func TestIntegration_Resume_PreservesNPCRegistry(t *testing.T) {
 	engine2, err := NewWithLLM(&MockLLMClientForScenario{})
 	require.NoError(t, err)
 
-	mockUI2 := &MockUI{lastInput: "exit", lastExit: true}
 	recorder2 := &recordingSaver{loadResult: &lastSave}
 
 	gm2 := NewGameManager(engine2)
 	gm2.SetPlayer(player)
-	gm2.SetUI(mockUI2)
 	gm2.SetSaver(recorder2)
 
-	err = gm2.Run(context.Background())
+	events, err = gm2.Start(context.Background())
 	require.NoError(t, err)
+	_ = events
 
 	// NPC should be in the engine's registry after resume
 	assert.NotNil(t, engine2.GetCharacter("npc_marshal"))
 	assert.Equal(t, "Marshal Dan", engine2.GetCharacter("npc_marshal").Name)
 
 	// And in subsequent saves
+	err = gm2.Save()
+	require.NoError(t, err)
 	require.NotEmpty(t, recorder2.savedStates)
 	resumeSave := recorder2.savedStates[len(recorder2.savedStates)-1]
 	assert.Contains(t, resumeSave.Scenario.NPCRegistry, "marshal dan")
 }
 
 // TestIntegration_Resume_SkipsSceneStartSave verifies that resuming does NOT
-// trigger a redundant "scene_start" save — only "player_quit" fires on exit.
+// trigger a redundant "scene_start" save.
 func TestIntegration_Resume_SkipsSceneStartSave(t *testing.T) {
 	engine, err := NewWithLLM(&MockLLMClientForScenario{})
 	require.NoError(t, err)
@@ -580,19 +577,18 @@ func TestIntegration_Resume_SkipsSceneStartSave(t *testing.T) {
 		},
 	}
 
-	mockUI := &MockUI{lastInput: "exit", lastExit: true}
 	recorder := &recordingSaver{loadResult: savedState}
 
 	gm := NewGameManager(engine)
 	gm.SetPlayer(player)
-	gm.SetUI(mockUI)
 	gm.SetSaver(recorder)
 
-	err = gm.Run(context.Background())
+	events, err := gm.Start(context.Background())
 	require.NoError(t, err)
+	_ = events
 
-	// On resume, only player_quit should trigger (no scene_start)
-	require.Len(t, recorder.savedStates, 1, "expected only player_quit save on resume")
+	// On resume, no scene_start save should be triggered
+	require.Len(t, recorder.savedStates, 0, "expected no auto-saves on resume")
 }
 
 // TestIntegration_Resume_MidConflict verifies that resuming into a scene with
@@ -635,18 +631,19 @@ func TestIntegration_Resume_MidConflict(t *testing.T) {
 		},
 	}
 
-	mockUI := &MockUI{lastInput: "exit", lastExit: true}
 	recorder := &recordingSaver{loadResult: savedState}
 
 	gm := NewGameManager(engine)
 	gm.SetPlayer(player)
-	gm.SetUI(mockUI)
 	gm.SetSaver(recorder)
 
-	err = gm.Run(context.Background())
+	events, err := gm.Start(context.Background())
 	require.NoError(t, err)
+	_ = events
 
-	// The save from player_quit should preserve conflict state
+	// Save should preserve conflict state
+	err = gm.Save()
+	require.NoError(t, err)
 	require.NotEmpty(t, recorder.savedStates)
 	lastSave := recorder.savedStates[len(recorder.savedStates)-1]
 

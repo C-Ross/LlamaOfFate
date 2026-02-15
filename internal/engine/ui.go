@@ -8,9 +8,7 @@ import (
 // package (and external consumers of engine) can continue using the short names.
 // The canonical definitions live in the uicontract package.
 
-type UI = uicontract.UI
 type SceneInfo = uicontract.SceneInfo
-type SceneInfoSetter = uicontract.SceneInfoSetter
 type ConflictParticipantInfo = uicontract.ConflictParticipantInfo
 type InvokableAspect = uicontract.InvokableAspect
 type GameEvent = uicontract.GameEvent
@@ -28,11 +26,8 @@ type ConflictEndEvent = uicontract.ConflictEndEvent
 type InvokePromptEvent = uicontract.InvokePromptEvent
 type InvokeResponse = uicontract.InvokeResponse
 type InputRequestEvent = uicontract.InputRequestEvent
-type InputRequestType = uicontract.InputRequestType
 type InputOption = uicontract.InputOption
 type MidFlowResponse = uicontract.MidFlowResponse
-type MidFlowPrompter = uicontract.MidFlowPrompter
-type InvokePrompter = uicontract.InvokePrompter
 
 // Composite mechanical event aliases
 type DefenseRollEvent = uicontract.DefenseRollEvent
