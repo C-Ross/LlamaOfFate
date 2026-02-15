@@ -36,6 +36,9 @@ bin/
 # Session logs folder (auto-generated during gameplay)
 sessions/
 
+# Logs logs folder
+logs/
+
 # Web UI
 web/node_modules/
 web/dist/

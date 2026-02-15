@@ -15,6 +15,11 @@ import {
 
 function getWebSocketUrl(): string {
   if (typeof window === "undefined") return "ws://localhost:8080/ws"
+  // In dev mode, connect directly to the Go backend to avoid Vite proxy
+  // EPIPE errors on WebSocket disconnect (tab close, page reload).
+  // TODO: once Go serves static files in production, the else branch will
+  // route through the same host automatically.
+  if (import.meta.env.DEV) return "ws://localhost:8080/ws"
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:"
   return `${proto}//${window.location.host}/ws`
 }

@@ -1,6 +1,9 @@
 package web
 
 import (
+	"context"
+	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 
@@ -19,7 +22,8 @@ type Handler struct {
 	mux     *http.ServeMux
 }
 
-// NewHandler creates an HTTP handler with WebSocket and static file endpoints.
+// NewHandler creates an HTTP handler with WebSocket and health endpoints.
+// TODO: serve static files from web/dist for production builds (no Vite proxy).
 func NewHandler(factory GameSessionManagerFactory, logger *slog.Logger) *Handler {
 	if logger == nil {
 		logger = slog.Default()
@@ -69,6 +73,10 @@ func (h *Handler) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Info("websocket session started", "remote", r.RemoteAddr)
 	if err := session.Run(r.Context()); err != nil {
+		if isNormalClose(err) {
+			h.logger.Info("client disconnected", "remote", r.RemoteAddr)
+			return
+		}
 		h.logger.Error("session ended with error", "error", err, "remote", r.RemoteAddr)
 		_ = conn.Close(websocket.StatusInternalError, "session error")
 		return
@@ -76,4 +84,14 @@ func (h *Handler) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Info("websocket session completed", "remote", r.RemoteAddr)
 	_ = conn.Close(websocket.StatusNormalClosure, "game over")
+}
+
+// isNormalClose returns true when the error indicates the client disconnected
+// normally (tab close, page reload, graceful close) rather than a real failure.
+func isNormalClose(err error) bool {
+	if errors.Is(err, io.EOF) || errors.Is(err, context.Canceled) {
+		return true
+	}
+	status := websocket.CloseStatus(err)
+	return status == websocket.StatusNormalClosure || status == websocket.StatusGoingAway
 }

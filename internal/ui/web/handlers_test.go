@@ -3,6 +3,8 @@ package web
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -129,4 +131,54 @@ func TestHandler_WebSocket_MultipleEvents(t *testing.T) {
 	err = wsjson.Read(ctx, client, &msg)
 	require.NoError(t, err)
 	assert.Equal(t, "result_meta", msg.Event)
+}
+
+func TestIsNormalClose(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "StatusGoingAway is normal",
+			err:      websocket.CloseError{Code: websocket.StatusGoingAway, Reason: ""},
+			expected: true,
+		},
+		{
+			name:     "StatusNormalClosure is normal",
+			err:      websocket.CloseError{Code: websocket.StatusNormalClosure, Reason: "bye"},
+			expected: true,
+		},
+		{
+			name:     "EOF is normal",
+			err:      io.EOF,
+			expected: true,
+		},
+		{
+			name:     "context canceled is normal",
+			err:      context.Canceled,
+			expected: true,
+		},
+		{
+			name:     "wrapped close error is normal",
+			err:      fmt.Errorf("read client message: %w", websocket.CloseError{Code: websocket.StatusGoingAway}),
+			expected: true,
+		},
+		{
+			name:     "real error is not normal",
+			err:      fmt.Errorf("something broke"),
+			expected: false,
+		},
+		{
+			name:     "StatusInternalError is not normal",
+			err:      websocket.CloseError{Code: websocket.StatusInternalError, Reason: "crash"},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, isNormalClose(tt.err))
+		})
+	}
 }
