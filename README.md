@@ -121,6 +121,7 @@ Run `just` without arguments to see all available commands. Common commands incl
 - **`just lint`** - Run golangci-lint
 - **`just fmt`** - Format code with gofmt
 - **`just clean`** - Clean build artifacts
+- **`just clean-sessions [n]`** - Remove old session logs (default: keep 5 most recent)
 
 ### Quick Start
 
@@ -145,6 +146,9 @@ LlamaOfFate automatically saves your game progress at key points during play. Wh
 - **Auto-save**: The game saves automatically at scene transitions and key moments
 - **Auto-resume**: On startup, the game resumes from the last unfinished scenario
 - **Save location**: Game saves are stored as YAML files (configurable via `GameSaver` interface)
+- **Session logs**: Gameplay transcripts are stored in the `sessions/` directory
+  - Use `just clean-sessions` to remove old logs (keeps 5 most recent by default)
+  - Session logs are automatically gitignored
 
 ## Package Structure
 
