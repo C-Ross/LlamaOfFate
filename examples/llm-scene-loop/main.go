@@ -7,7 +7,6 @@ import (
 	"log"
 	"math/rand"
 	"os"
-	"time"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
@@ -106,7 +105,11 @@ func main() {
 	// Set up session logging (default: enabled with auto-generated filename)
 	logPath := *logFlag
 	if logPath == "auto" {
-		logPath = fmt.Sprintf("session_%s_%s.yaml", selectedScene, time.Now().Format("20060102_150405"))
+		var err error
+		logPath, err = session.GenerateLogPath("session", []string{selectedScene}, 0)
+		if err != nil {
+			log.Fatalf("Failed to generate log path: %v", err)
+		}
 	}
 	var sessionLogger *session.Logger
 	if logPath != "" {

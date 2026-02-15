@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
@@ -96,21 +95,11 @@ func main() {
 	var sessionLogger *session.Logger
 	logPath := *logFlag
 	if logPath == "auto" {
-		safeName := strings.ToLower(strings.ReplaceAll(*hintFlag, " ", "_"))
-		safeName = strings.Map(func(r rune) rune {
-			if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' {
-				return r
-			}
-			return -1
-		}, safeName)
-		if len(safeName) > 30 {
-			safeName = safeName[:30]
+		var err error
+		logPath, err = session.GenerateLogPath("scene_gen", []string{*hintFlag, *genreFlag}, 30)
+		if err != nil {
+			log.Fatalf("Failed to generate log path: %v", err)
 		}
-		logPath = fmt.Sprintf("scene_gen_%s", safeName)
-		if *genreFlag != "" {
-			logPath += "_" + strings.ToLower(*genreFlag)
-		}
-		logPath += "_" + time.Now().Format("20060102_150405") + ".yaml"
 	}
 	if logPath != "" {
 		sessionLogger, err = session.NewLogger(logPath)

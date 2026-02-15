@@ -6,11 +6,66 @@ package session
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"gopkg.in/yaml.v3"
 )
+
+const (
+	// SessionsDir is the directory where session logs are stored
+	SessionsDir = "sessions"
+)
+
+// GenerateLogPath creates a session log path in the sessions/ directory.
+// The filename is constructed from a prefix and parts, each sanitized to be filesystem-safe.
+// Parts are joined with underscores and a timestamp is appended.
+// maxLen specifies the maximum length for each sanitized part (0 = no limit).
+//
+// Example: GenerateLogPath("session", []string{"western", "jesse calhoun"}, 20)
+// Returns: "sessions/session_western_jesse_calhoun_20060102_150405.yaml"
+func GenerateLogPath(prefix string, parts []string, maxLen int) (string, error) {
+	// Ensure sessions directory exists
+	if err := os.MkdirAll(SessionsDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create sessions directory: %w", err)
+	}
+
+	// Sanitize and collect parts
+	var sanitized []string
+	sanitized = append(sanitized, sanitizePart(prefix, maxLen))
+	for _, part := range parts {
+		if part != "" {
+			sanitized = append(sanitized, sanitizePart(part, maxLen))
+		}
+	}
+
+	// Add timestamp
+	sanitized = append(sanitized, time.Now().Format("20060102_150405"))
+
+	// Build filename
+	filename := strings.Join(sanitized, "_") + ".yaml"
+	return filepath.Join(SessionsDir, filename), nil
+}
+
+// sanitizePart converts a string to a filesystem-safe identifier.
+// Converts to lowercase, replaces spaces with underscores, removes non-alphanumeric chars.
+// If maxLen > 0, truncates to that length.
+func sanitizePart(s string, maxLen int) string {
+	s = strings.ToLower(s)
+	s = strings.ReplaceAll(s, " ", "_")
+	s = strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' {
+			return r
+		}
+		return -1
+	}, s)
+	if maxLen > 0 && len(s) > maxLen {
+		s = s[:maxLen]
+	}
+	return s
+}
 
 // Entry represents a single log entry in the session
 type Entry struct {

@@ -7,8 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
-	"time"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
@@ -138,21 +136,15 @@ func newSaver() *storage.YAMLSaver {
 
 // setupSessionLogger creates a session logger with an auto-generated filename
 func setupSessionLogger(scenario *scene.Scenario, playerName string) (*session.Logger, error) {
-	label := strings.ToLower(scenario.Genre)
+	label := scenario.Genre
 	if label == "" {
 		label = "game"
 	}
-	safeName := strings.ToLower(strings.ReplaceAll(playerName, " ", "_"))
-	safeName = strings.Map(func(r rune) rune {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' {
-			return r
-		}
-		return -1
-	}, safeName)
-	if len(safeName) > 20 {
-		safeName = safeName[:20]
+
+	logPath, err := session.GenerateLogPath("session", []string{label, playerName}, 20)
+	if err != nil {
+		return nil, err
 	}
-	logPath := fmt.Sprintf("session_%s_%s_%s.yaml", label, safeName, time.Now().Format("20060102_150405"))
 
 	logger, err := session.NewLogger(logPath)
 	if err != nil {

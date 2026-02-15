@@ -98,3 +98,20 @@ scenario-walkthrough:
     @mkdir -p bin
     {{gocmd}} build -o ./bin/scenario-walkthrough ./examples/scenario-walkthrough
     @echo "Build complete: ./bin/scenario-walkthrough"
+
+# Clean up old session logs, keeping the last n (default 5)
+clean-sessions n="5":
+    #!/usr/bin/env bash
+    if [ ! -d "sessions" ]; then
+        echo "No sessions directory found"
+        exit 0
+    fi
+    total=$(find sessions -maxdepth 1 -type f -name "*.yaml" | wc -l)
+    if [ "$total" -le "{{n}}" ]; then
+        echo "Found $total session files (keeping all, threshold is {{n}})"
+        exit 0
+    fi
+    to_delete=$((total - {{n}}))
+    echo "Found $total session files, removing $to_delete oldest files (keeping {{n}})"
+    find sessions -maxdepth 1 -type f -name "*.yaml" -printf '%T+ %p\0' | sort -z | head -z -n "$to_delete" | cut -z -d' ' -f2- | xargs -0 rm -v
+    echo "Cleanup complete"

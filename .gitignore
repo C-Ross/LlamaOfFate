@@ -32,14 +32,5 @@ bin/
 # Configuration files with sensitive information
 *.local.yaml
 
-# Session log files (auto-generated during gameplay)
-session_*.yaml
-
-# Scenario generator output files
-scenario_gen_*.yaml
-
-# Scene generator output files
-scene_gen_*.yaml
-
-# Walkthrough output files
-walkthrough_*.yaml
+# Session logs folder (auto-generated during gameplay)
+sessions/

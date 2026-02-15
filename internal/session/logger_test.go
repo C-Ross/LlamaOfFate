@@ -148,3 +148,114 @@ func TestLogger_MultipleEntries(t *testing.T) {
 	assert.Contains(t, content, "Second")
 	assert.Contains(t, content, "Third")
 }
+
+func TestGenerateLogPath(t *testing.T) {
+	// Clean up any sessions dir created by tests
+	defer func() {
+		_ = os.RemoveAll(SessionsDir)
+	}()
+
+	tests := []struct {
+		name      string
+		prefix    string
+		parts     []string
+		maxLen    int
+		wantMatch string // regex pattern to match
+	}{
+		{
+			name:      "simple parts",
+			prefix:    "session",
+			parts:     []string{"western", "jesse"},
+			maxLen:    0,
+			wantMatch: `^sessions/session_western_jesse_\d{8}_\d{6}\.yaml$`,
+		},
+		{
+			name:      "sanitize spaces",
+			prefix:    "walkthrough",
+			parts:     []string{"space opera", "simon falcon"},
+			maxLen:    20,
+			wantMatch: `^sessions/walkthrough_space_opera_simon_falcon_\d{8}_\d{6}\.yaml$`,
+		},
+		{
+			name:      "sanitize special chars",
+			prefix:    "session",
+			parts:     []string{"sci-fi!", "player@123"},
+			maxLen:    0,
+			wantMatch: `^sessions/session_scifi_player123_\d{8}_\d{6}\.yaml$`,
+		},
+		{
+			name:      "truncate long parts",
+			prefix:    "scene_gen",
+			parts:     []string{"a_very_long_description_that_exceeds_limit"},
+			maxLen:    20,
+			wantMatch: `^sessions/scene_gen_a_very_long_descript_\d{8}_\d{6}\.yaml$`,
+		},
+		{
+			name:      "empty parts filtered",
+			prefix:    "session",
+			parts:     []string{"", "western", "", "jesse"},
+			maxLen:    0,
+			wantMatch: `^sessions/session_western_jesse_\d{8}_\d{6}\.yaml$`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path, err := GenerateLogPath(tt.prefix, tt.parts, tt.maxLen)
+			require.NoError(t, err)
+			assert.Regexp(t, tt.wantMatch, path)
+
+			// Verify sessions directory was created
+			info, err := os.Stat(SessionsDir)
+			require.NoError(t, err)
+			assert.True(t, info.IsDir())
+		})
+	}
+}
+
+func TestSanitizePart(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  string
+		maxLen int
+		want   string
+	}{
+		{
+			name:   "lowercase conversion",
+			input:  "MyCharacter",
+			maxLen: 0,
+			want:   "mycharacter",
+		},
+		{
+			name:   "spaces to underscores",
+			input:  "space opera hero",
+			maxLen: 0,
+			want:   "space_opera_hero",
+		},
+		{
+			name:   "remove special chars",
+			input:  "name-with@special!chars",
+			maxLen: 0,
+			want:   "namewithspecialchars",
+		},
+		{
+			name:   "truncate",
+			input:  "verylongname",
+			maxLen: 8,
+			want:   "verylong",
+		},
+		{
+			name:   "mixed operations",
+			input:  "Jesse Calhoun!",
+			maxLen: 20,
+			want:   "jesse_calhoun",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sanitizePart(tt.input, tt.maxLen)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
