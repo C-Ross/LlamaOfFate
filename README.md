@@ -159,6 +159,7 @@ LlamaOfFate/
 │   │   ├── dice/               # Dice rolling and probability
 │   │   └── scene/              # Scene and conflict management
 │   ├── engine/                 # Game engine (scene/scenario managers, action parsing, conflict resolution)
+│   ├── syncdriver/             # Synchronous blocking game loop (wraps async engine API)
 │   ├── llm/                    # LLM integration layer
 │   │   └── azure/              # Azure OpenAI implementation
 │   ├── prompt/                 # LLM prompt templates and response parsing
@@ -185,7 +186,8 @@ LlamaOfFate/
 
 - **`cmd/cli/`**: Entry point for the command-line application
 - **`internal/core/`**: Core Fate mechanics implementation (character, dice, scene, action, skills)
-- **`internal/engine/`**: Orchestrates core mechanics and LLM services; emits GameEvents for UI rendering (scene/scenario managers, action parsing, conflict resolution)
+- **`internal/engine/`**: Purely async/event-driven game engine (GameSessionManager interface: Start/HandleInput/ProvideInvokeResponse/ProvideMidFlowResponse/Save); emits GameEvents for UI rendering
+- **`internal/syncdriver/`**: Synchronous blocking game loop that wraps the engine's async API for terminal-style UIs (Run function drives: ReadInput → HandleInput → Emit events → drive prompts → repeat)
 - **`internal/llm/`**: LLM integration with Azure OpenAI backend, including retry logic and response handling
 - **`internal/prompt/`**: LLM prompt template rendering and response parsing (template data types, render functions, marker extraction)
 - **`internal/session/`**: Session logging for game transcripts
