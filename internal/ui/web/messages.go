@@ -129,6 +129,8 @@ func eventTypeName(event uicontract.GameEvent) string {
 		return "milestone"
 	case uicontract.GameResumedEvent:
 		return "game_resumed"
+	case uicontract.GameStateSnapshotEvent:
+		return "game_state_snapshot"
 	default:
 		return "unknown"
 	}

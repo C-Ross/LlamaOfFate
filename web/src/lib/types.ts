@@ -282,6 +282,52 @@ export interface GameResumedEventData {
 }
 
 // ---------------------------------------------------------------------------
+// Game state snapshot (sent once after Start() for sidebar initialisation)
+// ---------------------------------------------------------------------------
+
+export interface StressTrackSnapshot {
+  boxes: boolean[]
+  maxBoxes: number
+}
+
+export interface ConsequenceSnapshotEntry {
+  severity: string
+  aspect: string
+  recovering: boolean
+}
+
+export interface PlayerSnapshot {
+  name: string
+  highConcept: string
+  trouble: string
+  aspects: string[]
+  fatePoints: number
+  refresh: number
+  stressTracks: Record<string, StressTrackSnapshot>
+  consequences: ConsequenceSnapshotEntry[]
+}
+
+export interface SituationAspectSnapshot {
+  name: string
+  freeInvokes: number
+}
+
+export interface NPCSnapshot {
+  name: string
+  highConcept: string
+  aspects: string[]
+  isTakenOut: boolean
+}
+
+export interface GameStateSnapshotEventData {
+  player: PlayerSnapshot
+  sceneName: string
+  situationAspects: SituationAspectSnapshot[]
+  npcs: NPCSnapshot[]
+  inConflict: boolean
+}
+
+// ---------------------------------------------------------------------------
 // Discriminated union for typed event handling
 // ---------------------------------------------------------------------------
 
@@ -317,6 +363,7 @@ export type GameEventType =
   | "stress_overflow"
   | "milestone"
   | "game_resumed"
+  | "game_state_snapshot"
   | "result_meta"
 
 /** A parsed game event with its type tag and data. */

@@ -16,6 +16,14 @@ export default defineConfig({
       "/ws": {
         target: "http://localhost:8080",
         ws: true,
+        // Suppress noisy EPIPE errors when the Go server restarts or closes WS connections
+        configure: (proxy) => {
+          proxy.on("error", (err) => {
+            if ((err as NodeJS.ErrnoException).code !== "EPIPE") {
+              console.error("[ws proxy]", err.message)
+            }
+          })
+        },
       },
     },
   },

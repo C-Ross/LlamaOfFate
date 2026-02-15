@@ -330,3 +330,58 @@ type GameResumedEvent struct {
 }
 
 func (GameResumedEvent) gameEvent() {}
+
+// ---------------------------------------------------------------------------
+// Full-state snapshot — sent once after Start() so the UI can initialise.
+// ---------------------------------------------------------------------------
+
+// GameStateSnapshotEvent is emitted after Start() completes so that the web
+// UI's sidebar can initialise character info, stress tracks, aspects, etc.
+type GameStateSnapshotEvent struct {
+	Player           PlayerSnapshot            `json:"player"`
+	SceneName        string                    `json:"sceneName"`
+	SituationAspects []SituationAspectSnapshot `json:"situationAspects"`
+	NPCs             []NPCSnapshot             `json:"npcs"`
+	InConflict       bool                      `json:"inConflict"`
+}
+
+func (GameStateSnapshotEvent) gameEvent() {}
+
+// PlayerSnapshot is a serialisable view of the player character.
+type PlayerSnapshot struct {
+	Name         string                         `json:"name"`
+	HighConcept  string                         `json:"highConcept"`
+	Trouble      string                         `json:"trouble"`
+	Aspects      []string                       `json:"aspects"`
+	FatePoints   int                            `json:"fatePoints"`
+	Refresh      int                            `json:"refresh"`
+	StressTracks map[string]StressTrackSnapshot `json:"stressTracks"`
+	Consequences []ConsequenceSnapshotEntry     `json:"consequences"`
+}
+
+// StressTrackSnapshot is a serialisable view of a stress track.
+type StressTrackSnapshot struct {
+	Boxes    []bool `json:"boxes"`
+	MaxBoxes int    `json:"maxBoxes"`
+}
+
+// ConsequenceSnapshotEntry is a serialisable view of a consequence slot.
+type ConsequenceSnapshotEntry struct {
+	Severity   string `json:"severity"`
+	Aspect     string `json:"aspect"`
+	Recovering bool   `json:"recovering"`
+}
+
+// SituationAspectSnapshot is a serialisable view of a situation aspect.
+type SituationAspectSnapshot struct {
+	Name        string `json:"name"`
+	FreeInvokes int    `json:"freeInvokes"`
+}
+
+// NPCSnapshot is a serialisable view of an NPC visible in the current scene.
+type NPCSnapshot struct {
+	Name        string   `json:"name"`
+	HighConcept string   `json:"highConcept"`
+	Aspects     []string `json:"aspects"`
+	IsTakenOut  bool     `json:"isTakenOut"`
+}

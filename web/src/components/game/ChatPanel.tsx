@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { ChatMessage } from "@/components/game/ChatMessage"
 import { CHAT_DISPLAYABLE_EVENTS, type GameEvent } from "@/lib/types"
+import { cn } from "@/lib/utils"
 
 interface ChatPanelProps {
   events: GameEvent[]
@@ -19,7 +19,7 @@ export function ChatPanel({ events, className }: ChatPanelProps) {
   }, [displayable.length])
 
   return (
-    <ScrollArea className={className}>
+    <div className={cn("overflow-y-auto", className)}>
       <div className="mx-auto max-w-2xl space-y-4 px-6 py-4">
         {displayable.length === 0 && (
           <div className="rounded-lg bg-secondary/50 px-4 py-3 text-sm text-muted-foreground italic font-body">
@@ -31,6 +31,6 @@ export function ChatPanel({ events, className }: ChatPanelProps) {
         ))}
         <div ref={bottomRef} />
       </div>
-    </ScrollArea>
+    </div>
   )
 }

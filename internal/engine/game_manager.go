@@ -149,7 +149,15 @@ func (g *GameManager) Start(ctx context.Context) ([]GameEvent, error) {
 		g.scenarioManager.SetSessionLogger(g.sessionLogger)
 	}
 
-	return g.scenarioManager.Start(ctx)
+	events, err := g.scenarioManager.Start(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Append a full-state snapshot so web UIs can initialise sidebar state.
+	events = append(events, g.buildStateSnapshot())
+
+	return events, nil
 }
 
 // startFromSave restores game state and returns opening events with GameResumedEvent prepended.
@@ -190,6 +198,9 @@ func (g *GameManager) startFromSave(ctx context.Context, state *GameState) ([]Ga
 	})
 	events = append(events, scenarioEvents...)
 
+	// Append a full-state snapshot so web UIs can initialise sidebar state.
+	events = append(events, g.buildStateSnapshot())
+
 	return events, nil
 }
 
@@ -206,12 +217,7 @@ func (g *GameManager) HandleInput(ctx context.Context, input string) (*InputResu
 		return nil, err
 	}
 
-	// If the scenario resolved, append milestone events
-	if result.GameOver && result.ScenarioResult != nil && result.ScenarioResult.Reason == ScenarioEndResolved {
-		g.scenarioCount++
-		milestoneEvents := g.handleMilestone()
-		result.Events = append(result.Events, milestoneEvents...)
-	}
+	g.appendPostInputSnapshot(result)
 
 	return result, nil
 }
@@ -227,10 +233,7 @@ func (g *GameManager) ProvideInvokeResponse(ctx context.Context, resp InvokeResp
 		return nil, err
 	}
 
-	if result.GameOver && result.ScenarioResult != nil && result.ScenarioResult.Reason == ScenarioEndResolved {
-		g.scenarioCount++
-		result.Events = append(result.Events, g.handleMilestone()...)
-	}
+	g.appendPostInputSnapshot(result)
 
 	return result, nil
 }
@@ -246,12 +249,25 @@ func (g *GameManager) ProvideMidFlowResponse(ctx context.Context, resp MidFlowRe
 		return nil, err
 	}
 
+	g.appendPostInputSnapshot(result)
+
+	return result, nil
+}
+
+// appendPostInputSnapshot appends milestone events when a scenario resolves and
+// a GameStateSnapshotEvent whenever a scene transition occurred (so the web
+// sidebar refreshes NPCs, stress, aspects, etc.).
+func (g *GameManager) appendPostInputSnapshot(result *InputResult) {
+	// Scenario resolution → milestone
 	if result.GameOver && result.ScenarioResult != nil && result.ScenarioResult.Reason == ScenarioEndResolved {
 		g.scenarioCount++
 		result.Events = append(result.Events, g.handleMilestone()...)
 	}
 
-	return result, nil
+	// Scene transition (new scene started) → append fresh snapshot
+	if result.SceneEnded && !result.GameOver {
+		result.Events = append(result.Events, g.buildStateSnapshot())
+	}
 }
 
 // handleMilestone processes a scenario milestone and returns the events
@@ -303,6 +319,76 @@ func (g *GameManager) handleMilestone() []GameEvent {
 	}
 
 	return events
+}
+
+// buildStateSnapshot creates a GameStateSnapshotEvent from the current engine
+// state.  It is safe to call after ScenarioManager.Start has returned.
+func (g *GameManager) buildStateSnapshot() GameStateSnapshotEvent {
+	snap := GameStateSnapshotEvent{}
+
+	// Player
+	if g.player != nil {
+		snap.Player = PlayerSnapshot{
+			Name:        g.player.Name,
+			HighConcept: g.player.Aspects.HighConcept,
+			Trouble:     g.player.Aspects.Trouble,
+			Aspects:     g.player.Aspects.OtherAspects,
+			FatePoints:  g.player.FatePoints,
+			Refresh:     g.player.Refresh,
+		}
+
+		// Stress tracks
+		tracks := make(map[string]StressTrackSnapshot, len(g.player.StressTracks))
+		for name, st := range g.player.StressTracks {
+			boxes := make([]bool, len(st.Boxes))
+			copy(boxes, st.Boxes)
+			tracks[name] = StressTrackSnapshot{
+				Boxes:    boxes,
+				MaxBoxes: st.MaxBoxes,
+			}
+		}
+		snap.Player.StressTracks = tracks
+
+		// Consequences
+		for _, c := range g.player.Consequences {
+			snap.Player.Consequences = append(snap.Player.Consequences, ConsequenceSnapshotEntry{
+				Severity:   string(c.Type),
+				Aspect:     c.Aspect,
+				Recovering: c.Recovering,
+			})
+		}
+	}
+
+	// Scene
+	currentScene := g.engine.GetSceneManager().GetCurrentScene()
+	if currentScene != nil {
+		snap.SceneName = currentScene.Name
+		snap.InConflict = currentScene.IsConflict
+
+		for _, sa := range currentScene.SituationAspects {
+			snap.SituationAspects = append(snap.SituationAspects, SituationAspectSnapshot{
+				Name:        sa.Aspect,
+				FreeInvokes: sa.FreeInvokes,
+			})
+		}
+
+		// NPCs in the scene
+		npcs := g.engine.GetCharactersByScene(currentScene)
+		for _, npc := range npcs {
+			if npc.ID == g.player.ID {
+				continue // skip the player
+			}
+			npcSnap := NPCSnapshot{
+				Name:        npc.Name,
+				HighConcept: npc.Aspects.HighConcept,
+				Aspects:     npc.Aspects.OtherAspects,
+				IsTakenOut:  npc.IsTakenOut(),
+			}
+			snap.NPCs = append(snap.NPCs, npcSnap)
+		}
+	}
+
+	return snap
 }
 
 // InitialSceneConfig holds configuration for starting with a pre-built scene

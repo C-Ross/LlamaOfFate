@@ -45,6 +45,8 @@ describe("App", () => {
     expect(screen.getByText("Character")).toBeInTheDocument()
     expect(screen.getByText("Situation Aspects")).toBeInTheDocument()
     expect(screen.getByText("Fate Points")).toBeInTheDocument()
+    expect(screen.getByText("Stress & Consequences")).toBeInTheDocument()
+    expect(screen.getByText("NPCs")).toBeInTheDocument()
   })
 
   it("renders the input form disabled when not connected", () => {
