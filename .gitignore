@@ -42,3 +42,6 @@ logs/
 # Web UI
 web/node_modules/
 web/dist/
+
+# Playwright MCP session artifacts
+.playwright-mcp/
