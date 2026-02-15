@@ -28,6 +28,7 @@ bin/
 /scene-generator
 /scenario-generator
 /scenario-walkthrough
+/server
 
 # Configuration files with sensitive information
 *.local.yaml

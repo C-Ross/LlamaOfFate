@@ -14,7 +14,7 @@ main_path := "./cmd/cli"
 default: clean deps vet fmt build
 
 # Run all validation checks
-validate: vet fmtcheck lint test build-llmeval
+validate: vet fmtcheck lint test build-llmeval build-server
     @echo "All validations passed!"
 
 # Build the application
@@ -23,6 +23,18 @@ build:
     @mkdir -p bin
     {{gocmd}} build -o {{binary_path}} {{main_path}}
     @echo "Build complete: {{binary_path}}"
+
+# Build the web server
+build-server:
+    @echo "Building web server..."
+    @mkdir -p bin
+    {{gocmd}} build -o ./bin/server ./cmd/server
+    @echo "Build complete: ./bin/server"
+
+# Build and run the web server
+serve: build-server
+    @echo "Starting web server on :8080..."
+    ./bin/server
 
 # Clean build artifacts
 clean:
