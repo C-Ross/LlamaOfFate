@@ -56,4 +56,9 @@ describe("App", () => {
     const button = screen.getByRole("button", { name: "Send" })
     expect(button).toBeDisabled()
   })
+
+  it("renders a mobile sidebar toggle button", () => {
+    render(<App />)
+    expect(screen.getByRole("button", { name: "Open game sidebar" })).toBeInTheDocument()
+  })
 })

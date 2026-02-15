@@ -1,9 +1,17 @@
+import { useState } from "react"
 import { GameSidebar } from "@/components/game/GameSidebar"
 import { ChatPanel } from "@/components/game/ChatPanel"
 import { ChatInput } from "@/components/game/ChatInput"
 import { useGameSocket } from "@/hooks/useGameSocket"
 import { useGameState } from "@/hooks/useGameState"
 import { Badge } from "@/components/ui/badge"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 
 function getWebSocketUrl(): string {
   if (typeof window === "undefined") return "ws://localhost:8080/ws"
@@ -12,6 +20,7 @@ function getWebSocketUrl(): string {
 }
 
 function App() {
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const {
     events,
     isConnected,
@@ -44,6 +53,26 @@ function App() {
           {isPending && (
             <span className="text-xs text-muted-foreground animate-pulse">Thinking...</span>
           )}
+          {/* Mobile sidebar toggle */}
+          <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+            <SheetTrigger asChild>
+              <button
+                className="ml-auto rounded-md p-2 text-muted-foreground hover:text-foreground lg:hidden"
+                aria-label="Open game sidebar"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect width="18" height="18" x="3" y="3" rx="2" />
+                  <path d="M15 3v18" />
+                </svg>
+              </button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-80 overflow-y-auto p-4">
+              <SheetHeader>
+                <SheetTitle className="text-sm font-heading uppercase tracking-wider">Game Info</SheetTitle>
+              </SheetHeader>
+              <GameSidebar state={gameState} />
+            </SheetContent>
+          </Sheet>
         </header>
 
         {/* Message area */}
