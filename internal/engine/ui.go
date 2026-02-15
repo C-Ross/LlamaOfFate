@@ -1,23 +1,8 @@
 package engine
 
 import (
-	"context"
-
 	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
 )
-
-// GameSessionManager is the async API surface for driving a game session.
-// GameManager implements this interface. Consumers (e.g. the web package)
-// depend on this interface rather than on *GameManager directly.
-type GameSessionManager interface {
-	Start(ctx context.Context) ([]GameEvent, error)
-	HandleInput(ctx context.Context, input string) (*InputResult, error)
-	ProvideInvokeResponse(ctx context.Context, resp InvokeResponse) (*InputResult, error)
-	ProvideMidFlowResponse(ctx context.Context, resp MidFlowResponse) (*InputResult, error)
-}
-
-// Compile-time check: *GameManager implements GameSessionManager.
-var _ GameSessionManager = (*GameManager)(nil)
 
 // Type aliases re-export the UI contract types so that code within the engine
 // package (and external consumers of engine) can continue using the short names.

@@ -91,11 +91,8 @@ func newGameSession(llmClient llm.LLMClient) (engine.GameSessionManager, error) 
 	scenario := defaultScenario()
 	player := defaultPlayer()
 
-	webUI := web.NewWebUI()
-
 	gm := engine.NewGameManager(gameEngine)
 	gm.SetPlayer(player)
-	gm.SetUI(webUI)
 	gm.SetScenario(scenario)
 
 	return gm, nil

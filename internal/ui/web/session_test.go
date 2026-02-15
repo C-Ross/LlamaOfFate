@@ -53,6 +53,10 @@ func (m *mockDriver) ProvideMidFlowResponse(_ context.Context, resp uicontract.M
 	return m.midFlowResult, m.midFlowErr
 }
 
+func (m *mockDriver) Save() error {
+	return nil
+}
+
 // wsTestPair creates a WebSocket server/client pair for testing. The server
 // side calls sessionFn with the accepted connection; the client side is
 // returned for the test to use.
