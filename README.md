@@ -45,6 +45,14 @@ Fate™ is a trademark of Evil Hat Productions, LLC.
 - **Conflict System**: Handle conflicts with initiative, zones, and positioning
 - **Narrative Continuity**: Maintain story context across scenes and sessions
 
+### Web UI
+- **Real-time Gameplay**: WebSocket-based connection for instant feedback
+- **Session Persistence**: Game state survives page refresh via localStorage
+- **Interactive Conflict Resolution**: Visual aspect invocation with +2/reroll options
+- **Fate Dice Visualization**: See individual die faces and outcomes with color-coded results
+- **Responsive Chat Interface**: Multi-line input, instant echo, loading indicators
+- **Mid-flow Prompts**: Make tactical choices during conflicts (concede, take consequences, etc.)
+
 ## Configuration
 
 ### Azure ML Setup
@@ -120,6 +128,8 @@ Run `just` without arguments to see all available commands. Common commands incl
 **Go:**
 - **`just build`** - Build the CLI application
 - **`just run`** - Build and run the CLI
+- **`just build-server`** - Build the WebSocket server
+- **`just serve`** - Build and start the WebSocket server (port 8080)
 - **`just go-test`** - Run Go tests
 - **`just go-lint`** - Run golangci-lint
 - **`just go-validate`** - vet + fmtcheck + lint + test + build
@@ -150,8 +160,13 @@ just validate
 # Run the CLI application
 just run
 
-# Start the web UI dev server
+# Start the web UI (requires two terminals)
+# Terminal 1: Start the WebSocket server
+just serve
+
+# Terminal 2: Start the Vite dev server
 just web-dev
+# Then open http://localhost:5173 in your browser
 ```
 
 ## Saving and Loading Games
@@ -237,11 +252,14 @@ LlamaOfFate/
 - ✅ Game state persistence (save/load functionality via YAML)
 - ✅ Event-driven UI architecture with async invoke/input support
 - ✅ Integration tests and LLM evaluation tests
-- ✅ Web UI scaffold (React + Vite + Tailwind + shadcn/ui)
-- ✅ WebSocket server backend
+- ✅ Web UI with React + Vite + Tailwind v4 + shadcn/ui
+- ✅ WebSocket server backend with full game engine integration
+- ✅ Web UI session persistence (survives page refresh via localStorage)
+- ✅ Interactive conflict UI with aspect invocation and mid-flow prompts
+- ✅ Fate dice visualization with structured die face display
+- ✅ Playwright testing framework for web UI validation
 
 ### Planned Features
 - 📋 Additional LLM backends (Ollama, OpenAI direct)
-- 📋 WebSocket integration connecting web UI to game engine
 - 📋 Public API packages for external integrations
 - 📋 Database backends for long-term storage
