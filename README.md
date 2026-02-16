@@ -113,20 +113,33 @@ scoop install just
 
 Run `just` without arguments to see all available commands. Common commands include:
 
-- **`just build`** - Build the application binary
-- **`just run`** - Build and run the application
-- **`just test`** - Run all unit and integration tests
+**Unified:**
+- **`just validate`** - Run all validation checks (Go + Web)
+- **`just clean`** - Clean all build artifacts
+
+**Go:**
+- **`just build`** - Build the CLI application
+- **`just run`** - Build and run the CLI
+- **`just go-test`** - Run Go tests
+- **`just go-lint`** - Run golangci-lint
+- **`just go-validate`** - vet + fmtcheck + lint + test + build
 - **`just test-llm`** - Run LLM evaluation tests (requires Azure credentials)
-- **`just validate`** - Run all validation checks (vet, format check, lint, test)
-- **`just lint`** - Run golangci-lint
-- **`just fmt`** - Format code with gofmt
-- **`just clean`** - Clean build artifacts
+- **`just go-fmt`** - Format Go code with gofmt
+
+**Web:**
+- **`just web-dev`** - Start Vite dev server
+- **`just web-test`** - Run Vitest
+- **`just web-lint`** - Run ESLint
+- **`just web-build`** - Production build
+- **`just web-validate`** - lint + test + build
+- **`just web-install`** - Install npm dependencies
 
 ### Quick Start
 
 ```bash
 # Install dependencies
-just deps
+just go-deps
+just web-install
 
 # Build the application
 just build
@@ -134,8 +147,11 @@ just build
 # Run all validations (recommended before committing)
 just validate
 
-# Run the application
+# Run the CLI application
 just run
+
+# Start the web UI dev server
+just web-dev
 ```
 
 ## Saving and Loading Games
@@ -151,7 +167,8 @@ LlamaOfFate automatically saves your game progress at key points during play. Wh
 ```
 LlamaOfFate/
 ├── cmd/
-│   └── cli/                    # Command-line interface
+│   ├── cli/                    # Command-line interface
+│   └── server/                 # WebSocket server entry point
 ├── internal/
 │   ├── core/                   # Core game mechanics
 │   │   ├── action/             # Action resolution system
@@ -167,7 +184,10 @@ LlamaOfFate/
 │   ├── storage/                # Game state persistence (YAML save/load)
 │   ├── logging/                # Application logging
 │   └── ui/
-│       └── terminal/           # Terminal-based interface
+│       ├── terminal/           # Terminal-based interface
+│       └── web/                # WebSocket UI implementation
+├── web/                        # React frontend (Vite, Tailwind v4, shadcn/ui)
+│   └── src/                    # Components, theme, tests
 ├── examples/                   # Example programs and scenarios
 │   ├── llm-scene-loop/         # Interactive scene loop example
 │   ├── scenario-generator/     # Scenario generation example
@@ -185,6 +205,7 @@ LlamaOfFate/
 ### Package Responsibilities
 
 - **`cmd/cli/`**: Entry point for the command-line application
+- **`cmd/server/`**: Entry point for the WebSocket server
 - **`internal/core/`**: Core Fate mechanics implementation (character, dice, scene, action, skills)
 - **`internal/engine/`**: Purely async/event-driven game engine (GameSessionManager interface: Start/HandleInput/ProvideInvokeResponse/ProvideMidFlowResponse/Save); emits GameEvents for UI rendering
 - **`internal/syncdriver/`**: Synchronous blocking game loop that wraps the engine's async API for terminal-style UIs (Run function drives: ReadInput → HandleInput → Emit events → drive prompts → repeat)
@@ -194,6 +215,8 @@ LlamaOfFate/
 - **`internal/storage/`**: Game state persistence with YAML-based save/load
 - **`internal/uicontract/`**: UI interface contracts (UI, SceneInfo, GameEvent types, etc.) for decoupling engine from UI implementations
 - **`internal/ui/terminal/`**: Terminal UI implementation; handles meta-commands and renders GameEvents to console
+- **`internal/ui/web/`**: WebSocket UI implementation; bridges engine events to WebSocket clients
+- **`web/`**: React frontend — Vite 7, React 19, TypeScript, Tailwind CSS v4, shadcn/ui, Vitest
 - **`examples/`**: Example programs demonstrating LLM scene loops, scenario generation, and walkthroughs
 - **`configs/`**: YAML configuration files (azure-llm.yaml)
 - **`test/integration/`**: Integration tests for the game system
@@ -214,9 +237,10 @@ LlamaOfFate/
 - ✅ Game state persistence (save/load functionality via YAML)
 - ✅ Event-driven UI architecture with async invoke/input support
 - ✅ Integration tests and LLM evaluation tests
+- ✅ Web UI with full WebSocket integration (React + Vite + Tailwind + shadcn/ui)
 
 ### Planned Features
 - 📋 Additional LLM backends (Ollama, OpenAI direct)
-- 📋 Web-based user interface
 - 📋 Public API packages for external integrations
 - 📋 Database backends for long-term storage
+
