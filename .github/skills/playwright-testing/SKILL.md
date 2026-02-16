@@ -27,7 +27,9 @@ The web UI requires **two services** running:
    ```
    Or use `just web-dev`.
 
-Run both as background processes before navigating with Playwright.
+Run both as background terminal processes (`isBackground=true`) before navigating with Playwright. Do NOT use shellwright for servers.
+
+Wait for both to be ready before navigating.
 
 In dev mode the React app connects directly to `ws://localhost:8080/ws` (bypasses Vite proxy to avoid EPIPE on disconnect).
 
@@ -95,13 +97,25 @@ browser_press_key(key="Enter")
 
 Use after typing to submit input. Common keys: `Enter`, `Escape`, `Tab`.
 
-### Waiting for Content
+### Waiting
 
 ```
 browser_wait_for(textGone="Thinking...")
+browser_wait_for(time=5)
 ```
 
-Use `textGone` to wait for an element to disappear (e.g., the "Thinking..." indicator after the LLM responds). Default timeout is 5 seconds — for LLM responses this may be too short; the server processes LLM calls which can take 10-30 seconds.
+- `textGone` — wait for an element to disappear (e.g., the "Thinking..." indicator)
+- `time` — wait a fixed number of seconds (useful for async operations like WebSocket connect)
+
+Default timeout is 5 seconds — for LLM responses this may be too short; the server processes LLM calls which can take 10-30 seconds.
+
+### Evaluating JavaScript
+
+```
+browser_evaluate(function="() => localStorage.getItem('key')")
+```
+
+Run arbitrary JS in the page context. Useful for checking application state.
 
 ### Resizing the Viewport
 
@@ -110,6 +124,15 @@ browser_resize(width=1280, height=800)
 ```
 
 Default viewport is phone-sized (~780px). Resize to 1280+ to see the desktop layout with the sidebar visible. The sidebar is hidden below `lg` breakpoint (1024px).
+
+## Tool Pitfalls
+
+| Tool | Gotcha |
+|------|--------|
+| `browser_evaluate` | Requires `function` param as arrow string: `() => expr`. Raw `expression` param does not work. |
+| `browser_fill_form` | Requires `fields` array with `ref`+`value`+`name`. For single inputs, prefer `browser_type`. |
+| `browser_wait_for` | Only supports `text` (exact match, first visible), `textGone`, or `time` (seconds). No `state` param. `timeout` is not supported as a separate param. |
+| `browser_snapshot` | Returns `ref=eN` IDs for elements. Use these refs in subsequent calls. Refs change on page navigation/re-render. |
 
 ## Page Structure
 
@@ -165,16 +188,27 @@ Default viewport is phone-sized (~780px). Resize to 1280+ to see the desktop lay
 ### Basic Interaction Flow
 
 ```
-1. browser_navigate(url="http://localhost:5173")
-2. browser_snapshot()                            — verify "Connected", scene loaded
-3. browser_resize(width=1280, height=800)        — show sidebar
-4. browser_click(ref=<input_ref>)                — focus input
-5. browser_type(ref=<input_ref>, text="I look around")
-6. browser_press_key(key="Enter")                — submit
-7. browser_snapshot()                            — see "Thinking..."
-8. browser_wait_for(textGone="Thinking...")       — wait for LLM
-9. browser_snapshot()                            — verify GM response
-10. browser_take_screenshot(type="png", fullPage=true)
+1. Start servers (background terminals)
+2. browser_navigate(url="http://localhost:5173")
+3. browser_wait_for(time=3)                      — let WebSocket connect
+4. browser_snapshot()                            — verify "Connected", scene loaded
+5. browser_resize(width=1280, height=800)        — show sidebar
+6. browser_click(ref=<input_ref>)                — focus input
+7. browser_type(ref=<input_ref>, text="I look around")
+8. browser_press_key(key="Enter")                — submit
+9. browser_snapshot()                            — see "Thinking..."
+10. browser_wait_for(textGone="Thinking...")      — wait for LLM (10-30s)
+11. browser_snapshot()                           — verify GM response
+12. browser_take_screenshot(type="png", fullPage=true)
+```
+
+### Testing Persistence
+
+```
+1. browser_evaluate(function="() => localStorage.getItem('key')")  — check state
+2. browser_navigate(url="http://localhost:5173")                    — refresh page
+3. browser_wait_for(time=5)                                        — wait for reconnect + resume
+4. browser_snapshot()                                              — verify game resumed
 ```
 
 ### Verifying Combat

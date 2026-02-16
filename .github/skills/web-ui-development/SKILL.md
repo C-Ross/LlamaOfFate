@@ -197,6 +197,10 @@ just serve      # Go backend on :8080
 just web-dev    # Vite dev server on :5173 (proxies /ws → :8080)
 ```
 
+## Playwright Testing (Browser)
+
+For end-to-end browser testing with Playwright MCP tools, see the **playwright-testing** skill. It covers server startup, tool reference, tool pitfalls, page structure, and testing patterns.
+
 ## ESLint
 
 Flat config in `eslint.config.js`. Includes:
