@@ -31,13 +31,13 @@ describe("ChatMessage", () => {
     expect(screen.getByText("A dusty road stretches ahead.")).toBeInTheDocument()
   })
 
-  it("renders dialog with player input and GM response", () => {
+  it("renders dialog with only GM response (player input shown via optimistic echo)", () => {
     const event = makeEvent("dialog", {
       PlayerInput: "I search the room.",
       GMResponse: "You find a hidden lever.",
     })
     render(<ChatMessage event={event} />)
-    expect(screen.getByText("I search the room.")).toBeInTheDocument()
+    expect(screen.queryByText("I search the room.")).not.toBeInTheDocument()
     expect(screen.getByText("You find a hidden lever.")).toBeInTheDocument()
   })
 

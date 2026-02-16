@@ -171,13 +171,6 @@ function NarrativeMessage({ data }: { data: NarrativeEventData }) {
 function DialogMessage({ data }: { data: DialogEventData }) {
   return (
     <div className="space-y-2">
-      {data.PlayerInput && (
-        <div className="flex justify-end">
-          <div className="max-w-[80%] rounded-lg bg-primary px-4 py-2 text-sm font-body text-primary-foreground">
-            {data.PlayerInput}
-          </div>
-        </div>
-      )}
       {data.GMResponse && (
         <div className="rounded-lg bg-secondary/50 px-4 py-3 text-sm font-body text-foreground leading-relaxed whitespace-pre-wrap">
           {data.GMResponse}
