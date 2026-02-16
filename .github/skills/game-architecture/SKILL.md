@@ -11,15 +11,16 @@ Orchestration layers in `internal/engine/` between `internal/core/` rules and `i
 ## Layer Overview
 
 ```
-GameManager          ← scenario lifecycle, milestones, save/load, fate point refresh
-  └─ ScenarioManager ← multi-scene loop, scene generation, summaries, NPC registry, recovery
-       └─ SceneManager ← single-scene loop, input classification, dialog/action, conflict turns
-            ├─ ActionParser    ← LLM: free-text → structured action
-            ├─ AspectGenerator ← LLM: Create Advantage → aspect name
-            └─ invoke.go       ← post-roll aspect invocation loop
+syncdriver.Run()     ← blocking terminal loop (wraps async engine API)
+  └─ GameManager (GameSessionManager interface) ← async API: Start/HandleInput/Provide*Response
+       └─ ScenarioManager ← multi-scene loop, scene generation, summaries, NPC registry, recovery
+            └─ SceneManager ← single-scene loop, input classification, dialog/action, conflict turns
+                 ├─ ActionParser    ← LLM: free-text → structured action
+                 ├─ AspectGenerator ← LLM: Create Advantage → aspect name
+                 └─ invoke.go       ← post-roll aspect invocation loop
 ```
 
-Each layer creates/configures the layer below. **Do not skip layers.**
+**syncdriver** wraps the async engine for blocking UIs. Engine itself is purely event-driven. Each layer creates/configures the layer below. **Do not skip layers.**
 
 ## Engine (`engine.go`)
 
@@ -32,24 +33,25 @@ Key methods:
 
 ## GameManager (`game_manager.go`)
 
-Top-level orchestrator. Creates `ScenarioManager` inside `Start()`.
+Purely async/event-driven API implementing `GameSessionManager` interface. Creates `ScenarioManager` inside `Start()`.
 
 ```go
 gm := engine.NewGameManager(eng)
 gm.SetPlayer(player)
-gm.SetUI(terminalUI)
 gm.SetSessionLogger(logger)    // optional
 gm.SetScenario(scenario)       // optional: otherwise ScenarioManager generates one
+gm.SetInitialScene(config)     // optional: demo/test pre-built scene
 gm.SetSaver(saver)             // optional: defaults to no-op
-gm.Run(ctx)                    // terminal blocking loop
-gm.RunWithInitialScene(ctx, &engine.InitialSceneConfig{...})  // demo/test
 
-// Event-driven (web) path:
-events, _ := gm.Start(ctx)              // opening GameEvents
-result, _ := gm.HandleInput(ctx, input)  // InputResult with events
+// Async API:
+events, _ := gm.Start(ctx)                             // opening GameEvents
+result, _ := gm.HandleInput(ctx, input)                 // InputResult with events
+result, _ := gm.ProvideInvokeResponse(ctx, invokeResp) // after InvokePromptEvent
+result, _ := gm.ProvideMidFlowResponse(ctx, midResp)   // after InputRequestEvent
+_ = gm.Save()                                          // persist state
 ```
 
-`Run()` wires `SceneInfoSetter` on the UI after `Start()` so terminal meta-commands work.
+For blocking UIs (terminal), use `syncdriver.Run()` which wraps this async API.
 
 **Milestones** (on `ScenarioEndResolved`): refresh fate points, check consequence recovery, increment `scenarioCount`.
 
@@ -147,7 +149,7 @@ End: all opponents taken out | player concedes | [CONFLICT_END:] marker | player
 All invoke logic in `invoke.go` (called from `conflict.go` and `npc.go`):
 1. `gatherInvokableAspects()` → character, situation (with free invokes), consequence aspects
 2. `beginInvokeLoop()` → emits `InvokePromptEvent`, sets `sm.pendingInvoke`
-3. Terminal: `GameManager.driveBlockingPrompts()` type-asserts UI to `InvokePrompter`
+3. Blocking UIs: `syncdriver` calls `ui.PromptForInvoke()`, then `gm.ProvideInvokeResponse()`
 4. Apply +2 or reroll; spend fate point or free invoke; loop until declined
 5. NPC defense invokes: `resumeTurns` flag triggers `maybeResumeConflictTurns`
 
@@ -177,21 +179,29 @@ Fallback: Attack with DefaultAttackSkillForConflict targeting player.
 
 `ActionParseRequest` → LLM (temp=0.3) → `ActionParseResponse` → `action.NewAction()`. Uses `parseActionType()` to handle LLM mistakes (e.g., skill name instead of action type).
 
-## UI Interface (`ui.go`, `uicontract/`)
+## UI Interfaces
 
-- `ReadInput() (string, bool, error)` — input + exit flag
-- `Emit(event GameEvent)` — single output channel
+### `syncdriver.BlockingUI` (`syncdriver/syncdriver.go`)
 
-Optional interfaces:
-- `InvokePrompter` — synchronous invoke prompts (terminal)
-- `MidFlowPrompter` — synchronous mid-flow input (e.g., consequence selection)
-- `SceneInfoSetter` — wired by `GameManager.Run()` for meta-command access to scene/player data
+Blocking terminal UI interface driven by `syncdriver.Run()`:
+- `ReadInput() (string, bool, error)` — read player input
+- `Emit(event GameEvent)` — render a single event
+- `PromptForInvoke(...)` — synchronous invoke prompt (blocking)
+- `PromptForMidFlow(event)` — synchronous mid-flow input (blocking)
+
+### `uicontract` package
+
+Data types shared between engine and UI:
+- `GameEvent`, `InvokePromptEvent`, `InputRequestEvent` — event types
+- `InvokeResponse`, `MidFlowResponse` — response types
+- `SceneInfoSetter` — optional: wired by `syncdriver.Run()` onStart callback for meta-command access
 
 ## Where to Add New Features
 
 | Feature | File(s) |
 |---------|---------|
 | Meta-command | `internal/ui/terminal/terminal.go` `handleSpecialCommands()` |
+| Blocking loop behavior | `internal/syncdriver/syncdriver.go` `Run()`, `driveBlockingPrompts()` |
 | Input classification type | `scene_manager.go` constants + `HandleInput()` switch |
 | Action outcome effect | `conflict.go` `applyActionEffects()` |
 | Conflict mechanic | `conflict.go` (method on `*SceneManager`) |
@@ -200,7 +210,8 @@ Optional interfaces:
 | Scene generation | `scenario_manager.go` `generateNextScene()` |
 | Scenario lifecycle | `scenario_manager.go` Start/HandleInput loop |
 | Milestone/recovery | `game_manager.go` or `scenario_manager.go` |
-| UI display | `ui.go` interface + `internal/ui/terminal/` |
+| UI event type | `uicontract/` event structs |
+| Terminal UI display | `internal/ui/terminal/terminal.go` `Emit()` |
 
 ## Session Logging
 
