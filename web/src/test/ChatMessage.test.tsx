@@ -60,7 +60,7 @@ describe("ChatMessage", () => {
       Skill: "Shoot",
       SkillLevel: "Great (+4)",
       Bonuses: 0,
-      Result: "Superb (+5)",
+      Result: "[+][-][ ][+] (Total: Superb (+5) vs Difficulty Fair (+2))",
       Outcome: "Success with Style",
     })
     render(<ChatMessage event={event} />)

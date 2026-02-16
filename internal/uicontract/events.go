@@ -51,6 +51,7 @@ type ActionResultEvent struct {
 	Bonuses    int
 	Result     string
 	Outcome    string
+	DiceFaces  []int `json:"DiceFaces,omitempty"` // Individual die values (-1, 0, +1)
 }
 
 func (ActionResultEvent) gameEvent() {}
@@ -139,6 +140,7 @@ type DefenseRollEvent struct {
 	DefenderName string // Name of the defending character
 	Skill        string // Defense skill used
 	Result       string // Roll result (e.g. "Good (+3)")
+	DiceFaces    []int  `json:"DiceFaces,omitempty"` // Individual die values (-1, 0, +1)
 }
 
 func (DefenseRollEvent) gameEvent() {}

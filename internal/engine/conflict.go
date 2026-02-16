@@ -21,6 +21,15 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
 )
 
+// diceFacesToInts converts a [4]FateDie array to a []int slice for JSON serialization.
+func diceFacesToInts(dice [4]dice.FateDie) []int {
+	out := make([]int, 4)
+	for i, d := range dice {
+		out[i] = int(d)
+	}
+	return out
+}
+
 // TakenOutResult represents the outcome classification of being taken out
 type TakenOutResult int
 
@@ -347,6 +356,7 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 		Bonuses:    parsedAction.CalculateBonus(),
 		Result:     resultString,
 		Outcome:    initialOutcome.Type.String(),
+		DiceFaces:  diceFacesToInts(result.Roll.Dice),
 	})
 
 	// Log the dice roll
@@ -448,6 +458,7 @@ func (sm *SceneManager) rollTargetDefense(target *character.Character, attackSki
 		DefenderName: target.Name,
 		Skill:        defenseSkill,
 		Result:       defenseRoll.FinalValue.String(),
+		DiceFaces:    diceFacesToInts(defenseRoll.Roll.Dice),
 	}
 
 	return defenseRoll, event

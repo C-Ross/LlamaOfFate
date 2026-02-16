@@ -1,4 +1,8 @@
 import { cn } from "@/lib/utils"
+import { RollResult } from "@/components/game/RollResult"
+import { ActionAttempt } from "@/components/game/ActionAttempt"
+import { DefenseRoll } from "@/components/game/DefenseRoll"
+import { OutcomeBadge } from "@/components/game/OutcomeBadge"
 import type {
   GameEvent,
   NarrativeEventData,
@@ -174,34 +178,11 @@ function SystemMessage({ data }: { data: SystemMessageEventData }) {
 // ---------------------------------------------------------------------------
 
 function ActionAttemptMessage({ data }: { data: ActionAttemptEventData }) {
-  return (
-    <div className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-body text-foreground">
-      <span className="font-heading text-xs uppercase tracking-wide text-muted-foreground">Action: </span>
-      {data.Description}
-    </div>
-  )
+  return <ActionAttempt data={data} />
 }
 
 function ActionResultMessage({ data }: { data: ActionResultEventData }) {
-  return (
-    <div className="rounded-lg border border-primary/30 bg-card px-4 py-3 text-sm font-body space-y-1">
-      <div className="flex items-center justify-between">
-        <span className="font-heading text-xs uppercase tracking-wide text-muted-foreground">
-          {data.Skill} ({data.SkillLevel})
-        </span>
-        <span className={cn(
-          "font-heading text-xs font-bold uppercase",
-          outcomeColor(data.Outcome),
-        )}>
-          {data.Outcome}
-        </span>
-      </div>
-      <div className="text-foreground">
-        Roll: {data.Result}
-        {data.Bonuses > 0 && <span className="text-primary"> (+{data.Bonuses} bonus)</span>}
-      </div>
-    </div>
-  )
+  return <RollResult data={data} />
 }
 
 function SceneTransitionMessage({ data }: { data: SceneTransitionEventData }) {
@@ -332,7 +313,7 @@ function NPCAttackMessage({ data }: { data: NPCAttackEventData }) {
           Attack: {data.AttackSkill} {data.AttackResult} vs Defense: {data.DefenseSkill} {data.DefenseResult}
         </div>
         <div className={cn("font-bold", outcomeColor(data.FinalOutcome))}>
-          {data.FinalOutcome}
+          <OutcomeBadge outcome={data.FinalOutcome} size="sm" />
         </div>
       </div>
       {data.Narrative && (
@@ -381,12 +362,7 @@ function DamageResolutionMessage({ data }: { data: DamageResolutionEventData }) 
 }
 
 function DefenseRollMessage({ data }: { data: DefenseRollEventData }) {
-  return (
-    <div className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-body">
-      <span className="font-heading text-xs uppercase tracking-wide text-muted-foreground">Defense: </span>
-      {data.DefenderName} rolls {data.Skill}: {data.Result}
-    </div>
-  )
+  return <DefenseRoll data={data} />
 }
 
 // ---------------------------------------------------------------------------
@@ -496,17 +472,19 @@ function AspectCreatedMessage({ data }: { data: AspectCreatedEventData }) {
 function NPCActionResultMessage({ data }: { data: NPCActionResultEventData }) {
   return (
     <div className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-body">
-      <span className="font-heading text-xs uppercase tracking-wide text-muted-foreground">
-        {data.NPCName} — {data.ActionType}:
-      </span>{" "}
-      {data.Skill && `${data.Skill} `}
-      {data.RollResult && `${data.RollResult} `}
-      {data.Outcome && (
-        <span className={cn("font-bold", outcomeColor(data.Outcome))}>{data.Outcome}</span>
-      )}
-      {data.AspectCreated && (
-        <span className="ml-2 text-boost">→ {data.AspectCreated}</span>
-      )}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <span className="font-heading text-xs uppercase tracking-wide text-muted-foreground">
+          {data.NPCName} — {data.ActionType}:
+        </span>
+        {data.Outcome && <OutcomeBadge outcome={data.Outcome} size="sm" />}
+      </div>
+      <div className="mt-1">
+        {data.Skill && `${data.Skill} `}
+        {data.RollResult && <span className="text-muted-foreground">{data.RollResult}</span>}
+        {data.AspectCreated && (
+          <span className="ml-2 text-boost">→ {data.AspectCreated}</span>
+        )}
+      </div>
     </div>
   )
 }

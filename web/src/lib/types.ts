@@ -77,6 +77,7 @@ export interface ActionResultEventData {
   Bonuses: number
   Result: string
   Outcome: string
+  DiceFaces?: number[] // Individual die values (-1, 0, +1) from server
 }
 
 export interface SceneTransitionEventData {
@@ -150,6 +151,7 @@ export interface DefenseRollEventData {
   DefenderName: string
   Skill: string
   Result: string
+  DiceFaces?: number[] // Individual die values (-1, 0, +1) from server
 }
 
 export interface StressAbsorptionDetail {

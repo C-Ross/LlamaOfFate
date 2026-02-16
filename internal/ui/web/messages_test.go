@@ -56,8 +56,9 @@ func TestMarshalEvent_ActionResultEvent(t *testing.T) {
 		Skill:      "Fight",
 		SkillLevel: "Good (+3)",
 		Bonuses:    2,
-		Result:     "Epic (+7)",
+		Result:     "[+][-][ ][+] (Total: Epic (+7) vs Difficulty Fair (+2))",
 		Outcome:    "Success with Style",
+		DiceFaces:  []int{1, -1, 0, 1},
 	}
 
 	data, err := MarshalEvent(event)
@@ -72,6 +73,7 @@ func TestMarshalEvent_ActionResultEvent(t *testing.T) {
 	assert.Equal(t, "Fight", parsed.Skill)
 	assert.Equal(t, 2, parsed.Bonuses)
 	assert.Equal(t, "Success with Style", parsed.Outcome)
+	assert.Equal(t, []int{1, -1, 0, 1}, parsed.DiceFaces)
 }
 
 func TestMarshalEvent_ConflictStartEvent(t *testing.T) {
@@ -97,6 +99,29 @@ func TestMarshalEvent_ConflictStartEvent(t *testing.T) {
 	require.Len(t, parsed.Participants, 2)
 	assert.Equal(t, "Jesse", parsed.Participants[0].CharacterName)
 	assert.True(t, parsed.Participants[0].IsPlayer)
+}
+
+func TestMarshalEvent_DefenseRollEvent(t *testing.T) {
+	event := uicontract.DefenseRollEvent{
+		DefenderName: "Bandit",
+		Skill:        "Athletics",
+		Result:       "Good (+3)",
+		DiceFaces:    []int{1, 0, -1, 1},
+	}
+
+	data, err := MarshalEvent(event)
+	require.NoError(t, err)
+
+	var msg ServerMessage
+	require.NoError(t, json.Unmarshal(data, &msg))
+	assert.Equal(t, "defense_roll", msg.Event)
+
+	var parsed uicontract.DefenseRollEvent
+	require.NoError(t, json.Unmarshal(msg.Data, &parsed))
+	assert.Equal(t, "Bandit", parsed.DefenderName)
+	assert.Equal(t, "Athletics", parsed.Skill)
+	assert.Equal(t, "Good (+3)", parsed.Result)
+	assert.Equal(t, []int{1, 0, -1, 1}, parsed.DiceFaces)
 }
 
 func TestMarshalEvent_InvokePromptEvent(t *testing.T) {
