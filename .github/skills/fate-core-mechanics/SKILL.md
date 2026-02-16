@@ -32,6 +32,7 @@ The Fate ladder maps adjectives to numbers. See [SRD: Dice & The Ladder](https:/
 ```go
 level := dice.Good       // +3
 name := level.String()   // "Good (+3)"
+adjOnly := level.Name()  // "Good"
 parsed, _ := dice.ParseLadder("Great")  // dice.Great
 ```
 

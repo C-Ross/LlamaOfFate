@@ -189,6 +189,16 @@ Blocking terminal UI interface driven by `syncdriver.Run()`:
 - `PromptForInvoke(...)` — synchronous invoke prompt (blocking)
 - `PromptForMidFlow(event)` — synchronous mid-flow input (blocking)
 
+### `internal/ui/web` — WebSocket UI (`cmd/server/`)
+
+Event-driven WebSocket implementation (`web.Handler`, `web.Session`):
+- **Handler**: HTTP router with `/ws` WebSocket endpoint + factory pattern for `GameSessionManager` per connection
+- **Session**: WebSocket manager that marshals `GameEvent` → JSON (`ServerMessage`), processes `ClientMessage` (input, invoke_response, mid_flow_response)
+- **Protocol**: JSON envelope: `{"event": "narrative", "data": {...}}`, plus `result_meta` after InputResult
+- **Persistence**: Wired with `storage.YAMLSaver` per game ID; sends `session_init` with game ID to client for localStorage tracking
+
+See **web-ui-development** skill for React frontend details.
+
 ### `uicontract` package
 
 Data types shared between engine and UI:
