@@ -8,6 +8,13 @@ function makeEvent(event: string, data: unknown): GameEvent {
 }
 
 describe("ChatMessage", () => {
+  it("renders player input message", () => {
+    const event = makeEvent("player_input", { text: "I search behind the bar." })
+    render(<ChatMessage event={event} />)
+    expect(screen.getByText("I search behind the bar.")).toBeInTheDocument()
+    expect(screen.getByText("You")).toBeInTheDocument()
+  })
+
   it("renders narrative text", () => {
     const event = makeEvent("narrative", { Text: "The saloon doors swing open." })
     render(<ChatMessage event={event} />)

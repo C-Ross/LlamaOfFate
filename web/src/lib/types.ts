@@ -335,6 +335,7 @@ export interface GameStateSnapshotEventData {
 
 /** All known event type names from the wire protocol. */
 export type GameEventType =
+  | "player_input"
   | "narrative"
   | "dialog"
   | "system_message"
@@ -375,8 +376,14 @@ export interface GameEvent {
   data: unknown
 }
 
+/** Data for a locally-generated player input echo. */
+export interface PlayerInputEventData {
+  text: string
+}
+
 /** Event types that should be displayed in the chat panel. */
 export const CHAT_DISPLAYABLE_EVENTS: Set<string> = new Set([
+  "player_input",
   "narrative",
   "dialog",
   "system_message",

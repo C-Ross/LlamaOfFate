@@ -5,18 +5,19 @@ import { cn } from "@/lib/utils"
 
 interface ChatPanelProps {
   events: GameEvent[]
+  isPending?: boolean
   className?: string
 }
 
-export function ChatPanel({ events, className }: ChatPanelProps) {
+export function ChatPanel({ events, isPending = false, className }: ChatPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const displayable = events.filter((e) => CHAT_DISPLAYABLE_EVENTS.has(e.event))
 
-  // Auto-scroll to bottom when new events arrive
+  // Auto-scroll to bottom when new events arrive or pending state changes
   useEffect(() => {
     bottomRef.current?.scrollIntoView?.({ behavior: "smooth" })
-  }, [displayable.length])
+  }, [displayable.length, isPending])
 
   return (
     <div className={cn("overflow-y-auto", className)}>
@@ -29,6 +30,13 @@ export function ChatPanel({ events, className }: ChatPanelProps) {
         {displayable.map((event) => (
           <ChatMessage key={event.id} event={event} />
         ))}
+        {isPending && (
+          <div className="flex items-center gap-1.5 px-4 py-3 animate-in fade-in-0 duration-300">
+            <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:0ms]" />
+            <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:150ms]" />
+            <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:300ms]" />
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
     </div>

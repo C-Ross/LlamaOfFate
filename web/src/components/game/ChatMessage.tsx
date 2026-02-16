@@ -5,6 +5,7 @@ import { DefenseRoll } from "@/components/game/DefenseRoll"
 import { OutcomeBadge } from "@/components/game/OutcomeBadge"
 import type {
   GameEvent,
+  PlayerInputEventData,
   NarrativeEventData,
   DialogEventData,
   SystemMessageEventData,
@@ -52,6 +53,8 @@ export function ChatMessage({ event, className }: ChatMessageProps) {
 
 function renderEvent(event: GameEvent) {
   switch (event.event) {
+    case "player_input":
+      return <PlayerInputMessage data={event.data as PlayerInputEventData} />
     case "narrative":
       return <NarrativeMessage data={event.data as NarrativeEventData} />
     case "dialog":
@@ -115,6 +118,25 @@ function renderEvent(event: GameEvent) {
     default:
       return null
   }
+}
+
+// ---------------------------------------------------------------------------
+// Player input echo
+// ---------------------------------------------------------------------------
+
+function PlayerInputMessage({ data }: { data: PlayerInputEventData }) {
+  return (
+    <div className="flex justify-end">
+      <div className="rounded-lg bg-primary/15 border border-primary/30 px-4 py-3 max-w-[80%]">
+        <div className="text-xs font-heading uppercase tracking-wide text-primary/70 mb-1">
+          You
+        </div>
+        <div className="text-sm font-body text-foreground whitespace-pre-wrap">
+          {data.text}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // ---------------------------------------------------------------------------

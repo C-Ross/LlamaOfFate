@@ -93,7 +93,17 @@ export function useGameSocket(url: string): UseGameSocketReturn {
   }, [])
 
   const sendInput = useCallback(
-    (text: string) => send({ type: "input", text }),
+    (text: string) => {
+      // Add the player's message to the event stream immediately so it
+      // appears in chat before the server responds.
+      const playerEvent: GameEvent = {
+        id: `evt-${nextEventId++}`,
+        event: "player_input",
+        data: { text },
+      }
+      dispatch({ type: "event", event: playerEvent })
+      send({ type: "input", text })
+    },
     [send],
   )
 

@@ -81,7 +81,7 @@ function App() {
         </header>
 
         {/* Message area */}
-        <ChatPanel events={events} className="flex-1" />
+        <ChatPanel events={events} isPending={isPending} className="flex-1" />
 
         {/* Input area */}
         <ChatInput
