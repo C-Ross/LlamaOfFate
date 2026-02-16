@@ -303,6 +303,9 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 					InitiatorName: sm.player.Name,
 					Participants:  sm.getParticipantInfo(),
 				})
+				sm.addToConversationHistory("",
+					fmt.Sprintf("[%s conflict initiated by %s]", actionConflictType, sm.player.Name),
+					inputTypeConflict)
 			}
 		} else if sm.currentScene.ConflictState.Type != actionConflictType {
 			// Escalate conflict if type changes
@@ -1160,6 +1163,11 @@ func (sm *SceneManager) handleConcession(ctx context.Context) []GameEvent {
 		sm.currentScene.EndConflict()
 		events = append(events, ConflictEndEvent{Reason: "You have conceded the conflict."})
 	}
+
+	// Record concession in conversation history for recap on resume
+	sm.addToConversationHistory("concede",
+		fmt.Sprintf("[Conflict ended — %s conceded. Gained %d fate point(s).]", sm.player.Name, fatePointsGained),
+		inputTypeConflict)
 
 	// Emit a free-text input request for the concession narration instead of
 	// blocking on ReadInput.

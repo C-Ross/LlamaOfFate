@@ -104,15 +104,19 @@ func TestSession_StartsAndSendsOpeningEvents(t *testing.T) {
 
 	sessionDone := make(chan error, 1)
 	client := wsTestPair(t, func(conn *websocket.Conn) {
-		s := NewSession(conn, driver, nil)
+		s := NewSession(conn, driver, nil, "test-game")
 		sessionDone <- s.Run(context.Background())
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Read opening narrative
+	// Read session_init
 	msg := readServerMessage(t, ctx, client)
+	assert.Equal(t, "session_init", msg.Event)
+
+	// Read opening narrative
+	msg = readServerMessage(t, ctx, client)
 	assert.Equal(t, "narrative", msg.Event)
 
 	// Read initial result_meta
@@ -155,14 +159,15 @@ func TestSession_HandleInputRoundTrip(t *testing.T) {
 
 	sessionDone := make(chan error, 1)
 	client := wsTestPair(t, func(conn *websocket.Conn) {
-		s := NewSession(conn, driver, nil)
+		s := NewSession(conn, driver, nil, "test-game")
 		sessionDone <- s.Run(context.Background())
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Skip opening events
+	// Skip session_init + opening events
+	_ = readServerMessage(t, ctx, client) // session_init
 	_ = readServerMessage(t, ctx, client) // narrative
 	_ = readServerMessage(t, ctx, client) // result_meta
 
@@ -209,7 +214,7 @@ func TestSession_InvokeResponseRoundTrip(t *testing.T) {
 		// Override HandleInput to track call count and switch results
 		origResult := driver.handleInputResult
 		driver.handleInputResult = origResult
-		s := NewSession(conn, driver, nil)
+		s := NewSession(conn, driver, nil, "test-game")
 		sessionDone <- s.Run(context.Background())
 	})
 	_ = callCount
@@ -217,7 +222,8 @@ func TestSession_InvokeResponseRoundTrip(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Skip opening events
+	// Skip session_init + opening events
+	_ = readServerMessage(t, ctx, client) // session_init
 	_ = readServerMessage(t, ctx, client) // narrative
 	_ = readServerMessage(t, ctx, client) // result_meta
 
@@ -281,16 +287,17 @@ func TestSession_MidFlowResponseRoundTrip(t *testing.T) {
 
 	sessionDone := make(chan error, 1)
 	client := wsTestPair(t, func(conn *websocket.Conn) {
-		s := NewSession(conn, driver, nil)
+		s := NewSession(conn, driver, nil, "test-game")
 		sessionDone <- s.Run(context.Background())
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Skip opening
-	_ = readServerMessage(t, ctx, client)
-	_ = readServerMessage(t, ctx, client)
+	// Skip session_init + opening
+	_ = readServerMessage(t, ctx, client) // session_init
+	_ = readServerMessage(t, ctx, client) // narrative
+	_ = readServerMessage(t, ctx, client) // result_meta
 
 	// Trigger mid-flow
 	err := wsjson.Write(ctx, client, ClientMessage{Type: ClientInput, Text: "action"})

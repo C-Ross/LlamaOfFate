@@ -18,10 +18,11 @@ type Session struct {
 	driver engine.GameSessionManager
 	conn   *websocket.Conn
 	logger *slog.Logger
+	gameID string
 }
 
 // NewSession creates a session for the given WebSocket connection and game driver.
-func NewSession(conn *websocket.Conn, driver engine.GameSessionManager, logger *slog.Logger) *Session {
+func NewSession(conn *websocket.Conn, driver engine.GameSessionManager, logger *slog.Logger, gameID string) *Session {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -29,12 +30,18 @@ func NewSession(conn *websocket.Conn, driver engine.GameSessionManager, logger *
 		driver: driver,
 		conn:   conn,
 		logger: logger,
+		gameID: gameID,
 	}
 }
 
 // Run executes the session lifecycle: start the game, then loop on client messages.
 // It blocks until the context is cancelled, the client disconnects, or the game ends.
 func (s *Session) Run(ctx context.Context) error {
+	// 0. Send session_init with game ID so the client can store it for reconnection.
+	if err := s.sendSessionInit(ctx); err != nil {
+		return fmt.Errorf("send session_init: %w", err)
+	}
+
 	// 1. Start the game and send opening events
 	events, err := s.driver.Start(ctx)
 	if err != nil {
@@ -135,6 +142,16 @@ func (s *Session) sendEvents(ctx context.Context, events []uicontract.GameEvent)
 // sendResultMeta marshals and writes a result_meta server message.
 func (s *Session) sendResultMeta(ctx context.Context, meta ResultMeta) error {
 	data, err := MarshalResultMeta(meta)
+	if err != nil {
+		return err
+	}
+	return s.conn.Write(ctx, websocket.MessageText, data)
+}
+
+// sendSessionInit sends a session_init server message so the client knows
+// the game ID for this session and can reconnect to it later.
+func (s *Session) sendSessionInit(ctx context.Context) error {
+	data, err := MarshalSessionInit(s.gameID)
 	if err != nil {
 		return err
 	}

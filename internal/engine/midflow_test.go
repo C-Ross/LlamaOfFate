@@ -327,6 +327,13 @@ func TestConcessionEmitsFreeTextEvent(t *testing.T) {
 	assert.Equal(t, uicontract.InputRequestFreeText, event.Type)
 	assert.Contains(t, event.Prompt, "concede")
 	assert.Equal(t, "concession_narration", event.Context["request_type"])
+
+	// Concession should have been recorded in conversation history.
+	history := sm.GetConversationHistory()
+	require.NotEmpty(t, history, "expected conversation history entry for concession")
+	last := history[len(history)-1]
+	assert.Equal(t, "conflict", last.Type)
+	assert.Contains(t, last.GMResponse, "conceded")
 }
 
 func TestProvideMidFlowResponse_ConcessionNarration(t *testing.T) {
@@ -456,6 +463,17 @@ func TestHandleInput_ConcessionSetsAwaitingMidFlow(t *testing.T) {
 
 	assert.True(t, result.AwaitingMidFlow, "expected AwaitingMidFlow after concession")
 	assert.False(t, result.SceneEnded, "scene should not end yet (waiting for narration)")
+
+	// The events should include an InputRequestEvent so the UI can render the prompt.
+	var foundInputRequest bool
+	for _, ev := range result.Events {
+		if ire, ok := ev.(InputRequestEvent); ok {
+			foundInputRequest = true
+			assert.Equal(t, uicontract.InputRequestFreeText, ire.Type)
+			assert.Contains(t, ire.Prompt, "concede")
+		}
+	}
+	assert.True(t, foundInputRequest, "expected InputRequestEvent in result events")
 }
 
 func TestHandleInput_RejectsInputWhileMidFlowPending(t *testing.T) {

@@ -50,6 +50,29 @@ describe("ChatMessage", () => {
     expect(screen.getByText("A voice echoes from the shadows.")).toBeInTheDocument()
   })
 
+  it("renders recap dialog with both player input and GM response", () => {
+    const event = makeEvent("dialog", {
+      PlayerInput: "I search behind the bar.",
+      GMResponse: "You find a hidden lever.",
+      IsRecap: true,
+    })
+    render(<ChatMessage event={event} />)
+    expect(screen.getByText("I search behind the bar.")).toBeInTheDocument()
+    expect(screen.getByText("You find a hidden lever.")).toBeInTheDocument()
+    expect(screen.getByText("You")).toBeInTheDocument()
+  })
+
+  it("does not show player input in normal dialog (non-recap)", () => {
+    const event = makeEvent("dialog", {
+      PlayerInput: "I search the room.",
+      GMResponse: "You find a hidden lever.",
+      IsRecap: false,
+    })
+    render(<ChatMessage event={event} />)
+    expect(screen.queryByText("I search the room.")).not.toBeInTheDocument()
+    expect(screen.getByText("You find a hidden lever.")).toBeInTheDocument()
+  })
+
   it("renders system message", () => {
     const event = makeEvent("system_message", { Message: "You have 3 fate points." })
     render(<ChatMessage event={event} />)
@@ -135,6 +158,36 @@ describe("ChatMessage", () => {
     })
     render(<ChatMessage event={event} />)
     expect(screen.getByText("Milestone: Trouble in Redemption Gulch")).toBeInTheDocument()
+  })
+
+  it("renders conflict recap as a system-style banner", () => {
+    const event = makeEvent("dialog", {
+      PlayerInput: "",
+      GMResponse: "[physical conflict initiated by Bandit]",
+      IsRecap: true,
+      RecapType: "conflict",
+    })
+    render(<ChatMessage event={event} />)
+    expect(
+      screen.getByText("[physical conflict initiated by Bandit]"),
+    ).toBeInTheDocument()
+    // Should NOT render a player input bubble
+    expect(screen.queryByText("You")).not.toBeInTheDocument()
+  })
+
+  it("renders conflict end recap as a system-style banner", () => {
+    const event = makeEvent("dialog", {
+      PlayerInput: "concede",
+      GMResponse: "[Conflict ended — Jesse conceded. Gained 1 fate point(s).]",
+      IsRecap: true,
+      RecapType: "conflict",
+    })
+    render(<ChatMessage event={event} />)
+    expect(
+      screen.getByText("[Conflict ended — Jesse conceded. Gained 1 fate point(s).]"),
+    ).toBeInTheDocument()
+    // Conflict recap should NOT render the player input even if present
+    expect(screen.queryByText("concede")).not.toBeInTheDocument()
   })
 
   it("renders nothing for unknown event type", () => {

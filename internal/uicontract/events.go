@@ -25,7 +25,8 @@ func (NarrativeEvent) gameEvent() {}
 type DialogEvent struct {
 	PlayerInput string
 	GMResponse  string
-	IsRecap     bool // True when replaying prior conversation on resume
+	IsRecap     bool   // True when replaying prior conversation on resume
+	RecapType   string // "dialog", "action", "conflict" — set when IsRecap is true
 }
 
 func (DialogEvent) gameEvent() {}

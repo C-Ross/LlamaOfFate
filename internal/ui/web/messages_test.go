@@ -35,6 +35,7 @@ func TestMarshalEvent_DialogEvent(t *testing.T) {
 		PlayerInput: "I look around the room.",
 		GMResponse:  "You see a dusty bar and three suspicious patrons.",
 		IsRecap:     true,
+		RecapType:   "dialog",
 	}
 
 	data, err := MarshalEvent(event)
@@ -49,6 +50,7 @@ func TestMarshalEvent_DialogEvent(t *testing.T) {
 	assert.Equal(t, "I look around the room.", parsed.PlayerInput)
 	assert.Equal(t, "You see a dusty bar and three suspicious patrons.", parsed.GMResponse)
 	assert.True(t, parsed.IsRecap)
+	assert.Equal(t, "dialog", parsed.RecapType)
 }
 
 func TestMarshalEvent_ActionResultEvent(t *testing.T) {

@@ -161,3 +161,23 @@ func MarshalResultMeta(meta ResultMeta) ([]byte, error) {
 	}
 	return json.Marshal(msg)
 }
+
+// SessionInit is the payload for the session_init event sent immediately after
+// WebSocket connection. It tells the client which game ID this session belongs
+// to, so the client can store it and reconnect to the same game later.
+type SessionInit struct {
+	GameID string `json:"gameId"`
+}
+
+// MarshalSessionInit serializes a session_init ServerMessage.
+func MarshalSessionInit(gameID string) ([]byte, error) {
+	data, err := json.Marshal(SessionInit{GameID: gameID})
+	if err != nil {
+		return nil, fmt.Errorf("marshal session init: %w", err)
+	}
+	msg := ServerMessage{
+		Event: "session_init",
+		Data:  data,
+	}
+	return json.Marshal(msg)
+}

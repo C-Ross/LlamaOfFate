@@ -25,6 +25,7 @@ const (
 	inputTypeClarification = "clarification"
 	inputTypeAction        = "action"
 	inputTypeNarrative     = "narrative"
+	inputTypeConflict      = "conflict"
 
 	// User-facing messages
 	msgLLMUnavailable = "[The mists of fate obscure my vision...]"
@@ -138,6 +139,7 @@ func (sm *SceneManager) HandleInput(ctx context.Context, input string) (*InputRe
 	if sm.currentScene.IsConflict && sm.isConcedeCommand(input) {
 		result.Events = sm.handleConcession(ctx)
 		if sm.pendingMidFlow != nil {
+			result.Events = append(result.Events, sm.pendingMidFlow.event)
 			result.AwaitingMidFlow = true
 		}
 		if sm.shouldExit && !result.AwaitingMidFlow {
@@ -183,6 +185,7 @@ func (sm *SceneManager) HandleInput(ctx context.Context, input string) (*InputRe
 
 	// Check if a mid-flow prompt was emitted during processing.
 	if sm.pendingMidFlow != nil {
+		result.Events = append(result.Events, sm.pendingMidFlow.event)
 		result.AwaitingMidFlow = true
 	}
 
@@ -319,6 +322,9 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) []GameEv
 				InitiatorName: initiatorName,
 				Participants:  sm.getParticipantInfo(),
 			})
+			sm.addToConversationHistory("",
+				fmt.Sprintf("[%s conflict initiated by %s]", conflictTrigger.Type, initiatorName),
+				inputTypeConflict)
 		}
 	}
 
@@ -327,6 +333,9 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) []GameEv
 		reasonMessage := sm.resolveConflictPeacefully(conflictResolution.Reason)
 		if reasonMessage != "" {
 			events = append(events, ConflictEndEvent{Reason: reasonMessage})
+			sm.addToConversationHistory("",
+				fmt.Sprintf("[Conflict ended — %s]", reasonMessage),
+				inputTypeConflict)
 		}
 	}
 

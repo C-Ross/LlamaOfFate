@@ -169,10 +169,37 @@ function NarrativeMessage({ data }: { data: NarrativeEventData }) {
 // ---------------------------------------------------------------------------
 
 function DialogMessage({ data }: { data: DialogEventData }) {
+  // Conflict recap entries (e.g. "conflict initiated", "conceded") get a
+  // distinctive system-style banner instead of a dialog bubble.
+  if (data.IsRecap && data.RecapType === "conflict") {
+    return (
+      <div className="flex items-center gap-2 text-xs font-heading uppercase tracking-widest text-primary/60 opacity-70">
+        <span className="h-px flex-1 bg-primary/20" />
+        {data.GMResponse}
+        <span className="h-px flex-1 bg-primary/20" />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-2">
+      {data.IsRecap && data.PlayerInput && (
+        <div className="flex justify-end">
+          <div className="rounded-lg bg-primary/15 border border-primary/30 px-4 py-3 max-w-[80%] opacity-70">
+            <div className="text-xs font-heading uppercase tracking-wide text-primary/70 mb-1">
+              You
+            </div>
+            <div className="text-sm font-body text-foreground whitespace-pre-wrap">
+              {data.PlayerInput}
+            </div>
+          </div>
+        </div>
+      )}
       {data.GMResponse && (
-        <div className="rounded-lg bg-secondary/50 px-4 py-3 text-sm font-body text-foreground leading-relaxed whitespace-pre-wrap">
+        <div className={cn(
+          "rounded-lg bg-secondary/50 px-4 py-3 text-sm font-body text-foreground leading-relaxed whitespace-pre-wrap",
+          data.IsRecap && "opacity-70",
+        )}>
           {data.GMResponse}
         </div>
       )}

@@ -61,6 +61,7 @@ export interface DialogEventData {
   PlayerInput: string
   GMResponse: string
   IsRecap?: boolean
+  RecapType?: string // "dialog" | "action" | "conflict"
 }
 
 export interface SystemMessageEventData {
@@ -373,6 +374,7 @@ export type GameEventType =
   | "milestone"
   | "game_resumed"
   | "game_state_snapshot"
+  | "session_init"
   | "result_meta"
 
 /** A parsed game event with its type tag and data. */
@@ -385,6 +387,11 @@ export interface GameEvent {
 /** Data for a locally-generated player input echo. */
 export interface PlayerInputEventData {
   text: string
+}
+
+/** Data for the session_init event sent immediately after WebSocket connection. */
+export interface SessionInitEventData {
+  gameId: string
 }
 
 /** Event types that should be displayed in the chat panel. */

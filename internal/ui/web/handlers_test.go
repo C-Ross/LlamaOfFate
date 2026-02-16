@@ -19,7 +19,7 @@ import (
 )
 
 func TestHandler_Health(t *testing.T) {
-	h := NewHandler(func() (engine.GameSessionManager, error) {
+	h := NewHandler(func(_ string) (engine.GameSessionManager, error) {
 		return nil, nil
 	}, nil)
 
@@ -32,7 +32,7 @@ func TestHandler_Health(t *testing.T) {
 }
 
 func TestHandler_WebSocket_FullRoundTrip(t *testing.T) {
-	factory := func() (engine.GameSessionManager, error) {
+	factory := func(_ string) (engine.GameSessionManager, error) {
 		return &mockDriver{
 			startEvents: []uicontract.GameEvent{
 				uicontract.NarrativeEvent{Text: "Welcome!", SceneName: "Test Scene"},
@@ -57,8 +57,13 @@ func TestHandler_WebSocket_FullRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = client.CloseNow() }()
 
-	// Read opening narrative
+	// Read session_init
 	var msg ServerMessage
+	err = wsjson.Read(ctx, client, &msg)
+	require.NoError(t, err)
+	assert.Equal(t, "session_init", msg.Event)
+
+	// Read opening narrative
 	err = wsjson.Read(ctx, client, &msg)
 	require.NoError(t, err)
 	assert.Equal(t, "narrative", msg.Event)
@@ -93,7 +98,7 @@ func TestHandler_WebSocket_FullRoundTrip(t *testing.T) {
 }
 
 func TestHandler_WebSocket_MultipleEvents(t *testing.T) {
-	factory := func() (engine.GameSessionManager, error) {
+	factory := func(_ string) (engine.GameSessionManager, error) {
 		return &mockDriver{
 			startEvents: []uicontract.GameEvent{
 				uicontract.NarrativeEvent{Text: "Scene begins."},
@@ -117,8 +122,13 @@ func TestHandler_WebSocket_MultipleEvents(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = client.CloseNow() }()
 
-	// Read two opening events
+	// Read session_init
 	var msg ServerMessage
+	err = wsjson.Read(ctx, client, &msg)
+	require.NoError(t, err)
+	assert.Equal(t, "session_init", msg.Event)
+
+	// Read two opening events
 	err = wsjson.Read(ctx, client, &msg)
 	require.NoError(t, err)
 	assert.Equal(t, "narrative", msg.Event)

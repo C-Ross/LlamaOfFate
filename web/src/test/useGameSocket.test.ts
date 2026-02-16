@@ -43,6 +43,7 @@ beforeEach(() => {
   MockWebSocket.instances = []
   vi.stubGlobal("WebSocket", MockWebSocket)
   vi.useFakeTimers()
+  localStorage.clear()
 })
 
 afterEach(() => {
@@ -164,7 +165,7 @@ describe("useGameSocket", () => {
     expect(result.current.isPending).toBe(false)
   })
 
-  it("resets state on disconnect", () => {
+  it("preserves events on disconnect", () => {
     const { result } = renderHook(() => useGameSocket("ws://localhost/ws"))
     act(() => getLastWs().simulateOpen())
     act(() => {
@@ -174,7 +175,57 @@ describe("useGameSocket", () => {
 
     act(() => getLastWs().simulateClose())
     expect(result.current.isConnected).toBe(false)
+    // Events are preserved across disconnects so chat history stays visible
+    expect(result.current.events).toHaveLength(1)
+  })
+
+  it("stores gameId from session_init in localStorage", () => {
+    const { result } = renderHook(() => useGameSocket("ws://localhost/ws"))
+    act(() => getLastWs().simulateOpen())
+
+    act(() => {
+      getLastWs().simulateMessage({
+        event: "session_init",
+        data: { gameId: "abc123" },
+      })
+    })
+
+    expect(localStorage.getItem("llamaoffate_game_id")).toBe("abc123")
+    expect(result.current.gameId).toBe("abc123")
+  })
+
+  it("does not add session_init to events array", () => {
+    const { result } = renderHook(() => useGameSocket("ws://localhost/ws"))
+    act(() => getLastWs().simulateOpen())
+
+    act(() => {
+      getLastWs().simulateMessage({
+        event: "session_init",
+        data: { gameId: "abc123" },
+      })
+    })
+
     expect(result.current.events).toHaveLength(0)
+  })
+
+  it("appends game_id to URL on reconnect when stored", () => {
+    renderHook(() => useGameSocket("ws://localhost/ws"))
+    act(() => getLastWs().simulateOpen())
+
+    // Simulate receiving a game ID
+    act(() => {
+      getLastWs().simulateMessage({
+        event: "session_init",
+        data: { gameId: "reconnect-id" },
+      })
+    })
+
+    // Disconnect and reconnect
+    act(() => getLastWs().simulateClose())
+    act(() => vi.advanceTimersByTime(2500))
+
+    const reconnectedWs = getLastWs()
+    expect(reconnectedWs.url).toBe("ws://localhost/ws?game_id=reconnect-id")
   })
 
   it("attempts reconnection after disconnect", () => {

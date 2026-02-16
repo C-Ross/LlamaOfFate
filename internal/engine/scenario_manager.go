@@ -237,6 +237,7 @@ func (m *ScenarioManager) Start(ctx context.Context) ([]GameEvent, error) {
 				PlayerInput: entry.PlayerInput,
 				GMResponse:  entry.GMResponse,
 				IsRecap:     true,
+				RecapType:   entry.Type,
 			})
 		}
 	} else {
@@ -309,8 +310,9 @@ func (m *ScenarioManager) HandleInput(ctx context.Context, input string) (*Input
 		return nil, err
 	}
 
-	// If scene hasn't ended or we're awaiting a response, return as-is
+	// If scene hasn't ended or we're awaiting a response, save and return
 	if !result.SceneEnded || result.AwaitingInvoke || result.AwaitingMidFlow {
+		m.triggerSave("dialog")
 		return result, nil
 	}
 
@@ -332,6 +334,7 @@ func (m *ScenarioManager) ProvideInvokeResponse(ctx context.Context, resp Invoke
 	}
 
 	if !result.SceneEnded || result.AwaitingInvoke || result.AwaitingMidFlow {
+		m.triggerSave("dialog")
 		return result, nil
 	}
 
@@ -352,6 +355,7 @@ func (m *ScenarioManager) ProvideMidFlowResponse(ctx context.Context, resp MidFl
 	}
 
 	if !result.SceneEnded || result.AwaitingInvoke || result.AwaitingMidFlow {
+		m.triggerSave("dialog")
 		return result, nil
 	}
 

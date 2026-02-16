@@ -4,8 +4,11 @@ import type {
   GameEvent,
   GameEventType,
   ResultMeta,
+  SessionInitEventData,
   ServerMessage,
 } from "@/lib/types"
+
+const GAME_ID_STORAGE_KEY = "llamaoffate_game_id"
 
 // ---------------------------------------------------------------------------
 // State
@@ -19,6 +22,7 @@ export interface GameSocketState {
   awaitingMidFlow: boolean
   gameOver: boolean
   sceneEnded: boolean
+  gameId: string | null
 }
 
 const initialState: GameSocketState = {
@@ -29,6 +33,7 @@ const initialState: GameSocketState = {
   awaitingMidFlow: false,
   gameOver: false,
   sceneEnded: false,
+  gameId: null,
 }
 
 // ---------------------------------------------------------------------------
@@ -41,6 +46,7 @@ type Action =
   | { type: "event"; event: GameEvent }
   | { type: "result_meta"; meta: ResultMeta }
   | { type: "send_pending" }
+  | { type: "session_init"; gameId: string }
 
 let nextEventId = 0
 
@@ -49,7 +55,17 @@ function reducer(state: GameSocketState, action: Action): GameSocketState {
     case "connected":
       return { ...state, isConnected: true }
     case "disconnected":
-      return { ...initialState }
+      // Preserve events and gameId across disconnects so the chat history
+      // stays visible while the client reconnects to the same game.
+      return {
+        ...state,
+        isConnected: false,
+        isPending: false,
+        awaitingInvoke: false,
+        awaitingMidFlow: false,
+      }
+    case "session_init":
+      return { ...state, gameId: action.gameId }
     case "event":
       return { ...state, events: [...state.events, action.event] }
     case "result_meta":
@@ -121,7 +137,15 @@ export function useGameSocket(url: string): UseGameSocketReturn {
 
   useEffect(() => {
     function connect() {
-      const ws = new WebSocket(url)
+      // Append the game ID (from localStorage) so the server can resume the game.
+      const storedGameId = localStorage.getItem(GAME_ID_STORAGE_KEY)
+      let connectUrl = url
+      if (storedGameId) {
+        const sep = url.includes("?") ? "&" : "?"
+        connectUrl = `${url}${sep}game_id=${encodeURIComponent(storedGameId)}`
+      }
+
+      const ws = new WebSocket(connectUrl)
       wsRef.current = ws
 
       ws.onopen = () => {
@@ -147,6 +171,16 @@ export function useGameSocket(url: string): UseGameSocketReturn {
 
           if (msg.event === "result_meta") {
             dispatch({ type: "result_meta", meta: msg.data as ResultMeta })
+            return
+          }
+
+          // Handle session_init: store the game ID so we can reconnect later.
+          if (msg.event === "session_init") {
+            const initData = msg.data as SessionInitEventData
+            if (initData.gameId) {
+              localStorage.setItem(GAME_ID_STORAGE_KEY, initData.gameId)
+              dispatch({ type: "session_init", gameId: initData.gameId })
+            }
             return
           }
 
