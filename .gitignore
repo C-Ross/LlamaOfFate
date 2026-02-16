@@ -28,9 +28,20 @@ bin/
 /scene-generator
 /scenario-generator
 /scenario-walkthrough
+/server
 
 # Configuration files with sensitive information
 *.local.yaml
 
 # Session logs folder (auto-generated during gameplay)
 sessions/
+
+# Logs logs folder
+logs/
+
+# Web UI
+web/node_modules/
+web/dist/
+
+# Playwright MCP session artifacts
+.playwright-mcp/

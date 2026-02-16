@@ -25,7 +25,8 @@ func (NarrativeEvent) gameEvent() {}
 type DialogEvent struct {
 	PlayerInput string
 	GMResponse  string
-	IsRecap     bool // True when replaying prior conversation on resume
+	IsRecap     bool   // True when replaying prior conversation on resume
+	RecapType   string // "dialog", "action", "conflict" — set when IsRecap is true
 }
 
 func (DialogEvent) gameEvent() {}
@@ -46,11 +47,18 @@ func (ActionAttemptEvent) gameEvent() {}
 
 // ActionResultEvent corresponds to UI.DisplayActionResult.
 type ActionResultEvent struct {
-	Skill      string
-	SkillLevel string
-	Bonuses    int
-	Result     string
-	Outcome    string
+	Skill        string
+	SkillRank    string // Fate ladder name, e.g. "Average"
+	SkillBonus   int    // Numeric skill level, e.g. 1
+	Bonuses      int
+	Result       string // Legacy display string (kept for terminal UI)
+	Outcome      string
+	DiceFaces    []int  `json:"DiceFaces,omitempty"` // Individual die values (-1, 0, +1)
+	Total        int    // Final roll value (dice + skill + bonuses)
+	TotalRank    string // Fate ladder name of Total, e.g. "Fair"
+	Difficulty   int    // Opposition difficulty or defense value
+	DiffRank     string // Fate ladder name of Difficulty, e.g. "Fair"
+	DefenderName string // Non-empty when rolling against a character's active defense
 }
 
 func (ActionResultEvent) gameEvent() {}
@@ -139,6 +147,7 @@ type DefenseRollEvent struct {
 	DefenderName string // Name of the defending character
 	Skill        string // Defense skill used
 	Result       string // Roll result (e.g. "Good (+3)")
+	DiceFaces    []int  `json:"DiceFaces,omitempty"` // Individual die values (-1, 0, +1)
 }
 
 func (DefenseRollEvent) gameEvent() {}
@@ -330,3 +339,58 @@ type GameResumedEvent struct {
 }
 
 func (GameResumedEvent) gameEvent() {}
+
+// ---------------------------------------------------------------------------
+// Full-state snapshot — sent once after Start() so the UI can initialise.
+// ---------------------------------------------------------------------------
+
+// GameStateSnapshotEvent is emitted after Start() completes so that the web
+// UI's sidebar can initialise character info, stress tracks, aspects, etc.
+type GameStateSnapshotEvent struct {
+	Player           PlayerSnapshot            `json:"player"`
+	SceneName        string                    `json:"sceneName"`
+	SituationAspects []SituationAspectSnapshot `json:"situationAspects"`
+	NPCs             []NPCSnapshot             `json:"npcs"`
+	InConflict       bool                      `json:"inConflict"`
+}
+
+func (GameStateSnapshotEvent) gameEvent() {}
+
+// PlayerSnapshot is a serialisable view of the player character.
+type PlayerSnapshot struct {
+	Name         string                         `json:"name"`
+	HighConcept  string                         `json:"highConcept"`
+	Trouble      string                         `json:"trouble"`
+	Aspects      []string                       `json:"aspects"`
+	FatePoints   int                            `json:"fatePoints"`
+	Refresh      int                            `json:"refresh"`
+	StressTracks map[string]StressTrackSnapshot `json:"stressTracks"`
+	Consequences []ConsequenceSnapshotEntry     `json:"consequences"`
+}
+
+// StressTrackSnapshot is a serialisable view of a stress track.
+type StressTrackSnapshot struct {
+	Boxes    []bool `json:"boxes"`
+	MaxBoxes int    `json:"maxBoxes"`
+}
+
+// ConsequenceSnapshotEntry is a serialisable view of a consequence slot.
+type ConsequenceSnapshotEntry struct {
+	Severity   string `json:"severity"`
+	Aspect     string `json:"aspect"`
+	Recovering bool   `json:"recovering"`
+}
+
+// SituationAspectSnapshot is a serialisable view of a situation aspect.
+type SituationAspectSnapshot struct {
+	Name        string `json:"name"`
+	FreeInvokes int    `json:"freeInvokes"`
+}
+
+// NPCSnapshot is a serialisable view of an NPC visible in the current scene.
+type NPCSnapshot struct {
+	Name        string   `json:"name"`
+	HighConcept string   `json:"highConcept"`
+	Aspects     []string `json:"aspects"`
+	IsTakenOut  bool     `json:"isTakenOut"`
+}

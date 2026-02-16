@@ -8,6 +8,7 @@ Core premise is to leverage LLMs for narrative generation and player input parsi
 ## Repository Structure
 ```
 cmd/cli/                    - CLI entry point
+cmd/server/                 - WebSocket server entry point
 examples/                   - Evaluation tools (llm-scene-loop, scenario-generator, scenario-walkthrough, scene-generator)
 internal/
   core/                     - Fate Core mechanics (action, character, dice, scene)
@@ -17,10 +18,12 @@ internal/
   logging/                  - Structured logging (slog)
   session/                  - Session logging for game transcripts (YAML)
   ui/terminal/              - Terminal UI implementation
+  ui/web/                   - WebSocket UI implementation
 test/
   integration/              - Integration tests
   llmeval/                  - LLM behavior evaluation tests (requires -tags=llmeval)
 configs/                    - Configuration files (azure-llm.yaml)
+web/                        - React frontend (Vite, Tailwind v4, shadcn/ui, Vitest)
 ```
 
 ## Development Standards
@@ -43,13 +46,25 @@ Use inversion of control to enable multiple UI's.  The core game logic should no
 
 ### Build System
 ```bash
-just build      # Build application
-just test       # Run all tests
-just run        # Build and run
-just clean      # Clean artifacts
-just lint       # Run linters
-just validate   # Run tests and linters
-just test-llm   # Run llm evaluate tests - may consume resources
+# Unified
+just validate       # Run Go + Web validation
+just clean          # Clean all build artifacts
+
+# Go targets
+just build          # Build CLI application
+just run            # Build and run CLI
+just go-test        # Run Go tests
+just go-lint        # Run golangci-lint
+just go-validate    # vet + fmtcheck + lint + test + build
+just test-llm       # Run LLM evaluation tests (may consume resources)
+
+# Web targets
+just web-dev        # Start Vite dev server
+just web-test       # Run Vitest
+just web-lint       # Run ESLint
+just web-build      # Production build
+just web-validate   # lint + test + build
+just web-install    # npm install
 ```
 
 ### Format

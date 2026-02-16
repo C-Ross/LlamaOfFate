@@ -47,7 +47,7 @@ func (ui *TerminalUI) Emit(event uicontract.GameEvent) {
 	case uicontract.ActionAttemptEvent:
 		ui.displayActionAttempt(e.Description)
 	case uicontract.ActionResultEvent:
-		ui.displayActionResult(e.Skill, e.SkillLevel, e.Bonuses, e.Result, e.Outcome)
+		ui.displayActionResult(e)
 	case uicontract.SceneTransitionEvent:
 		ui.displaySceneTransition(e.Narrative, e.NewSceneHint)
 	case uicontract.GameOverEvent:
@@ -142,13 +142,13 @@ func (ui *TerminalUI) displayActionAttempt(description string) {
 }
 
 // displayActionResult displays the mechanical result of an action (dice roll, bonuses, outcome)
-func (ui *TerminalUI) displayActionResult(skill string, skillLevel string, bonuses int, result string, outcome string) {
-	fmt.Printf("Skill (%s): %s\n", skill, skillLevel)
-	if bonuses != 0 {
-		fmt.Printf("Bonuses: %+d\n", bonuses)
+func (ui *TerminalUI) displayActionResult(e uicontract.ActionResultEvent) {
+	fmt.Printf("Skill (%s): %s %+d\n", e.Skill, e.SkillRank, e.SkillBonus)
+	if e.Bonuses != 0 {
+		fmt.Printf("Bonuses: %+d\n", e.Bonuses)
 	}
-	fmt.Printf("Rolled: %s\n", result)
-	fmt.Printf("Outcome: %s\n", outcome)
+	fmt.Printf("Rolled: %s\n", e.Result)
+	fmt.Printf("Outcome: %s\n", e.Outcome)
 }
 
 // displayNarrative displays narrative text from the GM.

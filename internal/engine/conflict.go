@@ -21,6 +21,15 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
 )
 
+// diceFacesToInts converts a [4]FateDie array to a []int slice for JSON serialization.
+func diceFacesToInts(dice [4]dice.FateDie) []int {
+	out := make([]int, 4)
+	for i, d := range dice {
+		out[i] = int(d)
+	}
+	return out
+}
+
 // TakenOutResult represents the outcome classification of being taken out
 type TakenOutResult int
 
@@ -294,6 +303,9 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 					InitiatorName: sm.player.Name,
 					Participants:  sm.getParticipantInfo(),
 				})
+				sm.addToConversationHistory("",
+					fmt.Sprintf("[%s conflict initiated by %s]", actionConflictType, sm.player.Name),
+					inputTypeConflict)
 			}
 		} else if sm.currentScene.ConflictState.Type != actionConflictType {
 			// Escalate conflict if type changes
@@ -333,7 +345,9 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 
 	// Display initial result
 	var resultString string
+	var defenderName string
 	if defenseResult != nil && targetChar != nil {
+		defenderName = targetChar.Name
 		resultString = fmt.Sprintf("%s (Total: %s vs %s's Defense %s)",
 			result.String(), result.FinalValue.String(), targetChar.Name, defenseResult.FinalValue.String())
 	} else {
@@ -342,11 +356,18 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 	}
 	initialOutcome := result.CompareAgainst(parsedAction.Difficulty)
 	events = append(events, ActionResultEvent{
-		Skill:      parsedAction.Skill,
-		SkillLevel: fmt.Sprintf("%s (%+d)", skillLevel.String(), int(skillLevel)),
-		Bonuses:    parsedAction.CalculateBonus(),
-		Result:     resultString,
-		Outcome:    initialOutcome.Type.String(),
+		Skill:        parsedAction.Skill,
+		SkillRank:    skillLevel.Name(),
+		SkillBonus:   int(skillLevel),
+		Bonuses:      parsedAction.CalculateBonus(),
+		Result:       resultString,
+		Outcome:      initialOutcome.Type.String(),
+		DiceFaces:    diceFacesToInts(result.Roll.Dice),
+		Total:        int(result.FinalValue),
+		TotalRank:    result.FinalValue.Name(),
+		Difficulty:   int(parsedAction.Difficulty),
+		DiffRank:     parsedAction.Difficulty.Name(),
+		DefenderName: defenderName,
 	})
 
 	// Log the dice roll
@@ -448,6 +469,7 @@ func (sm *SceneManager) rollTargetDefense(target *character.Character, attackSki
 		DefenderName: target.Name,
 		Skill:        defenseSkill,
 		Result:       defenseRoll.FinalValue.String(),
+		DiceFaces:    diceFacesToInts(defenseRoll.Roll.Dice),
 	}
 
 	return defenseRoll, event
@@ -1141,6 +1163,11 @@ func (sm *SceneManager) handleConcession(ctx context.Context) []GameEvent {
 		sm.currentScene.EndConflict()
 		events = append(events, ConflictEndEvent{Reason: "You have conceded the conflict."})
 	}
+
+	// Record concession in conversation history for recap on resume
+	sm.addToConversationHistory("concede",
+		fmt.Sprintf("[Conflict ended — %s conceded. Gained %d fate point(s).]", sm.player.Name, fatePointsGained),
+		inputTypeConflict)
 
 	// Emit a free-text input request for the concession narration instead of
 	// blocking on ReadInput.

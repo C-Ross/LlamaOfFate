@@ -49,6 +49,21 @@ func (l Ladder) String() string {
 	return fmt.Sprintf("Unknown (%+d)", int(l))
 }
 
+// Name returns just the adjective name without the numeric modifier.
+// For values outside the standard ladder, returns a label like "Legendary+" or "Terrible-".
+func (l Ladder) Name() string {
+	if name, exists := ladderNames[l]; exists {
+		return name
+	}
+	if l > Legendary {
+		return "Legendary+"
+	}
+	if l < Terrible {
+		return "Terrible-"
+	}
+	return "Unknown"
+}
+
 // IsValid checks if the ladder value is within reasonable bounds
 func (l Ladder) IsValid() bool {
 	return l >= -3 && l <= 10 // Allow some flexibility beyond core range

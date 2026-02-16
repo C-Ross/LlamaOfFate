@@ -50,6 +50,7 @@ func (sm *SceneManager) ProvideMidFlowResponse(ctx context.Context, resp MidFlow
 
 	// Check for nested mid-flow (e.g. recursive stress overflow).
 	if sm.pendingMidFlow != nil {
+		result.Events = append(result.Events, sm.pendingMidFlow.event)
 		result.AwaitingMidFlow = true
 	}
 

@@ -120,7 +120,7 @@ func TestTerminalUI_EmitMethods(t *testing.T) {
 	})
 
 	require.NotPanics(t, func() {
-		ui.Emit(uicontract.ActionResultEvent{Skill: "Fight", SkillLevel: "Good (+3)", Bonuses: 2, Result: "Fair (+2)", Outcome: "Success"})
+		ui.Emit(uicontract.ActionResultEvent{Skill: "Fight", SkillRank: "Good", SkillBonus: 3, Bonuses: 2, Result: "Fair (+2)", Outcome: "Success"})
 	})
 
 	require.NotPanics(t, func() {

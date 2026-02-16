@@ -3,6 +3,10 @@
     "shellwright": {
       "command": "npx",
       "args": ["-y", "@dwmkerr/shellwright@latest"]
+    },
+     "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
     }
   }
 }

@@ -11,33 +11,46 @@ binary_path := "./bin/" + binary_name
 main_path := "./cmd/cli"
 
 # Default recipe (shown when running `just`)
-default: clean deps vet fmt build
+default: clean go-deps go-vet go-fmt build
 
-# Run all validation checks
-validate: vet fmtcheck lint test build-llmeval
+# ─── Unified targets ────────────────────────────────────────────────
+
+# Run all validation checks (Go + Web)
+validate: go-validate web-validate
     @echo "All validations passed!"
 
-# Build the application
+# ─── Go targets ─────────────────────────────────────────────────────
+
+# Run all Go validation checks
+go-validate: go-vet go-fmtcheck go-lint go-test go-build-llmeval build-server
+    @echo "Go validations passed!"
+
+# Build the CLI application
 build:
     @echo "Building {{binary_name}}..."
     @mkdir -p bin
     {{gocmd}} build -o {{binary_path}} {{main_path}}
     @echo "Build complete: {{binary_path}}"
 
-# Clean build artifacts
-clean:
-    @echo "Cleaning..."
-    {{gocmd}} clean
-    @rm -rf bin/
-    @echo "Clean complete"
+# Build the web server
+build-server:
+    @echo "Building web server..."
+    @mkdir -p bin
+    {{gocmd}} build -o ./bin/server ./cmd/server
+    @echo "Build complete: ./bin/server"
 
-# Run tests
-test:
-    @echo "Running tests..."
+# Build and run the web server
+serve: build-server
+    @echo "Starting web server on :8080..."
+    ./bin/server
+
+# Run Go tests
+go-test:
+    @echo "Running Go tests..."
     {{gocmd}} test -v ./...
 
 # Compile LLM evaluation tests without running them
-build-llmeval:
+go-build-llmeval:
     @echo "Checking llmeval tests compile..."
     {{gocmd}} test -tags=llmeval -count=0 ./test/llmeval/...
 
@@ -48,35 +61,76 @@ test-llm:
     {{gocmd}} test -v -tags=llmeval ./test/llmeval/...
 
 # Run go vet
-vet:
+go-vet:
     @echo "Running go vet..."
     {{gocmd}} vet ./...
 
-# Format code
-fmt:
-    @echo "Formatting code..."
+# Format Go code
+go-fmt:
+    @echo "Formatting Go code..."
     {{gofmt}} -s -w .
 
-# Check code formatting (fails if unformatted)
-fmtcheck:
-    @echo "Checking formatting..."
+# Check Go code formatting (fails if unformatted)
+go-fmtcheck:
+    @echo "Checking Go formatting..."
     @test -z "$({{gofmt}} -s -l .)" || (echo "Files not formatted:" && {{gofmt}} -s -l . && exit 1)
 
 # Run golangci-lint
-lint:
+go-lint:
     @echo "Running golangci-lint..."
     {{golint}} run ./...
 
-# Download dependencies
-deps:
-    @echo "Downloading dependencies..."
+# Download Go dependencies
+go-deps:
+    @echo "Downloading Go dependencies..."
     {{gocmd}} mod download
     {{gocmd}} mod tidy
 
-# Build and run the application
+# Build and run the CLI application
 run: build
     @echo "Running {{binary_name}}..."
     {{binary_path}}
+
+# ─── Web targets ────────────────────────────────────────────────────
+
+# Run all web validation checks
+web-validate: web-lint web-test web-build
+    @echo "Web validations passed!"
+
+# Install web UI dependencies
+web-install:
+    @echo "Installing web dependencies..."
+    cd web && npm install
+
+# Start web UI dev server (Vite)
+web-dev:
+    @echo "Starting web dev server..."
+    cd web && npm run dev
+
+# Build web UI for production
+web-build:
+    @echo "Building web UI..."
+    cd web && npm run build
+
+# Run web UI tests
+web-test:
+    @echo "Running web tests..."
+    cd web && npm test
+
+# Run web UI linter
+web-lint:
+    @echo "Linting web UI..."
+    cd web && npm run lint
+
+# ─── Utilities ──────────────────────────────────────────────────────
+
+# Clean build artifacts
+clean:
+    @echo "Cleaning..."
+    {{gocmd}} clean
+    @rm -rf bin/
+    @rm -rf web/dist/
+    @echo "Clean complete"
 
 # Build scenario generation eval tool
 scenario-generator:
