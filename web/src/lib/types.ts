@@ -73,11 +73,17 @@ export interface ActionAttemptEventData {
 
 export interface ActionResultEventData {
   Skill: string
-  SkillLevel: string
+  SkillRank: string      // Fate ladder name, e.g. "Average"
+  SkillBonus: number     // Numeric skill level, e.g. 1
   Bonuses: number
-  Result: string
+  Result: string         // Legacy display string (fallback)
   Outcome: string
-  DiceFaces?: number[] // Individual die values (-1, 0, +1) from server
+  DiceFaces?: number[]   // Individual die values (-1, 0, +1) from server
+  Total: number          // Final roll value (dice + skill + bonuses)
+  TotalRank: string      // Fate ladder name, e.g. "Fair"
+  Difficulty: number     // Opposition difficulty or defense value
+  DiffRank: string       // Fate ladder name, e.g. "Fair"
+  DefenderName?: string  // Non-empty when rolling against a character
 }
 
 export interface SceneTransitionEventData {

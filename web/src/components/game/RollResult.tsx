@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils"
 import { FateDie } from "@/components/game/FateDie"
 import { OutcomeBadge } from "@/components/game/OutcomeBadge"
-import { parseDiceFaces, parseResultDetail, sumDice, type DieFace } from "@/lib/dice"
+import { parseDiceFaces, sumDice, type DieFace } from "@/lib/dice"
 import type { ActionResultEventData } from "@/lib/types"
 
 interface RollResultProps {
@@ -9,9 +9,14 @@ interface RollResultProps {
   className?: string
 }
 
+/** Format a signed number, e.g. 3 → "+3", -1 → "-1" */
+function signed(n: number): string {
+  return n >= 0 ? `+${n}` : `${n}`
+}
+
 /**
  * Displays a complete action result with visual Fate dice, skill info, and
- * outcome badge. Prefers structured DiceFaces from the server when available;
+ * outcome badge. Uses structured fields from the server for clean formatting;
  * falls back to parsing dice faces from the Result string for backward
  * compatibility.
  */
@@ -21,7 +26,14 @@ export function RollResult({ data, className }: RollResultProps) {
     data.DiceFaces && data.DiceFaces.length === 4
       ? (data.DiceFaces as DieFace[])
       : parseDiceFaces(data.Result)
-  const detail = parseResultDetail(data.Result)
+
+  // Build the "Total vs Difficulty" detail string from structured fields
+  const hasStructured = data.TotalRank && data.DiffRank
+  const detailText = hasStructured
+    ? data.DefenderName
+      ? `Total: ${data.TotalRank} ${signed(data.Total)} vs ${data.DefenderName}'s ${data.DiffRank} ${signed(data.Difficulty)}`
+      : `Total: ${data.TotalRank} ${signed(data.Total)} vs ${data.DiffRank} ${signed(data.Difficulty)}`
+    : null
 
   return (
     <div
@@ -32,10 +44,11 @@ export function RollResult({ data, className }: RollResultProps) {
       role="region"
       aria-label={`Roll result: ${data.Skill} — ${data.Outcome}`}
     >
-      {/* Header: skill + outcome badge */}
+      {/* Header: skill name · ladder rank + bonus, then outcome badge */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <span className="font-heading text-xs uppercase tracking-wide text-muted-foreground">
-          {data.Skill} ({data.SkillLevel})
+          {data.Skill}
+          {data.SkillRank && <> · {data.SkillRank} {signed(data.SkillBonus)}</>}
         </span>
         <OutcomeBadge outcome={data.Outcome} />
       </div>
@@ -55,16 +68,18 @@ export function RollResult({ data, className }: RollResultProps) {
             className="font-heading text-sm text-muted-foreground"
             title="Dice total"
           >
-            = {sumDice(diceFaces) >= 0 ? "+" : ""}{sumDice(diceFaces)}
+            = {signed(sumDice(diceFaces))}
           </span>
 
-          {/* Detailed breakdown (from parenthesized portion of Result) */}
-          <span
-            className="text-xs text-muted-foreground"
-            title="Full result breakdown"
-          >
-            {detail}
-          </span>
+          {/* Detailed breakdown */}
+          {detailText && (
+            <span
+              className="text-xs text-muted-foreground"
+              title="Full result breakdown"
+            >
+              {detailText}
+            </span>
+          )}
         </div>
       ) : (
         /* Fallback: plain text result if dice can't be parsed */

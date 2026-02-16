@@ -46,12 +46,18 @@ func (ActionAttemptEvent) gameEvent() {}
 
 // ActionResultEvent corresponds to UI.DisplayActionResult.
 type ActionResultEvent struct {
-	Skill      string
-	SkillLevel string
-	Bonuses    int
-	Result     string
-	Outcome    string
-	DiceFaces  []int `json:"DiceFaces,omitempty"` // Individual die values (-1, 0, +1)
+	Skill        string
+	SkillRank    string // Fate ladder name, e.g. "Average"
+	SkillBonus   int    // Numeric skill level, e.g. 1
+	Bonuses      int
+	Result       string // Legacy display string (kept for terminal UI)
+	Outcome      string
+	DiceFaces    []int  `json:"DiceFaces,omitempty"` // Individual die values (-1, 0, +1)
+	Total        int    // Final roll value (dice + skill + bonuses)
+	TotalRank    string // Fate ladder name of Total, e.g. "Fair"
+	Difficulty   int    // Opposition difficulty or defense value
+	DiffRank     string // Fate ladder name of Difficulty, e.g. "Fair"
+	DefenderName string // Non-empty when rolling against a character's active defense
 }
 
 func (ActionResultEvent) gameEvent() {}

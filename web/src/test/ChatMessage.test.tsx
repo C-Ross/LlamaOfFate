@@ -65,13 +65,19 @@ describe("ChatMessage", () => {
   it("renders action result with skill and outcome", () => {
     const event = makeEvent("action_result", {
       Skill: "Shoot",
-      SkillLevel: "Great (+4)",
+      SkillRank: "Great",
+      SkillBonus: 4,
       Bonuses: 0,
       Result: "[+][-][ ][+] (Total: Superb (+5) vs Difficulty Fair (+2))",
       Outcome: "Success with Style",
+      Total: 5,
+      TotalRank: "Superb",
+      Difficulty: 2,
+      DiffRank: "Fair",
     })
     render(<ChatMessage event={event} />)
-    expect(screen.getByText("Shoot (Great (+4))")).toBeInTheDocument()
+    expect(screen.getByText(/Shoot/)).toBeInTheDocument()
+    expect(screen.getByText(/Great \+4/)).toBeInTheDocument()
     expect(screen.getByText("Success with Style")).toBeInTheDocument()
   })
 

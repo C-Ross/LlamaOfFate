@@ -6,18 +6,24 @@ import type { ActionResultEventData } from "@/lib/types"
 function makeData(overrides: Partial<ActionResultEventData> = {}): ActionResultEventData {
   return {
     Skill: "Fight",
-    SkillLevel: "Good (+3)",
+    SkillRank: "Good",
+    SkillBonus: 3,
     Bonuses: 0,
     Result: "[+][-][ ][+] (Total: Great (+4) vs Difficulty Fair (+2))",
     Outcome: "Success",
+    Total: 4,
+    TotalRank: "Great",
+    Difficulty: 2,
+    DiffRank: "Fair",
     ...overrides,
   }
 }
 
 describe("RollResult", () => {
-  it("renders skill name and level", () => {
+  it("renders skill name and rank", () => {
     render(<RollResult data={makeData()} />)
-    expect(screen.getByText("Fight (Good (+3))")).toBeInTheDocument()
+    expect(screen.getByText(/Fight/)).toBeInTheDocument()
+    expect(screen.getByText(/Good \+3/)).toBeInTheDocument()
   })
 
   it("renders outcome badge", () => {
@@ -47,9 +53,18 @@ describe("RollResult", () => {
     expect(screen.getByText("= +1")).toBeInTheDocument()
   })
 
-  it("shows result detail (total vs difficulty)", () => {
+  it("shows structured total vs difficulty with ladder names", () => {
     render(<RollResult data={makeData()} />)
-    expect(screen.getByText("Total: Great (+4) vs Difficulty Fair (+2)")).toBeInTheDocument()
+    expect(screen.getByText("Total: Great +4 vs Fair +2")).toBeInTheDocument()
+  })
+
+  it("shows defender name when rolling against a character", () => {
+    render(<RollResult data={makeData({
+      DefenderName: "Bandit",
+      Difficulty: 3,
+      DiffRank: "Good",
+    })} />)
+    expect(screen.getByText("Total: Great +4 vs Bandit's Good +3")).toBeInTheDocument()
   })
 
   it("falls back to plain text when dice can't be parsed", () => {
@@ -76,6 +91,8 @@ describe("RollResult", () => {
   it("renders all-negative roll correctly", () => {
     render(<RollResult data={makeData({
       Result: "[-][-][-][-] (Total: Terrible (-2) vs Difficulty Fair (+2))",
+      Total: -2,
+      TotalRank: "Terrible",
     })} />)
     const dice = screen.getAllByRole("img", { name: "Minus die" })
     expect(dice).toHaveLength(4)

@@ -342,7 +342,9 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 
 	// Display initial result
 	var resultString string
+	var defenderName string
 	if defenseResult != nil && targetChar != nil {
+		defenderName = targetChar.Name
 		resultString = fmt.Sprintf("%s (Total: %s vs %s's Defense %s)",
 			result.String(), result.FinalValue.String(), targetChar.Name, defenseResult.FinalValue.String())
 	} else {
@@ -351,12 +353,18 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 	}
 	initialOutcome := result.CompareAgainst(parsedAction.Difficulty)
 	events = append(events, ActionResultEvent{
-		Skill:      parsedAction.Skill,
-		SkillLevel: fmt.Sprintf("%s (%+d)", skillLevel.String(), int(skillLevel)),
-		Bonuses:    parsedAction.CalculateBonus(),
-		Result:     resultString,
-		Outcome:    initialOutcome.Type.String(),
-		DiceFaces:  diceFacesToInts(result.Roll.Dice),
+		Skill:        parsedAction.Skill,
+		SkillRank:    skillLevel.Name(),
+		SkillBonus:   int(skillLevel),
+		Bonuses:      parsedAction.CalculateBonus(),
+		Result:       resultString,
+		Outcome:      initialOutcome.Type.String(),
+		DiceFaces:    diceFacesToInts(result.Roll.Dice),
+		Total:        int(result.FinalValue),
+		TotalRank:    result.FinalValue.Name(),
+		Difficulty:   int(parsedAction.Difficulty),
+		DiffRank:     parsedAction.Difficulty.Name(),
+		DefenderName: defenderName,
 	})
 
 	// Log the dice roll

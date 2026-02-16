@@ -27,6 +27,26 @@ func TestLadder_String(t *testing.T) {
 	}
 }
 
+func TestLadder_Name(t *testing.T) {
+	tests := []struct {
+		ladder   Ladder
+		expected string
+	}{
+		{Terrible, "Terrible"},
+		{Mediocre, "Mediocre"},
+		{Average, "Average"},
+		{Great, "Great"},
+		{Legendary, "Legendary"},
+		{Ladder(10), "Legendary+"},
+		{Ladder(-3), "Terrible-"},
+	}
+
+	for _, test := range tests {
+		result := test.ladder.Name()
+		assert.Equal(t, test.expected, result, "Ladder(%d).Name()", test.ladder)
+	}
+}
+
 func TestLadder_IsValid(t *testing.T) {
 	tests := []struct {
 		ladder Ladder

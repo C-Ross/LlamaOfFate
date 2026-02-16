@@ -7,40 +7,74 @@ import type { ActionResultEventData, DefenseRollEventData } from "@/lib/types"
 
 const successResult: ActionResultEventData = {
   Skill: "Fight",
-  SkillLevel: "Good (+3)",
+  SkillRank: "Good",
+  SkillBonus: 3,
   Bonuses: 0,
   Result: "[+][-][ ][+] (Total: Great (+4) vs Difficulty Fair (+2))",
   Outcome: "Success",
+  Total: 4,
+  TotalRank: "Great",
+  Difficulty: 2,
+  DiffRank: "Fair",
 }
 
 const styleResult: ActionResultEventData = {
   Skill: "Shoot",
-  SkillLevel: "Great (+4)",
+  SkillRank: "Great",
+  SkillBonus: 4,
   Bonuses: 2,
   Result: "[+][+][+][ ] (Total: Legendary (+8) vs Difficulty Good (+3))",
   Outcome: "Success with Style",
+  Total: 8,
+  TotalRank: "Legendary",
+  Difficulty: 3,
+  DiffRank: "Good",
 }
 
 const failureResult: ActionResultEventData = {
   Skill: "Athletics",
-  SkillLevel: "Average (+1)",
+  SkillRank: "Average",
+  SkillBonus: 1,
   Bonuses: 0,
   Result: "[-][-][ ][-] (Total: Poor (-1) vs Difficulty Fair (+2))",
   Outcome: "Failure",
+  Total: -1,
+  TotalRank: "Poor",
+  Difficulty: 2,
+  DiffRank: "Fair",
 }
 
 const tieResult: ActionResultEventData = {
   Skill: "Investigate",
-  SkillLevel: "Fair (+2)",
+  SkillRank: "Fair",
+  SkillBonus: 2,
   Bonuses: 0,
   Result: "[ ][ ][ ][ ] (Total: Fair (+2) vs Difficulty Fair (+2))",
   Outcome: "Tie",
+  Total: 2,
+  TotalRank: "Fair",
+  Difficulty: 2,
+  DiffRank: "Fair",
 }
 
 const defenseData: DefenseRollEventData = {
   DefenderName: "Shadow Bandit",
   Skill: "Athletics",
   Result: "Good (+3)",
+}
+
+const vsDefenderResult: ActionResultEventData = {
+  Skill: "Provoke",
+  SkillRank: "Average",
+  SkillBonus: 1,
+  Bonuses: 0,
+  Result: "[+][ ][ ][+] (Total: Good (+3) vs Shadow Bandit's Defense Fair (+2))",
+  Outcome: "Success",
+  Total: 3,
+  TotalRank: "Good",
+  Difficulty: 2,
+  DiffRank: "Fair",
+  DefenderName: "Shadow Bandit",
 }
 
 export function DiceDemo() {
@@ -95,6 +129,12 @@ export function DiceDemo() {
         <RollResult data={successResult} />
         <RollResult data={tieResult} />
         <RollResult data={failureResult} />
+      </section>
+
+      {/* Roll vs defender */}
+      <section className="space-y-3">
+        <h2 className="font-heading text-lg font-semibold">Roll vs Defender</h2>
+        <RollResult data={vsDefenderResult} />
       </section>
 
       {/* Defense roll */}

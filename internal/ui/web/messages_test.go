@@ -54,11 +54,16 @@ func TestMarshalEvent_DialogEvent(t *testing.T) {
 func TestMarshalEvent_ActionResultEvent(t *testing.T) {
 	event := uicontract.ActionResultEvent{
 		Skill:      "Fight",
-		SkillLevel: "Good (+3)",
+		SkillRank:  "Good",
+		SkillBonus: 3,
 		Bonuses:    2,
 		Result:     "[+][-][ ][+] (Total: Epic (+7) vs Difficulty Fair (+2))",
 		Outcome:    "Success with Style",
 		DiceFaces:  []int{1, -1, 0, 1},
+		Total:      7,
+		TotalRank:  "Epic",
+		Difficulty: 2,
+		DiffRank:   "Fair",
 	}
 
 	data, err := MarshalEvent(event)
@@ -71,9 +76,15 @@ func TestMarshalEvent_ActionResultEvent(t *testing.T) {
 	var parsed uicontract.ActionResultEvent
 	require.NoError(t, json.Unmarshal(msg.Data, &parsed))
 	assert.Equal(t, "Fight", parsed.Skill)
+	assert.Equal(t, "Good", parsed.SkillRank)
+	assert.Equal(t, 3, parsed.SkillBonus)
 	assert.Equal(t, 2, parsed.Bonuses)
 	assert.Equal(t, "Success with Style", parsed.Outcome)
 	assert.Equal(t, []int{1, -1, 0, 1}, parsed.DiceFaces)
+	assert.Equal(t, 7, parsed.Total)
+	assert.Equal(t, "Epic", parsed.TotalRank)
+	assert.Equal(t, 2, parsed.Difficulty)
+	assert.Equal(t, "Fair", parsed.DiffRank)
 }
 
 func TestMarshalEvent_ConflictStartEvent(t *testing.T) {
