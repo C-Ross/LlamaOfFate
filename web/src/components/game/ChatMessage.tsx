@@ -3,6 +3,10 @@ import { RollResult } from "@/components/game/RollResult"
 import { ActionAttempt } from "@/components/game/ActionAttempt"
 import { DefenseRoll } from "@/components/game/DefenseRoll"
 import { OutcomeBadge } from "@/components/game/OutcomeBadge"
+import { TurnAnnouncement } from "@/components/game/TurnAnnouncement"
+import { DamageResolution } from "@/components/game/DamageResolution"
+import { NPCAction } from "@/components/game/NPCAction"
+import { ConflictEnd } from "@/components/game/ConflictEnd"
 import type {
   GameEvent,
   PlayerInputEventData,
@@ -251,13 +255,7 @@ function ConflictStartMessage({ data }: { data: ConflictStartEventData }) {
 }
 
 function ConflictEndMessage({ data }: { data: ConflictEndEventData }) {
-  return (
-    <div className="my-3 flex items-center gap-2 text-xs font-heading uppercase tracking-widest text-muted-foreground">
-      <span className="h-px flex-1 bg-border" />
-      Conflict Ended: {data.Reason}
-      <span className="h-px flex-1 bg-border" />
-    </div>
-  )
+  return <ConflictEnd data={data} />
 }
 
 function ConflictEscalationMessage({ data }: { data: ConflictEscalationEventData }) {
@@ -270,13 +268,7 @@ function ConflictEscalationMessage({ data }: { data: ConflictEscalationEventData
 }
 
 function TurnAnnouncementMessage({ data }: { data: TurnAnnouncementEventData }) {
-  return (
-    <div className="flex items-center gap-2 py-1 text-xs font-heading uppercase tracking-wide text-muted-foreground">
-      <span className="h-px w-4 bg-border" />
-      Turn {data.TurnNumber}: {data.CharacterName}{data.IsPlayer ? " (You)" : ""}
-      <span className="h-px w-4 bg-border" />
-    </div>
-  )
+  return <TurnAnnouncement data={data} />
 }
 
 // ---------------------------------------------------------------------------
@@ -325,26 +317,7 @@ function InputRequestMessage({ data }: { data: InputRequestEventData }) {
 // ---------------------------------------------------------------------------
 
 function NPCAttackMessage({ data }: { data: NPCAttackEventData }) {
-  return (
-    <div className="space-y-2">
-      <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm font-body space-y-1">
-        <div className="font-heading text-xs uppercase tracking-wide text-destructive">
-          {data.AttackerName} attacks {data.TargetName}
-        </div>
-        <div>
-          Attack: {data.AttackSkill} {data.AttackResult} vs Defense: {data.DefenseSkill} {data.DefenseResult}
-        </div>
-        <div className={cn("font-bold", outcomeColor(data.FinalOutcome))}>
-          <OutcomeBadge outcome={data.FinalOutcome} size="sm" />
-        </div>
-      </div>
-      {data.Narrative && (
-        <div className="rounded-lg bg-secondary/50 px-4 py-3 text-sm font-body text-foreground leading-relaxed whitespace-pre-wrap">
-          {data.Narrative}
-        </div>
-      )}
-    </div>
-  )
+  return <NPCAction data={data} />
 }
 
 function PlayerAttackResultMessage({ data }: { data: PlayerAttackResultEventData }) {
@@ -365,22 +338,7 @@ function PlayerAttackResultMessage({ data }: { data: PlayerAttackResultEventData
 }
 
 function DamageResolutionMessage({ data }: { data: DamageResolutionEventData }) {
-  return (
-    <div className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-body space-y-1">
-      <div className="font-heading text-xs uppercase tracking-wide text-muted-foreground">
-        Damage to {data.TargetName}
-      </div>
-      {data.Absorbed && (
-        <div>Stress: {data.Absorbed.Shifts} shift{data.Absorbed.Shifts !== 1 ? "s" : ""} ({data.Absorbed.TrackType}) {data.Absorbed.TrackState}</div>
-      )}
-      {data.Consequence && (
-        <div className={cn(consequenceColor(data.Consequence.Severity))}>
-          {data.Consequence.Severity} consequence: {data.Consequence.Aspect}
-        </div>
-      )}
-      {data.TakenOut && <div className="font-bold text-destructive">Taken Out!</div>}
-    </div>
-  )
+  return <DamageResolution data={data} />
 }
 
 function DefenseRollMessage({ data }: { data: DefenseRollEventData }) {
@@ -556,15 +514,6 @@ function GameResumedMessage({ data }: { data: GameResumedEventData }) {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function outcomeColor(outcome: string): string {
-  const lower = outcome.toLowerCase()
-  if (lower.includes("success with style")) return "text-primary"
-  if (lower.includes("success")) return "text-boost"
-  if (lower.includes("tie")) return "text-consequence-mild"
-  if (lower.includes("failure")) return "text-destructive"
-  return "text-foreground"
-}
 
 function consequenceColor(severity: string): string {
   switch (severity.toLowerCase()) {

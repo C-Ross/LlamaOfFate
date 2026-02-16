@@ -1,7 +1,10 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { GameSidebar } from "@/components/game/GameSidebar"
 import { ChatPanel } from "@/components/game/ChatPanel"
 import { ChatInput } from "@/components/game/ChatInput"
+import { ConflictBanner } from "@/components/game/ConflictBanner"
+import { InvokePrompt } from "@/components/game/InvokePrompt"
+import { MidFlowPrompt } from "@/components/game/MidFlowPrompt"
 import { useGameSocket } from "@/hooks/useGameSocket"
 import { useGameState } from "@/hooks/useGameState"
 import { Badge } from "@/components/ui/badge"
@@ -12,6 +15,10 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import type {
+  InvokePromptEventData,
+  InputRequestEventData,
+} from "@/lib/types"
 
 function getWebSocketUrl(): string {
   if (typeof window === "undefined") return "ws://localhost:8080/ws"
@@ -34,9 +41,33 @@ function App() {
     awaitingMidFlow,
     gameOver,
     sendInput,
+    sendInvokeResponse,
+    sendMidFlowResponse,
   } = useGameSocket(getWebSocketUrl())
 
   const gameState = useGameState(events)
+
+  // Find the most recent invoke prompt data when awaiting an invoke response
+  const invokePromptData = useMemo(() => {
+    if (!awaitingInvoke) return null
+    for (let i = events.length - 1; i >= 0; i--) {
+      if (events[i].event === "invoke_prompt") {
+        return events[i].data as InvokePromptEventData
+      }
+    }
+    return null
+  }, [events, awaitingInvoke])
+
+  // Find the most recent input request data when awaiting a mid-flow response
+  const midFlowPromptData = useMemo(() => {
+    if (!awaitingMidFlow) return null
+    for (let i = events.length - 1; i >= 0; i--) {
+      if (events[i].event === "input_request") {
+        return events[i].data as InputRequestEventData
+      }
+    }
+    return null
+  }, [events, awaitingMidFlow])
 
   const inputDisabled = !isConnected || isPending || awaitingInvoke || awaitingMidFlow || gameOver
 
@@ -80,8 +111,38 @@ function App() {
           </Sheet>
         </header>
 
-        {/* Message area */}
-        <ChatPanel events={events} isPending={isPending} className="flex-1" />
+        {/* Conflict banner */}
+        <ConflictBanner active={gameState.inConflict} />
+
+        {/* Message area — relative container for overlaid prompts */}
+        <div className="relative flex-1 min-h-0">
+          <ChatPanel events={events} isPending={isPending} className="h-full" />
+
+          {/* Floating invoke prompt — overlaid at the bottom of the chat */}
+          {awaitingInvoke && invokePromptData && (
+            <div className="absolute inset-x-0 bottom-0 px-6 py-3 bg-gradient-to-t from-background via-background/95 to-transparent pt-10">
+              <div className="mx-auto max-w-2xl">
+                <InvokePrompt
+                  data={invokePromptData}
+                  onInvoke={sendInvokeResponse}
+                  onDecline={() => sendInvokeResponse(-1, false)}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Floating mid-flow prompt — overlaid at the bottom of the chat */}
+          {awaitingMidFlow && midFlowPromptData && (
+            <div className="absolute inset-x-0 bottom-0 px-6 py-3 bg-gradient-to-t from-background via-background/95 to-transparent pt-10">
+              <div className="mx-auto max-w-2xl">
+                <MidFlowPrompt
+                  data={midFlowPromptData}
+                  onChoose={sendMidFlowResponse}
+                />
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Input area */}
         <ChatInput
