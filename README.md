@@ -150,9 +150,31 @@ just validate
 # Run the CLI application
 just run
 
-# Start the web UI dev server
+# Run the web UI (starts both frontend and WebSocket server)
 just web-dev
 ```
+
+### Using the Web UI
+
+The web UI provides a modern, interactive interface for playing LlamaOfFate with:
+
+- **Visual Dice Rolls**: Animated Fate dice with color-coded results
+- **Interactive Prompts**: Click-to-invoke aspect prompts during conflicts
+- **Session Persistence**: Game state auto-saves and resumes across page refreshes
+- **Real-time Chat**: Multi-line input with instant feedback and loading indicators
+
+To start the web interface:
+
+```bash
+# Terminal 1: Start the WebSocket server
+just build
+./bin/llamaoffate server
+
+# Terminal 2: Start the Vite dev server
+just web-dev
+```
+
+Then open your browser to `http://localhost:5173`
 
 ## Saving and Loading Games
 
@@ -237,11 +259,13 @@ LlamaOfFate/
 - ✅ Game state persistence (save/load functionality via YAML)
 - ✅ Event-driven UI architecture with async invoke/input support
 - ✅ Integration tests and LLM evaluation tests
-- ✅ Web UI scaffold (React + Vite + Tailwind + shadcn/ui)
-- ✅ WebSocket server backend
+- ✅ Full-featured web UI with React + Vite + Tailwind + shadcn/ui
+- ✅ WebSocket server backend with game engine integration
+- ✅ Interactive conflict UI with aspect invocation prompts
+- ✅ Fate dice visualization with animated results
+- ✅ Game session persistence across page refreshes
 
 ### Planned Features
 - 📋 Additional LLM backends (Ollama, OpenAI direct)
-- 📋 WebSocket integration connecting web UI to game engine
 - 📋 Public API packages for external integrations
 - 📋 Database backends for long-term storage
