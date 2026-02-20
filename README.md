@@ -150,16 +150,18 @@ just validate
 # Run the CLI application
 just run
 
-# Start the web UI dev server
+# Start the WebSocket server and web UI dev server
 just web-dev
+# Then open http://localhost:5173 in your browser
 ```
 
 ## Saving and Loading Games
 
-LlamaOfFate automatically saves your game progress at key points during play. When you restart the application, it will automatically resume from your last save.
+LlamaOfFate automatically saves your game progress during play. When you restart the application, it will automatically resume from your last save.
 
-- **Auto-save**: The game saves automatically at scene transitions and key moments
+- **Auto-save**: The game saves automatically after every dialog turn and at key moments
 - **Auto-resume**: On startup, the game resumes from the last unfinished scenario
+- **Web persistence**: Web UI sessions persist across page refresh via localStorage and server-side YAML saves
 - **Save location**: Game saves are stored as YAML files (configurable via `GameSaver` interface)
 
 ## Package Structure
@@ -237,11 +239,12 @@ LlamaOfFate/
 - ✅ Game state persistence (save/load functionality via YAML)
 - ✅ Event-driven UI architecture with async invoke/input support
 - ✅ Integration tests and LLM evaluation tests
-- ✅ Web UI scaffold (React + Vite + Tailwind + shadcn/ui)
-- ✅ WebSocket server backend
+- ✅ Fully functional web UI with React + Vite + Tailwind v4 + shadcn/ui
+- ✅ WebSocket server backend with full game engine integration
+- ✅ Interactive conflict UI with aspect invocation and mid-flow prompts
+- ✅ Web session persistence across page refresh
 
 ### Planned Features
 - 📋 Additional LLM backends (Ollama, OpenAI direct)
-- 📋 WebSocket integration connecting web UI to game engine
 - 📋 Public API packages for external integrations
 - 📋 Database backends for long-term storage
