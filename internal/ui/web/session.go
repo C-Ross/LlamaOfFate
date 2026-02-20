@@ -175,7 +175,7 @@ func (s *Session) runSetup(ctx context.Context) error {
 		}
 	}
 
-	driver, err := s.factory(s.gameID, setup)
+	driver, err := s.factory(ctx, s.gameID, setup)
 	if err != nil {
 		// Send error to client and return
 		sysErr := uicontract.SystemMessageEvent{Message: fmt.Sprintf("Setup failed: %v", err)}

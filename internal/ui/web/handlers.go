@@ -21,10 +21,11 @@ type GameSetup struct {
 }
 
 // GameSessionManagerFactory creates a new GameSessionManager for a WebSocket session.
+// The ctx parameter carries request-scoped context (used for LLM calls during generation).
 // The gameID parameter identifies the game. When non-empty, the factory should
 // attempt to resume the game from a saved state. When empty, a fresh game is created.
 // The setup parameter carries the player's scenario choice (nil when resuming).
-type GameSessionManagerFactory func(gameID string, setup *GameSetup) (engine.GameSessionManager, error)
+type GameSessionManagerFactory func(ctx context.Context, gameID string, setup *GameSetup) (engine.GameSessionManager, error)
 
 // SetupConfig holds the data the Session sends in the setup_request event.
 type SetupConfig struct {
@@ -92,7 +93,7 @@ func (h *Handler) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		h.logger.Info("resuming game", "game_id", gameID)
 	}
 
-	driver, err := h.factory(gameID, nil)
+	driver, err := h.factory(r.Context(), gameID, nil)
 	if err != nil {
 		h.logger.Error("failed to create game driver", "error", err)
 		_ = conn.Close(websocket.StatusInternalError, "failed to initialize game")

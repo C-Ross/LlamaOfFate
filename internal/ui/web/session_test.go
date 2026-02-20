@@ -341,7 +341,7 @@ func TestSession_SetupFlowPreset(t *testing.T) {
 	}
 
 	var receivedSetup *GameSetup
-	factory := func(gameID string, setup *GameSetup) (engine.GameSessionManager, error) {
+	factory := func(_ context.Context, gameID string, setup *GameSetup) (engine.GameSessionManager, error) {
 		receivedSetup = setup
 		return driver, nil
 	}
@@ -412,7 +412,7 @@ func TestSession_SetupFlowCustom(t *testing.T) {
 	}
 
 	var receivedSetup *GameSetup
-	factory := func(gameID string, setup *GameSetup) (engine.GameSessionManager, error) {
+	factory := func(_ context.Context, gameID string, setup *GameSetup) (engine.GameSessionManager, error) {
 		receivedSetup = setup
 		return driver, nil
 	}
@@ -484,7 +484,7 @@ func TestSession_SetupFlowCustom(t *testing.T) {
 }
 
 func TestSession_SetupRejectsNonSetupMessage(t *testing.T) {
-	factory := func(gameID string, setup *GameSetup) (engine.GameSessionManager, error) {
+	factory := func(_ context.Context, gameID string, setup *GameSetup) (engine.GameSessionManager, error) {
 		return nil, fmt.Errorf("should not be called")
 	}
 

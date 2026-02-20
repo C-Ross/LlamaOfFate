@@ -17,6 +17,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/C-Ross/LlamaOfFate/internal/storage"
 	"github.com/C-Ross/LlamaOfFate/internal/ui/web"
 )
@@ -39,8 +40,8 @@ func main() {
 		log.Fatalf("LLM init failed: %v", err)
 	}
 
-	factory := func(gameID string, setup *web.GameSetup) (engine.GameSessionManager, error) {
-		return newGameSession(llmClient, gameID, setup)
+	factory := func(ctx context.Context, gameID string, setup *web.GameSetup) (engine.GameSessionManager, error) {
+		return newGameSession(ctx, llmClient, gameID, setup)
 	}
 
 	setupCfg := web.SetupConfig{
@@ -91,7 +92,7 @@ func initLLMClient(configPath string) (llm.LLMClient, error) {
 	return retryClient, nil
 }
 
-func newGameSession(llmClient llm.LLMClient, gameID string, setup *web.GameSetup) (engine.GameSessionManager, error) {
+func newGameSession(ctx context.Context, llmClient llm.LLMClient, gameID string, setup *web.GameSetup) (engine.GameSessionManager, error) {
 	saver := newSaver(gameID)
 
 	// If no setup is provided, try to resume a saved game.
@@ -140,9 +141,11 @@ func newGameSession(llmClient llm.LLMClient, gameID string, setup *web.GameSetup
 			setup.Custom.Trouble,
 			setup.Custom.Genre,
 		)
-		// For Phase 2 we'll generate the scenario via LLM here.
-		// For now, fall back to a generic scenario from the genre.
-		scenario = genreScenarioFallback(setup.Custom.Genre)
+		var err error
+		scenario, err = generateScenario(ctx, llmClient, setup.Custom)
+		if err != nil {
+			return nil, fmt.Errorf("scenario generation: %w", err)
+		}
 	} else {
 		return nil, fmt.Errorf("setup message has neither presetId nor custom data")
 	}
@@ -160,18 +163,47 @@ func newGameSession(llmClient llm.LLMClient, gameID string, setup *web.GameSetup
 	return gm, nil
 }
 
-// genreScenarioFallback returns a preset scenario that matches the given genre,
-// or the saloon scenario as a fallback. This is a temporary bridge until Phase 2
-// wires up LLM scenario generation.
-func genreScenarioFallback(genre string) *scene.Scenario {
-	switch genre {
-	case "Cyberpunk":
-		return scene.PredefinedScenario("heist")
-	case "Fantasy":
-		return scene.PredefinedScenario("tower")
-	default:
-		return scene.PredefinedScenario("saloon")
+// scenarioGenerationTimeout is the maximum time allowed for LLM scenario generation.
+const scenarioGenerationTimeout = 30 * time.Second
+
+// generateScenario uses the LLM to create a custom scenario from the player's
+// character data and chosen genre.
+func generateScenario(ctx context.Context, client llm.LLMClient, custom *web.CustomSetup) (*scene.Scenario, error) {
+	genCtx, cancel := context.WithTimeout(ctx, scenarioGenerationTimeout)
+	defer cancel()
+
+	data := prompt.ScenarioGenerationData{
+		PlayerName:        custom.Name,
+		PlayerHighConcept: custom.HighConcept,
+		PlayerTrouble:     custom.Trouble,
+		Genre:             custom.Genre,
 	}
+
+	promptText, err := prompt.RenderScenarioGeneration(data)
+	if err != nil {
+		return nil, fmt.Errorf("render prompt: %w", err)
+	}
+
+	slog.Info("generating scenario via LLM",
+		"genre", custom.Genre,
+		"player", custom.Name,
+	)
+
+	rawResponse, err := llm.SimpleCompletion(genCtx, client, promptText, 500, 0.8)
+	if err != nil {
+		return nil, fmt.Errorf("LLM completion: %w", err)
+	}
+
+	scenario, err := prompt.ParseScenario(rawResponse)
+	if err != nil {
+		return nil, fmt.Errorf("parse scenario: %w", err)
+	}
+
+	slog.Info("scenario generated",
+		"title", scenario.Title,
+		"genre", scenario.Genre,
+	)
+	return scenario, nil
 }
 
 // newSaver creates a YAMLSaver that stores saves in a per-game subdirectory
