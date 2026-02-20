@@ -15,7 +15,10 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, "index.html"),
-        demo: path.resolve(__dirname, "demo.html"),
+        ...(process.env.VITE_ENABLE_DEMOS === "true" && {
+          demo: path.resolve(__dirname, "demo.html"),
+          "dice-demo": path.resolve(__dirname, "dice-demo.html"),
+        }),
       },
     },
   },
