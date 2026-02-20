@@ -188,4 +188,28 @@ describe("InvokePrompt", () => {
     fireEvent.click(screen.getByText("Collapse"))
     expect(screen.queryByText("Quick Draw")).not.toBeInTheDocument()
   })
+
+  it("resets submitted state when remounted with a new key", () => {
+    // Simulates the fix: App renders <InvokePrompt key={invokePromptKey} />
+    // so when a new invoke_prompt event arrives, the component remounts with
+    // fresh state instead of staying stuck on "Resolving...".
+    const onInvoke = vi.fn()
+    const { rerender } = render(
+      <InvokePrompt key="evt-1" data={makeData()} onInvoke={onInvoke} onDecline={vi.fn()} />,
+    )
+    expandPrompt()
+    fireEvent.click(screen.getAllByText("+2")[0])
+    expect(screen.getByText("Resolving...")).toBeInTheDocument()
+
+    // Server responds with a new invoke prompt (different key = remount)
+    const newData = makeData({ CurrentResult: "Good (+3)", ShiftsNeeded: 1 })
+    rerender(
+      <InvokePrompt key="evt-2" data={newData} onInvoke={onInvoke} onDecline={vi.fn()} />,
+    )
+
+    // Component should show the new prompt, not "Resolving..."
+    expect(screen.queryByText("Resolving...")).not.toBeInTheDocument()
+    expect(screen.getByText("Invoke?")).toBeInTheDocument()
+    expect(screen.getByText(/Good \(\+3\) · 1 shift needed/)).toBeInTheDocument()
+  })
 })

@@ -66,6 +66,16 @@ function App() {
     return null
   }, [events, awaitingInvoke])
 
+  // Track the event ID of the latest invoke prompt so the InvokePrompt
+  // component remounts (resetting its local "submitted" state) when a new
+  // prompt arrives after an invoke that leaves more invokes available.
+  const invokePromptKey = useMemo(() => {
+    for (let i = events.length - 1; i >= 0; i--) {
+      if (events[i].event === "invoke_prompt") return events[i].id
+    }
+    return "none"
+  }, [events])
+
   // Find the most recent input request data when awaiting a mid-flow response
   const midFlowPromptData = useMemo(() => {
     if (!awaitingMidFlow) return null
@@ -154,6 +164,7 @@ function App() {
             invokeSlot={
               awaitingInvoke && invokePromptData ? (
                 <InvokePrompt
+                  key={invokePromptKey}
                   data={invokePromptData}
                   onInvoke={sendInvokeResponse}
                   onDecline={() => sendInvokeResponse(-1, false)}
