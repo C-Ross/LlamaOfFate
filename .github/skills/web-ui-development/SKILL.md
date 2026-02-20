@@ -36,14 +36,20 @@ web/
     main.tsx                  - React entry point
     App.tsx                   - Root layout (two-panel)
     index.css                 - Tailwind + theme variables
-    lib/utils.ts              - cn() helper (clsx + tailwind-merge)
+    lib/
+      utils.ts                 - cn() helper (clsx + tailwind-merge)
+      types.ts                 - TypeScript type definitions for game state
+      dice.ts                  - Dice utilities (parseFateDice, formatFateRoll)
+    hooks/
+      useGameSocket.ts         - WebSocket connection & game event handling
+      useGameState.ts          - Game state management (character, scene, conflict)
     components/
       SidebarCard.tsx          - Reusable sidebar card wrapper
+      game/                    - Game-specific components (20+ components)
       ui/                      - shadcn/ui components (DO NOT edit manually)
     test/
       setup.ts                 - Vitest setup (jest-dom matchers)
-      App.test.tsx             - App component tests
-      SidebarCard.test.tsx     - SidebarCard tests
+      *.test.tsx               - Component tests (one per component)
 ```
 
 ## Justfile Targets
@@ -80,7 +86,7 @@ shadcn copies component source into `src/components/ui/`. Do not hand-edit these
 cd web && npx shadcn@latest add <component-name>
 ```
 
-Available components already installed: `button`, `card`, `scroll-area`, `input`, `badge`.
+Available components already installed: `button`, `card`, `scroll-area`, `input`, `badge`, `collapsible`, `sheet`.
 
 The `components.json` configures shadcn: style is `new-york`, no RSC, uses `@/components/ui` alias.
 
@@ -125,6 +131,42 @@ The app uses a two-panel flexbox layout:
 
 - **Left panel** (flex-1): Chat area with header, scrollable message area, and input form
 - **Right panel** (w-80, hidden below `lg`): Game sidebar with `SidebarCard` components
+
+## Game Component Library
+
+The `components/game/` directory contains 20+ game-specific components:
+
+**Chat & Dialog:**
+- `ChatPanel.tsx` — Main chat container with message history
+- `ChatMessage.tsx` — Individual message rendering (player, GM, system, recap)
+- `ChatInput.tsx` — Text input with submit handling
+
+**Character & Stats:**
+- `GameSidebar.tsx` — Right panel container
+- `NpcPanel.tsx` — NPC list with attitudes
+- `FatePointTracker.tsx` — Player fate points display
+- `StressTrack.tsx` — Physical/mental stress boxes
+- `AspectBadge.tsx` — Aspect display with free invokes
+
+**Conflict:**
+- `ConflictBanner.tsx` — Conflict start/escalation/concession banners
+- `ConflictEnd.tsx` — Conflict end summary
+- `TurnAnnouncement.tsx` — Turn order display
+- `InvokePrompt.tsx` — Aspect invocation UI
+- `MidFlowPrompt.tsx` — Generic mid-flow input prompt
+
+**Actions & Rolls:**
+- `ActionAttempt.tsx` — Player action attempts with dice
+- `RollResult.tsx` — Roll outcome display
+- `NPCAction.tsx` — NPC action announcements
+- `DefenseRoll.tsx` — Defense roll display
+- `DamageResolution.tsx` — Damage/stress/consequence display
+- `FateDie.tsx` — Single Fate die visualization (-1/0/+1)
+- `OutcomeBadge.tsx` — Fate outcome badges (fail/tie/success/style)
+
+**Hooks:**
+- `useGameSocket.ts` — WebSocket connection, event handling, game ID persistence
+- `useGameState.ts` — Game state reducer (character, scene, conflict, conversation)
 
 ## Creating Components
 
