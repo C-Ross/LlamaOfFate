@@ -154,13 +154,34 @@ just run
 just web-dev
 ```
 
+## Game Setup
+
+### Pre-Game Setup (Web UI)
+
+The web interface provides an interactive setup screen where you can choose how to start your adventure:
+
+- **Preset Scenarios**: Select from curated scenario presets with pre-configured characters and story settings:
+  - **Saloon Showdown** - Western genre with a fast-talking gambler
+  - **High Stakes Heist** - Heist genre with a cat burglar
+  - **Tower Escape** - Fantasy genre with a scholar
+- **Custom Character**: Create your own character by specifying name, high concept, trouble, skills, and genre/setting
+
+The setup screen appears when starting a new game or when no saved game is available.
+
 ## Saving and Loading Games
 
 LlamaOfFate automatically saves your game progress at key points during play. When you restart the application, it will automatically resume from your last save.
 
+### CLI
 - **Auto-save**: The game saves automatically at scene transitions and key moments
 - **Auto-resume**: On startup, the game resumes from the last unfinished scenario
 - **Save location**: Game saves are stored as YAML files (configurable via `GameSaver` interface)
+
+### Web UI
+- **Auto-save**: Game state persists after every dialog turn, including full conversation history
+- **Auto-resume**: Refreshing the browser page automatically reconnects and resumes your game
+- **Conversation replay**: On resume, the conversation history is replayed as a recap with reduced opacity
+- **Save location**: Session ID stored in browser localStorage; game state stored on server as YAML files
 
 ## Package Structure
 
@@ -237,11 +258,13 @@ LlamaOfFate/
 - ✅ Game state persistence (save/load functionality via YAML)
 - ✅ Event-driven UI architecture with async invoke/input support
 - ✅ Integration tests and LLM evaluation tests
-- ✅ Web UI scaffold (React + Vite + Tailwind + shadcn/ui)
-- ✅ WebSocket server backend
+- ✅ Web UI with React + Vite + Tailwind + shadcn/ui
+- ✅ WebSocket server backend with persistent sessions
+- ✅ Pre-game setup with scenario presets and custom character creation
+- ✅ LLM-powered custom scenario generation
 
 ### Planned Features
 - 📋 Additional LLM backends (Ollama, OpenAI direct)
-- 📋 WebSocket integration connecting web UI to game engine
 - 📋 Public API packages for external integrations
 - 📋 Database backends for long-term storage
+- 📋 Additional preset scenarios and character templates
