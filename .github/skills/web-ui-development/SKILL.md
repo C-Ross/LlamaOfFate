@@ -25,6 +25,7 @@ This skill covers the React web frontend in `web/`. The UI communicates with the
 ```
 web/
   index.html                  - Entry HTML
+  demo.html                   - Demo page for component testing
   package.json                - Dependencies & scripts
   vite.config.ts              - Vite config (plugins, proxy, aliases)
   vitest.config.ts            - Test config (merges vite.config.ts)
@@ -34,16 +35,45 @@ web/
   eslint.config.js            - ESLint flat config
   src/
     main.tsx                  - React entry point
+    demo-entry.tsx            - Demo page entry point
+    Demo.tsx                  - Demo page component
     App.tsx                   - Root layout (two-panel)
     index.css                 - Tailwind + theme variables
-    lib/utils.ts              - cn() helper (clsx + tailwind-merge)
+    lib/
+      utils.ts                - cn() helper (clsx + tailwind-merge)
+      types.ts                - TypeScript type definitions for game events
+      dice.ts                 - Dice simulation utilities
     components/
-      SidebarCard.tsx          - Reusable sidebar card wrapper
-      ui/                      - shadcn/ui components (DO NOT edit manually)
+      SidebarCard.tsx         - Reusable sidebar card wrapper
+      DiceDemo.tsx            - Dice animation demo component
+      game/                   - Game-specific components (18+ components)
+        ChatPanel.tsx         - Main chat area with message list
+        ChatMessage.tsx       - Individual message rendering
+        ChatInput.tsx         - Multi-line input with send button
+        InvokePrompt.tsx      - Collapsible inline invoke prompt
+        MidFlowPrompt.tsx     - Mid-flow choice/text prompts
+        ConflictBanner.tsx    - Conflict start banner
+        ConflictEnd.tsx       - Conflict end display
+        TurnAnnouncement.tsx  - Turn tracker display
+        DamageResolution.tsx  - Damage/stress display
+        ActionAttempt.tsx     - Action roll display
+        DefenseRoll.tsx       - Defense roll display
+        RollResult.tsx        - Generic roll result display
+        NPCAction.tsx         - NPC action display
+        GameSidebar.tsx       - Right sidebar with character info
+        NpcPanel.tsx          - NPC display panel
+        FatePointTracker.tsx  - Fate point display
+        StressTrack.tsx       - Stress boxes display
+        AspectBadge.tsx       - Aspect badge component
+        OutcomeBadge.tsx      - Outcome badge (success/tie/fail)
+        FateDie.tsx           - Animated fate die display
+      ui/                     - shadcn/ui components (DO NOT edit manually)
+    hooks/
+      useGameSocket.ts        - WebSocket connection hook
+      useGameState.ts         - Game state management hook
     test/
-      setup.ts                 - Vitest setup (jest-dom matchers)
-      App.test.tsx             - App component tests
-      SidebarCard.test.tsx     - SidebarCard tests
+      setup.ts                - Vitest setup (jest-dom matchers)
+      (corresponding test files for each component)
 ```
 
 ## Justfile Targets
@@ -80,7 +110,7 @@ shadcn copies component source into `src/components/ui/`. Do not hand-edit these
 cd web && npx shadcn@latest add <component-name>
 ```
 
-Available components already installed: `button`, `card`, `scroll-area`, `input`, `badge`.
+Available components already installed: `button`, `card`, `scroll-area`, `input`, `badge`, `collapsible`, `sheet`.
 
 The `components.json` configures shadcn: style is `new-york`, no RSC, uses `@/components/ui` alias.
 

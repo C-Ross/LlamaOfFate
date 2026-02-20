@@ -189,6 +189,15 @@ Blocking terminal UI interface driven by `syncdriver.Run()`:
 - `PromptForInvoke(...)` — synchronous invoke prompt (blocking)
 - `PromptForMidFlow(event)` — synchronous mid-flow input (blocking)
 
+### WebSocket UI (`internal/ui/web/`)
+
+Event-driven WebSocket UI for the React frontend:
+- `web.go` — HTTP server, WebSocket upgrade, serves static files
+- `session.go` — WebSocket session, event serialization, client message handling
+- `messages.go` — WebSocket message types (invoke_response, mid_flow_response, session_init)
+- `handlers.go` — Game event → JSON serialization, sends to client
+- Uses `GameManager` async API directly (no syncdriver wrapper)
+
 ### `uicontract` package
 
 Data types shared between engine and UI:
@@ -212,6 +221,8 @@ Data types shared between engine and UI:
 | Milestone/recovery | `game_manager.go` or `scenario_manager.go` |
 | UI event type | `uicontract/` event structs |
 | Terminal UI display | `internal/ui/terminal/terminal.go` `Emit()` |
+| WebSocket UI display | `internal/ui/web/handlers.go` event serialization |
+| WebSocket message type | `internal/ui/web/messages.go` |
 
 ## Session Logging
 
