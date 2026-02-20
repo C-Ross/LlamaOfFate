@@ -31,6 +31,7 @@ const (
 	ClientInput   ClientMessageType = "input"
 	ClientInvoke  ClientMessageType = "invoke_response"
 	ClientMidFlow ClientMessageType = "mid_flow_response"
+	ClientSetup   ClientMessageType = "setup"
 )
 
 // ClientMessage is the JSON envelope received from the client.
@@ -47,6 +48,18 @@ type ClientMessage struct {
 	// For "mid_flow_response" messages
 	ChoiceIndex int    `json:"choiceIndex,omitempty"`
 	FreeText    string `json:"freeText,omitempty"`
+
+	// For "setup" messages — choose a preset or provide custom character data
+	PresetID string       `json:"presetId,omitempty"`
+	Custom   *CustomSetup `json:"custom,omitempty"`
+}
+
+// CustomSetup holds the character data for LLM-generated custom scenarios.
+type CustomSetup struct {
+	Name        string `json:"name"`
+	HighConcept string `json:"highConcept"`
+	Trouble     string `json:"trouble"`
+	Genre       string `json:"genre"`
 }
 
 // ParseClientMessage deserializes a JSON byte slice into a ClientMessage.
@@ -59,7 +72,7 @@ func ParseClientMessage(data []byte) (ClientMessage, error) {
 		return ClientMessage{}, fmt.Errorf("parse client message: missing type field")
 	}
 	switch msg.Type {
-	case ClientInput, ClientInvoke, ClientMidFlow:
+	case ClientInput, ClientInvoke, ClientMidFlow, ClientSetup:
 		return msg, nil
 	default:
 		return ClientMessage{}, fmt.Errorf("parse client message: unknown type %q", msg.Type)
@@ -177,6 +190,54 @@ func MarshalSessionInit(gameID string) ([]byte, error) {
 	}
 	msg := ServerMessage{
 		Event: "session_init",
+		Data:  data,
+	}
+	return json.Marshal(msg)
+}
+
+// ScenarioPreset describes a preset scenario available for selection.
+type ScenarioPreset struct {
+	ID          string `json:"id"`
+	Title       string `json:"title"`
+	Genre       string `json:"genre"`
+	Description string `json:"description"`
+}
+
+// SetupRequest is the payload for the setup_request event sent after session_init.
+// It tells the client which presets are available and whether custom generation
+// is supported.
+type SetupRequest struct {
+	Presets     []ScenarioPreset `json:"presets"`
+	AllowCustom bool             `json:"allowCustom"`
+}
+
+// MarshalSetupRequest serializes a setup_request ServerMessage.
+func MarshalSetupRequest(req SetupRequest) ([]byte, error) {
+	data, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal setup request: %w", err)
+	}
+	msg := ServerMessage{
+		Event: "setup_request",
+		Data:  data,
+	}
+	return json.Marshal(msg)
+}
+
+// SetupGenerating is the payload for the setup_generating event, sent while an
+// LLM scenario generation call is in progress so the client can show a spinner.
+type SetupGenerating struct {
+	Message string `json:"message"`
+}
+
+// MarshalSetupGenerating serializes a setup_generating ServerMessage.
+func MarshalSetupGenerating(message string) ([]byte, error) {
+	data, err := json.Marshal(SetupGenerating{Message: message})
+	if err != nil {
+		return nil, fmt.Errorf("marshal setup generating: %w", err)
+	}
+	msg := ServerMessage{
+		Event: "setup_generating",
 		Data:  data,
 	}
 	return json.Marshal(msg)

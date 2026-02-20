@@ -247,4 +247,110 @@ describe("useGameSocket", () => {
     act(() => result.current.sendInput("test"))
     expect(getLastWs().send).not.toHaveBeenCalled()
   })
+
+  it("dispatches setup_request from server", () => {
+    const { result } = renderHook(() => useGameSocket("ws://localhost/ws"))
+    act(() => getLastWs().simulateOpen())
+
+    act(() => {
+      getLastWs().simulateMessage({
+        event: "setup_request",
+        data: {
+          presets: [{ id: "saloon", title: "Trouble in Redemption Gulch", genre: "Western", description: "Outlaws." }],
+          allowCustom: true,
+        },
+      })
+    })
+
+    expect(result.current.setupRequest).not.toBeNull()
+    expect(result.current.setupRequest?.presets).toHaveLength(1)
+    expect(result.current.setupRequest?.allowCustom).toBe(true)
+    // setup_request should NOT be added to events
+    expect(result.current.events).toHaveLength(0)
+  })
+
+  it("dispatches setup_generating from server", () => {
+    const { result } = renderHook(() => useGameSocket("ws://localhost/ws"))
+    act(() => getLastWs().simulateOpen())
+
+    act(() => {
+      getLastWs().simulateMessage({
+        event: "setup_generating",
+        data: { message: "Building world..." },
+      })
+    })
+
+    expect(result.current.setupGeneratingMessage).toBe("Building world...")
+  })
+
+  it("clears setup state when first game event arrives", () => {
+    const { result } = renderHook(() => useGameSocket("ws://localhost/ws"))
+    act(() => getLastWs().simulateOpen())
+
+    // Enter setup
+    act(() => {
+      getLastWs().simulateMessage({
+        event: "setup_request",
+        data: { presets: [], allowCustom: false },
+      })
+    })
+    expect(result.current.setupRequest).not.toBeNull()
+
+    // Receive a game event — setup should clear
+    act(() => {
+      getLastWs().simulateMessage({ event: "narrative", data: { Text: "Adventure!" } })
+    })
+    expect(result.current.setupRequest).toBeNull()
+    expect(result.current.setupGeneratingMessage).toBeNull()
+    expect(result.current.events).toHaveLength(1)
+  })
+
+  it("sendSetupPreset sends correct JSON", () => {
+    const { result } = renderHook(() => useGameSocket("ws://localhost/ws"))
+    act(() => getLastWs().simulateOpen())
+
+    act(() => result.current.sendSetupPreset("heist"))
+
+    expect(getLastWs().send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "setup", presetId: "heist" }),
+    )
+  })
+
+  it("sendSetupCustom sends correct JSON", () => {
+    const { result } = renderHook(() => useGameSocket("ws://localhost/ws"))
+    act(() => getLastWs().simulateOpen())
+
+    act(() => result.current.sendSetupCustom({
+      name: "Ada", highConcept: "Hacker", trouble: "Paranoid", genre: "Cyberpunk",
+    }))
+
+    expect(getLastWs().send).toHaveBeenCalledWith(
+      JSON.stringify({
+        type: "setup",
+        custom: { name: "Ada", highConcept: "Hacker", trouble: "Paranoid", genre: "Cyberpunk" },
+      }),
+    )
+  })
+
+  it("newGame clears state and reconnects without game_id", () => {
+    const { result } = renderHook(() => useGameSocket("ws://localhost/ws"))
+    act(() => getLastWs().simulateOpen())
+
+    // Store a game_id
+    act(() => {
+      getLastWs().simulateMessage({ event: "session_init", data: { gameId: "old-game" } })
+    })
+    expect(localStorage.getItem("llamaoffate_game_id")).toBe("old-game")
+
+    // Start new game
+    act(() => result.current.newGame())
+
+    expect(localStorage.getItem("llamaoffate_game_id")).toBeNull()
+    expect(result.current.events).toHaveLength(0)
+    expect(result.current.gameId).toBeNull()
+
+    // A new WebSocket should have been created without game_id
+    const newWs = getLastWs()
+    expect(newWs.url).toBe("ws://localhost/ws")
+  })
 })

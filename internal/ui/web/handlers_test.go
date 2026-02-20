@@ -19,9 +19,9 @@ import (
 )
 
 func TestHandler_Health(t *testing.T) {
-	h := NewHandler(func(_ string) (engine.GameSessionManager, error) {
+	h := NewHandler(func(_ string, _ *GameSetup) (engine.GameSessionManager, error) {
 		return nil, nil
-	}, nil)
+	}, SetupConfig{}, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	w := httptest.NewRecorder()
@@ -32,7 +32,7 @@ func TestHandler_Health(t *testing.T) {
 }
 
 func TestHandler_WebSocket_FullRoundTrip(t *testing.T) {
-	factory := func(_ string) (engine.GameSessionManager, error) {
+	factory := func(_ string, _ *GameSetup) (engine.GameSessionManager, error) {
 		return &mockDriver{
 			startEvents: []uicontract.GameEvent{
 				uicontract.NarrativeEvent{Text: "Welcome!", SceneName: "Test Scene"},
@@ -46,7 +46,7 @@ func TestHandler_WebSocket_FullRoundTrip(t *testing.T) {
 		}, nil
 	}
 
-	h := NewHandler(factory, nil)
+	h := NewHandler(factory, SetupConfig{}, nil)
 	server := httptest.NewServer(h)
 	defer server.Close()
 
@@ -98,7 +98,7 @@ func TestHandler_WebSocket_FullRoundTrip(t *testing.T) {
 }
 
 func TestHandler_WebSocket_MultipleEvents(t *testing.T) {
-	factory := func(_ string) (engine.GameSessionManager, error) {
+	factory := func(_ string, _ *GameSetup) (engine.GameSessionManager, error) {
 		return &mockDriver{
 			startEvents: []uicontract.GameEvent{
 				uicontract.NarrativeEvent{Text: "Scene begins."},
@@ -111,7 +111,7 @@ func TestHandler_WebSocket_MultipleEvents(t *testing.T) {
 		}, nil
 	}
 
-	h := NewHandler(factory, nil)
+	h := NewHandler(factory, SetupConfig{}, nil)
 	server := httptest.NewServer(h)
 	defer server.Close()
 

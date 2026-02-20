@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -326,4 +327,191 @@ func TestSession_MidFlowResponseRoundTrip(t *testing.T) {
 	}
 
 	assert.Equal(t, 0, driver.lastMidFlow.ChoiceIndex)
+}
+
+func TestSession_SetupFlowPreset(t *testing.T) {
+	driver := &mockDriver{
+		startEvents: []uicontract.GameEvent{
+			uicontract.NarrativeEvent{Text: "Adventure begins!"},
+		},
+		handleInputResult: &engine.InputResult{
+			Events:   []uicontract.GameEvent{uicontract.GameOverEvent{Reason: "done"}},
+			GameOver: true,
+		},
+	}
+
+	var receivedSetup *GameSetup
+	factory := func(gameID string, setup *GameSetup) (engine.GameSessionManager, error) {
+		receivedSetup = setup
+		return driver, nil
+	}
+
+	setupCfg := SetupConfig{
+		Presets: []ScenarioPreset{
+			{ID: "saloon", Title: "Redemption Gulch", Genre: "Western", Description: "Outlaws."},
+		},
+		AllowCustom: true,
+	}
+
+	sessionDone := make(chan error, 1)
+	client := wsTestPair(t, func(conn *websocket.Conn) {
+		s := NewSetupSession(conn, factory, setupCfg, nil, "test-game")
+		sessionDone <- s.Run(context.Background())
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// 1. Read session_init
+	msg := readServerMessage(t, ctx, client)
+	assert.Equal(t, "session_init", msg.Event)
+
+	// 2. Read setup_request
+	msg = readServerMessage(t, ctx, client)
+	assert.Equal(t, "setup_request", msg.Event)
+
+	// 3. Send setup choice (preset)
+	err := wsjson.Write(ctx, client, ClientMessage{Type: ClientSetup, PresetID: "saloon"})
+	require.NoError(t, err)
+
+	// 4. Read opening narrative (game started)
+	msg = readServerMessage(t, ctx, client)
+	assert.Equal(t, "narrative", msg.Event)
+
+	// Read result_meta
+	_ = readServerMessage(t, ctx, client)
+
+	// Send input to end game
+	err = wsjson.Write(ctx, client, ClientMessage{Type: ClientInput, Text: "end"})
+	require.NoError(t, err)
+
+	_ = readServerMessage(t, ctx, client) // game_over
+	_ = readServerMessage(t, ctx, client) // result_meta
+
+	select {
+	case err := <-sessionDone:
+		assert.NoError(t, err)
+	case <-ctx.Done():
+		t.Fatal("session did not complete in time")
+	}
+
+	require.NotNil(t, receivedSetup)
+	assert.Equal(t, "saloon", receivedSetup.PresetID)
+	assert.Nil(t, receivedSetup.Custom)
+}
+
+func TestSession_SetupFlowCustom(t *testing.T) {
+	driver := &mockDriver{
+		startEvents: []uicontract.GameEvent{
+			uicontract.NarrativeEvent{Text: "Custom adventure!"},
+		},
+		handleInputResult: &engine.InputResult{
+			Events:   []uicontract.GameEvent{uicontract.GameOverEvent{Reason: "done"}},
+			GameOver: true,
+		},
+	}
+
+	var receivedSetup *GameSetup
+	factory := func(gameID string, setup *GameSetup) (engine.GameSessionManager, error) {
+		receivedSetup = setup
+		return driver, nil
+	}
+
+	setupCfg := SetupConfig{
+		Presets:     []ScenarioPreset{},
+		AllowCustom: true,
+	}
+
+	sessionDone := make(chan error, 1)
+	client := wsTestPair(t, func(conn *websocket.Conn) {
+		s := NewSetupSession(conn, factory, setupCfg, nil, "test-game")
+		sessionDone <- s.Run(context.Background())
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Read session_init
+	msg := readServerMessage(t, ctx, client)
+	assert.Equal(t, "session_init", msg.Event)
+
+	// Read setup_request
+	msg = readServerMessage(t, ctx, client)
+	assert.Equal(t, "setup_request", msg.Event)
+
+	// Send custom setup
+	err := wsjson.Write(ctx, client, ClientMessage{
+		Type: ClientSetup,
+		Custom: &CustomSetup{
+			Name:        "Ada",
+			HighConcept: "Rogue AI Whisperer",
+			Trouble:     "Trusts Machines More Than People",
+			Genre:       "Cyberpunk",
+		},
+	})
+	require.NoError(t, err)
+
+	// Read setup_generating indicator
+	msg = readServerMessage(t, ctx, client)
+	assert.Equal(t, "setup_generating", msg.Event)
+
+	// Read opening narrative (game started)
+	msg = readServerMessage(t, ctx, client)
+	assert.Equal(t, "narrative", msg.Event)
+
+	// Read result_meta
+	_ = readServerMessage(t, ctx, client)
+
+	// End game
+	err = wsjson.Write(ctx, client, ClientMessage{Type: ClientInput, Text: "end"})
+	require.NoError(t, err)
+
+	_ = readServerMessage(t, ctx, client) // game_over
+	_ = readServerMessage(t, ctx, client) // result_meta
+
+	select {
+	case err := <-sessionDone:
+		assert.NoError(t, err)
+	case <-ctx.Done():
+		t.Fatal("session did not complete in time")
+	}
+
+	require.NotNil(t, receivedSetup)
+	assert.Empty(t, receivedSetup.PresetID)
+	require.NotNil(t, receivedSetup.Custom)
+	assert.Equal(t, "Ada", receivedSetup.Custom.Name)
+	assert.Equal(t, "Cyberpunk", receivedSetup.Custom.Genre)
+}
+
+func TestSession_SetupRejectsNonSetupMessage(t *testing.T) {
+	factory := func(gameID string, setup *GameSetup) (engine.GameSessionManager, error) {
+		return nil, fmt.Errorf("should not be called")
+	}
+
+	sessionDone := make(chan error, 1)
+	client := wsTestPair(t, func(conn *websocket.Conn) {
+		s := NewSetupSession(conn, factory, SetupConfig{}, nil, "test-game")
+		sessionDone <- s.Run(context.Background())
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Read session_init
+	_ = readServerMessage(t, ctx, client)
+	// Read setup_request
+	_ = readServerMessage(t, ctx, client)
+
+	// Send wrong message type (input instead of setup)
+	err := wsjson.Write(ctx, client, ClientMessage{Type: ClientInput, Text: "hello"})
+	require.NoError(t, err)
+
+	// Session should error
+	select {
+	case err := <-sessionDone:
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected setup message")
+	case <-ctx.Done():
+		t.Fatal("session did not complete in time")
+	}
 }

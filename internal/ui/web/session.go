@@ -15,13 +15,16 @@ import (
 
 // Session manages a single WebSocket ↔ GameSessionManager interaction.
 type Session struct {
-	driver engine.GameSessionManager
-	conn   *websocket.Conn
-	logger *slog.Logger
-	gameID string
+	driver  engine.GameSessionManager
+	conn    *websocket.Conn
+	logger  *slog.Logger
+	gameID  string
+	factory GameSessionManagerFactory // non-nil only for setup sessions
+	setup   SetupConfig               // preset list for setup_request
 }
 
 // NewSession creates a session for the given WebSocket connection and game driver.
+// Use this when the driver is already created (e.g. resumed game).
 func NewSession(conn *websocket.Conn, driver engine.GameSessionManager, logger *slog.Logger, gameID string) *Session {
 	if logger == nil {
 		logger = slog.Default()
@@ -34,12 +37,34 @@ func NewSession(conn *websocket.Conn, driver engine.GameSessionManager, logger *
 	}
 }
 
+// NewSetupSession creates a session that sends setup_request and waits
+// for the player's choice before creating a game driver.
+func NewSetupSession(conn *websocket.Conn, factory GameSessionManagerFactory, setup SetupConfig, logger *slog.Logger, gameID string) *Session {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return &Session{
+		conn:    conn,
+		logger:  logger,
+		gameID:  gameID,
+		factory: factory,
+		setup:   setup,
+	}
+}
+
 // Run executes the session lifecycle: start the game, then loop on client messages.
 // It blocks until the context is cancelled, the client disconnects, or the game ends.
 func (s *Session) Run(ctx context.Context) error {
 	// 0. Send session_init with game ID so the client can store it for reconnection.
 	if err := s.sendSessionInit(ctx); err != nil {
 		return fmt.Errorf("send session_init: %w", err)
+	}
+
+	// 0b. If we don't have a driver yet, run the setup flow to get one.
+	if s.driver == nil {
+		if err := s.runSetup(ctx); err != nil {
+			return fmt.Errorf("setup: %w", err)
+		}
 	}
 
 	// 1. Start the game and send opening events
@@ -113,6 +138,75 @@ func (s *Session) dispatch(ctx context.Context, msg ClientMessage) (*engine.Inpu
 	default:
 		return nil, fmt.Errorf("unhandled message type: %s", msg.Type)
 	}
+}
+
+// runSetup sends the setup_request event and waits for the client's
+// setup message. On success it creates a GameSessionManager via the factory
+// and stores it in s.driver.
+func (s *Session) runSetup(ctx context.Context) error {
+	// Send setup_request with available presets.
+	if err := s.sendSetupRequest(ctx); err != nil {
+		return fmt.Errorf("send setup_request: %w", err)
+	}
+
+	// Wait for the client's setup choice.
+	msg, err := s.readClientMessage(ctx)
+	if err != nil {
+		return fmt.Errorf("read setup message: %w", err)
+	}
+	if msg.Type != ClientSetup {
+		return fmt.Errorf("expected setup message, got %q", msg.Type)
+	}
+
+	setup := &GameSetup{
+		PresetID: msg.PresetID,
+		Custom:   msg.Custom,
+	}
+
+	s.logger.Info("setup received",
+		"preset_id", setup.PresetID,
+		"has_custom", setup.Custom != nil,
+	)
+
+	// If custom scenario requested, notify client of generation in progress.
+	if setup.Custom != nil {
+		if err := s.sendSetupGenerating(ctx, "Generating your scenario..."); err != nil {
+			return fmt.Errorf("send setup_generating: %w", err)
+		}
+	}
+
+	driver, err := s.factory(s.gameID, setup)
+	if err != nil {
+		// Send error to client and return
+		sysErr := uicontract.SystemMessageEvent{Message: fmt.Sprintf("Setup failed: %v", err)}
+		_ = s.sendEvents(ctx, []uicontract.GameEvent{sysErr})
+		return fmt.Errorf("factory: %w", err)
+	}
+	s.driver = driver
+	return nil
+}
+
+// sendSetupRequest sends a setup_request server message listing available presets.
+func (s *Session) sendSetupRequest(ctx context.Context) error {
+	req := SetupRequest{
+		Presets:     s.setup.Presets,
+		AllowCustom: s.setup.AllowCustom,
+	}
+	data, err := MarshalSetupRequest(req)
+	if err != nil {
+		return err
+	}
+	return s.conn.Write(ctx, websocket.MessageText, data)
+}
+
+// sendSetupGenerating sends a setup_generating server message so the client
+// can display a loading indicator during LLM scenario generation.
+func (s *Session) sendSetupGenerating(ctx context.Context, message string) error {
+	data, err := MarshalSetupGenerating(message)
+	if err != nil {
+		return err
+	}
+	return s.conn.Write(ctx, websocket.MessageText, data)
 }
 
 // readClientMessage reads and parses a single JSON message from the WebSocket.

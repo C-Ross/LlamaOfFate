@@ -342,3 +342,83 @@ func TestParseClientMessage_UnknownType(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown type")
 }
+
+func TestParseClientMessage_SetupPreset(t *testing.T) {
+	raw := `{"type": "setup", "presetId": "heist"}`
+
+	msg, err := ParseClientMessage([]byte(raw))
+	require.NoError(t, err)
+	assert.Equal(t, ClientSetup, msg.Type)
+	assert.Equal(t, "heist", msg.PresetID)
+	assert.Nil(t, msg.Custom)
+}
+
+func TestParseClientMessage_SetupCustom(t *testing.T) {
+	raw := `{
+		"type": "setup",
+		"custom": {
+			"name": "Ada",
+			"highConcept": "Rogue AI Whisperer",
+			"trouble": "Trusts Machines More Than People",
+			"genre": "Cyberpunk"
+		}
+	}`
+
+	msg, err := ParseClientMessage([]byte(raw))
+	require.NoError(t, err)
+	assert.Equal(t, ClientSetup, msg.Type)
+	assert.Empty(t, msg.PresetID)
+	require.NotNil(t, msg.Custom)
+	assert.Equal(t, "Ada", msg.Custom.Name)
+	assert.Equal(t, "Rogue AI Whisperer", msg.Custom.HighConcept)
+	assert.Equal(t, "Trusts Machines More Than People", msg.Custom.Trouble)
+	assert.Equal(t, "Cyberpunk", msg.Custom.Genre)
+}
+
+func TestMarshalSetupRequest(t *testing.T) {
+	req := SetupRequest{
+		Presets: []ScenarioPreset{
+			{ID: "saloon", Title: "Trouble in Redemption Gulch", Genre: "Western", Description: "A frontier town."},
+		},
+		AllowCustom: true,
+	}
+
+	data, err := MarshalSetupRequest(req)
+	require.NoError(t, err)
+
+	var msg ServerMessage
+	require.NoError(t, json.Unmarshal(data, &msg))
+	assert.Equal(t, "setup_request", msg.Event)
+
+	var parsed SetupRequest
+	require.NoError(t, json.Unmarshal(msg.Data, &parsed))
+	require.Len(t, parsed.Presets, 1)
+	assert.Equal(t, "saloon", parsed.Presets[0].ID)
+	assert.True(t, parsed.AllowCustom)
+}
+
+func TestMarshalSetupGenerating(t *testing.T) {
+	data, err := MarshalSetupGenerating("Generating scenario...")
+	require.NoError(t, err)
+
+	var msg ServerMessage
+	require.NoError(t, json.Unmarshal(data, &msg))
+	assert.Equal(t, "setup_generating", msg.Event)
+
+	var parsed SetupGenerating
+	require.NoError(t, json.Unmarshal(msg.Data, &parsed))
+	assert.Equal(t, "Generating scenario...", parsed.Message)
+}
+
+func TestMarshalSessionInit(t *testing.T) {
+	data, err := MarshalSessionInit("game-42")
+	require.NoError(t, err)
+
+	var msg ServerMessage
+	require.NoError(t, json.Unmarshal(data, &msg))
+	assert.Equal(t, "session_init", msg.Event)
+
+	var parsed SessionInit
+	require.NoError(t, json.Unmarshal(msg.Data, &parsed))
+	assert.Equal(t, "game-42", parsed.GameID)
+}

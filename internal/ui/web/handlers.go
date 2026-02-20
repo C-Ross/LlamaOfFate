@@ -13,28 +13,44 @@ import (
 	"github.com/coder/websocket"
 )
 
+// GameSetup carries the player's scenario + character choice from the setup
+// screen. Exactly one of PresetID or Custom is set.
+type GameSetup struct {
+	PresetID string       // Non-empty when the player picked a preset
+	Custom   *CustomSetup // Non-nil when the player chose \"Create Your Own\"
+}
+
 // GameSessionManagerFactory creates a new GameSessionManager for a WebSocket session.
 // The gameID parameter identifies the game. When non-empty, the factory should
 // attempt to resume the game from a saved state. When empty, a fresh game is created.
-type GameSessionManagerFactory func(gameID string) (engine.GameSessionManager, error)
+// The setup parameter carries the player's scenario choice (nil when resuming).
+type GameSessionManagerFactory func(gameID string, setup *GameSetup) (engine.GameSessionManager, error)
+
+// SetupConfig holds the data the Session sends in the setup_request event.
+type SetupConfig struct {
+	Presets     []ScenarioPreset
+	AllowCustom bool
+}
 
 // Handler provides HTTP endpoints for the web UI.
 type Handler struct {
-	factory GameSessionManagerFactory
-	logger  *slog.Logger
-	mux     *http.ServeMux
+	factory     GameSessionManagerFactory
+	setupConfig SetupConfig
+	logger      *slog.Logger
+	mux         *http.ServeMux
 }
 
 // NewHandler creates an HTTP handler with WebSocket and health endpoints.
 // TODO: serve static files from web/dist for production builds (no Vite proxy).
-func NewHandler(factory GameSessionManagerFactory, logger *slog.Logger) *Handler {
+func NewHandler(factory GameSessionManagerFactory, setupCfg SetupConfig, logger *slog.Logger) *Handler {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	h := &Handler{
-		factory: factory,
-		logger:  logger,
-		mux:     http.NewServeMux(),
+		factory:     factory,
+		setupConfig: setupCfg,
+		logger:      logger,
+		mux:         http.NewServeMux(),
 	}
 	h.mux.HandleFunc("GET /ws", h.handleWebSocket)
 	h.mux.HandleFunc("GET /health", h.handleHealth)
@@ -76,14 +92,21 @@ func (h *Handler) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		h.logger.Info("resuming game", "game_id", gameID)
 	}
 
-	driver, err := h.factory(gameID)
+	driver, err := h.factory(gameID, nil)
 	if err != nil {
 		h.logger.Error("failed to create game driver", "error", err)
 		_ = conn.Close(websocket.StatusInternalError, "failed to initialize game")
 		return
 	}
 
-	session := NewSession(conn, driver, h.logger, gameID)
+	// If the factory returned a driver (resumed game), skip setup.
+	// Otherwise begin the setup flow.
+	var session *Session
+	if driver != nil {
+		session = NewSession(conn, driver, h.logger, gameID)
+	} else {
+		session = NewSetupSession(conn, h.factory, h.setupConfig, h.logger, gameID)
+	}
 
 	h.logger.Info("websocket session started", "remote", r.RemoteAddr, "game_id", gameID)
 	if err := session.Run(r.Context()); err != nil {

@@ -23,7 +23,7 @@ export interface ResultMeta {
 // Client → server messages
 // ---------------------------------------------------------------------------
 
-export type ClientMessageType = "input" | "invoke_response" | "mid_flow_response"
+export type ClientMessageType = "input" | "invoke_response" | "mid_flow_response" | "setup"
 
 export interface ClientInputMessage {
   type: "input"
@@ -42,10 +42,30 @@ export interface ClientMidFlowMessage {
   freeText?: string
 }
 
+export interface ClientSetupPresetMessage {
+  type: "setup"
+  presetId: string
+}
+
+export interface CustomSetup {
+  name: string
+  highConcept: string
+  trouble: string
+  genre: string
+}
+
+export interface ClientSetupCustomMessage {
+  type: "setup"
+  custom: CustomSetup
+}
+
+export type ClientSetupMessage = ClientSetupPresetMessage | ClientSetupCustomMessage
+
 export type ClientMessage =
   | ClientInputMessage
   | ClientInvokeMessage
   | ClientMidFlowMessage
+  | ClientSetupMessage
 
 // ---------------------------------------------------------------------------
 // Server → client event data types (mirrors Go uicontract structs)
@@ -341,8 +361,33 @@ export interface GameStateSnapshotEventData {
 // ---------------------------------------------------------------------------
 
 /** All known event type names from the wire protocol. */
+// ---------------------------------------------------------------------------
+// Setup event data types
+// ---------------------------------------------------------------------------
+
+/** A preset scenario available for selection. */
+export interface ScenarioPreset {
+  id: string
+  title: string
+  genre: string
+  description: string
+}
+
+/** Data for the setup_request event listing available presets. */
+export interface SetupRequestEventData {
+  presets: ScenarioPreset[]
+  allowCustom: boolean
+}
+
+/** Data for the setup_generating event shown during LLM scenario generation. */
+export interface SetupGeneratingEventData {
+  message: string
+}
+
 export type GameEventType =
   | "player_input"
+  | "setup_request"
+  | "setup_generating"
   | "narrative"
   | "dialog"
   | "system_message"
@@ -376,6 +421,8 @@ export type GameEventType =
   | "game_state_snapshot"
   | "session_init"
   | "result_meta"
+  | "setup_request"
+  | "setup_generating"
 
 /** A parsed game event with its type tag and data. */
 export interface GameEvent {

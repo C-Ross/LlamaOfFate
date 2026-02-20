@@ -5,9 +5,11 @@ import { ChatInput } from "@/components/game/ChatInput"
 import { ConflictBanner } from "@/components/game/ConflictBanner"
 import { InvokePrompt } from "@/components/game/InvokePrompt"
 import { MidFlowPrompt } from "@/components/game/MidFlowPrompt"
+import { SetupScreen } from "@/components/game/SetupScreen"
 import { useGameSocket } from "@/hooks/useGameSocket"
 import { useGameState } from "@/hooks/useGameState"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   Sheet,
   SheetContent,
@@ -18,6 +20,7 @@ import {
 import type {
   InvokePromptEventData,
   InputRequestEventData,
+  SetupRequestEventData,
 } from "@/lib/types"
 
 function getWebSocketUrl(): string {
@@ -40,9 +43,14 @@ function App() {
     awaitingInvoke,
     awaitingMidFlow,
     gameOver,
+    setupRequest,
+    setupGeneratingMessage,
     sendInput,
     sendInvokeResponse,
     sendMidFlowResponse,
+    sendSetupPreset,
+    sendSetupCustom,
+    newGame,
   } = useGameSocket(getWebSocketUrl())
 
   const gameState = useGameState(events)
@@ -71,6 +79,19 @@ function App() {
 
   const inputDisabled = !isConnected || isPending || awaitingInvoke || awaitingMidFlow || gameOver
 
+  // If the server sent a setup_request, show the setup screen instead of the game.
+  if (setupRequest || setupGeneratingMessage) {
+    return (
+      <SetupScreen
+        presets={(setupRequest as SetupRequestEventData | null)?.presets ?? []}
+        allowCustom={(setupRequest as SetupRequestEventData | null)?.allowCustom ?? false}
+        generatingMessage={setupGeneratingMessage}
+        onSelectPreset={sendSetupPreset}
+        onSelectCustom={sendSetupCustom}
+      />
+    )
+  }
+
   return (
     <div className="flex h-screen w-screen overflow-hidden">
       {/* Chat Panel — left side */}
@@ -89,11 +110,21 @@ function App() {
           {isPending && (
             <span className="text-xs text-muted-foreground animate-pulse">Thinking...</span>
           )}
+          {/* New Game button — visible once game is in progress or finished */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto text-xs text-muted-foreground hover:text-foreground"
+            onClick={newGame}
+            data-testid="new-game-button"
+          >
+            New Game
+          </Button>
           {/* Mobile sidebar toggle */}
           <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
             <SheetTrigger asChild>
               <button
-                className="ml-auto rounded-md p-2 text-muted-foreground hover:text-foreground lg:hidden"
+                className="rounded-md p-2 text-muted-foreground hover:text-foreground lg:hidden"
                 aria-label="Open game sidebar"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
@@ -37,11 +39,16 @@ func main() {
 		log.Fatalf("LLM init failed: %v", err)
 	}
 
-	factory := func(gameID string) (engine.GameSessionManager, error) {
-		return newGameSession(llmClient, gameID)
+	factory := func(gameID string, setup *web.GameSetup) (engine.GameSessionManager, error) {
+		return newGameSession(llmClient, gameID, setup)
 	}
 
-	handler := web.NewHandler(factory, slog.Default())
+	setupCfg := web.SetupConfig{
+		Presets:     allPresetMeta(),
+		AllowCustom: true,
+	}
+
+	handler := web.NewHandler(factory, setupCfg, slog.Default())
 
 	srv := &http.Server{
 		Addr:              ":" + port,
@@ -84,21 +91,87 @@ func initLLMClient(configPath string) (llm.LLMClient, error) {
 	return retryClient, nil
 }
 
-func newGameSession(llmClient llm.LLMClient, gameID string) (engine.GameSessionManager, error) {
+func newGameSession(llmClient llm.LLMClient, gameID string, setup *web.GameSetup) (engine.GameSessionManager, error) {
+	saver := newSaver(gameID)
+
+	// If no setup is provided, try to resume a saved game.
+	// Return nil (no driver) when no save exists — the caller enters setup flow.
+	if setup == nil {
+		gameEngine, err := engine.NewWithLLM(llmClient)
+		if err != nil {
+			return nil, fmt.Errorf("create engine: %w", err)
+		}
+		gm := engine.NewGameManager(gameEngine)
+		gm.SetSaver(saver)
+
+		// Attempt to load a saved game. If the save file exists, set a
+		// placeholder player (Start will overwrite from the save). Otherwise
+		// signal "no driver" so the handler triggers the setup flow.
+		state, loadErr := saver.Load()
+		if loadErr != nil || state == nil || state.Scene.CurrentScene == nil {
+			return nil, nil // no saved game — enter setup flow
+		}
+		// Save exists: provide a placeholder player; Start() will hydrate from state.
+		placeholder := state.Scenario.Player
+		if placeholder == nil {
+			return nil, nil
+		}
+		gm.SetPlayer(placeholder)
+		if state.Scenario.Scenario != nil {
+			gm.SetScenario(state.Scenario.Scenario)
+		}
+		return gm, nil
+	}
+
+	// Setup provided — create fresh game with chosen scenario + player.
+	var scenario *scene.Scenario
+	var player *character.Character
+
+	if setup.PresetID != "" {
+		var err error
+		scenario, player, err = lookupPreset(setup.PresetID)
+		if err != nil {
+			return nil, err
+		}
+	} else if setup.Custom != nil {
+		player = buildCustomPlayer(
+			setup.Custom.Name,
+			setup.Custom.HighConcept,
+			setup.Custom.Trouble,
+			setup.Custom.Genre,
+		)
+		// For Phase 2 we'll generate the scenario via LLM here.
+		// For now, fall back to a generic scenario from the genre.
+		scenario = genreScenarioFallback(setup.Custom.Genre)
+	} else {
+		return nil, fmt.Errorf("setup message has neither presetId nor custom data")
+	}
+
 	gameEngine, err := engine.NewWithLLM(llmClient)
 	if err != nil {
 		return nil, fmt.Errorf("create engine: %w", err)
 	}
 
-	scenario := defaultScenario()
-	player := defaultPlayer()
-
 	gm := engine.NewGameManager(gameEngine)
 	gm.SetPlayer(player)
 	gm.SetScenario(scenario)
-	gm.SetSaver(newSaver(gameID))
+	gm.SetSaver(saver)
 
 	return gm, nil
+}
+
+// genreScenarioFallback returns a preset scenario that matches the given genre,
+// or the saloon scenario as a fallback. This is a temporary bridge until Phase 2
+// wires up LLM scenario generation.
+func genreScenarioFallback(genre string) *scene.Scenario {
+	switch genre {
+	case "Cyberpunk":
+		return scene.PredefinedScenario("heist")
+	case "Fantasy":
+		return scene.PredefinedScenario("tower")
+	default:
+		return scene.PredefinedScenario("saloon")
+	}
 }
 
 // newSaver creates a YAMLSaver that stores saves in a per-game subdirectory
