@@ -11,11 +11,11 @@ interface InvokePromptProps {
 }
 
 /**
- * Interactive invoke prompt overlay for aspect invocation during conflicts.
+ * Inline invoke prompt that lives in the chat flow rather than as a modal overlay.
  *
- * Shows available aspects with clickable buttons. The player can choose to
- * invoke an aspect for a +2 bonus or a reroll, or decline the invocation.
- * Each aspect shows its source and any remaining free invokes.
+ * Starts collapsed showing a compact summary with an expand toggle. When expanded,
+ * each aspect shows a single row with compact +2/Reroll buttons. This keeps the
+ * chat scrollable so the player can see what they rolled.
  */
 export function InvokePrompt({
   data,
@@ -24,6 +24,7 @@ export function InvokePrompt({
   className,
 }: InvokePromptProps) {
   const [submitted, setSubmitted] = useState(false)
+  const [expanded, setExpanded] = useState(false)
 
   const handleInvoke = useCallback(
     (aspectIndex: number, isReroll: boolean) => {
@@ -38,65 +39,94 @@ export function InvokePrompt({
     onDecline()
   }, [onDecline])
 
-  return (
-    <div
-      className={cn(
-        "rounded-lg border-2 border-fate-point/50 bg-card px-4 py-4 space-y-3 shadow-lg shadow-fate-point/10",
-        className,
-      )}
-      role="dialog"
-      aria-label="Invoke an aspect"
-    >
-      {/* Header */}
-      <div className="space-y-1">
-        <div className="font-heading text-sm font-bold text-fate-point">
-          Invoke an Aspect?
-        </div>
-        <div className="text-xs font-body text-muted-foreground">
-          Current: {data.CurrentResult} · {data.ShiftsNeeded} shift
-          {data.ShiftsNeeded !== 1 ? "s" : ""} needed · {data.FatePoints} fate
-          point{data.FatePoints !== 1 ? "s" : ""}
-        </div>
-      </div>
-
-      {/* Submitted spinner */}
-      {submitted ? (
-        <div className="flex items-center justify-center gap-2 py-3 text-sm text-muted-foreground" aria-live="polite">
+  if (submitted) {
+    return (
+      <div
+        className={cn(
+          "rounded-lg border border-fate-point/30 bg-card px-4 py-3",
+          className,
+        )}
+      >
+        <div className="flex items-center justify-center gap-2 py-1 text-sm text-muted-foreground" aria-live="polite">
           <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
           Resolving...
         </div>
-      ) : (
-        <>
-          {/* Aspect list */}
-          <div className="space-y-2">
-            {data.Available?.map((aspect, index) => (
-              <AspectRow
-                key={index}
-                aspect={aspect}
-                index={index}
-                fatePoints={data.FatePoints}
-                onInvoke={handleInvoke}
-              />
-            ))}
-          </div>
+      </div>
+    )
+  }
 
-          {/* Decline button */}
+  return (
+    <div
+      className={cn(
+        "rounded-lg border-2 border-fate-point/50 bg-card px-4 py-3 shadow-sm",
+        className,
+      )}
+      role="region"
+      aria-label="Invoke an aspect"
+    >
+      {/* Collapsed summary — always visible */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="font-heading text-sm font-bold text-fate-point whitespace-nowrap">
+            Invoke?
+          </span>
+          <span className="text-xs font-body text-muted-foreground truncate">
+            {data.CurrentResult} · {data.ShiftsNeeded} shift
+            {data.ShiftsNeeded !== 1 ? "s" : ""} needed · {data.FatePoints} FP
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {!expanded && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="font-heading text-xs h-7 px-2"
+              onClick={handleDecline}
+            >
+              Skip
+            </Button>
+          )}
+          <Button
+            variant={expanded ? "ghost" : "default"}
+            size="sm"
+            className="font-heading text-xs h-7 px-2"
+            onClick={() => setExpanded((prev) => !prev)}
+            aria-expanded={expanded}
+            aria-controls="invoke-options"
+          >
+            {expanded ? "Collapse" : `${data.Available?.filter(a => !a.AlreadyUsed).length ?? 0} Aspects ▾`}
+          </Button>
+        </div>
+      </div>
+
+      {/* Expanded aspect list */}
+      {expanded && (
+        <div id="invoke-options" className="mt-3 space-y-1.5">
+          {data.Available?.map((aspect, index) => (
+            <AspectRow
+              key={index}
+              aspect={aspect}
+              index={index}
+              fatePoints={data.FatePoints}
+              onInvoke={handleInvoke}
+            />
+          ))}
           <Button
             variant="outline"
             size="sm"
-            className="w-full font-heading text-xs"
+            className="w-full font-heading text-xs h-7 mt-1"
             onClick={handleDecline}
           >
             Decline — Keep Current Result
           </Button>
-        </>
+        </div>
       )}
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Aspect row sub-component
+// Aspect row sub-component — compact single-line layout
 // ---------------------------------------------------------------------------
 
 interface AspectRowProps {
@@ -122,35 +152,36 @@ function AspectRow({ aspect, index, fatePoints, onInvoke }: AspectRowProps) {
   return (
     <div
       className={cn(
-        "rounded-md border bg-secondary/50 px-3 py-2 space-y-1",
-        alreadyUsed && "opacity-50",
-        !canAfford && "opacity-50",
+        "flex items-center gap-2 rounded-md border bg-secondary/50 px-3 py-1.5",
+        (alreadyUsed || !canAfford) && "opacity-50",
       )}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <span className="font-bold text-sm">{aspect.Name}</span>
-          <span className="text-xs text-muted-foreground ml-2">
-            ({aspect.Source}
-            {isFree ? `, ${aspect.FreeInvokes} free` : ""}
-            {!isFree ? ", 1 FP" : ""})
-          </span>
-        </div>
+      {/* Aspect info */}
+      <div
+        className="flex-1 min-w-0"
+        title={`${aspect.Source} aspect${isFree ? ` — ${aspect.FreeInvokes} free invoke${aspect.FreeInvokes !== 1 ? "s" : ""}` : " — costs 1 fate point"}`}
+      >
+        <span className="font-bold text-sm">{aspect.Name}</span>
+        <span className="text-xs text-muted-foreground ml-1.5">
+          {isFree ? `★${aspect.FreeInvokes} free` : "1 FP"}
+        </span>
       </div>
+
+      {/* Action buttons — compact inline */}
       {!alreadyUsed && canAfford && (
-        <div className="flex gap-2">
+        <div className="flex gap-1 shrink-0">
           <Button
             variant="default"
             size="sm"
-            className="flex-1 font-heading text-xs"
+            className="font-heading text-xs h-6 px-2"
             onClick={handlePlus2}
           >
-            +2 Bonus
+            +2
           </Button>
           <Button
             variant="secondary"
             size="sm"
-            className="flex-1 font-heading text-xs"
+            className="font-heading text-xs h-6 px-2"
             onClick={handleReroll}
           >
             Reroll
@@ -158,10 +189,10 @@ function AspectRow({ aspect, index, fatePoints, onInvoke }: AspectRowProps) {
         </div>
       )}
       {alreadyUsed && (
-        <div className="text-xs text-muted-foreground italic">Already used</div>
+        <span className="text-xs text-muted-foreground italic shrink-0">Used</span>
       )}
       {!canAfford && !alreadyUsed && (
-        <div className="text-xs text-destructive italic">Not enough fate points</div>
+        <span className="text-xs text-destructive italic shrink-0">No FP</span>
       )}
     </div>
   )

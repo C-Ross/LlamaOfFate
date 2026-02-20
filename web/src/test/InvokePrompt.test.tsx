@@ -18,27 +18,41 @@ function makeData(
   }
 }
 
+/** Helper: expand the collapsed prompt to reveal aspect rows. */
+function expandPrompt() {
+  const expandBtn = screen.getByRole("button", { expanded: false })
+  fireEvent.click(expandBtn)
+}
+
 describe("InvokePrompt", () => {
-  it("renders header text", () => {
+  it("renders compact header with invoke label", () => {
     render(
       <InvokePrompt data={makeData()} onInvoke={vi.fn()} onDecline={vi.fn()} />,
     )
-    expect(screen.getByText("Invoke an Aspect?")).toBeInTheDocument()
+    expect(screen.getByText("Invoke?")).toBeInTheDocument()
   })
 
-  it("renders current result and shifts needed", () => {
+  it("shows current result and shifts in collapsed summary", () => {
     render(
       <InvokePrompt data={makeData()} onInvoke={vi.fn()} onDecline={vi.fn()} />,
     )
     expect(
-      screen.getByText(/Current: Fair \(\+2\) · 2 shifts needed · 3 fate points/),
+      screen.getByText(/Fair \(\+2\) · 2 shifts needed · 3 FP/),
     ).toBeInTheDocument()
   })
 
-  it("renders available aspects", () => {
+  it("starts collapsed — aspects not visible", () => {
     render(
       <InvokePrompt data={makeData()} onInvoke={vi.fn()} onDecline={vi.fn()} />,
     )
+    expect(screen.queryByText("Quick Draw")).not.toBeInTheDocument()
+  })
+
+  it("shows aspects after expanding", () => {
+    render(
+      <InvokePrompt data={makeData()} onInvoke={vi.fn()} onDecline={vi.fn()} />,
+    )
+    expandPrompt()
     expect(screen.getByText("Quick Draw")).toBeInTheDocument()
     expect(screen.getByText("Dark Alley")).toBeInTheDocument()
   })
@@ -47,15 +61,17 @@ describe("InvokePrompt", () => {
     render(
       <InvokePrompt data={makeData()} onInvoke={vi.fn()} onDecline={vi.fn()} />,
     )
-    expect(screen.getByText(/1 free/)).toBeInTheDocument()
+    expandPrompt()
+    expect(screen.getByText(/★1 free/)).toBeInTheDocument()
   })
 
-  it("calls onInvoke with +2 when clicking +2 Bonus", () => {
+  it("calls onInvoke with +2 when clicking +2", () => {
     const onInvoke = vi.fn()
     render(
       <InvokePrompt data={makeData()} onInvoke={onInvoke} onDecline={vi.fn()} />,
     )
-    const plus2Buttons = screen.getAllByText("+2 Bonus")
+    expandPrompt()
+    const plus2Buttons = screen.getAllByText("+2")
     fireEvent.click(plus2Buttons[0])
     expect(onInvoke).toHaveBeenCalledWith(0, false)
   })
@@ -65,16 +81,27 @@ describe("InvokePrompt", () => {
     render(
       <InvokePrompt data={makeData()} onInvoke={onInvoke} onDecline={vi.fn()} />,
     )
+    expandPrompt()
     const rerollButtons = screen.getAllByText("Reroll")
     fireEvent.click(rerollButtons[1])
     expect(onInvoke).toHaveBeenCalledWith(1, true)
   })
 
-  it("calls onDecline when clicking decline", () => {
+  it("calls onDecline when clicking Skip in collapsed state", () => {
     const onDecline = vi.fn()
     render(
       <InvokePrompt data={makeData()} onInvoke={vi.fn()} onDecline={onDecline} />,
     )
+    fireEvent.click(screen.getByText("Skip"))
+    expect(onDecline).toHaveBeenCalledOnce()
+  })
+
+  it("calls onDecline when clicking Decline in expanded state", () => {
+    const onDecline = vi.fn()
+    render(
+      <InvokePrompt data={makeData()} onInvoke={vi.fn()} onDecline={onDecline} />,
+    )
+    expandPrompt()
     fireEvent.click(screen.getByText(/Decline/))
     expect(onDecline).toHaveBeenCalledOnce()
   })
@@ -96,10 +123,11 @@ describe("InvokePrompt", () => {
         onDecline={vi.fn()}
       />,
     )
-    expect(screen.getByText("Already used")).toBeInTheDocument()
+    expandPrompt()
+    expect(screen.getByText("Used")).toBeInTheDocument()
   })
 
-  it("shows not-enough-FP message when no fate points and no free invokes", () => {
+  it("shows no-FP message when no fate points and no free invokes", () => {
     render(
       <InvokePrompt
         data={makeData({
@@ -112,33 +140,52 @@ describe("InvokePrompt", () => {
         onDecline={vi.fn()}
       />,
     )
-    expect(screen.getByText("Not enough fate points")).toBeInTheDocument()
+    expandPrompt()
+    expect(screen.getByText("No FP")).toBeInTheDocument()
   })
 
-  it("has dialog role", () => {
+  it("has region role", () => {
     render(
       <InvokePrompt data={makeData()} onInvoke={vi.fn()} onDecline={vi.fn()} />,
     )
     expect(
-      screen.getByRole("dialog", { name: "Invoke an aspect" }),
+      screen.getByRole("region", { name: "Invoke an aspect" }),
     ).toBeInTheDocument()
   })
 
-  it("shows resolving spinner after clicking +2 Bonus", () => {
+  it("shows resolving spinner after clicking +2", () => {
     render(
       <InvokePrompt data={makeData()} onInvoke={vi.fn()} onDecline={vi.fn()} />,
     )
-    fireEvent.click(screen.getAllByText("+2 Bonus")[0])
+    expandPrompt()
+    fireEvent.click(screen.getAllByText("+2")[0])
     expect(screen.getByText("Resolving...")).toBeInTheDocument()
-    expect(screen.queryByText("+2 Bonus")).not.toBeInTheDocument()
+    expect(screen.queryByText("+2")).not.toBeInTheDocument()
   })
 
-  it("shows resolving spinner after clicking Decline", () => {
+  it("shows resolving spinner after clicking Skip", () => {
     render(
       <InvokePrompt data={makeData()} onInvoke={vi.fn()} onDecline={vi.fn()} />,
     )
-    fireEvent.click(screen.getByText(/Decline/))
+    fireEvent.click(screen.getByText("Skip"))
     expect(screen.getByText("Resolving...")).toBeInTheDocument()
-    expect(screen.queryByText(/Decline/)).not.toBeInTheDocument()
+    expect(screen.queryByText("Skip")).not.toBeInTheDocument()
+  })
+
+  it("shows aspect count on expand button", () => {
+    render(
+      <InvokePrompt data={makeData()} onInvoke={vi.fn()} onDecline={vi.fn()} />,
+    )
+    expect(screen.getByText(/2 Aspects/)).toBeInTheDocument()
+  })
+
+  it("collapses when clicking Collapse", () => {
+    render(
+      <InvokePrompt data={makeData()} onInvoke={vi.fn()} onDecline={vi.fn()} />,
+    )
+    expandPrompt()
+    expect(screen.getByText("Quick Draw")).toBeInTheDocument()
+    fireEvent.click(screen.getByText("Collapse"))
+    expect(screen.queryByText("Quick Draw")).not.toBeInTheDocument()
   })
 })

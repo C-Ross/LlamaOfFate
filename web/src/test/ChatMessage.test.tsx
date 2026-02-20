@@ -134,22 +134,6 @@ describe("ChatMessage", () => {
     expect(screen.getByText("Turn 1: Jesse (You)")).toBeInTheDocument()
   })
 
-  it("renders invoke prompt with aspects", () => {
-    const event = makeEvent("invoke_prompt", {
-      Available: [
-        { Name: "Quick Draw", Source: "character", FreeInvokes: 0 },
-        { Name: "Dark Alley", Source: "situation", FreeInvokes: 1 },
-      ],
-      FatePoints: 3,
-      CurrentResult: "Fair (+2)",
-      ShiftsNeeded: 2,
-    })
-    render(<ChatMessage event={event} />)
-    expect(screen.getByText("Invoke an Aspect?")).toBeInTheDocument()
-    expect(screen.getByText("Quick Draw")).toBeInTheDocument()
-    expect(screen.getByText("Dark Alley")).toBeInTheDocument()
-  })
-
   it("renders milestone", () => {
     const event = makeEvent("milestone", {
       Type: "scenario_complete",

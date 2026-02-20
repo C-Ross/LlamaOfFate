@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, type ReactNode } from "react"
 import { ChatMessage } from "@/components/game/ChatMessage"
 import { CHAT_DISPLAYABLE_EVENTS, type GameEvent } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -7,17 +7,27 @@ interface ChatPanelProps {
   events: GameEvent[]
   isPending?: boolean
   className?: string
+  /** Slot for an inline invoke prompt rendered at the bottom of the chat. */
+  invokeSlot?: ReactNode
+  /** Slot for an inline mid-flow prompt rendered at the bottom of the chat. */
+  midFlowSlot?: ReactNode
 }
 
-export function ChatPanel({ events, isPending = false, className }: ChatPanelProps) {
+export function ChatPanel({
+  events,
+  isPending = false,
+  className,
+  invokeSlot,
+  midFlowSlot,
+}: ChatPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const displayable = events.filter((e) => CHAT_DISPLAYABLE_EVENTS.has(e.event))
 
-  // Auto-scroll to bottom when new events arrive or pending state changes
+  // Auto-scroll to bottom when new events arrive, pending state, or prompt slots change
   useEffect(() => {
     bottomRef.current?.scrollIntoView?.({ behavior: "smooth" })
-  }, [displayable.length, isPending])
+  }, [displayable.length, isPending, invokeSlot, midFlowSlot])
 
   return (
     <div className={cn("overflow-y-auto", className)}>
@@ -37,6 +47,9 @@ export function ChatPanel({ events, isPending = false, className }: ChatPanelPro
             <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:300ms]" />
           </div>
         )}
+        {/* Inline interactive prompts — scrollable with chat history */}
+        {invokeSlot}
+        {midFlowSlot}
         <div ref={bottomRef} />
       </div>
     </div>

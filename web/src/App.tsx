@@ -116,32 +116,28 @@ function App() {
 
         {/* Message area — relative container for overlaid prompts */}
         <div className="relative flex-1 min-h-0">
-          <ChatPanel events={events} isPending={isPending} className="h-full" />
-
-          {/* Floating invoke prompt — overlaid at the bottom of the chat */}
-          {awaitingInvoke && invokePromptData && (
-            <div className="absolute inset-x-0 bottom-0 px-6 py-3 bg-gradient-to-t from-background via-background/95 to-transparent pt-10">
-              <div className="mx-auto max-w-2xl">
+          <ChatPanel
+            events={events}
+            isPending={isPending}
+            className="h-full"
+            invokeSlot={
+              awaitingInvoke && invokePromptData ? (
                 <InvokePrompt
                   data={invokePromptData}
                   onInvoke={sendInvokeResponse}
                   onDecline={() => sendInvokeResponse(-1, false)}
                 />
-              </div>
-            </div>
-          )}
-
-          {/* Floating mid-flow prompt — overlaid at the bottom of the chat */}
-          {awaitingMidFlow && midFlowPromptData && (
-            <div className="absolute inset-x-0 bottom-0 px-6 py-3 bg-gradient-to-t from-background via-background/95 to-transparent pt-10">
-              <div className="mx-auto max-w-2xl">
+              ) : undefined
+            }
+            midFlowSlot={
+              awaitingMidFlow && midFlowPromptData ? (
                 <MidFlowPrompt
                   data={midFlowPromptData}
                   onChoose={sendMidFlowResponse}
                 />
-              </div>
-            </div>
-          )}
+              ) : undefined
+            }
+          />
         </div>
 
         {/* Input area */}

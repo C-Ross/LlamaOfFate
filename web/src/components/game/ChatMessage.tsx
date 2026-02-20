@@ -20,7 +20,6 @@ import type {
   ConflictStartEventData,
   ConflictEndEventData,
   TurnAnnouncementEventData,
-  InvokePromptEventData,
   InputRequestEventData,
   NPCAttackEventData,
   PlayerAttackResultEventData,
@@ -81,8 +80,6 @@ function renderEvent(event: GameEvent) {
       return <ConflictEscalationMessage data={event.data as ConflictEscalationEventData} />
     case "turn_announcement":
       return <TurnAnnouncementMessage data={event.data as TurnAnnouncementEventData} />
-    case "invoke_prompt":
-      return <InvokePromptMessage data={event.data as InvokePromptEventData} />
     case "input_request":
       return <InputRequestMessage data={event.data as InputRequestEventData} />
     case "npc_attack":
@@ -294,27 +291,6 @@ function TurnAnnouncementMessage({ data }: { data: TurnAnnouncementEventData }) 
 // ---------------------------------------------------------------------------
 // Invoke / Input prompts
 // ---------------------------------------------------------------------------
-
-function InvokePromptMessage({ data }: { data: InvokePromptEventData }) {
-  return (
-    <div className="rounded-lg border border-fate-point/50 bg-fate-point/5 px-4 py-3 space-y-2">
-      <div className="font-heading text-sm font-bold text-fate-point">
-        Invoke an Aspect?
-      </div>
-      <div className="text-xs font-body text-muted-foreground">
-        Current: {data.CurrentResult} • {data.ShiftsNeeded} shifts needed • {data.FatePoints} fate points
-      </div>
-      {data.Available?.map((a, i) => (
-        <div key={i} className="rounded bg-card px-3 py-1 text-sm font-body">
-          <span className="font-bold">{a.Name}</span>
-          <span className="text-xs text-muted-foreground ml-2">
-            ({a.Source}{a.FreeInvokes > 0 ? `, ${a.FreeInvokes} free` : ""})
-          </span>
-        </div>
-      ))}
-    </div>
-  )
-}
 
 function InputRequestMessage({ data }: { data: InputRequestEventData }) {
   return (

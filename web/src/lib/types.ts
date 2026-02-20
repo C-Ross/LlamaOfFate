@@ -407,7 +407,6 @@ export const CHAT_DISPLAYABLE_EVENTS: Set<string> = new Set([
   "conflict_start",
   "conflict_end",
   "turn_announcement",
-  "invoke_prompt",
   "input_request",
   "npc_attack",
   "player_attack_result",
