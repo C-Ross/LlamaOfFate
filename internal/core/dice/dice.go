@@ -45,6 +45,14 @@ type Roller struct {
 	rng *rand.Rand
 }
 
+// DiceRoller is the interface consumed by the engine for all dice operations.
+// *Roller satisfies it out of the box; PlannedRoller provides a test double
+// that returns pre-configured results.
+type DiceRoller interface {
+	RollWithModifier(skill Ladder, modifier int) *CheckResult
+	Reroll(original *CheckResult) *CheckResult
+}
+
 // NewRoller creates a new dice roller
 func NewRoller() *Roller {
 	return &Roller{

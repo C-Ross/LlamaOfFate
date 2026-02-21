@@ -36,7 +36,7 @@ type SceneManager struct {
 	engine                *Engine
 	currentScene          *scene.Scene
 	player                *character.Character
-	roller                *dice.Roller
+	roller                dice.DiceRoller
 	conversationHistory   []prompt.ConversationEntry
 	shouldExit            bool                    // Set to true when the game should end
 	exitOnSceneTransition bool                    // Set to true to exit the loop on scene transition
