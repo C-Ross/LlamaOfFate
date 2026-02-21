@@ -77,6 +77,33 @@ model_name: "Llama-4-Maverick-17B-128E-Instruct-FP8"
 timeout: 300
 ```
 
+## User Interfaces
+
+LlamaOfFate provides two interfaces for playing:
+
+### Web UI (Recommended)
+A modern browser-based interface with real-time updates via WebSocket:
+- Pre-game setup with preset scenarios (Wild West Saloon, Heist, Tower Defense)
+- Custom character creation with LLM-powered scenario generation
+- Session persistence across page refreshes
+- Continue saved games from the setup screen
+
+```bash
+# Start the WebSocket server (port 8080)
+just serve
+
+# In a separate terminal, start the web dev server (port 5173)
+just web-dev
+
+# Then open http://localhost:5173 in your browser
+```
+
+### Terminal UI
+A command-line interface for playing in the terminal:
+```bash
+just run
+```
+
 ## Building and Running
 
 LlamaOfFate uses [`just`](https://github.com/casey/just) as a command runner for common development tasks.
@@ -119,6 +146,8 @@ Run `just` without arguments to see all available commands. Common commands incl
 
 **Go:**
 - **`just build`** - Build the CLI application
+- **`just build-server`** - Build the WebSocket server
+- **`just serve`** - Build and run the WebSocket server
 - **`just run`** - Build and run the CLI
 - **`just go-test`** - Run Go tests
 - **`just go-lint`** - Run golangci-lint
@@ -237,11 +266,12 @@ LlamaOfFate/
 - ✅ Game state persistence (save/load functionality via YAML)
 - ✅ Event-driven UI architecture with async invoke/input support
 - ✅ Integration tests and LLM evaluation tests
-- ✅ Web UI scaffold (React + Vite + Tailwind + shadcn/ui)
-- ✅ WebSocket server backend
+- ✅ Web UI with WebSocket integration (React + Vite + Tailwind + shadcn/ui)
+- ✅ Pre-game setup flow with preset scenarios and custom character creation
+- ✅ WebSocket server with full game session management
+- ✅ Session persistence across page refreshes
 
 ### Planned Features
 - 📋 Additional LLM backends (Ollama, OpenAI direct)
-- 📋 WebSocket integration connecting web UI to game engine
 - 📋 Public API packages for external integrations
 - 📋 Database backends for long-term storage
