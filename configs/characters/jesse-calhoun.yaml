@@ -1,0 +1,27 @@
+id: jesse-calhoun
+name: "Jesse Calhoun"
+aspects:
+  high_concept: "Haunted Former Rancher Seeking Justice"
+  trouble: "Vengeance Burns Hotter Than Reason"
+  other:
+    - "Fastest Draw in Three Counties"
+    - "I Remember Every Face"
+    - "The Land Speaks to Me"
+skills:
+  Shoot: 5       # Superb
+  Notice: 4      # Great
+  Empathy: 4     # Great
+  Will: 3        # Good
+  Athletics: 3   # Good
+  Rapport: 3     # Good
+  Investigate: 2 # Fair
+  Ride: 2        # Fair (horsemanship in this setting)
+  Fight: 2       # Fair
+  Provoke: 2     # Fair
+  Physique: 1    # Average
+  Stealth: 1     # Average
+  Contacts: 1    # Average
+  Deceive: 1     # Average
+  Resources: 0   # Mediocre
+fate_points: 3
+refresh: 3

@@ -1,0 +1,52 @@
+id: saloon
+title: "Trouble in Redemption Gulch"
+genre: Western
+description: "Outlaws threaten a frontier town. Take justice into your own hands."
+problem: "The town is under threat from outlaws and someone needs to stand up for the innocent"
+setting: >-
+  The American Old West in the late 1800s. Dusty frontier towns, lawless
+  territories, and the struggle between civilization and the wild. Gunslingers,
+  outlaws, and honest folk all seeking their fortune.
+story_questions:
+  - "Will the outlaws be brought to justice?"
+  - "Can the town be saved?"
+
+default_player: jesse-calhoun
+
+npcs:
+  - id: bartender
+    name: "Maggie Two-Rivers"
+    type: supporting
+    high_concept: "Shrewd Saloon Owner with Secrets"
+    aspects:
+      - "I've Heard Every Story in This Town"
+      - "Nobody Crosses Me Twice"
+    skills:
+      Empathy: 3  # Good
+      Rapport: 3  # Good
+      Notice: 2   # Fair
+      Will: 2     # Fair
+      Deceive: 1  # Average
+      Shoot: 1    # Average (keeps a shotgun under the bar)
+    fate_points: 2
+
+initial_scene:
+  id: dusty-spur-saloon
+  name: "The Dusty Spur Saloon"
+  description: >-
+    The swinging doors creak as you step into the Dusty Spur, the only watering
+    hole in Redemption Gulch. Dust motes dance in shafts of afternoon light
+    cutting through grimy windows. A piano sits silent in the corner, its player
+    long gone. Behind the bar, a weathered woman with sharp eyes polishes a
+    glass, watching you with guarded curiosity. The smell of cheap whiskey and
+    tobacco hangs heavy in the air. You've heard rumors that someone here knows
+    the whereabouts of the Cortez Gang—the outlaws who burned your ranch and
+    left you for dead.
+  situation_aspects:
+    - id: information-for-sale
+      aspect: "Everyone Here Has a Price"
+      duration: scene
+    - id: nervous-tension
+      aspect: "Strangers Ain't Welcome"
+      duration: scene
+  farewell: "You tip your hat and step back into the dusty street. The hunt continues."

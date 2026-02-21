@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	gameconfig "github.com/C-Ross/LlamaOfFate/internal/config"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
@@ -117,11 +118,16 @@ func main() {
 	// Build scenario context
 	var scenario *scene.Scenario
 	if *scenarioFlag != "" {
-		scenario = scene.PredefinedScenario(*scenarioFlag)
-		if scenario == nil {
+		scenarios, loadErr := gameconfig.LoadAll("configs")
+		if loadErr != nil {
+			log.Fatalf("Failed to load configs: %v", loadErr)
+		}
+		ls, ok := scenarios[*scenarioFlag]
+		if !ok {
 			fmt.Fprintf(os.Stderr, "Unknown scenario: %s (use saloon, heist, or tower)\n", *scenarioFlag)
 			os.Exit(1)
 		}
+		scenario = ls.Scenario
 	} else if *genreFlag != "" {
 		scenario = &scene.Scenario{
 			Genre: *genreFlag,

@@ -1,0 +1,27 @@
+id: zero
+name: "Zero"
+aspects:
+  high_concept: "Ghost in the Machine Netrunner"
+  trouble: "Wanted by Three Megacorps"
+  other:
+    - "Military-Grade Cybernetic Reflexes"
+    - "Nobody Gets Left Behind"
+    - "I Know a Guy for Everything"
+skills:
+  Burglary: 5    # Superb (hacking/infiltration)
+  Stealth: 4     # Great
+  Notice: 4      # Great
+  Crafts: 3      # Good (tech skills)
+  Athletics: 3   # Good
+  Shoot: 3       # Good
+  Deceive: 2     # Fair
+  Will: 2        # Fair
+  Investigate: 2 # Fair
+  Contacts: 2    # Fair
+  Fight: 1       # Average
+  Physique: 1    # Average
+  Provoke: 1     # Average
+  Resources: 1   # Average
+  Empathy: 0     # Mediocre
+fate_points: 3
+refresh: 3

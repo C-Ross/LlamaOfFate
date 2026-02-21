@@ -1,16 +1,36 @@
 package main
 
-// Hardcoded scenario and player character for development/testing.
-// Replace this file with scenario generation or selection logic later.
+// Scenario and player character loading from YAML config files.
+// Falls back to hardcoded defaults if configs are unavailable.
 
 import (
+	"log/slog"
+
+	"github.com/C-Ross/LlamaOfFate/internal/config"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
-	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 )
 
-// defaultScenario returns the hardcoded scenario used for testing.
+const defaultScenarioID = "saloon"
+
+// loadedScenarios caches scenarios loaded from YAML at startup.
+var loadedScenarios map[string]*config.LoadedScenario
+
+func init() {
+	loaded, err := config.LoadAll("configs")
+	if err != nil {
+		slog.Warn("failed to load scenarios from YAML, will use hardcoded defaults", "error", err)
+		return
+	}
+	loadedScenarios = loaded
+}
+
+// defaultScenario returns the default scenario (saloon).
 func defaultScenario() *scene.Scenario {
+	if ls, ok := loadedScenarios[defaultScenarioID]; ok {
+		return ls.Scenario
+	}
+	slog.Warn("falling back to hardcoded default scenario")
 	return &scene.Scenario{
 		Title:   "Trouble in Redemption Gulch",
 		Genre:   "Western",
@@ -25,27 +45,14 @@ func defaultScenario() *scene.Scenario {
 	}
 }
 
-// defaultPlayer returns the hardcoded player character used for testing.
-// Skill pyramid follows Fate Core defaults: 1 Great, 2 Good, 3 Fair, 4 Average.
+// defaultPlayer returns the default player character for the saloon scenario.
 func defaultPlayer() *character.Character {
+	if ls, ok := loadedScenarios[defaultScenarioID]; ok && ls.Player != nil {
+		return ls.Player
+	}
+	slog.Warn("falling back to hardcoded default player")
 	player := character.NewCharacter("player1", "Jesse Calhoun")
 	player.Aspects.HighConcept = "Haunted Former Rancher Seeking Justice"
 	player.Aspects.Trouble = "Vengeance Burns Hotter Than Reason"
-
-	// Great (+4)
-	player.SetSkill("Shoot", dice.Great)
-	// Good (+3)
-	player.SetSkill("Athletics", dice.Good)
-	player.SetSkill("Notice", dice.Good)
-	// Fair (+2)
-	player.SetSkill("Fight", dice.Fair)
-	player.SetSkill("Will", dice.Fair)
-	player.SetSkill("Drive", dice.Fair) // Horsemanship in this setting
-	// Average (+1)
-	player.SetSkill("Physique", dice.Average)
-	player.SetSkill("Provoke", dice.Average)
-	player.SetSkill("Stealth", dice.Average)
-	player.SetSkill("Investigate", dice.Average)
-
 	return player
 }

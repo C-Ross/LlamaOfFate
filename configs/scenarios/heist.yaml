@@ -1,0 +1,65 @@
+id: heist
+title: "The Prometheus Job"
+genre: Cyberpunk
+description: "Extract a data core from a corporate fortress. Trust no one."
+problem: "A high-value data core must be extracted from a heavily guarded corporate facility"
+setting: >-
+  A dark near-future where megacorporations rule, hackers breach digital
+  fortresses, and chrome-enhanced mercenaries sell their skills to the highest
+  bidder. Neon lights flicker over rain-slicked streets.
+story_questions:
+  - "Can the team breach the facility's security?"
+  - "Will the extraction succeed without casualties?"
+  - "What secrets does the data core contain?"
+
+default_player: zero
+
+npcs:
+  - id: drone-1
+    name: "Security Drone Alpha"
+    type: nameless_fair
+    high_concept: "Automated Threat Response Unit"
+    primary_skill: Shoot
+    skills:
+      Notice: 1 # Average
+
+  - id: drone-2
+    name: "Security Drone Beta"
+    type: nameless_fair
+    high_concept: "Automated Threat Response Unit"
+    primary_skill: Shoot
+    skills:
+      Notice: 1 # Average
+
+  - id: corp-agent
+    name: "Agent Chen"
+    type: supporting
+    high_concept: "Nexus Industries Troubleshooter"
+    aspects:
+      - "Augmented Combat Implants"
+    skills:
+      Fight: 3     # Good
+      Shoot: 3     # Good
+      Notice: 2    # Fair
+      Athletics: 2 # Fair
+      Will: 1      # Average
+      Physique: 1  # Average
+    fate_points: 2
+
+initial_scene:
+  id: megacorp-vault
+  name: "Megacorp Data Vault"
+  description: >-
+    You've infiltrated the lower levels of Nexus Industries' headquarters. The
+    data vault stretches before you—a cathedral of humming server racks bathed
+    in cold blue light. Holographic warning signs flicker: 'LEVEL 5 CLEARANCE
+    REQUIRED.' Two hovering security drones patrol the aisles with scanning
+    beams, while a black-suited corporate agent reviews a datapad near the
+    central access terminal. The air is cold and sterile, and you can hear the
+    distant thrum of the building's fusion reactor. Your contact said the
+    prototype AI core data is stored here—worth millions on the black market.
+  situation_aspects:
+    - id: biometric-lockdown
+      aspect: "Biometric Lockdown Protocols Active"
+      duration: scene
+  farewell: "You slip back into the neon-lit streets. The data burns in your pocket."

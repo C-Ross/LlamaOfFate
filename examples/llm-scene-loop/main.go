@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 
+	gameconfig "github.com/C-Ross/LlamaOfFate/internal/config"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
@@ -22,6 +23,7 @@ import (
 type SceneConfig struct {
 	Name        string
 	Description string
+	Scenario    *scene.Scenario
 	Player      *character.Character
 	NPCs        []*character.Character
 	Scene       *scene.Scene
@@ -90,17 +92,25 @@ func main() {
 		log.Fatalf("Failed to start engine: %v", err)
 	}
 
-	// Build the selected scene configuration
-	var sceneConfig SceneConfig
-	switch selectedScene {
-	case "tower":
-		sceneConfig = buildTowerScene()
-	case "heist":
-		sceneConfig = buildHeistScene()
-	case "saloon":
-		sceneConfig = buildSaloonScene()
-	default:
+	// Load scenarios from YAML
+	scenarios, err := gameconfig.LoadAll("configs")
+	if err != nil {
+		log.Fatalf("Failed to load scenario configs: %v", err)
+	}
+
+	// Build the selected scene configuration from YAML
+	ls, ok := scenarios[selectedScene]
+	if !ok {
 		log.Fatalf("Unknown scene: %s. Use -list to see available scenes.", selectedScene)
+	}
+	sceneConfig := SceneConfig{
+		Name:        ls.Raw.Title,
+		Description: ls.Raw.Description,
+		Scenario:    ls.Scenario,
+		Player:      ls.Player,
+		NPCs:        ls.NPCs,
+		Scene:       ls.Scene,
+		Farewell:    ls.Farewell,
 	}
 
 	// Set up session logging (default: enabled with auto-generated filename)
@@ -135,7 +145,7 @@ func main() {
 		fmt.Println()
 	}
 
-	runGame(ctx, gameEngine, sceneConfig, terminalUI, sessionLogger, selectedScene, *multiFlag)
+	runGame(ctx, gameEngine, sceneConfig, terminalUI, sessionLogger, *multiFlag)
 
 	// Stop the engine
 	if err := gameEngine.Stop(); err != nil {
@@ -150,7 +160,7 @@ func main() {
 // runGame sets up a GameManager and runs the game. In single-scene mode
 // (multi=false), ExitAfterScene causes the game to end when the first scene
 // completes. In multi-scene mode, scenes continue to be generated on transition.
-func runGame(ctx context.Context, gameEngine *engine.Engine, sceneConfig SceneConfig, terminalUI *terminal.TerminalUI, sessionLogger *session.Logger, sceneName string, multi bool) {
+func runGame(ctx context.Context, gameEngine *engine.Engine, sceneConfig SceneConfig, terminalUI *terminal.TerminalUI, sessionLogger *session.Logger, multi bool) {
 	// Create and configure the game manager
 	gameManager := engine.NewGameManager(gameEngine)
 	gameManager.SetPlayer(sceneConfig.Player)
@@ -159,7 +169,7 @@ func runGame(ctx context.Context, gameEngine *engine.Engine, sceneConfig SceneCo
 	}
 
 	// Set genre-appropriate scenario
-	gameManager.SetScenario(getScenario(sceneName))
+	gameManager.SetScenario(sceneConfig.Scenario)
 
 	// Set up the initial scene
 	gameManager.SetInitialScene(&engine.InitialSceneConfig{
@@ -178,22 +188,5 @@ func runGame(ctx context.Context, gameEngine *engine.Engine, sceneConfig SceneCo
 	}
 	if err := syncdriver.Run(ctx, gameManager, terminalUI, onStart); err != nil {
 		log.Fatalf("Game error: %v", err)
-	}
-}
-
-// getScenario returns appropriate scenario for each scene type
-func getScenario(sceneName string) *scene.Scenario {
-	scenario := scene.PredefinedScenario(sceneName)
-	if scenario != nil {
-		return scenario
-	}
-	return &scene.Scenario{
-		Title:   "A New Adventure",
-		Problem: "Danger lurks and heroes are needed",
-		StoryQuestions: []string{
-			"Can the heroes prevail?",
-		},
-		Genre:   "Adventure",
-		Setting: "A world of adventure and danger where heroes rise to meet challenges.",
 	}
 }

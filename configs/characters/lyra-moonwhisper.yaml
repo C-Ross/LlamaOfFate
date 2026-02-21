@@ -1,0 +1,27 @@
+id: lyra-moonwhisper
+name: "Lyra Moonwhisper"
+aspects:
+  high_concept: "Scholarly Arcane Investigator"
+  trouble: "Curiosity About Forbidden Knowledge"
+  other:
+    - "Trained by the College of Mages"
+    - "Sees Magic in Everything"
+    - "Protective Ward Tattoos"
+skills:
+  Lore: 5        # Superb
+  Investigate: 4 # Great
+  Notice: 4      # Great
+  Will: 3        # Good
+  Empathy: 3     # Good
+  Rapport: 3     # Good
+  Athletics: 2   # Fair
+  Burglary: 2    # Fair
+  Stealth: 2     # Fair
+  Crafts: 2      # Fair
+  Deceive: 1     # Average
+  Drive: 1       # Average
+  Fight: 1       # Average
+  Physique: 1    # Average
+  Provoke: 1     # Average
+fate_points: 3
+refresh: 3

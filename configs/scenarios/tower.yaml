@@ -1,0 +1,36 @@
+id: tower
+title: "The Wizard's Tower"
+genre: Fantasy
+description: "Investigate a magical disturbance in an ancient tower."
+problem: "A mysterious magical disturbance threatens the tower and its inhabitants"
+setting: >-
+  A medieval fantasy world of magic and mystery. Wizards study arcane arts in
+  towers, adventurers seek treasure in ancient ruins, and supernatural forces
+  are very real.
+story_questions:
+  - "Can the source of the disturbance be discovered?"
+  - "Will the tower's secrets be revealed?"
+
+default_player: lyra-moonwhisper
+
+npcs:
+  - id: goblin-guard
+    name: "Goblin Guard"
+    type: nameless_good
+    high_concept: "Sneaky Tower Guardian"
+    primary_skill: Fight
+    skills:
+      Stealth: 2 # Fair
+      Notice: 1  # Average
+
+initial_scene:
+  id: abandoned-tower
+  name: "The Abandoned Wizard's Tower"
+  description: >-
+    You stand before a crumbling stone tower that stretches high into the mist.
+    Strange blue lights flicker through broken windows near the top. The heavy
+    wooden door hangs ajar, revealing darkness within. Ancient runes are carved
+    deep into the stone archway, still glowing faintly with magical energy. The
+    air hums with residual magic, and you hear the distant sound of something
+    large moving inside.
+  farewell: "Thanks for exploring the tower!"
