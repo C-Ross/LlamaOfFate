@@ -5,7 +5,6 @@ package llmeval_test
 import (
 	"context"
 	"os"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -18,15 +17,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Regex patterns for detecting "choose your own adventure" style options
-var (
-	// Matches "Jesse must now decide:" or similar prompts
-	decisionPromptRegex = regexp.MustCompile(`(?i)(must now decide|must decide|you must choose|you can choose|what will .* do\?|what do you do\?)`)
-	// Matches bullet point options like "- Option 1" or "• Option"
-	bulletOptionsRegex = regexp.MustCompile(`(?m)^[\s]*[-•*]\s+(Use|Take|Press|Attempt|Keep|Try|Draw|Reach|Spin|Slowly)`)
-	// Matches numbered options like "1. Option" or "1) Option"
-	numberedOptionsRegex = regexp.MustCompile(`(?m)^[\s]*\d+[.)]\s+\w+`)
-)
+// noOptionsJudgeQuestion asks whether the response presents CYOA-style player choices.
+const noOptionsJudgeQuestion = "Does this response present a numbered or bulleted menu of player choices for the player to choose from (like a choose-your-own-adventure list of options)?"
 
 // SceneResponseTestCase for testing scene response behaviors
 type SceneResponseTestCase struct {
@@ -485,24 +477,19 @@ func evaluateSceneResponseBehavior(ctx context.Context, client llm.LLMClient, tc
 		return SceneResponseResult{TestCase: tc, Error: err}
 	}
 
-	// Check for options patterns
+	// Check for options patterns using LLM judge (only for no-options test cases)
 	hasOptions := false
 	optionsFound := ""
 
-	if decisionPromptRegex.MatchString(response) {
-		hasOptions = true
-		match := decisionPromptRegex.FindString(response)
-		optionsFound = "Decision prompt: " + match
-	}
-	if bulletOptionsRegex.MatchString(response) {
-		hasOptions = true
-		matches := bulletOptionsRegex.FindAllString(response, 3)
-		optionsFound += " Bullet options: " + strings.Join(matches, ", ")
-	}
-	if numberedOptionsRegex.MatchString(response) {
-		hasOptions = true
-		matches := numberedOptionsRegex.FindAllString(response, 3)
-		optionsFound += " Numbered options: " + strings.Join(matches, ", ")
+	if tc.CheckNoOptions {
+		judge, err := LLMJudge(ctx, client, response, noOptionsJudgeQuestion)
+		if err != nil {
+			return SceneResponseResult{TestCase: tc, Error: err}
+		}
+		hasOptions = judge.Pass
+		if hasOptions {
+			optionsFound = judge.Reasoning
+		}
 	}
 
 	// Check for transition marker using production parser
