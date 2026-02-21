@@ -23,7 +23,7 @@ func setupNPCConflictSM(t *testing.T) (*SceneManager, *character.Character, *cha
 	engine, err := New()
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 
 	player := character.NewCharacter("player-1", "Hero")
 	npc := character.NewCharacter("npc-1", "Goblin Scout")
@@ -314,7 +314,7 @@ func TestProcessNPCTurn_DispatchDefend(t *testing.T) {
 	engine, err := NewWithLLM(mockLLM)
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 
 	player := character.NewCharacter("player-1", "Hero")
 	npc := character.NewCharacter("npc-1", "Goblin Scout")

@@ -55,7 +55,7 @@ func TestSceneManager_Snapshot_Empty(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	snapshot := sm.Snapshot()
 
 	assert.Nil(t, snapshot.CurrentScene)
@@ -67,7 +67,7 @@ func TestSceneManager_Snapshot_WithState(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 
 	testScene := scene.NewScene("scene1", "Saloon", "A dusty saloon")
 	player := character.NewCharacter("player1", "Jesse")
@@ -91,7 +91,7 @@ func TestSceneManager_Snapshot_CopiesConversationHistory(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	sm.conversationHistory = []prompt.ConversationEntry{
 		{PlayerInput: "hello", GMResponse: "hi", Timestamp: time.Now(), Type: "dialog"},
 	}
@@ -307,7 +307,7 @@ func TestSceneManager_Restore_Empty(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	player := character.NewCharacter("player1", "Jesse")
 
 	sm.Restore(SceneState{}, player)
@@ -322,7 +322,7 @@ func TestSceneManager_Restore_WithState(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	player := character.NewCharacter("player1", "Jesse")
 
 	testScene := scene.NewScene("scene1", "Saloon", "A dusty saloon")
@@ -348,7 +348,7 @@ func TestSceneManager_Restore_AddsPlayerToScene(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	player := character.NewCharacter("player1", "Jesse")
 
 	testScene := scene.NewScene("scene1", "Saloon", "A dusty saloon")
@@ -365,7 +365,7 @@ func TestSceneManager_Restore_RoundTrip(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create and populate a scene manager
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	player := character.NewCharacter("player1", "Jesse")
 	testScene := scene.NewScene("scene1", "Saloon", "A dusty saloon")
 	require.NoError(t, sm.StartScene(testScene, player))
@@ -378,7 +378,7 @@ func TestSceneManager_Restore_RoundTrip(t *testing.T) {
 	snapshot := sm.Snapshot()
 
 	// Restore into a fresh scene manager
-	sm2 := NewSceneManager(engine)
+	sm2 := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	sm2.Restore(snapshot, player)
 
 	assert.Equal(t, testScene, sm2.currentScene)

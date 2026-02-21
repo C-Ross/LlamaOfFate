@@ -579,7 +579,7 @@ func TestSceneManager_SetScenePurpose(t *testing.T) {
 	engine, err := NewWithLLM(&MockLLMClientForScenario{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	assert.Equal(t, "", sm.scenePurpose)
 
 	sm.SetScenePurpose("Can the hero escape?")

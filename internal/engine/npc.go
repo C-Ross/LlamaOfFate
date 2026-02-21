@@ -19,7 +19,7 @@ import (
 
 // getNPCActionDecision uses the LLM to decide what action an NPC should take
 func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character.Character) (*prompt.NPCActionDecision, error) {
-	if sm.engine.llmClient == nil {
+	if sm.llmClient == nil {
 		return nil, fmt.Errorf("LLM client required for NPC decisions")
 	}
 
@@ -35,7 +35,7 @@ func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character
 		if p.CharacterID == npc.ID || p.Status != scene.StatusActive {
 			continue
 		}
-		char := sm.engine.GetCharacter(p.CharacterID)
+		char := sm.characters.GetCharacter(p.CharacterID)
 		if char == nil {
 			continue
 		}
@@ -89,7 +89,7 @@ func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character
 		return nil, fmt.Errorf("failed to render NPC action decision template: %w", err)
 	}
 
-	content, err := llm.SimpleCompletion(ctx, sm.engine.llmClient, promptText, 150, 0.7)
+	content, err := llm.SimpleCompletion(ctx, sm.llmClient, promptText, 150, 0.7)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,7 @@ func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character
 // Returns (events, awaitingInvoke) where awaitingInvoke is true if the player
 // needs to respond to a defense invoke prompt.
 func (sm *SceneManager) processNPCTurn(ctx context.Context, npcID string) ([]GameEvent, bool) {
-	npc := sm.engine.GetCharacter(npcID)
+	npc := sm.characters.GetCharacter(npcID)
 	if npc == nil {
 		slog.Warn("NPC not found for turn processing",
 			"component", componentSceneManager,
@@ -315,7 +315,7 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 	target := sm.player // Default to player
 	targetID := decision.TargetID
 	if targetID != "" && targetID != sm.player.ID {
-		if t := sm.engine.GetCharacter(targetID); t != nil {
+		if t := sm.characters.GetCharacter(targetID); t != nil {
 			target = t
 		}
 	}
@@ -469,7 +469,7 @@ func (sm *SceneManager) finishNPCAttackOnPlayer(
 
 // generateNPCAttackNarrative generates narrative for an NPC's attack
 func (sm *SceneManager) generateNPCAttackNarrative(ctx context.Context, npc *character.Character, skill string, outcome *dice.Outcome) (string, error) {
-	if sm.engine.llmClient == nil {
+	if sm.llmClient == nil {
 		return "", fmt.Errorf("LLM client required for NPC narratives")
 	}
 
@@ -518,7 +518,7 @@ func (sm *SceneManager) generateNPCAttackNarrative(ctx context.Context, npc *cha
 		return "", fmt.Errorf("failed to render NPC attack template: %w", err)
 	}
 
-	return llm.SimpleCompletion(ctx, sm.engine.llmClient, promptText, 100, 0.8)
+	return llm.SimpleCompletion(ctx, sm.llmClient, promptText, 100, 0.8)
 }
 
 // npcAttackFallbackNarrative returns a simple hit/miss narrative when LLM

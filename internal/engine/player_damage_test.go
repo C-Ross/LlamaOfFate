@@ -28,7 +28,7 @@ func setupConflictSM(t *testing.T, llmClient *capturingMockLLMClient) (*SceneMan
 	}
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 
 	player := character.NewCharacter("player-1", "Hero")
 	attacker := character.NewCharacter("npc-1", "Bandit")
@@ -207,7 +207,7 @@ func TestApplyAttackDamageToPlayer_MentalConflict_UsesMentalStress(t *testing.T)
 	engine, err := New()
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 
 	player := character.NewCharacter("player-1", "Hero")
 	attacker := character.NewCharacter("npc-1", "Illusionist")
@@ -543,7 +543,7 @@ func TestStressOverflow_MidFlowContinuation_SelectTakenOut(t *testing.T) {
 	sm, _, _ := setupConflictSM(t, mockLLM)
 
 	sm.handleStressOverflow(context.Background(), 3, character.PhysicalStress,
-		sm.engine.GetCharacter("npc-1"), testAttackCtx())
+		sm.characters.GetCharacter("npc-1"), testAttackCtx())
 	require.NotNil(t, sm.pendingMidFlow)
 
 	// "Be Taken Out" is the last option (index = len(consequences)).

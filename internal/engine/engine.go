@@ -8,6 +8,14 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 )
 
+// CharacterResolver provides read-only access to the character registry.
+// Engine satisfies this interface — no new implementation code is needed.
+type CharacterResolver interface {
+	GetCharacter(id string) *character.Character
+	ResolveCharacter(target string) *character.Character
+	GetCharactersByScene(s *scene.Scene) map[string]*character.Character
+}
+
 // Engine represents the core game engine
 type Engine struct {
 	actionParser      ActionParser
@@ -21,7 +29,7 @@ func New() (*Engine, error) {
 	engine := &Engine{
 		characterRegistry: make(map[string]*character.Character),
 	}
-	engine.sceneManager = NewSceneManager(engine)
+	engine.sceneManager = NewSceneManager(engine, nil, nil)
 	return engine, nil
 }
 
@@ -32,7 +40,7 @@ func NewWithLLM(llmClient llm.LLMClient) (*Engine, error) {
 		actionParser:      NewActionParser(llmClient),
 		characterRegistry: make(map[string]*character.Character),
 	}
-	engine.sceneManager = NewSceneManager(engine)
+	engine.sceneManager = NewSceneManager(engine, llmClient, engine.actionParser)
 	return engine, nil
 }
 

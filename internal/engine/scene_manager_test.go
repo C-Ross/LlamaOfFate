@@ -24,10 +24,10 @@ func TestNewSceneManager(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 
 	assert.NotNil(t, sm)
-	assert.Equal(t, engine, sm.engine)
+	assert.Equal(t, engine, sm.characters)
 	assert.NotNil(t, sm.roller)
 }
 
@@ -35,7 +35,7 @@ func TestSceneManager_StartScene(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	player := character.NewCharacter("player1", "Test Character")
 
 	testScene := scene.NewScene("scene1", "Test Scene", "A test scene description")
@@ -55,7 +55,7 @@ func TestSceneManager_ConversationHistory(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 
 	// Test initial state
 	assert.Empty(t, sm.conversationHistory)
@@ -74,7 +74,7 @@ func TestSceneManager_BuildContexts(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	player := character.NewCharacter("player1", "Test Character")
 	player.Aspects.HighConcept = "Brave Warrior"
 	player.Aspects.Trouble = "Quick to Anger"
@@ -105,11 +105,81 @@ func TestSceneManager_BuildContexts(t *testing.T) {
 	assert.Contains(t, aspectsContext, "Quick to Anger")
 }
 
+func TestBuildCharacterContext_OtherAspects(t *testing.T) {
+	sm := NewSceneManager(nil, nil, nil)
+	player := character.NewCharacter("p1", "Lyra")
+	player.Aspects.HighConcept = "Wandering Wizard"
+	player.Aspects.Trouble = "Haunted Past"
+	player.Aspects.AddAspect("Well Connected")
+	player.Aspects.AddAspect("Silver Tongue")
+	sm.player = player
+
+	ctx := sm.buildCharacterContext()
+	assert.Contains(t, ctx, "Well Connected")
+	assert.Contains(t, ctx, "Silver Tongue")
+	assert.Contains(t, ctx, "Other Aspects:")
+}
+
+func TestBuildAspectsContext_FreeInvokes(t *testing.T) {
+	sm := NewSceneManager(nil, nil, nil)
+	player := character.NewCharacter("p1", "Hero")
+	player.Aspects.HighConcept = "Bold Knight"
+	testScene := scene.NewScene("s1", "Hall", "A great hall")
+	testScene.SituationAspects = append(testScene.SituationAspects, scene.SituationAspect{
+		ID:          "sa-1",
+		Aspect:      "On Fire",
+		FreeInvokes: 2,
+	})
+	sm.player = player
+	sm.currentScene = testScene
+
+	ctx := sm.buildAspectsContext()
+	assert.Contains(t, ctx, "On Fire (2 free invokes)")
+}
+
+func TestBuildAspectsContext_Empty(t *testing.T) {
+	sm := NewSceneManager(nil, nil, nil)
+	sm.player = nil
+	testScene := scene.NewScene("s1", "Hall", "Empty hall")
+	sm.currentScene = testScene
+
+	ctx := sm.buildAspectsContext()
+	assert.Equal(t, "No special aspects currently in play.", ctx)
+}
+
+func TestAddToConversationHistory_TrimsBeyond10(t *testing.T) {
+	sm := NewSceneManager(nil, nil, nil)
+
+	// Add 12 entries
+	for i := 0; i < 12; i++ {
+		sm.addToConversationHistory("input", "response", "dialog")
+	}
+
+	assert.Len(t, sm.conversationHistory, 10, "should trim to last 10 entries")
+}
+
+func TestBuildSceneEndResult_PlayerTakenOut(t *testing.T) {
+	sm := NewSceneManager(nil, nil, nil)
+	sm.sceneEndReason = SceneEndPlayerTakenOut
+	sm.playerTakenOutHint = "You collapse in a heap."
+
+	result := sm.buildSceneEndResult()
+	assert.Equal(t, SceneEndPlayerTakenOut, result.Reason)
+	assert.Equal(t, "You collapse in a heap.", result.TransitionHint)
+}
+
+func TestBuildSceneEndResult_DefaultReason(t *testing.T) {
+	sm := NewSceneManager(nil, nil, nil)
+	// sceneEndReason is empty
+	result := sm.buildSceneEndResult()
+	assert.Equal(t, SceneEndQuit, result.Reason)
+}
+
 func TestSceneManager_ApplyActionEffects_CreateAdvantage(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 
 	player := character.NewCharacter("player1", "Test Character")
 	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
@@ -193,7 +263,7 @@ func TestSceneManager_GetCurrentScene(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 
 	assert.Nil(t, sm.GetCurrentScene())
 
@@ -211,7 +281,7 @@ func TestSceneManager_GetPlayer(t *testing.T) {
 	engine, err := New()
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 
 	assert.Nil(t, sm.GetPlayer())
 
@@ -240,7 +310,7 @@ func TestSceneManager_OtherCharactersInTemplateData(t *testing.T) {
 	engine, err := NewWithLLM(mockClient)
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 
 	// Create test characters
 	player := character.NewCharacter("player1", "Player Character")
@@ -286,7 +356,7 @@ func TestSceneManager_GenerateActionNarrativeWithTarget(t *testing.T) {
 	engine, err := NewWithLLM(mockClient)
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 
 	// Create test characters
 	player := character.NewCharacter("player1", "Player Character")
@@ -337,7 +407,7 @@ func TestSceneManager_GenerateActionNarrativeWithoutTarget(t *testing.T) {
 	engine, err := NewWithLLM(mockClient)
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 
 	// Create test character
 	player := character.NewCharacter("player1", "Player Character")
@@ -472,7 +542,7 @@ func TestClassifyInput_TrimsExtraText(t *testing.T) {
 			engine, err := NewWithLLM(mockClient)
 			require.NoError(t, err)
 
-			sm := NewSceneManager(engine)
+			sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 			sm.currentScene = scene.NewScene("test", "Test", "Test scene")
 
 			result, err := sm.classifyInput(context.Background(), "test input")
@@ -492,7 +562,7 @@ func TestProcessInput_NarrativeRoutesToDialog(t *testing.T) {
 	engine, err := NewWithLLM(client)
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	testScene := scene.NewScene("test-scene", "Tavern", "A cozy tavern")
 	sm.currentScene = testScene
 
@@ -543,7 +613,7 @@ func TestSceneManager_StartScene_ClearsConversationHistory(t *testing.T) {
 	gameEngine, err := New()
 	require.NoError(t, err)
 
-	sm := NewSceneManager(gameEngine)
+	sm := NewSceneManager(gameEngine, gameEngine.llmClient, gameEngine.actionParser)
 	player := character.NewCharacter("player1", "Test Character")
 
 	// Restore with conversation history (simulating a previous scene)
@@ -574,7 +644,7 @@ func TestHandleInput_DialogReturnsDialogEvent(t *testing.T) {
 	engine, err := NewWithLLM(client)
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	testScene := scene.NewScene("tavern", "Tavern", "A dimly lit tavern")
 	sm.currentScene = testScene
 	sm.player = character.NewCharacter("player-1", "Hero")
@@ -603,7 +673,7 @@ func TestHandleInput_DialogWithSceneTransition(t *testing.T) {
 	engine, err := NewWithLLM(client)
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	sm.exitOnSceneTransition = true
 	testScene := scene.NewScene("tavern", "Tavern", "A dimly lit tavern")
 	sm.currentScene = testScene
@@ -643,7 +713,7 @@ func TestHandleInput_ActionPath_ReturnsEvents(t *testing.T) {
 	engine, err := NewWithLLM(client)
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	sm.roller = dice.NewSeededRoller(12345)
 	testScene := scene.NewScene("arena", "Arena", "A fighting arena")
 
@@ -676,7 +746,7 @@ func TestHandleInput_ClassificationFallbackToDialog(t *testing.T) {
 	engine, err := NewWithLLM(client)
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	testScene := scene.NewScene("room", "Room", "A quiet room")
 	sm.currentScene = testScene
 	sm.player = character.NewCharacter("player-1", "Hero")

@@ -22,7 +22,7 @@ func buildInvokeTestSM(t *testing.T, fatePoints int) (*SceneManager, *MockUI) {
 	engine, err := New()
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	sm.roller = dice.NewSeededRoller(42)
 
 	player := character.NewCharacter("player-1", "Test Hero")

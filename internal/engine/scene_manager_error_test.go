@@ -36,7 +36,7 @@ func (m *MockFailingLLMClient) GetModelInfo() llm.ModelInfo {
 
 func TestClassifyInput_LLMUnavailable(t *testing.T) {
 	sm := &SceneManager{
-		engine: &Engine{llmClient: nil},
+		llmClient: nil,
 	}
 
 	_, err := sm.classifyInput(context.Background(), "hello")
@@ -50,7 +50,7 @@ func TestClassifyInput_LLMError(t *testing.T) {
 	engine, err := NewWithLLM(mockClient)
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.currentScene = testScene
 
@@ -65,7 +65,7 @@ func TestClassifyInput_EmptyResponse(t *testing.T) {
 	engine, err := NewWithLLM(mockClient)
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.currentScene = testScene
 
@@ -80,7 +80,7 @@ func TestClassifyInput_UnexpectedClassification(t *testing.T) {
 	engine, err := NewWithLLM(mockClient)
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.currentScene = testScene
 
@@ -111,7 +111,7 @@ func TestClassifyInput_ValidTypes(t *testing.T) {
 			engine, err := NewWithLLM(mockClient)
 			require.NoError(t, err)
 
-			sm := NewSceneManager(engine)
+			sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 			testScene := scene.NewScene("test", "Test", "Test scene")
 			sm.currentScene = testScene
 
@@ -125,7 +125,7 @@ func TestClassifyInput_ValidTypes(t *testing.T) {
 
 func TestGenerateSceneResponse_LLMUnavailable(t *testing.T) {
 	sm := &SceneManager{
-		engine: &Engine{llmClient: nil},
+		llmClient: nil,
 	}
 
 	_, err := sm.generateSceneResponse(context.Background(), "hello", inputTypeDialog)
@@ -139,7 +139,7 @@ func TestGenerateSceneResponse_LLMError(t *testing.T) {
 	engine, err := NewWithLLM(mockClient)
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	player := character.NewCharacter("p1", "Player")
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.player = player
@@ -157,7 +157,7 @@ func TestGenerateSceneResponse_EmptyResponse(t *testing.T) {
 	engine, err := NewWithLLM(mockClient)
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	player := character.NewCharacter("p1", "Player")
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.player = player
@@ -172,7 +172,7 @@ func TestGenerateSceneResponse_EmptyResponse(t *testing.T) {
 
 func TestGenerateActionNarrative_LLMUnavailable(t *testing.T) {
 	sm := &SceneManager{
-		engine: &Engine{llmClient: nil},
+		llmClient: nil,
 	}
 
 	testAction := action.NewAction("a1", "p1", action.Overcome, "Athletics", "Jump")
@@ -189,7 +189,7 @@ func TestGenerateActionNarrative_LLMError(t *testing.T) {
 	engine, err := NewWithLLM(mockClient)
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	player := character.NewCharacter("p1", "Player")
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.player = player
@@ -206,7 +206,7 @@ func TestGenerateActionNarrative_LLMError(t *testing.T) {
 }
 
 func TestBuildMechanicalNarrative(t *testing.T) {
-	sm := NewSceneManager(&Engine{})
+	sm := NewSceneManager(nil, nil, nil)
 
 	tests := []struct {
 		name         string
@@ -254,7 +254,7 @@ func TestBuildMechanicalNarrative(t *testing.T) {
 }
 
 func TestBuildMechanicalNarrative_NilOutcome(t *testing.T) {
-	sm := NewSceneManager(&Engine{})
+	sm := NewSceneManager(nil, nil, nil)
 
 	testAction := action.NewAction("a1", "p1", action.Overcome, "Athletics", "jump the gap")
 	testAction.Outcome = nil
@@ -265,13 +265,25 @@ func TestBuildMechanicalNarrative_NilOutcome(t *testing.T) {
 	assert.Contains(t, narrative, "attempt")
 }
 
+func TestBuildMechanicalNarrative_DefaultOutcome(t *testing.T) {
+	sm := NewSceneManager(nil, nil, nil)
+
+	testAction := action.NewAction("a1", "p1", action.Overcome, "Athletics", "cross the bridge")
+	testAction.Outcome = &dice.Outcome{Type: dice.OutcomeType(99)}
+
+	narrative := sm.buildMechanicalNarrative(testAction)
+
+	assert.Contains(t, narrative, "cross the bridge")
+	assert.Contains(t, narrative, "completes")
+}
+
 func TestProcessInput_ClassificationFallback(t *testing.T) {
 	// When classification fails, it should default to dialog
 	mockClient := &MockFailingLLMClient{err: errors.New("network error")}
 	engine, err := NewWithLLM(mockClient)
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	player := character.NewCharacter("p1", "Player")
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.player = player

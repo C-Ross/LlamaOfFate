@@ -56,7 +56,7 @@ func (sm *SceneManager) initiateConflict(conflictType scene.ConflictType, initia
 	}
 
 	// Validate the initiator is a real character in this scene
-	if sm.engine.GetCharacter(initiatorID) == nil {
+	if sm.characters.GetCharacter(initiatorID) == nil {
 		slog.Warn("Conflict trigger rejected: initiator ID does not match any character",
 			"component", componentSceneManager,
 			"initiator", initiatorID)
@@ -75,7 +75,7 @@ func (sm *SceneManager) initiateConflict(conflictType scene.ConflictType, initia
 	participants := make([]scene.ConflictParticipant, 0)
 
 	for _, charID := range sm.currentScene.Characters {
-		char := sm.engine.GetCharacter(charID)
+		char := sm.characters.GetCharacter(charID)
 		if char == nil {
 			continue
 		}
@@ -153,7 +153,7 @@ func (sm *SceneManager) clearConflictStress() {
 	}
 
 	for _, p := range sm.currentScene.ConflictState.Participants {
-		char := sm.engine.GetCharacter(p.CharacterID)
+		char := sm.characters.GetCharacter(p.CharacterID)
 		if char != nil {
 			char.ClearAllStress()
 		}
@@ -186,7 +186,7 @@ func (sm *SceneManager) recalculateInitiative(conflictType scene.ConflictType) {
 
 	for i := range sm.currentScene.ConflictState.Participants {
 		p := &sm.currentScene.ConflictState.Participants[i]
-		char := sm.engine.GetCharacter(p.CharacterID)
+		char := sm.characters.GetCharacter(p.CharacterID)
 		if char != nil {
 			p.Initiative = sm.calculateInitiative(char, conflictType)
 		}
@@ -270,7 +270,7 @@ func (sm *SceneManager) getParticipantInfo() []ConflictParticipantInfo {
 	info := make([]ConflictParticipantInfo, 0, len(sm.currentScene.ConflictState.Participants))
 	for _, p := range sm.currentScene.ConflictState.Participants {
 		name := p.CharacterID
-		if char := sm.engine.GetCharacter(p.CharacterID); char != nil {
+		if char := sm.characters.GetCharacter(p.CharacterID); char != nil {
 			name = char.Name
 		}
 		info = append(info, ConflictParticipantInfo{
@@ -327,7 +327,7 @@ func (sm *SceneManager) resolveAction(ctx context.Context, parsedAction *action.
 	var defenseResult *dice.CheckResult
 	var targetChar *character.Character
 	if parsedAction.Type == action.Attack && parsedAction.Target != "" {
-		targetChar = sm.engine.ResolveCharacter(parsedAction.Target)
+		targetChar = sm.characters.ResolveCharacter(parsedAction.Target)
 		if targetChar == nil {
 			slog.Warn("Attack target not found, action aborted",
 				"component", componentSceneManager,
@@ -791,7 +791,7 @@ func (sm *SceneManager) promptPlayerForFates(ctx context.Context) {
 	var takenOutNPCs []prompt.FateNarrationNPC
 	var npcNames []string
 	for _, charID := range sm.takenOutChars {
-		char := sm.engine.GetCharacter(charID)
+		char := sm.characters.GetCharacter(charID)
 		if char == nil || charID == sm.player.ID {
 			continue
 		}
@@ -874,7 +874,7 @@ func (sm *SceneManager) processFateNarration(ctx context.Context, input string, 
 		return nil
 	}
 
-	content, err := llm.SimpleCompletion(ctx, sm.engine.llmClient, rendered, 400, 0.4)
+	content, err := llm.SimpleCompletion(ctx, sm.llmClient, rendered, 400, 0.4)
 	if err != nil {
 		slog.Error("Failed to get fate narration from LLM",
 			"component", componentSceneManager,
@@ -892,7 +892,7 @@ func (sm *SceneManager) processFateNarration(ctx context.Context, input string, 
 
 	// Apply fates to characters
 	for _, fate := range result.Fates {
-		char := sm.engine.GetCharacter(fate.ID)
+		char := sm.characters.GetCharacter(fate.ID)
 		if char == nil {
 			slog.Warn("Could not resolve character for fate",
 				"component", componentSceneManager,
@@ -1096,7 +1096,7 @@ func (sm *SceneManager) applyConsequence(ctx context.Context, conseqType charact
 
 // generateConsequenceAspect uses LLM to generate a consequence aspect
 func (sm *SceneManager) generateConsequenceAspect(ctx context.Context, conseqType character.ConsequenceType, attacker *character.Character, attackCtx prompt.AttackContext) (string, error) {
-	if sm.engine.llmClient == nil {
+	if sm.llmClient == nil {
 		return "", fmt.Errorf("LLM client required")
 	}
 
@@ -1118,7 +1118,7 @@ func (sm *SceneManager) generateConsequenceAspect(ctx context.Context, conseqTyp
 		return "", fmt.Errorf("failed to render consequence aspect template: %w", err)
 	}
 
-	return llm.SimpleCompletion(ctx, sm.engine.llmClient, prompt, 20, 0.8)
+	return llm.SimpleCompletion(ctx, sm.llmClient, prompt, 20, 0.8)
 }
 
 // isConcedeCommand checks if the input is a concession command
@@ -1253,7 +1253,7 @@ func (sm *SceneManager) handleTakenOut(ctx context.Context, attacker *character.
 
 // generateTakenOutNarrativeAndOutcome generates narrative and classifies the outcome
 func (sm *SceneManager) generateTakenOutNarrativeAndOutcome(ctx context.Context, attacker *character.Character, attackCtx prompt.AttackContext) (narrative string, outcome TakenOutResult, newSceneHint string, err error) {
-	if sm.engine.llmClient == nil {
+	if sm.llmClient == nil {
 		return "", TakenOutTransition, "", fmt.Errorf("LLM client required")
 	}
 
@@ -1276,7 +1276,7 @@ func (sm *SceneManager) generateTakenOutNarrativeAndOutcome(ctx context.Context,
 		return "", TakenOutTransition, "", fmt.Errorf("failed to render taken out template: %w", err)
 	}
 
-	content, err := llm.SimpleCompletion(ctx, sm.engine.llmClient, prompt, 200, 0.7)
+	content, err := llm.SimpleCompletion(ctx, sm.llmClient, prompt, 200, 0.7)
 	if err != nil {
 		return "", TakenOutTransition, "", err
 	}

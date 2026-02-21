@@ -33,7 +33,9 @@ const (
 
 // SceneManager handles the main scene loop and player interactions
 type SceneManager struct {
-	engine                *Engine
+	llmClient             llm.LLMClient
+	characters            CharacterResolver
+	actionParser          ActionParser
 	currentScene          *scene.Scene
 	player                *character.Character
 	roller                dice.DiceRoller
@@ -57,16 +59,19 @@ func (sm *SceneManager) SetScenePurpose(purpose string) {
 	sm.scenePurpose = purpose
 }
 
-// NewSceneManager creates a new scene manager
-func NewSceneManager(engine *Engine) *SceneManager {
+// NewSceneManager creates a new scene manager with injected dependencies.
+// llmClient and actionParser may be nil when running without an LLM.
+func NewSceneManager(characters CharacterResolver, llmClient llm.LLMClient, actionParser ActionParser) *SceneManager {
 	sm := &SceneManager{
-		engine:              engine,
+		llmClient:           llmClient,
+		characters:          characters,
+		actionParser:        actionParser,
 		roller:              dice.NewRoller(),
 		conversationHistory: make([]prompt.ConversationEntry, 0),
 	}
 	// Initialize aspect generator if LLM client is available
-	if engine.llmClient != nil {
-		sm.aspectGenerator = NewAspectGenerator(engine.llmClient)
+	if llmClient != nil {
+		sm.aspectGenerator = NewAspectGenerator(llmClient)
 	}
 	return sm
 }
@@ -233,7 +238,7 @@ func (sm *SceneManager) buildSceneEndResult() *SceneEndResult {
 
 // classifyInput uses LLM to determine if input is dialog, clarification, or action
 func (sm *SceneManager) classifyInput(ctx context.Context, input string) (string, error) {
-	if sm.engine.llmClient == nil {
+	if sm.llmClient == nil {
 		return "", fmt.Errorf("classifyInput: %w", llm.ErrUnavailable)
 	}
 
@@ -248,7 +253,7 @@ func (sm *SceneManager) classifyInput(ctx context.Context, input string) (string
 		return "", fmt.Errorf("classifyInput: %w: %v", llm.ErrInvalidResponse, err)
 	}
 
-	content, err := llm.SimpleCompletion(ctx, sm.engine.llmClient, promptText, 10, 0.1)
+	content, err := llm.SimpleCompletion(ctx, sm.llmClient, promptText, 10, 0.1)
 	if err != nil {
 		return "", fmt.Errorf("classifyInput: %w: %v", llm.ErrUnavailable, err)
 	}
@@ -314,7 +319,7 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) []GameEv
 				"error", err)
 		} else {
 			initiatorName := conflictTrigger.InitiatorID
-			if char := sm.engine.GetCharacter(conflictTrigger.InitiatorID); char != nil {
+			if char := sm.characters.GetCharacter(conflictTrigger.InitiatorID); char != nil {
 				initiatorName = char.Name
 			}
 			events = append(events, ConflictStartEvent{
@@ -381,9 +386,9 @@ func (sm *SceneManager) handleAction(ctx context.Context, input string) ([]GameE
 	events = append(events, ActionAttemptEvent{Description: input})
 
 	// Parse the action using the action parser
-	if sm.engine.actionParser != nil {
-		// Get other characters in the scene from the engine's registry
-		otherCharactersMap := sm.engine.GetCharactersByScene(sm.currentScene)
+	if sm.actionParser != nil {
+		// Get other characters in the scene from the character registry
+		otherCharactersMap := sm.characters.GetCharactersByScene(sm.currentScene)
 		// Remove the player from other characters (they're already the main character)
 		delete(otherCharactersMap, sm.player.ID)
 
@@ -396,7 +401,7 @@ func (sm *SceneManager) handleAction(ctx context.Context, input string) ([]GameE
 			otherCharacters = append(otherCharacters, char)
 		}
 
-		action, err := sm.engine.actionParser.ParseAction(ctx, ActionParseRequest{
+		action, err := sm.actionParser.ParseAction(ctx, ActionParseRequest{
 			Character:       sm.player,
 			RawInput:        input,
 			Context:         sm.currentScene.Description,
@@ -427,12 +432,12 @@ func (sm *SceneManager) handleAction(ctx context.Context, input string) ([]GameE
 
 // generateSceneResponse generates an LLM response for dialog/clarification
 func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string, interactionType string) (string, error) {
-	if sm.engine.llmClient == nil {
+	if sm.llmClient == nil {
 		return "", fmt.Errorf("generateSceneResponse: %w", llm.ErrUnavailable)
 	}
 
 	// Get other characters in the scene
-	otherCharactersMap := sm.engine.GetCharactersByScene(sm.currentScene)
+	otherCharactersMap := sm.characters.GetCharactersByScene(sm.currentScene)
 	delete(otherCharactersMap, sm.player.ID) // Remove the player
 
 	// Separate active characters from taken-out characters
@@ -509,7 +514,7 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 		return "", fmt.Errorf("generateSceneResponse: %w: %v", llm.ErrInvalidResponse, renderErr)
 	}
 
-	content, err := llm.SimpleCompletion(ctx, sm.engine.llmClient, promptText, 300, 0.7)
+	content, err := llm.SimpleCompletion(ctx, sm.llmClient, promptText, 300, 0.7)
 	if err != nil {
 		return "", fmt.Errorf("generateSceneResponse: %w: %v", llm.ErrUnavailable, err)
 	}
@@ -519,12 +524,12 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 
 // generateActionNarrative generates narrative text for action results
 func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedAction *action.Action) (string, error) {
-	if sm.engine.llmClient == nil {
+	if sm.llmClient == nil {
 		return "", fmt.Errorf("generateActionNarrative: %w", llm.ErrUnavailable)
 	}
 
 	// Get other characters in the scene
-	otherCharactersMap := sm.engine.GetCharactersByScene(sm.currentScene)
+	otherCharactersMap := sm.characters.GetCharactersByScene(sm.currentScene)
 	delete(otherCharactersMap, sm.player.ID) // Remove the player
 
 	// Exclude taken-out characters from narrative context
@@ -551,7 +556,7 @@ func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedActio
 		return "", fmt.Errorf("generateActionNarrative: %w: %v", llm.ErrInvalidResponse, err)
 	}
 
-	narrative, err := llm.SimpleCompletion(ctx, sm.engine.llmClient, promptText, 200, 0.8)
+	narrative, err := llm.SimpleCompletion(ctx, sm.llmClient, promptText, 200, 0.8)
 	if err != nil {
 		return "", fmt.Errorf("generateActionNarrative: %w: %v", llm.ErrUnavailable, err)
 	}
