@@ -80,9 +80,11 @@ shadcn copies component source into `src/components/ui/`. Do not hand-edit these
 cd web && npx shadcn@latest add <component-name>
 ```
 
-Available components already installed: `button`, `card`, `scroll-area`, `input`, `badge`.
+Available components already installed: `button`, `card`, `scroll-area`, `input`, `badge`, `sonner`.
 
 The `components.json` configures shadcn: style is `new-york`, no RSC, uses `@/components/ui` alias.
+
+**Toast notifications:** Use `sonner` for toast notifications (error, success, info). Imported from `sonner` package and rendered via `<Toaster />` component in `App.tsx`.
 
 ## Theming
 

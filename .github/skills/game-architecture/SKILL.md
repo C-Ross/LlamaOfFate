@@ -192,7 +192,7 @@ Blocking terminal UI interface driven by `syncdriver.Run()`:
 ### `uicontract` package
 
 Data types shared between engine and UI:
-- `GameEvent`, `InvokePromptEvent`, `InputRequestEvent` — event types
+- `GameEvent`, `InvokePromptEvent`, `InputRequestEvent`, `ErrorNotificationEvent` — event types
 - `InvokeResponse`, `MidFlowResponse` — response types
 - `SceneInfoSetter` — optional: wired by `syncdriver.Run()` onStart callback for meta-command access
 
