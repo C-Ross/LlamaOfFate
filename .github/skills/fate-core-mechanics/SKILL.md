@@ -39,13 +39,27 @@ parsed, _ := dice.ParseLadder("Great")  // dice.Great
 
 Roll four Fate dice (each -1, 0, or +1), sum them (range -4 to +4), add skill level and modifiers. See [SRD: Rolling the Dice](https://fate-srd.com/fate-core/taking-action-dice-ladder#rolling-the-dice).
 
-**Code:** `internal/core/dice/dice.go`
+**Code:** `internal/core/dice/dice.go`, `internal/core/dice/planned_roller.go`
 
 ```go
+// Production
 roller := dice.NewRoller()                          // Random
-roller := dice.NewSeededRoller(12345)                // Deterministic (tests)
-result := roller.RollWithModifier(dice.Good, 2)      // skill Good(+3) + modifier 2
-outcome := result.CompareAgainst(dice.Great)          // vs difficulty Great(+4)
+roller := dice.NewSeededRoller(12345)               // Deterministic (tests)
+result := roller.RollWithModifier(dice.Good, 2)     // skill Good(+3) + modifier 2
+outcome := result.CompareAgainst(dice.Great)        // vs difficulty Great(+4)
+```
+
+**DiceRoller interface** (`dice.DiceRoller`) is used by engine for dependency injection:
+- `RollWithModifier(skill Ladder, modifier int) *CheckResult`
+- `Reroll(original *CheckResult) *CheckResult`
+
+Both `*Roller` and `*PlannedRoller` satisfy this interface.
+
+**PlannedRoller** test double returns pre-configured 4dF totals in sequence:
+
+```go
+roller := dice.NewPlannedRoller([]int{2, -1, 0})  // Next 3 rolls use these totals
+result := roller.RollWithModifier(dice.Good, 0)   // Uses total +2 → Good(+3) + 2 = Superb(+5)
 ```
 
 Key types:

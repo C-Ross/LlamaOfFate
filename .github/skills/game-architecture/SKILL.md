@@ -22,6 +22,28 @@ syncdriver.Run()     ← blocking terminal loop (wraps async engine API)
 
 **syncdriver** wraps the async engine for blocking UIs. Engine itself is purely event-driven. Each layer creates/configures the layer below. **Do not skip layers.**
 
+## Configuration Loader (`internal/config/`)
+
+Loads scenarios and characters from YAML files under `configs/scenarios/` and `configs/characters/`.
+
+```go
+allScenarios, allChars := config.LoadAll()                     // Load all configs
+scenario := config.LoadScenario("configs/scenarios/heist.yaml")
+character := config.LoadCharacter("configs/characters/zero.yaml")
+```
+
+**Character YAML** unmarshals directly into `character.Character` (with yaml tags). Loader calls `InitDefaults()` to populate runtime fields (stress, timestamps).
+
+**Scenario YAML** shape (`config.ScenarioFile`):
+- `ID`, `Title`, `Genre`, `Description`, `Problem`, `Setting`
+- `StoryQuestions []string` — questions the scenario aims to resolve
+- `DefaultPlayer string` — default character ID
+- `NPCs []NPCDef` — embedded NPC definitions (type: `supporting`, `main`, `nameless_*`)
+- `InitialScene *scene.Scene` — optional pre-built opening scene
+- `Farewell string` — end-of-scenario message
+
+Loader converts `ScenarioFile` → `scene.Scenario` + instantiates NPCs as `character.Character` objects.
+
 ## Engine (`engine.go`)
 
 Shared kernel: LLM client, character registry, creates `SceneManager` + `ActionParser`.
