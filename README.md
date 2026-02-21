@@ -47,6 +47,58 @@ Fate™ is a trademark of Evil Hat Productions, LLC.
 
 ## Configuration
 
+### Custom Characters and Scenarios
+
+LlamaOfFate supports custom characters and scenarios defined in YAML files:
+
+**Characters**: Place YAML files in `configs/characters/`
+```yaml
+id: your-character-id
+name: "Character Name"
+aspects:
+  high_concept: "Character Concept"
+  trouble: "Character Trouble"
+  other:
+    - "Additional Aspect"
+skills:
+  Shoot: 4
+  Notice: 3
+  # ... other skills
+fate_points: 3
+refresh: 3
+```
+
+**Scenarios**: Place YAML files in `configs/scenarios/`
+```yaml
+id: your-scenario-id
+title: "Scenario Title"
+genre: Western
+description: "Brief description"
+problem: "The central problem"
+setting: "Setting details"
+story_questions:
+  - "Key question 1"
+  - "Key question 2"
+default_player: character-id
+npcs:
+  - id: npc-id
+    name: "NPC Name"
+    type: supporting
+    high_concept: "NPC Concept"
+    # ... NPC details
+initial_scene:
+  id: scene-id
+  name: "Scene Name"
+  description: "Scene description"
+  situation_aspects:
+    - id: aspect-id
+      aspect: "Aspect Name"
+      duration: scene
+farewell: "Farewell message"
+```
+
+See `configs/characters/` and `configs/scenarios/` for complete examples.
+
 ### Azure ML Setup
 
 LlamaOfFate uses Azure ML for LLM integration. Configuration is stored in `configs/azure-llm.yaml`.
@@ -169,7 +221,12 @@ LlamaOfFate/
 ├── cmd/
 │   ├── cli/                    # Command-line interface
 │   └── server/                 # WebSocket server entry point
+├── configs/
+│   ├── characters/             # Custom character YAML files
+│   ├── scenarios/              # Custom scenario YAML files
+│   └── azure-llm.yaml          # LLM configuration
 ├── internal/
+│   ├── config/                 # YAML config loader (characters, scenarios)
 │   ├── core/                   # Core game mechanics
 │   │   ├── action/             # Action resolution system
 │   │   ├── character/          # Character management
@@ -193,7 +250,6 @@ LlamaOfFate/
 │   ├── scenario-generator/     # Scenario generation example
 │   ├── scenario-walkthrough/   # Scenario walkthrough example
 │   └── scene-generator/        # Scene generation example
-├── configs/                    # Configuration files (azure-llm.yaml)
 ├── docs/                       # Documentation
 │   └── architecture.md         # Architecture documentation
 ├── test/                       # Tests
@@ -206,6 +262,8 @@ LlamaOfFate/
 
 - **`cmd/cli/`**: Entry point for the command-line application
 - **`cmd/server/`**: Entry point for the WebSocket server
+- **`configs/`**: YAML configuration files for LLM settings, custom characters, and scenarios
+- **`internal/config/`**: YAML config loader for characters and scenarios
 - **`internal/core/`**: Core Fate mechanics implementation (character, dice, scene, action, skills)
 - **`internal/engine/`**: Purely async/event-driven game engine (GameSessionManager interface: Start/HandleInput/ProvideInvokeResponse/ProvideMidFlowResponse/Save); emits GameEvents for UI rendering
 - **`internal/syncdriver/`**: Synchronous blocking game loop that wraps the engine's async API for terminal-style UIs (Run function drives: ReadInput → HandleInput → Emit events → drive prompts → repeat)
@@ -218,7 +276,6 @@ LlamaOfFate/
 - **`internal/ui/web/`**: WebSocket UI implementation; bridges engine events to WebSocket clients
 - **`web/`**: React frontend — Vite 7, React 19, TypeScript, Tailwind CSS v4, shadcn/ui, Vitest
 - **`examples/`**: Example programs demonstrating LLM scene loops, scenario generation, and walkthroughs
-- **`configs/`**: YAML configuration files (azure-llm.yaml)
 - **`test/integration/`**: Integration tests for the game system
 - **`test/llmeval/`**: LLM evaluation tests for prompt behavior
 
