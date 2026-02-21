@@ -19,6 +19,7 @@ This skill covers the React web frontend in `web/`. The UI communicates with the
 | Vitest | 4.x | Test runner (shares Vite config) |
 | React Testing Library | latest | Component testing |
 | framer-motion | latest | Animations |
+| sonner | latest | Toast notifications |
 
 ## Project Structure
 
@@ -37,9 +38,11 @@ web/
     App.tsx                   - Root layout (two-panel)
     index.css                 - Tailwind + theme variables
     lib/utils.ts              - cn() helper (clsx + tailwind-merge)
+    lib/types.ts              - TypeScript types for WebSocket messages
     components/
       SidebarCard.tsx          - Reusable sidebar card wrapper
       ui/                      - shadcn/ui components (DO NOT edit manually)
+        sonner.tsx             - Toast notification component (shadcn)
     test/
       setup.ts                 - Vitest setup (jest-dom matchers)
       App.test.tsx             - App component tests
@@ -80,7 +83,7 @@ shadcn copies component source into `src/components/ui/`. Do not hand-edit these
 cd web && npx shadcn@latest add <component-name>
 ```
 
-Available components already installed: `button`, `card`, `scroll-area`, `input`, `badge`.
+Available components already installed: `button`, `card`, `scroll-area`, `input`, `badge`, `sonner`.
 
 The `components.json` configures shadcn: style is `new-york`, no RSC, uses `@/components/ui` alias.
 
@@ -125,6 +128,8 @@ The app uses a two-panel flexbox layout:
 
 - **Left panel** (flex-1): Chat area with header, scrollable message area, and input form
 - **Right panel** (w-80, hidden below `lg`): Game sidebar with `SidebarCard` components
+
+Toast notifications (sonner `Toaster`) are rendered at the root level in `main.tsx` for error/info messages.
 
 ## Creating Components
 
@@ -210,6 +215,15 @@ Flat config in `eslint.config.js`. Includes:
 - `react-refresh` with `allowConstantExport: true` (needed for shadcn variant exports)
 
 The 2 warnings on `badge.tsx`/`button.tsx` about constant exports are expected from shadcn-generated code.
+
+## WebSocket Message Types
+
+TypeScript types in `src/lib/types.ts` define the WebSocket protocol between frontend and backend:
+
+- **Outbound** (client → server): `SetupMessage`, `InputMessage`, `InvokeResponseMessage`, `MidFlowResponseMessage`
+- **Inbound** (server → client): `GameEventMessage` with typed event payloads matching `internal/uicontract` Go types
+
+Events include `error_notification` for showing toast errors on corrupt saves, load failures, etc.
 
 ## Common Pitfalls
 

@@ -18,6 +18,9 @@ syncdriver.Run()     ← blocking terminal loop (wraps async engine API)
                  ├─ ActionParser    ← LLM: free-text → structured action
                  ├─ AspectGenerator ← LLM: Create Advantage → aspect name
                  └─ invoke.go       ← post-roll aspect invocation loop
+
+internal/config/     ← YAML config loader (characters, scenarios)
+internal/storage/    ← Save/load game state (YAML format)
 ```
 
 **syncdriver** wraps the async engine for blocking UIs. Engine itself is purely event-driven. Each layer creates/configures the layer below. **Do not skip layers.**
@@ -44,7 +47,7 @@ gm.SetInitialScene(config)     // optional: demo/test pre-built scene
 gm.SetSaver(saver)             // optional: defaults to no-op
 
 // Async API:
-events, _ := gm.Start(ctx)                             // opening GameEvents
+events, _ := gm.Start(ctx)                             // opening GameEvents (may include ErrorNotificationEvent)
 result, _ := gm.HandleInput(ctx, input)                 // InputResult with events
 result, _ := gm.ProvideInvokeResponse(ctx, invokeResp) // after InvokePromptEvent
 result, _ := gm.ProvideMidFlowResponse(ctx, midResp)   // after InputRequestEvent
@@ -52,6 +55,8 @@ _ = gm.Save()                                          // persist state
 ```
 
 For blocking UIs (terminal), use `syncdriver.Run()` which wraps this async API.
+
+**Save/Load**: Handles load errors (corrupt save, validation failure) by emitting `ErrorNotificationEvent` on `Start()` and continuing with fresh setup.
 
 **Milestones** (on `ScenarioEndResolved`): refresh fate points, check consequence recovery, increment `scenarioCount`.
 
@@ -192,7 +197,7 @@ Blocking terminal UI interface driven by `syncdriver.Run()`:
 ### `uicontract` package
 
 Data types shared between engine and UI:
-- `GameEvent`, `InvokePromptEvent`, `InputRequestEvent` — event types
+- `GameEvent`, `InvokePromptEvent`, `InputRequestEvent`, `ErrorNotificationEvent` — event types
 - `InvokeResponse`, `MidFlowResponse` — response types
 - `SceneInfoSetter` — optional: wired by `syncdriver.Run()` onStart callback for meta-command access
 
@@ -212,6 +217,40 @@ Data types shared between engine and UI:
 | Milestone/recovery | `game_manager.go` or `scenario_manager.go` |
 | UI event type | `uicontract/` event structs |
 | Terminal UI display | `internal/ui/terminal/terminal.go` `Emit()` |
+| YAML character/scenario configs | `configs/characters/`, `configs/scenarios/` |
+| Config loading | `internal/config/loader.go` (LoadAll, LoadCharacter, LoadScenario) |
+| Save/load persistence | `internal/storage/yaml_saver.go` (Save, Load, Validate) |
+| Error types | `internal/engine/errors.go` (SaveCorruptError, etc.) |
+
+## Configuration & Persistence
+
+### Config Loading (`internal/config/loader.go`)
+
+Load character and scenario definitions from YAML:
+
+```go
+cfg := config.LoadAll("configs")  // load all characters & scenarios
+char := config.LoadCharacter("configs/characters/jesse-calhoun.yaml")
+scenario := config.LoadScenario("configs/scenarios/saloon.yaml")
+```
+
+Characters and Scenes have `InitDefaults()` methods to initialize runtime fields (stress tracks, timestamps) after unmarshal.
+
+### Save/Load (`internal/storage/yaml_saver.go`)
+
+```go
+saver := storage.NewYAMLSaver("savegame.yaml")
+gm.SetSaver(saver)
+_ = gm.Save()  // persist state
+
+// Load validates required fields (high concept, trouble, stress tracks, scenario)
+state, err := saver.Load()
+if errors.As(err, &engine.SaveCorruptError{}) {
+  // corrupt/invalid save - emit ErrorNotificationEvent
+}
+```
+
+GameState has `Validate()` method enforcing required fields.
 
 ## Session Logging
 
