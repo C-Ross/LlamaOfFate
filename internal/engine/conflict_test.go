@@ -1175,9 +1175,113 @@ func TestSceneManager_ApplyActionEffects_Attack_Tie_GrantsBoost(t *testing.T) {
 
 	events := sm.applyActionEffects(context.Background(), testAction, target)
 
-	// Verify boost event was returned
+	// Attack result reports a tie.
 	ar := RequireFirstFrom[PlayerAttackResultEvent](t, events)
 	assert.True(t, ar.IsTie, "Expected PlayerAttackResultEvent with IsTie")
+
+	// Attacker (player) gets a boost on a tie.
+	boostEvt := RequireFirstFrom[AspectCreatedEvent](t, events)
+	assert.True(t, boostEvt.IsBoost, "tie on attack should create a boost for the attacker")
+	assert.Equal(t, 1, boostEvt.FreeInvokes)
+
+	require.Len(t, sm.currentScene.SituationAspects, 1)
+	assert.True(t, sm.currentScene.SituationAspects[0].IsBoost)
+	assert.Equal(t, player.ID, sm.currentScene.SituationAspects[0].CreatedBy)
+}
+
+// Fate Core SRD (Defend): "If you succeed with style on a defend action, you
+// get a boost instead of just succeeding." When the NPC player attacks and the
+// NPC defender rolls 3+ more than the attacker, the NPC gets a boost.
+func TestSceneManager_ApplyActionEffects_Attack_Failure_DefendWithStyle_GrantsTargetBoost(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+
+	player := character.NewCharacter("player-1", "Hero")
+	target := character.NewCharacter("target-1", "Goblin")
+
+	engine.AddCharacter(player)
+	engine.AddCharacter(target)
+
+	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(target.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	testAction := action.NewActionWithTarget("action-1", player.ID, action.Attack, "Fight", "Strike", target.ID)
+	// Shifts = -3 → attacker lost by 3, defender succeeded with style.
+	testAction.Outcome = &dice.Outcome{Type: dice.Failure, Shifts: -3}
+
+	events := sm.applyActionEffects(context.Background(), testAction, target)
+
+	boostEvt := RequireFirstFrom[AspectCreatedEvent](t, events)
+	assert.True(t, boostEvt.IsBoost, "defending with style should create a boost for the defender")
+	assert.Equal(t, 1, boostEvt.FreeInvokes)
+
+	require.Len(t, sm.currentScene.SituationAspects, 1)
+	assert.True(t, sm.currentScene.SituationAspects[0].IsBoost)
+	assert.Equal(t, target.ID, sm.currentScene.SituationAspects[0].CreatedBy)
+}
+
+// Fate Core SRD (Create Advantage, Tie): "You get a boost instead of the full aspect."
+func TestSceneManager_ApplyActionEffects_CreateAdvantage_Tie_CreatesBoost(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+
+	player := character.NewCharacter("player-1", "Hero")
+	engine.AddCharacter(player)
+
+	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
+	testScene.AddCharacter(player.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	testAction := action.NewAction("action-1", player.ID, action.CreateAdvantage, "Notice", "Look for an opening")
+	testAction.Outcome = &dice.Outcome{Type: dice.Tie, Shifts: 0}
+
+	events := sm.applyActionEffects(context.Background(), testAction, nil)
+
+	boostEvt := RequireFirstFrom[AspectCreatedEvent](t, events)
+	assert.True(t, boostEvt.IsBoost, "CaA tie should create a boost, not a full aspect")
+	assert.Equal(t, 1, boostEvt.FreeInvokes)
+
+	require.Len(t, sm.currentScene.SituationAspects, 1)
+	assert.True(t, sm.currentScene.SituationAspects[0].IsBoost)
+	assert.Equal(t, player.ID, sm.currentScene.SituationAspects[0].CreatedBy)
+}
+
+// Fate Core SRD (Overcome, SWS): "You succeed with style and... can be used to
+// gain a boost." Overcome with SWS grants the player a boost.
+func TestSceneManager_ApplyActionEffects_Overcome_SWS_CreatesBoost(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+
+	player := character.NewCharacter("player-1", "Hero")
+	engine.AddCharacter(player)
+
+	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
+	testScene.AddCharacter(player.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	testAction := action.NewAction("action-1", player.ID, action.Overcome, "Athletics", "Vault the obstacle")
+	testAction.Outcome = &dice.Outcome{Type: dice.SuccessWithStyle, Shifts: 3}
+
+	events := sm.applyActionEffects(context.Background(), testAction, nil)
+
+	boostEvt := RequireFirstFrom[AspectCreatedEvent](t, events)
+	assert.True(t, boostEvt.IsBoost, "Overcome SWS should create a boost for the player")
+	assert.Equal(t, 1, boostEvt.FreeInvokes)
+
+	require.Len(t, sm.currentScene.SituationAspects, 1)
+	assert.True(t, sm.currentScene.SituationAspects[0].IsBoost)
+	assert.Equal(t, player.ID, sm.currentScene.SituationAspects[0].CreatedBy)
 }
 
 func TestSceneManager_ResolveAction_TargetByName(t *testing.T) {

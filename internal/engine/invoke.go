@@ -241,6 +241,11 @@ func (sm *SceneManager) applyInvokeChoice(is *invokeState, selected *InvokableAs
 		for i := range sm.currentScene.SituationAspects {
 			if sm.currentScene.SituationAspects[i].Aspect == selected.Name {
 				sm.currentScene.SituationAspects[i].UseFreeInvoke()
+				// Boosts are removed from the scene once their free invoke is consumed.
+				if sm.currentScene.SituationAspects[i].IsBoost && sm.currentScene.SituationAspects[i].FreeInvokes == 0 {
+					boostID := sm.currentScene.SituationAspects[i].ID
+					sm.currentScene.RemoveSituationAspect(boostID)
+				}
 				break
 			}
 		}

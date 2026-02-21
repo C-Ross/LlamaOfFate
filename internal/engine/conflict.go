@@ -524,6 +524,15 @@ func (sm *SceneManager) gatherInvokableAspects(usedAspects map[string]bool) []In
 	return aspects
 }
 
+// createBoost creates a boost aspect on the scene and returns an AspectCreatedEvent.
+// A boost is a temporary situation aspect with 1 free invoke that is removed
+// after its free invoke is consumed (per Fate Core SRD: Types of Aspects — Boosts).
+func (sm *SceneManager) createBoost(name, createdByID string) AspectCreatedEvent {
+	boost := scene.NewBoost(fmt.Sprintf("boost-%d", time.Now().UnixNano()), name, createdByID)
+	sm.currentScene.AddSituationAspect(boost)
+	return AspectCreatedEvent{AspectName: name, FreeInvokes: 1, IsBoost: true}
+}
+
 // applyActionEffects applies mechanical effects based on action results
 // and returns composite events describing what happened.
 func (sm *SceneManager) applyActionEffects(ctx context.Context, parsedAction *action.Action, target *character.Character) []GameEvent {
@@ -550,6 +559,10 @@ func (sm *SceneManager) applyActionEffects(ctx context.Context, parsedAction *ac
 				AspectName:  aspectName,
 				FreeInvokes: freeInvokes,
 			})
+		} else if parsedAction.Outcome.Type == dice.Tie {
+			// On a tie, player gets a boost instead of a full aspect.
+			aspectName, _ := sm.generateAspectName(ctx, parsedAction)
+			events = append(events, sm.createBoost(aspectName, sm.player.ID))
 		}
 
 	case action.Attack:
@@ -583,11 +596,21 @@ func (sm *SceneManager) applyActionEffects(ctx context.Context, parsedAction *ac
 			dmgEvent := sm.applyDamageToTarget(ctx, target, shifts, stressType)
 			events = append(events, dmgEvent)
 		} else if parsedAction.Outcome.Type == dice.Tie {
-			// On a tie, attacker gets a boost
+			// On a tie, attacker gets a boost (no damage dealt).
 			events = append(events, PlayerAttackResultEvent{
 				TargetName: target.Name,
 				IsTie:      true,
 			})
+			events = append(events, sm.createBoost("Fleeting Opening", sm.player.ID))
+		} else if parsedAction.Outcome.Type == dice.Failure && parsedAction.Outcome.Shifts <= -3 {
+			// Target defended with style — defender gets a boost.
+			events = append(events, sm.createBoost("Deflected with Ease", target.ID))
+		}
+
+	case action.Overcome:
+		if parsedAction.IsSuccessWithStyle() {
+			// Overcome SWS grants a boost in addition to achieving the goal.
+			events = append(events, sm.createBoost("Strong Momentum", sm.player.ID))
 		}
 	}
 
@@ -954,9 +977,15 @@ func (sm *SceneManager) applyAttackDamageToPlayer(ctx context.Context, outcome *
 			events = append(events, overflowEvents...)
 		}
 	case dice.Tie:
+		// Attacker gets a boost on a tie (no damage to player).
 		events = append(events, PlayerDefendedEvent{IsTie: true})
+		events = append(events, sm.createBoost("Fleeting Opening", attacker.ID))
 	default:
+		// Attack failed — check if player defended with style (3+ margin).
 		events = append(events, PlayerDefendedEvent{IsTie: false})
+		if outcome.Shifts <= -3 {
+			events = append(events, sm.createBoost("Deflected with Ease", sm.player.ID))
+		}
 	}
 
 	return events

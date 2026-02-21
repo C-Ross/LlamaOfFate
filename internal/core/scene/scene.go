@@ -31,6 +31,7 @@ type SituationAspect struct {
 	ID          string    `json:"id" yaml:"id"`
 	Aspect      string    `json:"aspect" yaml:"aspect"`
 	FreeInvokes int       `json:"free_invokes" yaml:"free_invokes,omitempty"`
+	IsBoost     bool      `json:"is_boost" yaml:"is_boost,omitempty"`     // Boosts are temporary: removed after their free invoke is used
 	Duration    string    `json:"duration" yaml:"duration"`               // "scene", "scenario", "permanent"
 	CreatedBy   string    `json:"created_by" yaml:"created_by,omitempty"` // character ID
 	CreatedAt   time.Time `json:"created_at" yaml:"created_at,omitempty"`
@@ -402,6 +403,20 @@ func NewSituationAspect(id, aspect, createdBy string, freeInvokes int) Situation
 		Aspect:      aspect,
 		FreeInvokes: freeInvokes,
 		Duration:    "scene", // Default duration
+		CreatedBy:   createdBy,
+		CreatedAt:   time.Now(),
+	}
+}
+
+// NewBoost creates a boost — a temporary situation aspect with 1 free invoke
+// that is removed from the scene once the invoke is consumed.
+func NewBoost(id, aspect, createdBy string) SituationAspect {
+	return SituationAspect{
+		ID:          id,
+		Aspect:      aspect,
+		FreeInvokes: 1,
+		IsBoost:     true,
+		Duration:    "scene",
 		CreatedBy:   createdBy,
 		CreatedAt:   time.Now(),
 	}

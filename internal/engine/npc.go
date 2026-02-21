@@ -239,15 +239,26 @@ func (sm *SceneManager) processNPCCreateAdvantage(ctx context.Context, npc *char
 		})
 		events = append(events, NarrativeEvent{Text: fmt.Sprintf("%s gains a tactical advantage!", npc.Name)})
 	case dice.Tie:
+		// On a tie, NPC gets a boost instead of a full aspect.
+		boostName := fmt.Sprintf("%s's Opportunity", npc.Name)
+		if decision.Description != "" {
+			boostName = decision.Description
+			if len(boostName) > 40 {
+				boostName = boostName[:40]
+			}
+		}
 		events = append(events, NPCActionResultEvent{
-			NPCName:    npc.Name,
-			ActionType: "create_advantage",
-			Skill:      skill,
-			RollResult: npcRoll.FinalValue.String(),
-			Difficulty: "Fair",
-			Outcome:    outcome.Type.String(),
+			NPCName:       npc.Name,
+			ActionType:    "create_advantage",
+			Skill:         skill,
+			RollResult:    npcRoll.FinalValue.String(),
+			Difficulty:    "Fair",
+			Outcome:       outcome.Type.String(),
+			AspectCreated: boostName,
+			FreeInvokes:   1,
 		})
-		events = append(events, NarrativeEvent{Text: fmt.Sprintf("%s's maneuver is partially successful.", npc.Name)})
+		events = append(events, sm.createBoost(boostName, npc.ID))
+		events = append(events, NarrativeEvent{Text: fmt.Sprintf("%s's maneuver creates a fleeting opening.", npc.Name)})
 	default:
 		events = append(events, NPCActionResultEvent{
 			NPCName:    npc.Name,
@@ -289,7 +300,15 @@ func (sm *SceneManager) processNPCOvercome(ctx context.Context, npc *character.C
 	})
 
 	switch outcome.Type {
-	case dice.Success, dice.SuccessWithStyle:
+	case dice.SuccessWithStyle:
+		narrative := decision.Description
+		if narrative == "" {
+			narrative = fmt.Sprintf("%s successfully overcomes the challenge with style.", npc.Name)
+		}
+		events = append(events, NarrativeEvent{Text: narrative})
+		// Overcome SWS grants a boost in addition to achieving the goal.
+		events = append(events, sm.createBoost("Strong Momentum", npc.ID))
+	case dice.Success:
 		narrative := decision.Description
 		if narrative == "" {
 			narrative = fmt.Sprintf("%s successfully overcomes the challenge.", npc.Name)
@@ -413,6 +432,12 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 
 	if outcome.Type == dice.Success || outcome.Type == dice.SuccessWithStyle {
 		events = append(events, NarrativeEvent{Text: fmt.Sprintf("%s takes %d shifts of stress!", target.Name, outcome.Shifts)})
+	} else if outcome.Type == dice.Tie {
+		// On a tie, attacker (NPC) gets a boost (no damage to target).
+		events = append(events, sm.createBoost("Fleeting Opening", npc.ID))
+	} else if outcome.Type == dice.Failure && outcome.Shifts <= -3 {
+		// Target defended with style — target gets a boost.
+		events = append(events, sm.createBoost("Deflected with Ease", target.ID))
 	}
 
 	return events, false

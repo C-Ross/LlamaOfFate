@@ -191,10 +191,11 @@ type PlayerAttackResultEvent struct {
 
 func (PlayerAttackResultEvent) gameEvent() {}
 
-// AspectCreatedEvent is emitted when Create an Advantage succeeds.
+// AspectCreatedEvent is emitted when Create an Advantage succeeds or a boost is granted.
 type AspectCreatedEvent struct {
 	AspectName  string // The new situation aspect
 	FreeInvokes int    // Number of free invokes granted
+	IsBoost     bool   // True if this is a boost (temporary, auto-removed after free invoke is used)
 }
 
 func (AspectCreatedEvent) gameEvent() {}

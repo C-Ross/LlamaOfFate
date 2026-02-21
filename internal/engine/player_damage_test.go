@@ -162,6 +162,7 @@ func TestApplyAttackDamageToPlayer_StressOverflow_PromptsMidFlow(t *testing.T) {
 }
 
 // Fate Core SRD: On a Tie the attacker gets a boost but deals no stress.
+// Per SRD (Attack): "You don't deal any harm, but you gain a boost."
 func TestApplyAttackDamageToPlayer_Tie_NoStress(t *testing.T) {
 	sm, player, attacker := setupConflictSM(t, nil)
 
@@ -169,13 +170,24 @@ func TestApplyAttackDamageToPlayer_Tie_NoStress(t *testing.T) {
 	atkCtx := testAttackCtx()
 
 	events := sm.applyAttackDamageToPlayer(context.Background(), outcome, attacker, atkCtx)
-	require.Len(t, events, 1)
+	// Tie produces 2 events: PlayerDefendedEvent + AspectCreatedEvent (attacker boost).
+	require.Len(t, events, 2)
 
 	defEvt, ok := events[0].(PlayerDefendedEvent)
 	require.True(t, ok, "expected PlayerDefendedEvent, got %T", events[0])
 	assert.True(t, defEvt.IsTie, "Tie should set IsTie=true (attacker gets a boost)")
 
-	// No stress should be applied.
+	// Attacker (NPC) should receive a boost on the scene.
+	boostEvt, ok := events[1].(AspectCreatedEvent)
+	require.True(t, ok, "expected AspectCreatedEvent for attacker boost, got %T", events[1])
+	assert.True(t, boostEvt.IsBoost, "attacker's tie reward should be a boost")
+	assert.Equal(t, 1, boostEvt.FreeInvokes)
+
+	require.Len(t, sm.currentScene.SituationAspects, 1)
+	assert.True(t, sm.currentScene.SituationAspects[0].IsBoost)
+	assert.Equal(t, attacker.ID, sm.currentScene.SituationAspects[0].CreatedBy)
+
+	// No stress should be applied to the player.
 	track := player.StressTracks["physical"]
 	for i, box := range track.Boxes {
 		assert.False(t, box, "stress box %d should not be checked on a tie", i+1)
@@ -199,6 +211,43 @@ func TestApplyAttackDamageToPlayer_Failure_NoStress(t *testing.T) {
 	track := player.StressTracks["physical"]
 	for i, box := range track.Boxes {
 		assert.False(t, box, "stress box %d should not be checked on a failure", i+1)
+	}
+
+	// No boost on a regular failure.
+	assert.Empty(t, sm.currentScene.SituationAspects, "no boost on a regular defense failure")
+}
+
+// Fate Core SRD (Defend): "If you succeed with style on a defend action, you
+// get a boost instead of just succeeding." Player defends by 3+ shifts → boost.
+func TestApplyAttackDamageToPlayer_DefendWithStyle_PlayerGetsBoost(t *testing.T) {
+	sm, player, attacker := setupConflictSM(t, nil)
+	_ = attacker
+
+	// Shifts = -3 means attacker failed by 3 (player defended with style).
+	outcome := &dice.Outcome{Type: dice.Failure, Shifts: -3}
+	atkCtx := testAttackCtx()
+
+	events := sm.applyAttackDamageToPlayer(context.Background(), outcome, attacker, atkCtx)
+	require.Len(t, events, 2)
+
+	defEvt, ok := events[0].(PlayerDefendedEvent)
+	require.True(t, ok, "expected PlayerDefendedEvent, got %T", events[0])
+	assert.False(t, defEvt.IsTie)
+
+	// Player gets a boost for defending with style.
+	boostEvt, ok := events[1].(AspectCreatedEvent)
+	require.True(t, ok, "expected AspectCreatedEvent for player's defend-with-style boost, got %T", events[1])
+	assert.True(t, boostEvt.IsBoost)
+	assert.Equal(t, 1, boostEvt.FreeInvokes)
+
+	require.Len(t, sm.currentScene.SituationAspects, 1)
+	assert.True(t, sm.currentScene.SituationAspects[0].IsBoost)
+	assert.Equal(t, player.ID, sm.currentScene.SituationAspects[0].CreatedBy)
+
+	// No stress to the player.
+	track := player.StressTracks["physical"]
+	for i, box := range track.Boxes {
+		assert.False(t, box, "stress box %d should not be checked", i+1)
 	}
 }
 
