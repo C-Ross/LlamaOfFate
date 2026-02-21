@@ -206,7 +206,7 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage(t *testing.T) {
 	testAction.Outcome = result.CompareAgainst(dice.Fair)
 
 	initialAspectCount := len(sm.currentScene.SituationAspects)
-	events := sm.conflict.applyActionEffects(context.Background(), testAction, nil) // nil target for create advantage
+	events := sm.actions.applyActionEffects(context.Background(), testAction, nil) // nil target for create advantage
 
 	assert.Equal(t, initialAspectCount+1, len(sm.currentScene.SituationAspects))
 
@@ -254,7 +254,7 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage_WithLLM(t *testing.T) {
 	testAction.Outcome = result.CompareAgainst(dice.Fair)
 
 	initialAspectCount := len(sm.currentScene.SituationAspects)
-	events := sm.conflict.applyActionEffects(context.Background(), testAction, nil)
+	events := sm.actions.applyActionEffects(context.Background(), testAction, nil)
 
 	assert.Equal(t, initialAspectCount+1, len(sm.currentScene.SituationAspects))
 
@@ -267,6 +267,105 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage_WithLLM(t *testing.T) {
 	// Verify AspectCreatedEvent was returned with the creative name
 	ac := RequireFirstFrom[AspectCreatedEvent](t, events)
 	assert.Equal(t, "Perfect Vantage Point", ac.AspectName)
+}
+
+func TestActionResolver_ApplyActionEffects_Overcome_NoMechanicalEffect(t *testing.T) {
+	// Overcome actions currently produce no mechanical side effects via
+	// applyActionEffects — this test documents that expectation so a future
+	// ChallengeManager can add its own branch without breaking existing logic.
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+
+	player := character.NewCharacter("player1", "Test Character")
+	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	// Create a successful Overcome action
+	testAction := action.NewAction("test-action-1", "player1", action.Overcome, "Athletics", "Leap over the chasm")
+	testAction.Outcome = &dice.Outcome{Type: dice.Success, Shifts: 2}
+
+	events := sm.actions.applyActionEffects(context.Background(), testAction, nil)
+
+	assert.Empty(t, events, "Overcome actions should produce no mechanical events (yet)")
+}
+
+func TestActionResolver_ApplyActionEffects_NilOutcome_ReturnsNil(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+
+	player := character.NewCharacter("player1", "Test Character")
+	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	// Action with nil outcome
+	testAction := action.NewAction("test-action-1", "player1", action.Attack, "Fight", "Strike")
+	testAction.Outcome = nil
+
+	events := sm.actions.applyActionEffects(context.Background(), testAction, nil)
+
+	assert.Nil(t, events)
+}
+
+func TestActionResolver_AspectGeneratorWiring(t *testing.T) {
+	// When created with an LLM, the ActionResolver should have an AspectGenerator.
+	mockLLM := &MockLLMClient{response: "test"}
+	engine, err := NewWithLLM(mockLLM)
+	require.NoError(t, err)
+
+	sm := engine.GetSceneManager()
+	assert.NotNil(t, sm.actions.aspectGenerator, "ActionResolver should have aspectGenerator when LLM is present")
+}
+
+func TestActionResolver_AspectGeneratorWiring_NoLLM(t *testing.T) {
+	// Without an LLM, AspectGenerator should be nil.
+	sm := NewSceneManager(nil, nil, nil)
+	assert.Nil(t, sm.actions.aspectGenerator, "ActionResolver should have nil aspectGenerator without LLM")
+}
+
+func TestActionResolver_GenerateAspectName_Fallback(t *testing.T) {
+	// Without an aspect generator, generateAspectName should return a fallback.
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+
+	player := character.NewCharacter("player1", "Test Character")
+	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	testAction := action.NewAction("test-action-1", "player1", action.CreateAdvantage, "Athletics", "Jump to high ground")
+	testAction.Outcome = &dice.Outcome{Type: dice.Success, Shifts: 2}
+
+	name, freeInvokes := sm.actions.generateAspectName(context.Background(), testAction)
+
+	assert.Contains(t, name, "Advantage from")
+	assert.Equal(t, 1, freeInvokes)
+}
+
+func TestActionResolver_GenerateAspectName_SuccessWithStyle_TwoFreeInvokes(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+
+	player := character.NewCharacter("player1", "Test Character")
+	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	testAction := action.NewAction("test-action-1", "player1", action.CreateAdvantage, "Athletics", "Jump to high ground")
+	testAction.Outcome = &dice.Outcome{Type: dice.SuccessWithStyle, Shifts: 3}
+
+	_, freeInvokes := sm.actions.generateAspectName(context.Background(), testAction)
+
+	assert.Equal(t, 2, freeInvokes, "Success with Style should grant 2 free invokes")
 }
 
 func TestSceneManager_GetCurrentScene(t *testing.T) {

@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 )
 
@@ -29,18 +31,20 @@ type NarrativeProvider interface {
 }
 
 // ActionResolver handles the generic action resolution pipeline: dice rolling,
-// invoke loops, mid-flow prompts, and narrative coordination. Both SceneManager
-// (for player actions) and ConflictManager (for NPC defense invokes) use
-// ActionResolver.
+// invoke loops, mid-flow prompts, narrative coordination, and applying
+// mechanical effects (create-advantage aspects, attack damage delegation).
+// Both SceneManager (for player actions) and ConflictManager (for NPC defense
+// invokes) use ActionResolver.
 type ActionResolver struct {
 	// Shared dependencies — set once at construction.
-	roller        dice.DiceRoller
-	characters    CharacterResolver
-	narrative     NarrativeProvider
-	sessionLogger *session.Logger
+	roller          dice.DiceRoller
+	characters      CharacterResolver
+	narrative       NarrativeProvider
+	sessionLogger   *session.Logger
+	aspectGenerator AspectGenerator
 
 	// ConflictManager — used for conflict-specific side effects (initiate,
-	// escalate, apply effects, advance turns). May be nil in tests.
+	// escalate, damage, advance turns). May be nil in tests.
 	conflict *ConflictManager
 
 	// Per-scene state — wired by SceneManager.StartScene.
@@ -55,10 +59,11 @@ type ActionResolver struct {
 // newActionResolver creates an ActionResolver with the given shared dependencies.
 // The conflict back-reference and NarrativeProvider are wired separately after
 // construction to break the circular dependency.
-func newActionResolver(roller dice.DiceRoller, characters CharacterResolver) *ActionResolver {
+func newActionResolver(roller dice.DiceRoller, characters CharacterResolver, ag AspectGenerator) *ActionResolver {
 	return &ActionResolver{
-		roller:     roller,
-		characters: characters,
+		roller:          roller,
+		characters:      characters,
+		aspectGenerator: ag,
 	}
 }
 
@@ -280,7 +285,7 @@ func (ar *ActionResolver) finishResolveAction(
 	}
 
 	// Apply mechanical effects based on action type and outcome
-	effectEvents := ar.conflict.applyActionEffects(ctx, parsedAction, targetChar)
+	effectEvents := ar.applyActionEffects(ctx, parsedAction, targetChar)
 	events = append(events, effectEvents...)
 
 	// If we're in a conflict, advance turn and process NPC turns
@@ -359,4 +364,145 @@ func (ar *ActionResolver) gatherInvokableAspects(usedAspects map[string]bool) []
 	}
 
 	return aspects
+}
+
+// --- Action effect application ---
+
+// applyActionEffects applies mechanical effects based on action results
+// and returns composite events describing what happened.
+// Create Advantage effects (aspect creation) are handled here directly.
+// Attack damage is delegated to ConflictManager since it touches
+// conflict-specific state (stress, consequences, taken-out, victory).
+func (ar *ActionResolver) applyActionEffects(ctx context.Context, parsedAction *action.Action, target *character.Character) []GameEvent {
+	if parsedAction.Outcome == nil {
+		return nil
+	}
+
+	var events []GameEvent
+
+	switch parsedAction.Type {
+	case action.CreateAdvantage:
+		if parsedAction.IsSuccess() {
+			aspectName, freeInvokes := ar.generateAspectName(ctx, parsedAction)
+
+			situationAspect := scene.NewSituationAspect(
+				fmt.Sprintf("aspect-%d", time.Now().UnixNano()),
+				aspectName,
+				ar.player.ID,
+				freeInvokes,
+			)
+
+			ar.currentScene.AddSituationAspect(situationAspect)
+			events = append(events, AspectCreatedEvent{
+				AspectName:  aspectName,
+				FreeInvokes: freeInvokes,
+			})
+		}
+
+	case action.Attack:
+		if target == nil {
+			slog.Warn("Attack has no valid target, cannot apply damage",
+				"component", componentSceneManager,
+				"action_id", parsedAction.ID,
+				"target", parsedAction.Target)
+			events = append(events, PlayerAttackResultEvent{
+				TargetMissing: true,
+				TargetHint:    parsedAction.Target,
+			})
+			return events
+		}
+
+		if parsedAction.IsSuccess() {
+			shifts := parsedAction.Outcome.Shifts
+			if shifts < 1 {
+				shifts = 1 // Minimum 1 shift on success
+			}
+
+			// Determine stress type based on attack skill
+			stressType := core.StressTypeForAttack(parsedAction.Skill)
+
+			events = append(events, PlayerAttackResultEvent{
+				TargetName: target.Name,
+				Shifts:     shifts,
+			})
+
+			// Delegate damage application to ConflictManager (conflict-specific state)
+			dmgEvent := ar.conflict.applyDamageToTarget(ctx, target, shifts, stressType)
+			events = append(events, dmgEvent)
+		} else if parsedAction.Outcome.Type == dice.Tie {
+			// On a tie, attacker gets a boost
+			events = append(events, PlayerAttackResultEvent{
+				TargetName: target.Name,
+				IsTie:      true,
+			})
+		}
+	}
+
+	return events
+}
+
+// generateAspectName uses the LLM to generate a creative aspect name for Create an Advantage.
+// Falls back to a simple description-based name if the LLM is unavailable or fails.
+func (ar *ActionResolver) generateAspectName(ctx context.Context, parsedAction *action.Action) (string, int) {
+	// Determine free invokes based on outcome
+	freeInvokes := 1
+	if parsedAction.IsSuccessWithStyle() {
+		freeInvokes = 2
+	}
+
+	// Fallback name if LLM generation fails
+	fallbackName := fmt.Sprintf("Advantage from %s", parsedAction.Description)
+
+	// If no aspect generator available, use fallback
+	if ar.aspectGenerator == nil {
+		slog.Debug("No aspect generator available, using fallback name",
+			"component", componentSceneManager)
+		return fallbackName, freeInvokes
+	}
+
+	// Gather existing aspects for context
+	existingAspects := make([]string, 0)
+	for _, sa := range ar.currentScene.SituationAspects {
+		existingAspects = append(existingAspects, sa.Aspect)
+	}
+
+	// Build the request
+	req := prompt.AspectGenerationRequest{
+		Character:       ar.player,
+		Action:          parsedAction,
+		Outcome:         parsedAction.Outcome,
+		Context:         ar.currentScene.Description,
+		TargetType:      "situation",
+		ExistingAspects: existingAspects,
+	}
+
+	// Generate aspect via LLM with timeout derived from the caller's context
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	response, err := ar.aspectGenerator.GenerateAspect(ctx, req)
+	if err != nil {
+		slog.Warn("Failed to generate aspect via LLM, using fallback",
+			"component", componentSceneManager,
+			"error", err)
+		return fallbackName, freeInvokes
+	}
+
+	// Use generated aspect text, or fallback if empty
+	if response.AspectText == "" {
+		return fallbackName, freeInvokes
+	}
+
+	// Override free invokes from LLM response if it makes sense
+	if response.FreeInvokes > 0 {
+		freeInvokes = response.FreeInvokes
+	}
+
+	slog.Debug("Generated aspect via LLM",
+		"component", componentSceneManager,
+		"aspect", response.AspectText,
+		"freeInvokes", freeInvokes,
+		"reasoning", response.Reasoning)
+
+	return response.AspectText, freeInvokes
 }

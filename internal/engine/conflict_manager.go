@@ -13,10 +13,9 @@ import (
 // to ActionResolver.
 type ConflictManager struct {
 	// Shared dependencies — set once at construction.
-	llmClient       llm.LLMClient
-	characters      CharacterResolver
-	sessionLogger   *session.Logger
-	aspectGenerator AspectGenerator
+	llmClient     llm.LLMClient
+	characters    CharacterResolver
+	sessionLogger *session.Logger
 
 	// ActionResolver — used for dice rolling, invoke loops, mid-flow prompts,
 	// and narrative. Wired after construction by SceneManager.
@@ -42,12 +41,10 @@ type ConflictManager struct {
 func newConflictManager(
 	llmClient llm.LLMClient,
 	characters CharacterResolver,
-	aspectGenerator AspectGenerator,
 ) *ConflictManager {
 	return &ConflictManager{
-		llmClient:       llmClient,
-		characters:      characters,
-		aspectGenerator: aspectGenerator,
+		llmClient:  llmClient,
+		characters: characters,
 	}
 }
 

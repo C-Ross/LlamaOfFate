@@ -10,7 +10,7 @@ import (
 )
 
 func TestNewConflictManager(t *testing.T) {
-	cm := newConflictManager(nil, nil, nil)
+	cm := newConflictManager(nil, nil)
 	require.NotNil(t, cm)
 	assert.Nil(t, cm.llmClient)
 	assert.Nil(t, cm.characters)
@@ -18,7 +18,7 @@ func TestNewConflictManager(t *testing.T) {
 }
 
 func TestConflictManager_SetSceneState(t *testing.T) {
-	cm := newConflictManager(nil, nil, nil)
+	cm := newConflictManager(nil, nil)
 	player := character.NewCharacter("p1", "Hero")
 	s := scene.NewScene("s1", "Room", "A room")
 
@@ -29,7 +29,7 @@ func TestConflictManager_SetSceneState(t *testing.T) {
 }
 
 func TestConflictManager_ResetState(t *testing.T) {
-	cm := newConflictManager(nil, nil, nil)
+	cm := newConflictManager(nil, nil)
 	cm.takenOutChars = []string{"npc1"}
 
 	cm.resetState()

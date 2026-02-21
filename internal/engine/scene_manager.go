@@ -67,8 +67,8 @@ func NewSceneManager(characters CharacterResolver, llmClient llm.LLMClient, acti
 		ag = NewAspectGenerator(llmClient)
 	}
 
-	cm := newConflictManager(llmClient, characters, ag)
-	ar := newActionResolver(roller, characters)
+	cm := newConflictManager(llmClient, characters)
+	ar := newActionResolver(roller, characters, ag)
 	// Wire cross-references: AR ↔ CM.
 	ar.conflict = cm
 	cm.actions = ar

@@ -963,7 +963,7 @@ func TestSceneManager_ApplyActionEffects_Attack(t *testing.T) {
 		Shifts: 3,
 	}
 
-	events := sm.conflict.applyActionEffects(context.Background(), testAction, target)
+	events := sm.actions.applyActionEffects(context.Background(), testAction, target)
 
 	// Check that events contain attack result with shifts
 	ar := RequireFirstFrom[PlayerAttackResultEvent](t, events)
@@ -1126,7 +1126,7 @@ func TestSceneManager_ApplyActionEffects_Attack_NilTarget_ShowsError(t *testing.
 	}
 
 	// Call with nil target (simulating failed resolution)
-	events := sm.conflict.applyActionEffects(context.Background(), testAction, nil)
+	events := sm.actions.applyActionEffects(context.Background(), testAction, nil)
 
 	// Should return a PlayerAttackResultEvent with TargetMissing
 	ar := RequireFirstFrom[PlayerAttackResultEvent](t, events)
@@ -1169,7 +1169,7 @@ func TestSceneManager_ApplyActionEffects_Attack_DealsDamage(t *testing.T) {
 		Shifts: 1,
 	}
 
-	events := sm.conflict.applyActionEffects(context.Background(), testAction, target)
+	events := sm.actions.applyActionEffects(context.Background(), testAction, target)
 
 	// Verify stress was actually applied
 	afterAvailable := target.GetStressTrack(character.PhysicalStress).AvailableBoxes()
@@ -1217,7 +1217,7 @@ func TestSceneManager_ApplyActionEffects_Attack_Tie_GrantsBoost(t *testing.T) {
 		Shifts: 0,
 	}
 
-	events := sm.conflict.applyActionEffects(context.Background(), testAction, target)
+	events := sm.actions.applyActionEffects(context.Background(), testAction, target)
 
 	// Verify boost event was returned
 	ar := RequireFirstFrom[PlayerAttackResultEvent](t, events)
