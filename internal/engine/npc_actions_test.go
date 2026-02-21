@@ -40,8 +40,10 @@ func setupNPCConflictSM(t *testing.T) (*SceneManager, *character.Character, *cha
 	testScene.AddCharacter(npc.ID)
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
 	sm.conflict.player = player
+	sm.actions.player = player
 
 	err = sm.conflict.initiateConflict(scene.PhysicalConflict, npc.ID)
 	require.NoError(t, err)
@@ -100,7 +102,7 @@ func TestProcessNPCCreateAdvantage_Success(t *testing.T) {
 
 	// NPC Notice +2, rolled against Fair (+2).
 	// Dice total 1 → final Good(+3), shifts=1 → Success.
-	sm.conflict.roller = dice.NewPlannedRoller([]int{1})
+	sm.actions.roller = dice.NewPlannedRoller([]int{1})
 
 	decision := &prompt.NPCActionDecision{
 		ActionType:  "CREATE_ADVANTAGE",
@@ -131,7 +133,7 @@ func TestProcessNPCCreateAdvantage_SuccessWithStyle(t *testing.T) {
 	sm, _, npc := setupNPCConflictSM(t)
 
 	// Dice total 3 → final Superb(+5), shifts=3 → SWS.
-	sm.conflict.roller = dice.NewPlannedRoller([]int{3})
+	sm.actions.roller = dice.NewPlannedRoller([]int{3})
 
 	decision := &prompt.NPCActionDecision{
 		ActionType:  "CREATE_ADVANTAGE",
@@ -155,7 +157,7 @@ func TestProcessNPCCreateAdvantage_Tie(t *testing.T) {
 	sm, _, npc := setupNPCConflictSM(t)
 
 	// Dice total 0 → final Fair(+2), shifts=0 → Tie.
-	sm.conflict.roller = dice.NewPlannedRoller([]int{0})
+	sm.actions.roller = dice.NewPlannedRoller([]int{0})
 
 	decision := &prompt.NPCActionDecision{
 		ActionType: "CREATE_ADVANTAGE",
@@ -183,7 +185,7 @@ func TestProcessNPCCreateAdvantage_Failure(t *testing.T) {
 	sm, _, npc := setupNPCConflictSM(t)
 
 	// Dice total -1 → final Average(+1), shifts=-1 → Failure.
-	sm.conflict.roller = dice.NewPlannedRoller([]int{-1})
+	sm.actions.roller = dice.NewPlannedRoller([]int{-1})
 
 	decision := &prompt.NPCActionDecision{
 		ActionType: "CREATE_ADVANTAGE",
@@ -205,7 +207,7 @@ func TestProcessNPCCreateAdvantage_Failure(t *testing.T) {
 func TestProcessNPCCreateAdvantage_DefaultSkill(t *testing.T) {
 	sm, _, npc := setupNPCConflictSM(t)
 
-	sm.conflict.roller = dice.NewPlannedRoller([]int{1})
+	sm.actions.roller = dice.NewPlannedRoller([]int{1})
 
 	decision := &prompt.NPCActionDecision{
 		ActionType: "CREATE_ADVANTAGE",
@@ -224,7 +226,7 @@ func TestProcessNPCOvercome_Success(t *testing.T) {
 	sm, _, npc := setupNPCConflictSM(t)
 
 	// Dice total 1 → Success (shifts=1).
-	sm.conflict.roller = dice.NewPlannedRoller([]int{1})
+	sm.actions.roller = dice.NewPlannedRoller([]int{1})
 
 	decision := &prompt.NPCActionDecision{
 		ActionType:  "OVERCOME",
@@ -251,7 +253,7 @@ func TestProcessNPCOvercome_Tie(t *testing.T) {
 	sm, _, npc := setupNPCConflictSM(t)
 
 	// Dice total 0 → Tie.
-	sm.conflict.roller = dice.NewPlannedRoller([]int{0})
+	sm.actions.roller = dice.NewPlannedRoller([]int{0})
 
 	decision := &prompt.NPCActionDecision{
 		ActionType: "OVERCOME",
@@ -272,7 +274,7 @@ func TestProcessNPCOvercome_Failure(t *testing.T) {
 	sm, _, npc := setupNPCConflictSM(t)
 
 	// Dice total -1 → Failure.
-	sm.conflict.roller = dice.NewPlannedRoller([]int{-1})
+	sm.actions.roller = dice.NewPlannedRoller([]int{-1})
 
 	decision := &prompt.NPCActionDecision{
 		ActionType: "OVERCOME",
@@ -292,7 +294,7 @@ func TestProcessNPCOvercome_Failure(t *testing.T) {
 func TestProcessNPCOvercome_DefaultSkill(t *testing.T) {
 	sm, _, npc := setupNPCConflictSM(t)
 
-	sm.conflict.roller = dice.NewPlannedRoller([]int{1})
+	sm.actions.roller = dice.NewPlannedRoller([]int{1})
 
 	decision := &prompt.NPCActionDecision{
 		ActionType: "OVERCOME",
@@ -330,8 +332,10 @@ func TestProcessNPCTurn_DispatchDefend(t *testing.T) {
 	testScene.AddCharacter(npc.ID)
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
 	sm.conflict.player = player
+	sm.actions.player = player
 
 	err = sm.conflict.initiateConflict(scene.PhysicalConflict, npc.ID)
 	require.NoError(t, err)
@@ -363,7 +367,7 @@ func TestProcessNPCTurn_FallbackToAttack(t *testing.T) {
 	// PlannedRoller: first roll for NPC attack, second for player defense.
 	// NPC Fight +2: dice -4 → final = 0+(-4)+2 = -2 (Terrible).
 	// Player defense: dice +4 → high defense. Attack will fail.
-	sm.conflict.roller = dice.NewPlannedRoller([]int{-4, 4})
+	sm.actions.roller = dice.NewPlannedRoller([]int{-4, 4})
 
 	events, awaiting := sm.conflict.processNPCTurn(context.Background(), npc.ID)
 

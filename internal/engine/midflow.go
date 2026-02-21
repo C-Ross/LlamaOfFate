@@ -25,13 +25,13 @@ type midFlowContinuation func(ctx context.Context, resp MidFlowResponse) []GameE
 // ProvideMidFlowResponse processes the player's response to an InputRequestEvent
 // and returns the resulting events. This is the mid-flow equivalent of
 // ProvideInvokeResponse.
-func (cm *ConflictManager) ProvideMidFlowResponse(ctx context.Context, resp MidFlowResponse) (*InputResult, error) {
-	if cm.pendingMidFlow == nil {
+func (ar *ActionResolver) ProvideMidFlowResponse(ctx context.Context, resp MidFlowResponse) (*InputResult, error) {
+	if ar.pendingMidFlow == nil {
 		return nil, fmt.Errorf("ProvideMidFlowResponse called with no pending mid-flow request")
 	}
 
-	mf := cm.pendingMidFlow
-	cm.pendingMidFlow = nil
+	mf := ar.pendingMidFlow
+	ar.pendingMidFlow = nil
 
 	// Validate numbered choice index.
 	if mf.event.Type == uicontract.InputRequestNumberedChoice {
@@ -49,8 +49,8 @@ func (cm *ConflictManager) ProvideMidFlowResponse(ctx context.Context, resp MidF
 	result := &InputResult{Events: events}
 
 	// Check for nested mid-flow (e.g. recursive stress overflow).
-	if cm.pendingMidFlow != nil {
-		result.Events = append(result.Events, cm.pendingMidFlow.event)
+	if ar.pendingMidFlow != nil {
+		result.Events = append(result.Events, ar.pendingMidFlow.event)
 		result.AwaitingMidFlow = true
 	}
 

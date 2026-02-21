@@ -39,9 +39,9 @@ func TestStressOverflowEmitsChoiceEvent(t *testing.T) {
 	sm.conflict.handleStressOverflow(ctx, 3, character.PhysicalStress, attacker, attackCtx)
 
 	// Should have set pendingMidFlow.
-	require.NotNil(t, sm.conflict.pendingMidFlow, "expected pendingMidFlow to be set")
+	require.NotNil(t, sm.actions.pendingMidFlow, "expected pendingMidFlow to be set")
 
-	event := sm.conflict.pendingMidFlow.event
+	event := sm.actions.pendingMidFlow.event
 	assert.Equal(t, uicontract.InputRequestNumberedChoice, event.Type)
 	assert.Contains(t, event.Prompt, "choose how to handle")
 
@@ -91,7 +91,7 @@ func TestStressOverflowNoConsequences_TakenOut(t *testing.T) {
 	events := sm.conflict.handleStressOverflow(ctx, 3, character.PhysicalStress, attacker, attackCtx)
 
 	// No consequences available → should NOT set pendingMidFlow, should go straight to taken out.
-	assert.Nil(t, sm.conflict.pendingMidFlow, "expected no pending mid-flow when no consequences available")
+	assert.Nil(t, sm.actions.pendingMidFlow, "expected no pending mid-flow when no consequences available")
 
 	// Should have returned "taken out" events.
 	AssertHasEventIn[PlayerTakenOutEvent](t, events)
@@ -126,7 +126,7 @@ func TestProvideMidFlowResponse_ConsequenceChoice(t *testing.T) {
 
 	// Trigger stress overflow to get a pending mid-flow.
 	sm.conflict.handleStressOverflow(ctx, 2, character.PhysicalStress, attacker, attackCtx)
-	require.NotNil(t, sm.conflict.pendingMidFlow)
+	require.NotNil(t, sm.actions.pendingMidFlow)
 
 	// Choose the first consequence (mild = absorbs 2).
 	result, err := sm.ProvideMidFlowResponse(ctx, MidFlowResponse{ChoiceIndex: 0})
@@ -164,7 +164,7 @@ func TestProvideMidFlowResponse_TakenOutChoice(t *testing.T) {
 	ctx := context.Background()
 	attackCtx := prompt.AttackContext{Skill: "Fight", Description: "Slash", Shifts: 3}
 	sm.conflict.handleStressOverflow(ctx, 3, character.PhysicalStress, attacker, attackCtx)
-	require.NotNil(t, sm.conflict.pendingMidFlow)
+	require.NotNil(t, sm.actions.pendingMidFlow)
 
 	// Choose the last option (taken out). Available = 3 consequence slots, so index 3 = taken out.
 	available := player.AvailableConsequenceSlots()
@@ -209,8 +209,8 @@ func TestFateNarrationEmitsFreeTextEvent(t *testing.T) {
 	sm.conflict.promptPlayerForFates(ctx)
 
 	// Should have set pendingMidFlow with a free_text event.
-	require.NotNil(t, sm.conflict.pendingMidFlow, "expected pendingMidFlow for fate narration")
-	event := sm.conflict.pendingMidFlow.event
+	require.NotNil(t, sm.actions.pendingMidFlow, "expected pendingMidFlow for fate narration")
+	event := sm.actions.pendingMidFlow.event
 
 	assert.Equal(t, uicontract.InputRequestFreeText, event.Type)
 	assert.Contains(t, event.Prompt, "Goblin Scout")
@@ -244,7 +244,7 @@ func TestFateNarrationNoTakenOut_NoPendingMidFlow(t *testing.T) {
 	ctx := context.Background()
 	sm.conflict.promptPlayerForFates(ctx)
 
-	assert.Nil(t, sm.conflict.pendingMidFlow, "expected no pending mid-flow with no taken-out chars")
+	assert.Nil(t, sm.actions.pendingMidFlow, "expected no pending mid-flow with no taken-out chars")
 }
 
 func TestProvideMidFlowResponse_FateNarration(t *testing.T) {
@@ -274,7 +274,7 @@ func TestProvideMidFlowResponse_FateNarration(t *testing.T) {
 
 	ctx := context.Background()
 	sm.conflict.promptPlayerForFates(ctx)
-	require.NotNil(t, sm.conflict.pendingMidFlow)
+	require.NotNil(t, sm.actions.pendingMidFlow)
 
 	// Provide the narration.
 	result, err := sm.ProvideMidFlowResponse(ctx, MidFlowResponse{Text: "I let the goblin flee"})
@@ -282,7 +282,7 @@ func TestProvideMidFlowResponse_FateNarration(t *testing.T) {
 	require.NotNil(t, result)
 
 	// pendingMidFlow should be cleared.
-	assert.Nil(t, sm.conflict.pendingMidFlow)
+	assert.Nil(t, sm.actions.pendingMidFlow)
 
 	// If parsing succeeded, events should include a NarrativeEvent.
 	// (The actual LLM parsing may fail with our mock, but the continuation is exercised.)
@@ -321,8 +321,8 @@ func TestConcessionEmitsFreeTextEvent(t *testing.T) {
 	assert.False(t, sm.currentScene.IsConflict, "expected conflict to end")
 
 	// Should have a pending mid-flow for the concession narration.
-	require.NotNil(t, sm.conflict.pendingMidFlow, "expected pendingMidFlow for concession narration")
-	event := sm.conflict.pendingMidFlow.event
+	require.NotNil(t, sm.actions.pendingMidFlow, "expected pendingMidFlow for concession narration")
+	event := sm.actions.pendingMidFlow.event
 
 	assert.Equal(t, uicontract.InputRequestFreeText, event.Type)
 	assert.Contains(t, event.Prompt, "concede")
@@ -359,7 +359,7 @@ func TestProvideMidFlowResponse_ConcessionNarration(t *testing.T) {
 
 	ctx := context.Background()
 	sm.conflict.handleConcession(ctx)
-	require.NotNil(t, sm.conflict.pendingMidFlow)
+	require.NotNil(t, sm.actions.pendingMidFlow)
 
 	// Provide concession narration.
 	result, err := sm.ProvideMidFlowResponse(ctx, MidFlowResponse{Text: "I raise my hands in surrender and back away."})
@@ -367,7 +367,7 @@ func TestProvideMidFlowResponse_ConcessionNarration(t *testing.T) {
 	require.NotNil(t, result)
 
 	// pendingMidFlow should be cleared.
-	assert.Nil(t, sm.conflict.pendingMidFlow)
+	assert.Nil(t, sm.actions.pendingMidFlow)
 
 	// Events should include a NarrativeEvent with the player's narration.
 	require.Len(t, result.Events, 1)
@@ -403,7 +403,7 @@ func TestProvideMidFlowResponse_EmptyConcessionNarration(t *testing.T) {
 
 	ctx := context.Background()
 	sm.conflict.handleConcession(ctx)
-	require.NotNil(t, sm.conflict.pendingMidFlow)
+	require.NotNil(t, sm.actions.pendingMidFlow)
 
 	// Provide empty narration.
 	result, err := sm.ProvideMidFlowResponse(ctx, MidFlowResponse{Text: ""})
@@ -491,7 +491,7 @@ func TestHandleInput_RejectsInputWhileMidFlowPending(t *testing.T) {
 	require.NoError(t, err)
 
 	// Manually set a pending mid-flow.
-	sm.conflict.pendingMidFlow = &midFlowState{
+	sm.actions.pendingMidFlow = &midFlowState{
 		event: InputRequestEvent{
 			Type:   uicontract.InputRequestFreeText,
 			Prompt: "test",
@@ -533,8 +533,8 @@ func TestProvideMidFlowResponse_NumberedChoice(t *testing.T) {
 	ctx := context.Background()
 	attackCtx := prompt.AttackContext{Skill: "Fight", Description: "Slash", Shifts: 2}
 	sm.conflict.handleStressOverflow(ctx, 2, character.PhysicalStress, attacker, attackCtx)
-	require.NotNil(t, sm.conflict.pendingMidFlow)
-	assert.Equal(t, uicontract.InputRequestNumberedChoice, sm.conflict.pendingMidFlow.event.Type)
+	require.NotNil(t, sm.actions.pendingMidFlow)
+	assert.Equal(t, uicontract.InputRequestNumberedChoice, sm.actions.pendingMidFlow.event.Type)
 
 	// Provide the response directly (choose the first option — mild consequence).
 	result, err := sm.ProvideMidFlowResponse(ctx, MidFlowResponse{ChoiceIndex: 0})
@@ -569,8 +569,8 @@ func TestProvideMidFlowResponse_FreeText(t *testing.T) {
 
 	ctx := context.Background()
 	sm.conflict.handleConcession(ctx)
-	require.NotNil(t, sm.conflict.pendingMidFlow)
-	assert.Equal(t, uicontract.InputRequestFreeText, sm.conflict.pendingMidFlow.event.Type)
+	require.NotNil(t, sm.actions.pendingMidFlow)
+	assert.Equal(t, uicontract.InputRequestFreeText, sm.actions.pendingMidFlow.event.Type)
 
 	// Provide the narration text directly.
 	result, err := sm.ProvideMidFlowResponse(ctx, MidFlowResponse{Text: "I drop my weapon and back away."})
@@ -606,9 +606,9 @@ func TestStressOverflowContextFields(t *testing.T) {
 	ctx := context.Background()
 	attackCtx := prompt.AttackContext{Skill: "Fight", Description: "A mighty blow", Shifts: 5}
 	sm.conflict.handleStressOverflow(ctx, 5, character.PhysicalStress, attacker, attackCtx)
-	require.NotNil(t, sm.conflict.pendingMidFlow)
+	require.NotNil(t, sm.actions.pendingMidFlow)
 
-	event := sm.conflict.pendingMidFlow.event
+	event := sm.actions.pendingMidFlow.event
 
 	// Verify context fields.
 	assert.Equal(t, "consequence_choice", event.Context["request_type"])

@@ -1,64 +1,52 @@
 package engine
 
 import (
-	"context"
-
-	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
-	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 )
 
-// ConflictManager owns conflict resolution, NPC turns, invoke loops,
-// and mid-flow prompts. SceneManager delegates to it and wraps the
-// results with scene-level concerns (narrative, scene-end).
+// ConflictManager owns conflict lifecycle, NPC turns, damage resolution,
+// taken-out/concession handling, and other combat-specific logic.
+// It delegates generic action resolution (dice, invokes, mid-flow, narrative)
+// to ActionResolver.
 type ConflictManager struct {
 	// Shared dependencies — set once at construction.
 	llmClient       llm.LLMClient
 	characters      CharacterResolver
-	roller          dice.DiceRoller
 	sessionLogger   *session.Logger
 	aspectGenerator AspectGenerator
+
+	// ActionResolver — used for dice rolling, invoke loops, mid-flow prompts,
+	// and narrative. Wired after construction by SceneManager.
+	actions *ActionResolver
 
 	// Per-scene state — wired by SceneManager.StartScene / resetConflictState.
 	player       *character.Character
 	currentScene *scene.Scene
 
 	// Conflict-specific mutable state — reset each scene.
-	pendingInvoke  *invokeState
-	pendingMidFlow *midFlowState
-	takenOutChars  []string
+	takenOutChars []string
 
-	// Scene-exit state — set by conflict methods, read by SceneManager to
-	// build SceneEndResult. Moved here so conflict methods don't need a
-	// back-pointer to SceneManager. Phase 4 will replace with return types.
+	// Scene-exit state — set by conflict methods (handleTakenOut), read by
+	// SceneManager via accessors to build SceneEndResult.
 	shouldExit            bool
 	sceneEndReason        SceneEndReason
 	playerTakenOutHint    string
 	exitOnSceneTransition bool
-
-	// Narrative callbacks — wired by SceneManager after construction so that
-	// conflict methods can generate narrative and record conversation history
-	// without a direct dependency on SceneManager.
-	generateActionNarrative  func(ctx context.Context, a *action.Action) (string, error)
-	buildMechanicalNarrative func(a *action.Action) string
-	addToConversationHistory func(playerInput, gmResponse, interactionType string)
 }
 
 // newConflictManager creates a ConflictManager sharing the given dependencies.
-// Narrative callbacks must be wired separately after construction.
+// The actions back-reference is wired separately after construction.
 func newConflictManager(
 	llmClient llm.LLMClient,
 	characters CharacterResolver,
-	roller dice.DiceRoller,
 	aspectGenerator AspectGenerator,
 ) *ConflictManager {
 	return &ConflictManager{
 		llmClient:       llmClient,
 		characters:      characters,
-		roller:          roller,
 		aspectGenerator: aspectGenerator,
 	}
 }
@@ -71,8 +59,6 @@ func (cm *ConflictManager) setSceneState(s *scene.Scene, player *character.Chara
 
 // resetState clears per-scene conflict state. Called by SceneManager.resetSceneState.
 func (cm *ConflictManager) resetState() {
-	cm.pendingInvoke = nil
-	cm.pendingMidFlow = nil
 	cm.takenOutChars = nil
 	cm.shouldExit = false
 	cm.sceneEndReason = ""
@@ -82,4 +68,25 @@ func (cm *ConflictManager) resetState() {
 // setSessionLogger updates the session logger (may be called after construction).
 func (cm *ConflictManager) setSessionLogger(logger *session.Logger) {
 	cm.sessionLogger = logger
+}
+
+// --- Accessor methods ---
+// These encapsulate ConflictManager internal state so that SceneManager
+// does not reach into struct fields directly.
+
+// SceneExitRequested returns true when a conflict method (e.g. handleTakenOut)
+// has signalled that the scene should end.
+func (cm *ConflictManager) SceneExitRequested() bool {
+	return cm.shouldExit
+}
+
+// SceneExitState returns the scene-end reason and transition hint set by
+// conflict resolution. Only meaningful when SceneExitRequested() is true.
+func (cm *ConflictManager) SceneExitState() (SceneEndReason, string) {
+	return cm.sceneEndReason, cm.playerTakenOutHint
+}
+
+// GetTakenOutChars returns the IDs of characters taken out during this scene.
+func (cm *ConflictManager) GetTakenOutChars() []string {
+	return cm.takenOutChars
 }

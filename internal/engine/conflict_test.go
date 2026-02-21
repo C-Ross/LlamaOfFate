@@ -388,8 +388,10 @@ func TestSceneManager_ResolveConflictPeacefully(t *testing.T) {
 	testScene.AddCharacter(enemy.ID)
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
 	sm.conflict.player = player
+	sm.actions.player = player
 
 	// Start a conflict
 	err = sm.conflict.initiateConflict(scene.PhysicalConflict, enemy.ID)
@@ -432,8 +434,10 @@ func TestSceneManager_ResolveConflictPeacefully_ClearsStress(t *testing.T) {
 	testScene.AddCharacter(enemy.ID)
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
 	sm.conflict.player = player
+	sm.actions.player = player
 
 	// Start a conflict
 	err = sm.conflict.initiateConflict(scene.PhysicalConflict, enemy.ID)
@@ -458,6 +462,7 @@ func TestSceneManager_ResolveConflictPeacefully_NotInConflict(t *testing.T) {
 	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 
 	// Attempting to resolve should not panic
 	sm.conflict.resolveConflictPeacefully("surrender")
@@ -496,8 +501,10 @@ func TestSceneManager_ResolveConflictPeacefully_AllReasons(t *testing.T) {
 			testScene.AddCharacter(enemy.ID)
 			sm.currentScene = testScene
 			sm.conflict.currentScene = testScene
+			sm.actions.currentScene = testScene
 			sm.player = player
 			sm.conflict.player = player
+			sm.actions.player = player
 
 			err = sm.conflict.initiateConflict(scene.PhysicalConflict, enemy.ID)
 			require.NoError(t, err)
@@ -517,6 +524,7 @@ func TestSceneManager_HandleConflictEscalation_NotInConflict(t *testing.T) {
 	testScene := scene.NewScene("s1", "Room", "A room")
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 
 	events := sm.conflict.handleConflictEscalation(scene.PhysicalConflict)
 	assert.Nil(t, events)
@@ -539,8 +547,10 @@ func TestSceneManager_HandleConflictEscalation_SameType(t *testing.T) {
 	testScene.AddCharacter(enemy.ID)
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
 	sm.conflict.player = player
+	sm.actions.player = player
 
 	err = sm.conflict.initiateConflict(scene.PhysicalConflict, enemy.ID)
 	require.NoError(t, err)
@@ -563,6 +573,7 @@ func TestSceneManager_GatherInvokableAspects_ConsequencesAndSituation(t *testing
 	})
 	sm.player = player
 	sm.conflict.player = player
+	sm.actions.player = player
 
 	testScene := scene.NewScene("s1", "Room", "A room")
 	testScene.SituationAspects = append(testScene.SituationAspects, scene.SituationAspect{
@@ -572,8 +583,9 @@ func TestSceneManager_GatherInvokableAspects_ConsequencesAndSituation(t *testing
 	})
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 
-	aspects := sm.conflict.gatherInvokableAspects(map[string]bool{})
+	aspects := sm.actions.gatherInvokableAspects(map[string]bool{})
 	var names []string
 	for _, a := range aspects {
 		names = append(names, a.Name)
@@ -599,20 +611,20 @@ func TestSceneManager_RollTargetDefense(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
-	sm.conflict.roller = dice.NewSeededRoller(12345) // Predictable rolls
+	sm.actions.roller = dice.NewSeededRoller(12345) // Predictable rolls
 
 	target := character.NewCharacter("target-1", "Goblin")
 	target.SetSkill("Athletics", 2)
 	target.SetSkill("Will", 1)
 
 	// Test physical attack defense (uses Athletics)
-	defenseResult, defEvent := sm.conflict.rollTargetDefense(target, "Fight")
+	defenseResult, defEvent := sm.actions.rollTargetDefense(target, "Fight")
 	assert.NotNil(t, defenseResult)
 	assert.NotEmpty(t, defEvent.DefenderName)
 	// With seeded roller and Athletics +2, we get a predictable result
 
 	// Test mental attack defense (uses Will)
-	defenseResult, defEvent = sm.conflict.rollTargetDefense(target, "Provoke")
+	defenseResult, defEvent = sm.actions.rollTargetDefense(target, "Provoke")
 	assert.NotNil(t, defenseResult)
 	assert.NotEmpty(t, defEvent.DefenderName)
 }
@@ -728,8 +740,10 @@ func TestSceneManager_HandleTargetTakenOut(t *testing.T) {
 	testScene.AddCharacter(otherEnemy.ID)
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
 	sm.conflict.player = player
+	sm.actions.player = player
 
 	// Start a conflict
 	err = sm.conflict.initiateConflict(scene.PhysicalConflict, target.ID)
@@ -767,8 +781,10 @@ func TestSceneManager_HandleTargetTakenOut_ConflictEnds(t *testing.T) {
 	testScene.AddCharacter(target.ID)
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
 	sm.conflict.player = player
+	sm.actions.player = player
 
 	// Start a conflict
 	err = sm.conflict.initiateConflict(scene.PhysicalConflict, target.ID)
@@ -802,8 +818,10 @@ func TestSceneManager_HandleTargetTakenOut_MarksSceneLevelTakenOut(t *testing.T)
 	testScene.AddCharacter(target.ID)
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
 	sm.conflict.player = player
+	sm.actions.player = player
 
 	// Start a conflict
 	err = sm.conflict.initiateConflict(scene.PhysicalConflict, target.ID)
@@ -838,8 +856,10 @@ func TestSceneManager_InitiateConflict_ExcludesTakenOutCharacters(t *testing.T) 
 	testScene.AddCharacter(enemy2.ID)
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
 	sm.conflict.player = player
+	sm.actions.player = player
 
 	// Start first conflict and take out enemy1
 	err = sm.conflict.initiateConflict(scene.PhysicalConflict, enemy1.ID)
@@ -884,8 +904,10 @@ func TestSceneManager_InitiateConflict_TakenOutInitiatorFails(t *testing.T) {
 	testScene.AddCharacter(enemy.ID)
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
 	sm.conflict.player = player
+	sm.actions.player = player
 
 	// Start first conflict and take out enemy
 	err = sm.conflict.initiateConflict(scene.PhysicalConflict, enemy.ID)
@@ -1209,7 +1231,7 @@ func TestSceneManager_ResolveAction_TargetByName(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := engine.GetSceneManager()
-	sm.conflict.roller = dice.NewSeededRoller(42)
+	sm.actions.roller = dice.NewSeededRoller(42)
 
 	// Create player and NPC with different ID and name
 	player := character.NewCharacter("player-1", "Hero")
@@ -1238,7 +1260,7 @@ func TestSceneManager_ResolveAction_TargetByName(t *testing.T) {
 	testAction.Difficulty = dice.Fair
 
 	ctx := context.Background()
-	events, _ := sm.conflict.resolveAction(ctx, testAction)
+	events, _ := sm.actions.resolveAction(ctx, testAction)
 
 	// The attack should have resolved against Bart — check defense was rolled
 	// and damage was applied (if target wasn't found, no damage messages would appear)
@@ -1275,7 +1297,7 @@ func TestSceneManager_ResolveAction_UnknownTarget_AbortsWithoutConsumingTurn(t *
 	require.NoError(t, err)
 
 	sm := engine.GetSceneManager()
-	sm.conflict.roller = dice.NewSeededRoller(42)
+	sm.actions.roller = dice.NewSeededRoller(42)
 
 	player := character.NewCharacter("player-1", "Hero")
 	player.SetSkill("Fight", dice.Good)
@@ -1304,7 +1326,7 @@ func TestSceneManager_ResolveAction_UnknownTarget_AbortsWithoutConsumingTurn(t *
 	testAction.Difficulty = dice.Fair
 
 	ctx := context.Background()
-	events, awaiting := sm.conflict.resolveAction(ctx, testAction)
+	events, awaiting := sm.actions.resolveAction(ctx, testAction)
 	assert.False(t, awaiting, "unknown target should not await invoke")
 
 	// Should see the "try again" message in events
@@ -1357,9 +1379,11 @@ func TestSceneManager_HandleAction_ExcludesTakenOutFromTargets(t *testing.T) {
 
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
 	sm.conflict.player = player
-	sm.conflict.roller = dice.NewSeededRoller(12345)
+	sm.actions.player = player
+	sm.actions.roller = dice.NewSeededRoller(12345)
 
 	// Mark the goblin as taken out
 	testScene.MarkCharacterTakenOut(takenOutNPC.ID)

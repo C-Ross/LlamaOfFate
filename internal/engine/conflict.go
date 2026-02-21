@@ -220,7 +220,7 @@ func (cm *ConflictManager) handleConflictEscalation(newType scene.ConflictType) 
 // advanceConflictTurns advances through turns and processes NPC actions until
 // it's the player's turn or a defense invoke pauses the loop.
 // Returns (events, awaitingInvoke). When awaitingInvoke is true,
-// cm.pendingInvoke is set; the invoke continuation will resume NPC turns.
+// the ActionResolver's pendingInvoke is set; the invoke continuation will resume NPC turns.
 func (cm *ConflictManager) advanceConflictTurns(ctx context.Context) ([]GameEvent, bool) {
 	if !cm.currentScene.IsConflict || cm.currentScene.ConflictState == nil {
 		return nil, false
@@ -281,247 +281,6 @@ func (cm *ConflictManager) getParticipantInfo() []ConflictParticipantInfo {
 		})
 	}
 	return info
-}
-
-// resolveAction fully resolves a parsed action
-func (cm *ConflictManager) resolveAction(ctx context.Context, parsedAction *action.Action) ([]GameEvent, bool) {
-	var events []GameEvent
-
-	// Check if this action should initiate or escalate a conflict
-	if parsedAction.Type == action.Attack {
-		actionConflictType := core.ConflictTypeForSkill(parsedAction.Skill)
-
-		if !cm.currentScene.IsConflict {
-			// Auto-initiate conflict for attack actions
-			if err := cm.initiateConflict(actionConflictType, cm.player.ID); err != nil {
-				slog.Warn("Failed to auto-initiate conflict",
-					"component", componentSceneManager,
-					"error", err)
-			} else {
-				events = append(events, ConflictStartEvent{
-					ConflictType:  string(actionConflictType),
-					InitiatorName: cm.player.Name,
-					Participants:  cm.getParticipantInfo(),
-				})
-				cm.addToConversationHistory("",
-					fmt.Sprintf("[%s conflict initiated by %s]", actionConflictType, cm.player.Name),
-					inputTypeConflict)
-			}
-		} else if cm.currentScene.ConflictState.Type != actionConflictType {
-			// Escalate conflict if type changes
-			escalateEvents := cm.handleConflictEscalation(actionConflictType)
-			events = append(events, escalateEvents...)
-		}
-	}
-
-	// Get character's skill level
-	skillLevel := cm.player.GetSkill(parsedAction.Skill)
-
-	// Calculate total bonus
-	totalBonus := int(skillLevel) + parsedAction.CalculateBonus()
-
-	// Roll dice
-	result := cm.roller.RollWithModifier(dice.Mediocre, totalBonus)
-
-	// For attacks against characters, use active defense instead of static difficulty
-	var defenseResult *dice.CheckResult
-	var targetChar *character.Character
-	if parsedAction.Type == action.Attack && parsedAction.Target != "" {
-		targetChar = cm.characters.ResolveCharacter(parsedAction.Target)
-		if targetChar == nil {
-			slog.Warn("Attack target not found, action aborted",
-				"component", componentSceneManager,
-				"target", parsedAction.Target)
-			events = append(events, SystemMessageEvent{
-				Message: fmt.Sprintf("Could not find target '%s' — try again.", parsedAction.Target),
-			})
-			return events, false
-		}
-		var defEvent DefenseRollEvent
-		defenseResult, defEvent = cm.rollTargetDefense(targetChar, parsedAction.Skill)
-		events = append(events, defEvent)
-		parsedAction.Difficulty = defenseResult.FinalValue
-	}
-
-	// Display initial result
-	var resultString string
-	var defenderName string
-	if defenseResult != nil && targetChar != nil {
-		defenderName = targetChar.Name
-		resultString = fmt.Sprintf("%s (Total: %s vs %s's Defense %s)",
-			result.String(), result.FinalValue.String(), targetChar.Name, defenseResult.FinalValue.String())
-	} else {
-		resultString = fmt.Sprintf("%s (Total: %s vs Difficulty %s)",
-			result.String(), result.FinalValue.String(), parsedAction.Difficulty.String())
-	}
-	initialOutcome := result.CompareAgainst(parsedAction.Difficulty)
-	events = append(events, ActionResultEvent{
-		Skill:        parsedAction.Skill,
-		SkillRank:    skillLevel.Name(),
-		SkillBonus:   int(skillLevel),
-		Bonuses:      parsedAction.CalculateBonus(),
-		Result:       resultString,
-		Outcome:      initialOutcome.Type.String(),
-		DiceFaces:    diceFacesToInts(result.Roll.Dice),
-		Total:        int(result.FinalValue),
-		TotalRank:    result.FinalValue.Name(),
-		Difficulty:   int(parsedAction.Difficulty),
-		DiffRank:     parsedAction.Difficulty.Name(),
-		DefenderName: defenderName,
-	})
-
-	// Log the dice roll
-	if cm.sessionLogger != nil {
-		cm.sessionLogger.Log("dice_roll", map[string]any{
-			"skill":       parsedAction.Skill,
-			"skill_level": int(skillLevel),
-			"bonus":       parsedAction.CalculateBonus(),
-			"roll_result": result.String(),
-			"final_value": int(result.FinalValue),
-			"difficulty":  int(parsedAction.Difficulty),
-			"outcome":     initialOutcome.Type.String(),
-			"shifts":      initialOutcome.Shifts,
-		})
-	}
-
-	// Build the continuation that runs after invokes complete.
-	// Capture the variables needed by the post-invoke logic.
-	capturedInitialOutcome := initialOutcome
-	capturedTargetChar := targetChar
-	capturedParsedAction := parsedAction
-
-	finish := func(finishCtx context.Context, finalResult *dice.CheckResult, accEvents []GameEvent) []GameEvent {
-		return cm.finishResolveAction(finishCtx, finalResult, capturedParsedAction, capturedInitialOutcome, capturedTargetChar, accEvents)
-	}
-
-	// Post-roll invoke opportunity via event-driven loop
-	return cm.beginInvokeLoop(ctx, result, parsedAction.Difficulty, parsedAction, false, events, finish)
-}
-
-// finishResolveAction is the continuation called after the invoke loop completes.
-// It determines the final outcome, generates narrative, applies effects, and
-// advances conflict turns. Returns all events for the InputResult.
-func (cm *ConflictManager) finishResolveAction(
-	ctx context.Context,
-	result *dice.CheckResult,
-	parsedAction *action.Action,
-	initialOutcome *dice.Outcome,
-	targetChar *character.Character,
-	events []GameEvent,
-) []GameEvent {
-	parsedAction.CheckResult = result
-
-	// Determine final outcome after invokes
-	outcome := result.CompareAgainst(parsedAction.Difficulty)
-	parsedAction.Outcome = outcome
-
-	// Display updated outcome if it changed
-	if outcome.Type != initialOutcome.Type {
-		events = append(events, OutcomeChangedEvent{
-			FinalOutcome: outcome.Type.String(),
-		})
-	}
-
-	// Generate narrative with error handling
-	narrative, err := cm.generateActionNarrative(ctx, parsedAction)
-	if err != nil {
-		slog.Error("Action narrative generation failed",
-			"component", componentSceneManager,
-			"action_id", parsedAction.ID,
-			"error", err)
-		narrative = cm.buildMechanicalNarrative(parsedAction)
-	}
-	events = append(events, NarrativeEvent{Text: narrative})
-
-	// Log the narrative
-	if cm.sessionLogger != nil {
-		cm.sessionLogger.Log("narrative", map[string]any{
-			"text":    narrative,
-			"action":  parsedAction.Type.String(),
-			"outcome": outcome.Type.String(),
-		})
-	}
-
-	// Apply mechanical effects based on action type and outcome
-	effectEvents := cm.applyActionEffects(ctx, parsedAction, targetChar)
-	events = append(events, effectEvents...)
-
-	// If we're in a conflict, advance turn and process NPC turns
-	if cm.currentScene.IsConflict {
-		turnEvents, _ := cm.advanceConflictTurns(ctx)
-		events = append(events, turnEvents...)
-	}
-
-	return events
-}
-
-// rollTargetDefense rolls an active defense for a target character
-// and returns the roll result plus a DefenseRollEvent.
-func (cm *ConflictManager) rollTargetDefense(target *character.Character, attackSkill string) (*dice.CheckResult, DefenseRollEvent) {
-	// Determine defense skill based on attack skill type
-	defenseSkill := core.DefenseSkillForAttack(attackSkill)
-	defenseLevel := target.GetSkill(defenseSkill)
-
-	// Roll defense
-	defenseRoll := cm.roller.RollWithModifier(dice.Mediocre, int(defenseLevel))
-
-	event := DefenseRollEvent{
-		DefenderName: target.Name,
-		Skill:        defenseSkill,
-		Result:       defenseRoll.FinalValue.String(),
-		DiceFaces:    diceFacesToInts(defenseRoll.Roll.Dice),
-	}
-
-	return defenseRoll, event
-}
-
-// gatherInvokableAspects collects all aspects available for the player to invoke
-func (cm *ConflictManager) gatherInvokableAspects(usedAspects map[string]bool) []InvokableAspect {
-	var aspects []InvokableAspect
-
-	// Character aspects (High Concept, Trouble, Other)
-	for _, aspectText := range cm.player.Aspects.GetAll() {
-		if aspectText == "" {
-			continue
-		}
-		aspects = append(aspects, InvokableAspect{
-			Name:        aspectText,
-			Source:      "character",
-			SourceID:    cm.player.ID,
-			FreeInvokes: 0, // Character aspects don't have free invokes
-			AlreadyUsed: usedAspects[aspectText],
-		})
-	}
-
-	// Player's consequences (can be invoked against self for +2)
-	for _, consequence := range cm.player.Consequences {
-		if consequence.Aspect == "" {
-			continue
-		}
-		aspects = append(aspects, InvokableAspect{
-			Name:        consequence.Aspect,
-			Source:      "consequence",
-			SourceID:    consequence.ID,
-			FreeInvokes: 0,
-			AlreadyUsed: usedAspects[consequence.Aspect],
-		})
-	}
-
-	// Situation aspects
-	for _, sitAspect := range cm.currentScene.SituationAspects {
-		if sitAspect.Aspect == "" {
-			continue
-		}
-		aspects = append(aspects, InvokableAspect{
-			Name:        sitAspect.Aspect,
-			Source:      "situation",
-			SourceID:    sitAspect.ID,
-			FreeInvokes: sitAspect.FreeInvokes,
-			AlreadyUsed: usedAspects[sitAspect.Aspect],
-		})
-	}
-
-	return aspects
 }
 
 // applyActionEffects applies mechanical effects based on action results
@@ -833,7 +592,7 @@ func (cm *ConflictManager) promptPlayerForFates(ctx context.Context) {
 	// Capture variables for the continuation closure.
 	capturedNPCs := takenOutNPCs
 
-	cm.pendingMidFlow = &midFlowState{
+	cm.actions.pendingMidFlow = &midFlowState{
 		event: event,
 		continuation: func(ctx context.Context, resp MidFlowResponse) []GameEvent {
 			if strings.TrimSpace(resp.Text) == "" {
@@ -1014,7 +773,7 @@ func (cm *ConflictManager) handleStressOverflow(ctx context.Context, shifts int,
 	capturedAttacker := attacker
 	capturedAttackCtx := attackCtx
 
-	cm.pendingMidFlow = &midFlowState{
+	cm.actions.pendingMidFlow = &midFlowState{
 		event: event,
 		continuation: func(ctx context.Context, resp MidFlowResponse) []GameEvent {
 			takenOutIdx := len(capturedConsequences)
@@ -1165,7 +924,7 @@ func (cm *ConflictManager) handleConcession(ctx context.Context) []GameEvent {
 	}
 
 	// Record concession in conversation history for recap on resume
-	cm.addToConversationHistory("concede",
+	cm.actions.RecordConversation("concede",
 		fmt.Sprintf("[Conflict ended — %s conceded. Gained %d fate point(s).]", cm.player.Name, fatePointsGained),
 		inputTypeConflict)
 
@@ -1180,7 +939,7 @@ func (cm *ConflictManager) handleConcession(ctx context.Context) []GameEvent {
 		},
 	}
 
-	cm.pendingMidFlow = &midFlowState{
+	cm.actions.pendingMidFlow = &midFlowState{
 		event: event,
 		continuation: func(_ context.Context, resp MidFlowResponse) []GameEvent {
 			var events []GameEvent
@@ -1188,7 +947,7 @@ func (cm *ConflictManager) handleConcession(ctx context.Context) []GameEvent {
 				events = append(events, NarrativeEvent{
 					Text: fmt.Sprintf("%s %s", cm.player.Name, resp.Text),
 				})
-				cm.addToConversationHistory(resp.Text, "You exit the conflict on your own terms.", inputTypeDialog)
+				cm.actions.RecordConversation(resp.Text, "You exit the conflict on your own terms.", inputTypeDialog)
 			}
 			return events
 		},

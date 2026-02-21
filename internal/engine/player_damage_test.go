@@ -42,8 +42,10 @@ func setupConflictSM(t *testing.T, llmClient *capturingMockLLMClient) (*SceneMan
 	testScene.AddCharacter(attacker.ID)
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
 	sm.conflict.player = player
+	sm.actions.player = player
 
 	err = sm.conflict.initiateConflict(scene.PhysicalConflict, attacker.ID)
 	require.NoError(t, err)
@@ -150,16 +152,16 @@ func TestApplyAttackDamageToPlayer_StressOverflow_PromptsMidFlow(t *testing.T) {
 	assert.True(t, hasOverflow, "expected StressOverflowEvent for 3-shift hit on 2-box track")
 
 	// pendingMidFlow should be set with consequence choices per Fate Core.
-	require.NotNil(t, sm.conflict.pendingMidFlow, "expected pendingMidFlow to be set for consequence choice")
-	assert.Contains(t, sm.conflict.pendingMidFlow.event.Prompt, "choose")
+	require.NotNil(t, sm.actions.pendingMidFlow, "expected pendingMidFlow to be set for consequence choice")
+	assert.Contains(t, sm.actions.pendingMidFlow.event.Prompt, "choose")
 
 	// Available consequences: mild(2), moderate(4), severe(6) + "Be Taken Out".
 	slots := player.AvailableConsequenceSlots()
 	expectedOptions := len(slots) + 1 // +1 for "Be Taken Out"
-	assert.Equal(t, expectedOptions, len(sm.conflict.pendingMidFlow.event.Options))
+	assert.Equal(t, expectedOptions, len(sm.actions.pendingMidFlow.event.Options))
 
 	// Last option should be "Be Taken Out".
-	lastOpt := sm.conflict.pendingMidFlow.event.Options[len(sm.conflict.pendingMidFlow.event.Options)-1]
+	lastOpt := sm.actions.pendingMidFlow.event.Options[len(sm.actions.pendingMidFlow.event.Options)-1]
 	assert.Equal(t, "Be Taken Out", lastOpt.Label)
 }
 
@@ -222,8 +224,10 @@ func TestApplyAttackDamageToPlayer_MentalConflict_UsesMentalStress(t *testing.T)
 	testScene.AddCharacter(attacker.ID)
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
 	sm.conflict.player = player
+	sm.actions.player = player
 
 	// Start a MENTAL conflict.
 	err = sm.conflict.initiateConflict(scene.MentalConflict, attacker.ID)
@@ -296,9 +300,9 @@ func TestHandleStressOverflow_ConsequencesAvailable_SetsMidFlow(t *testing.T) {
 	assert.Equal(t, 3, overflowEvt.Shifts)
 
 	// pendingMidFlow should be set.
-	require.NotNil(t, sm.conflict.pendingMidFlow)
+	require.NotNil(t, sm.actions.pendingMidFlow)
 	// Options: mild, moderate, severe, + Be Taken Out = 4.
-	assert.Len(t, sm.conflict.pendingMidFlow.event.Options, 4)
+	assert.Len(t, sm.actions.pendingMidFlow.event.Options, 4)
 }
 
 // --- applyConsequence ---
@@ -389,7 +393,7 @@ func TestApplyConsequence_RecursiveOverflow(t *testing.T) {
 	}
 	assert.True(t, hasOverflow, "should emit StressOverflowEvent for remaining shifts")
 	// pendingMidFlow should be set (moderate and severe still available).
-	require.NotNil(t, sm.conflict.pendingMidFlow, "recursive overflow should set pendingMidFlow")
+	require.NotNil(t, sm.actions.pendingMidFlow, "recursive overflow should set pendingMidFlow")
 }
 
 // --- handleTakenOut ---
@@ -521,10 +525,10 @@ func TestStressOverflow_MidFlowContinuation_SelectConsequence(t *testing.T) {
 
 	// Trigger overflow.
 	sm.conflict.handleStressOverflow(context.Background(), 3, character.PhysicalStress, attacker, testAttackCtx())
-	require.NotNil(t, sm.conflict.pendingMidFlow)
+	require.NotNil(t, sm.actions.pendingMidFlow)
 
 	// Player picks choice 0 (mild consequence).
-	contEvents := sm.conflict.pendingMidFlow.continuation(context.Background(), MidFlowResponse{ChoiceIndex: 0})
+	contEvents := sm.actions.pendingMidFlow.continuation(context.Background(), MidFlowResponse{ChoiceIndex: 0})
 
 	var hasConseq bool
 	for _, e := range contEvents {
@@ -548,11 +552,11 @@ func TestStressOverflow_MidFlowContinuation_SelectTakenOut(t *testing.T) {
 
 	sm.conflict.handleStressOverflow(context.Background(), 3, character.PhysicalStress,
 		sm.characters.GetCharacter("npc-1"), testAttackCtx())
-	require.NotNil(t, sm.conflict.pendingMidFlow)
+	require.NotNil(t, sm.actions.pendingMidFlow)
 
 	// "Be Taken Out" is the last option (index = len(consequences)).
-	takenOutIdx := len(sm.conflict.pendingMidFlow.event.Options) - 1
-	contEvents := sm.conflict.pendingMidFlow.continuation(context.Background(), MidFlowResponse{ChoiceIndex: takenOutIdx})
+	takenOutIdx := len(sm.actions.pendingMidFlow.event.Options) - 1
+	contEvents := sm.actions.pendingMidFlow.continuation(context.Background(), MidFlowResponse{ChoiceIndex: takenOutIdx})
 
 	var hasTakenOut bool
 	for _, e := range contEvents {

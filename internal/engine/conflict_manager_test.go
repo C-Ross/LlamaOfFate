@@ -10,17 +10,15 @@ import (
 )
 
 func TestNewConflictManager(t *testing.T) {
-	cm := newConflictManager(nil, nil, nil, nil)
+	cm := newConflictManager(nil, nil, nil)
 	require.NotNil(t, cm)
 	assert.Nil(t, cm.llmClient)
 	assert.Nil(t, cm.characters)
-	assert.Nil(t, cm.pendingInvoke)
-	assert.Nil(t, cm.pendingMidFlow)
 	assert.Nil(t, cm.takenOutChars)
 }
 
 func TestConflictManager_SetSceneState(t *testing.T) {
-	cm := newConflictManager(nil, nil, nil, nil)
+	cm := newConflictManager(nil, nil, nil)
 	player := character.NewCharacter("p1", "Hero")
 	s := scene.NewScene("s1", "Room", "A room")
 
@@ -31,15 +29,11 @@ func TestConflictManager_SetSceneState(t *testing.T) {
 }
 
 func TestConflictManager_ResetState(t *testing.T) {
-	cm := newConflictManager(nil, nil, nil, nil)
-	cm.pendingInvoke = &invokeState{}
-	cm.pendingMidFlow = &midFlowState{}
+	cm := newConflictManager(nil, nil, nil)
 	cm.takenOutChars = []string{"npc1"}
 
 	cm.resetState()
 
-	assert.Nil(t, cm.pendingInvoke)
-	assert.Nil(t, cm.pendingMidFlow)
 	assert.Nil(t, cm.takenOutChars)
 }
 
@@ -61,14 +55,14 @@ func TestSceneManager_ConflictManagerWiring(t *testing.T) {
 
 func TestSceneManager_ResetSceneState_ResetsConflictManager(t *testing.T) {
 	sm := NewSceneManager(nil, nil, nil)
-	sm.conflict.pendingInvoke = &invokeState{}
-	sm.conflict.pendingMidFlow = &midFlowState{}
+	sm.actions.pendingInvoke = &invokeState{}
+	sm.actions.pendingMidFlow = &midFlowState{}
 	sm.conflict.takenOutChars = []string{"npc1"}
 
 	sm.resetSceneState()
 
-	assert.Nil(t, sm.conflict.pendingInvoke)
-	assert.Nil(t, sm.conflict.pendingMidFlow)
+	assert.Nil(t, sm.actions.pendingInvoke)
+	assert.Nil(t, sm.actions.pendingMidFlow)
 	assert.Nil(t, sm.conflict.takenOutChars)
 }
 

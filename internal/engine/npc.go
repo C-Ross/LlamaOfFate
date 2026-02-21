@@ -201,7 +201,7 @@ func (cm *ConflictManager) processNPCCreateAdvantage(ctx context.Context, npc *c
 	npcSkillLevel := npc.GetSkill(skill)
 
 	// Roll against Fair (+2) difficulty for creating aspects
-	npcRoll := cm.roller.RollWithModifier(dice.Mediocre, int(npcSkillLevel))
+	npcRoll := cm.actions.roller.RollWithModifier(dice.Mediocre, int(npcSkillLevel))
 	difficulty := dice.Fair
 	outcome := npcRoll.CompareAgainst(difficulty)
 
@@ -274,7 +274,7 @@ func (cm *ConflictManager) processNPCOvercome(ctx context.Context, npc *characte
 	npcSkillLevel := npc.GetSkill(skill)
 
 	// Roll against Fair (+2) difficulty
-	npcRoll := cm.roller.RollWithModifier(dice.Mediocre, int(npcSkillLevel))
+	npcRoll := cm.actions.roller.RollWithModifier(dice.Mediocre, int(npcSkillLevel))
 	difficulty := dice.Fair
 	outcome := npcRoll.CompareAgainst(difficulty)
 
@@ -307,7 +307,7 @@ func (cm *ConflictManager) processNPCOvercome(ctx context.Context, npc *characte
 // processNPCAttack handles an NPC attacking a target.
 // Returns (events, awaitingInvoke).
 // When the target is the player and defense
-// invokes are available, cm.pendingInvoke is set and awaitingInvoke is true.
+// invokes are available, cm.actions.pendingInvoke is set and awaitingInvoke is true.
 // The invoke continuation finishes the attack (narrative, damage) and resumes
 // processing remaining NPC turns via advanceConflictTurns.
 func (cm *ConflictManager) processNPCAttack(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) ([]GameEvent, bool) {
@@ -333,7 +333,7 @@ func (cm *ConflictManager) processNPCAttack(ctx context.Context, npc *character.
 	npcSkillLevel := npc.GetSkill(attackSkill)
 
 	// Roll NPC's attack
-	npcRoll := cm.roller.RollWithModifier(dice.Mediocre, int(npcSkillLevel))
+	npcRoll := cm.actions.roller.RollWithModifier(dice.Mediocre, int(npcSkillLevel))
 
 	// Get target's defense (check for full defense bonus)
 	targetDefenseLevel := target.GetSkill(defenseSkill)
@@ -341,7 +341,7 @@ func (cm *ConflictManager) processNPCAttack(ctx context.Context, npc *character.
 	if participant := cm.currentScene.GetParticipant(target.ID); participant != nil && participant.FullDefense {
 		defenseBonus = 2
 	}
-	targetDefense := cm.roller.RollWithModifier(dice.Mediocre, int(targetDefenseLevel)+defenseBonus)
+	targetDefense := cm.actions.roller.RollWithModifier(dice.Mediocre, int(targetDefenseLevel)+defenseBonus)
 
 	fullDefense := defenseBonus > 0
 
@@ -377,10 +377,10 @@ func (cm *ConflictManager) processNPCAttack(ctx context.Context, npc *character.
 			return cm.finishNPCAttackOnPlayer(finishCtx, result, accEvents, capturedNPC, capturedAttackSkill, capturedNPCRoll, capturedInitialOutcome)
 		}
 
-		evts, awaiting := cm.beginInvokeLoop(ctx, targetDefense, npcRoll.FinalValue, defenseAction, true, preEvents, finish)
+		evts, awaiting := cm.actions.beginInvokeLoop(ctx, targetDefense, npcRoll.FinalValue, defenseAction, true, preEvents, finish)
 		// Mark the pending invoke for NPC turn resumption after it resolves.
-		if awaiting && cm.pendingInvoke != nil {
-			cm.pendingInvoke.resumeTurns = true
+		if awaiting && cm.actions.pendingInvoke != nil {
+			cm.actions.pendingInvoke.resumeTurns = true
 		}
 		return evts, awaiting
 	}
