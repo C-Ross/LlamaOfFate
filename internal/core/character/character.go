@@ -270,29 +270,30 @@ type Consequence struct {
 	RecoveryStartScenario int             `json:"recovery_start_scenario"` // Scenario count when recovery began
 }
 
-// NewCharacter creates a new character with default values
+// NewCharacter creates a new character with default values.
+// Stress track sizes are set by RecalculateStressTracks based on Physique and Will.
 func NewCharacter(id, name string) *Character {
-	return &Character{
-		ID:         id,
-		Name:       name,
-		Aspects:    Aspects{OtherAspects: make([]string, 0)},
-		Skills:     make(map[string]dice.Ladder),
-		Stunts:     make([]Stunt, 0),
-		FatePoints: 3, // Default starting fate points
-		Refresh:    3, // Default refresh
-		StressTracks: map[string]*StressTrack{
-			string(PhysicalStress): NewStressTrack(PhysicalStress, 2),
-			string(MentalStress):   NewStressTrack(MentalStress, 2),
-		},
+	char := &Character{
+		ID:           id,
+		Name:         name,
+		Aspects:      Aspects{OtherAspects: make([]string, 0)},
+		Skills:       make(map[string]dice.Ladder),
+		Stunts:       make([]Stunt, 0),
+		FatePoints:   3, // Default starting fate points
+		Refresh:      3, // Default refresh
+		StressTracks: make(map[string]*StressTrack),
 		Consequences: make([]Consequence, 0),
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}
+	char.RecalculateStressTracks()
+	return char
 }
 
 // InitDefaults fills in runtime fields (stress tracks, timestamps, nil slices/maps)
 // that are not present in serialized data. Call this after unmarshaling from YAML/JSON
-// into a zero-value Character.
+// into a zero-value Character. Stress track sizes are always recalculated from the
+// character's current Physique and Will skills.
 func (c *Character) InitDefaults() {
 	if c.Skills == nil {
 		c.Skills = make(map[string]dice.Ladder)
@@ -307,11 +308,9 @@ func (c *Character) InitDefaults() {
 		c.Consequences = make([]Consequence, 0)
 	}
 	if c.StressTracks == nil {
-		c.StressTracks = map[string]*StressTrack{
-			string(PhysicalStress): NewStressTrack(PhysicalStress, 2),
-			string(MentalStress):   NewStressTrack(MentalStress, 2),
-		}
+		c.StressTracks = make(map[string]*StressTrack)
 	}
+	c.RecalculateStressTracks()
 	now := time.Now()
 	if c.CreatedAt.IsZero() {
 		c.CreatedAt = now
@@ -329,10 +328,74 @@ func (c *Character) GetSkill(skillName string) dice.Ladder {
 	return dice.Mediocre
 }
 
-// SetSkill sets a character's skill level
+// SetSkill sets a character's skill level and recalculates stress tracks when
+// Physique or Will changes, keeping them in sync with the new skill rating.
 func (c *Character) SetSkill(skillName string, level dice.Ladder) {
 	c.Skills[skillName] = level
 	c.UpdatedAt = time.Now()
+	if skillName == "Physique" || skillName == "Will" {
+		c.RecalculateStressTracks()
+	}
+}
+
+// stressBoxesForSkill returns the number of stress boxes granted by a skill rating.
+// Per Fate Core SRD (Physique and Will sections):
+//   - Mediocre (+0) or no skill → 2 boxes
+//   - Average (+1) or Fair (+2) → 3 boxes
+//   - Good (+3) or higher       → 4 boxes
+func stressBoxesForSkill(level dice.Ladder) int {
+	switch {
+	case level >= dice.Good:
+		return 4
+	case level >= dice.Average:
+		return 3
+	default:
+		return 2
+	}
+}
+
+// RecalculateStressTracks resizes the physical and mental stress tracks based on
+// the character's Physique and Will skills respectively, per the Fate Core SRD.
+// Checked boxes are preserved when expanding; the track is trimmed to the new
+// maximum when shrinking (preserving any already-checked boxes up to the new size).
+func (c *Character) RecalculateStressTracks() {
+	if c.StressTracks == nil {
+		c.StressTracks = make(map[string]*StressTrack)
+	}
+	c.recalculateTrack(PhysicalStress, c.GetSkill("Physique"))
+	c.recalculateTrack(MentalStress, c.GetSkill("Will"))
+}
+
+// recalculateTrack resizes a single stress track to match the size dictated by
+// the given skill level, preserving any already-checked boxes.
+func (c *Character) recalculateTrack(trackType StressTrackType, skillLevel dice.Ladder) {
+	newMax := stressBoxesForSkill(skillLevel)
+	track := c.GetStressTrack(trackType)
+	if track == nil {
+		c.StressTracks[string(trackType)] = NewStressTrack(trackType, newMax)
+		return
+	}
+	if track.MaxBoxes == newMax {
+		return
+	}
+	newBoxes := make([]bool, newMax)
+	copy(newBoxes, track.Boxes)
+	track.Boxes = newBoxes
+	track.MaxBoxes = newMax
+}
+
+// extraMildConsequences returns the number of additional mild consequence slots
+// granted by Physique (physical) and Will (mental) at Superb (+5) or higher,
+// per the Fate Core SRD.
+func (c *Character) extraMildConsequences() int {
+	extra := 0
+	if c.GetSkill("Physique") >= dice.Superb {
+		extra++
+	}
+	if c.GetSkill("Will") >= dice.Superb {
+		extra++
+	}
+	return extra
 }
 
 // AddStunt adds a stunt to the character

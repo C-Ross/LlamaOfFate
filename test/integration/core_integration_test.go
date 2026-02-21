@@ -77,21 +77,28 @@ func TestIntegration_StressAndConsequences(t *testing.T) {
 	// Create a character
 	fighter := character.NewCharacter("fighter-1", "Grimm the Barbarian")
 	fighter.SetSkill("Fight", dice.Superb)
-	fighter.SetSkill("Physique", dice.Great)
+	fighter.SetSkill("Physique", dice.Great) // Great (+4) → 4 physical stress boxes
 
 	// Test stress system
 	physicalTrack := fighter.GetStressTrack(character.PhysicalStress)
 	require.NotNil(t, physicalTrack)
+	assert.Equal(t, 4, physicalTrack.MaxBoxes, "Physique: Great should grant 4 physical stress boxes")
 
 	// Take some stress
 	assert.True(t, fighter.TakeStress(character.PhysicalStress, 1))
 	assert.True(t, fighter.TakeStress(character.PhysicalStress, 2))
 
-	// Try to take stress when track is full
+	// Try to take stress on an already filled box
 	assert.False(t, fighter.TakeStress(character.PhysicalStress, 1),
 		"Should not be able to take 1-stress when box already filled")
 
-	// Verify track state
+	// Track is not full yet (boxes 3 and 4 are still open)
+	assert.False(t, physicalTrack.IsFull())
+	assert.Equal(t, 2, physicalTrack.AvailableBoxes())
+
+	// Fill remaining boxes
+	assert.True(t, fighter.TakeStress(character.PhysicalStress, 3))
+	assert.True(t, fighter.TakeStress(character.PhysicalStress, 4))
 	assert.True(t, physicalTrack.IsFull())
 	assert.Equal(t, 0, physicalTrack.AvailableBoxes())
 

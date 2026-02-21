@@ -125,7 +125,8 @@ func NewNamelessNPC(id, name string, charType CharacterType, primarySkill string
 }
 
 // NewSupportingNPC creates a supporting NPC with the given name and high concept.
-// Supporting NPCs have 1-2 stress boxes and can only take Mild consequences.
+// Supporting NPCs have stress tracks sized by Physique/Will (defaulting to 2 boxes
+// each) and can only take Mild consequences.
 func NewSupportingNPC(id, name, highConcept string) *Character {
 	char := &Character{
 		ID:            id,
@@ -135,17 +136,14 @@ func NewSupportingNPC(id, name, highConcept string) *Character {
 			HighConcept:  highConcept,
 			OtherAspects: make([]string, 0),
 		},
-		Skills:     make(map[string]dice.Ladder),
-		Stunts:     make([]Stunt, 0),
-		FatePoints: 1, // Limited fate points
-		Refresh:    1,
-		StressTracks: map[string]*StressTrack{
-			string(PhysicalStress): NewStressTrack(PhysicalStress, 2),
-			string(MentalStress):   NewStressTrack(MentalStress, 1),
-		},
+		Skills:       make(map[string]dice.Ladder),
+		Stunts:       make([]Stunt, 0),
+		FatePoints:   1, // Limited fate points
+		Refresh:      1,
+		StressTracks: make(map[string]*StressTrack),
 		Consequences: make([]Consequence, 0),
 	}
-
+	char.RecalculateStressTracks()
 	return char
 }
 
@@ -170,14 +168,19 @@ func (c *Character) CanTakeConsequence(conseqType ConsequenceType) bool {
 		return false
 	}
 
-	// Check if the slot is already taken
+	// Count how many of this type are already taken
+	count := 0
 	for _, existing := range c.Consequences {
 		if existing.Type == conseqType {
-			return false
+			count++
 		}
 	}
 
-	return true
+	// Mild consequences can have additional slots from Physique/Will at Superb+
+	if conseqType == MildConsequence {
+		return count < 1+c.extraMildConsequences()
+	}
+	return count == 0
 }
 
 // isConsequenceSeverityAllowed checks if a consequence type is at or below the max severity

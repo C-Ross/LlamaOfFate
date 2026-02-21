@@ -514,3 +514,177 @@ func TestCharacter_IsPermanentlyRemoved(t *testing.T) {
 	}
 	assert.True(t, char.IsPermanentlyRemoved(), "Permanent fate should be permanently removed")
 }
+
+// TestRecalculateStressTracks_DefaultNoSkill verifies a character with no Physique/Will
+// gets the default 2-box tracks per Fate Core.
+func TestRecalculateStressTracks_DefaultNoSkill(t *testing.T) {
+	char := NewCharacter("test", "Test")
+
+	physTrack := char.GetStressTrack(PhysicalStress)
+	mentalTrack := char.GetStressTrack(MentalStress)
+	require.NotNil(t, physTrack)
+	require.NotNil(t, mentalTrack)
+	assert.Equal(t, 2, physTrack.MaxBoxes, "No Physique → 2 physical boxes")
+	assert.Equal(t, 2, mentalTrack.MaxBoxes, "No Will → 2 mental boxes")
+}
+
+// TestRecalculateStressTracks_AverageAndFair verifies Average (+1) and Fair (+2)
+// skill ratings grant 3 stress boxes.
+func TestRecalculateStressTracks_AverageAndFair(t *testing.T) {
+	for _, level := range []dice.Ladder{dice.Average, dice.Fair} {
+		char := NewCharacter("test", "Test")
+		char.SetSkill("Physique", level)
+		char.SetSkill("Will", level)
+
+		physTrack := char.GetStressTrack(PhysicalStress)
+		mentalTrack := char.GetStressTrack(MentalStress)
+		assert.Equal(t, 3, physTrack.MaxBoxes, "Physique %s → 3 physical boxes", level)
+		assert.Equal(t, 3, mentalTrack.MaxBoxes, "Will %s → 3 mental boxes", level)
+	}
+}
+
+// TestRecalculateStressTracks_GoodAndGreat verifies Good (+3) and Great (+4)
+// skill ratings grant 4 stress boxes.
+func TestRecalculateStressTracks_GoodAndGreat(t *testing.T) {
+	for _, level := range []dice.Ladder{dice.Good, dice.Great} {
+		char := NewCharacter("test", "Test")
+		char.SetSkill("Physique", level)
+		char.SetSkill("Will", level)
+
+		physTrack := char.GetStressTrack(PhysicalStress)
+		mentalTrack := char.GetStressTrack(MentalStress)
+		assert.Equal(t, 4, physTrack.MaxBoxes, "Physique %s → 4 physical boxes", level)
+		assert.Equal(t, 4, mentalTrack.MaxBoxes, "Will %s → 4 mental boxes", level)
+	}
+}
+
+// TestRecalculateStressTracks_SuperbGrantsExtraMild verifies Superb (+5) or higher
+// grants 4 stress boxes AND an extra mild consequence slot per Fate Core SRD.
+func TestRecalculateStressTracks_SuperbGrantsExtraMild(t *testing.T) {
+	char := NewCharacter("test", "Test")
+	char.SetSkill("Physique", dice.Superb)
+	char.SetSkill("Will", dice.Superb)
+
+	physTrack := char.GetStressTrack(PhysicalStress)
+	mentalTrack := char.GetStressTrack(MentalStress)
+	assert.Equal(t, 4, physTrack.MaxBoxes, "Physique Superb → 4 physical boxes")
+	assert.Equal(t, 4, mentalTrack.MaxBoxes, "Will Superb → 4 mental boxes")
+
+	// Superb Physique + Superb Will → 2 extra mild slots (3 mild total)
+	assert.True(t, char.CanTakeConsequence(MildConsequence))
+	char.AddConsequence(Consequence{ID: "m1", Type: MildConsequence, Aspect: "First Mild"})
+	assert.True(t, char.CanTakeConsequence(MildConsequence), "Should allow second mild with Superb Physique+Will")
+	char.AddConsequence(Consequence{ID: "m2", Type: MildConsequence, Aspect: "Second Mild"})
+	assert.True(t, char.CanTakeConsequence(MildConsequence), "Should allow third mild with both at Superb")
+	char.AddConsequence(Consequence{ID: "m3", Type: MildConsequence, Aspect: "Third Mild"})
+	assert.False(t, char.CanTakeConsequence(MildConsequence), "No more mild slots available")
+}
+
+// TestRecalculateStressTracks_SuperbOnlyPhysique verifies only one extra mild slot
+// when only Physique is Superb+.
+func TestRecalculateStressTracks_SuperbOnlyPhysique(t *testing.T) {
+	char := NewCharacter("test", "Test")
+	char.SetSkill("Physique", dice.Superb)
+
+	assert.True(t, char.CanTakeConsequence(MildConsequence))
+	char.AddConsequence(Consequence{ID: "m1", Type: MildConsequence, Aspect: "First Mild"})
+	assert.True(t, char.CanTakeConsequence(MildConsequence), "Superb Physique grants one extra mild slot")
+	char.AddConsequence(Consequence{ID: "m2", Type: MildConsequence, Aspect: "Second Mild"})
+	assert.False(t, char.CanTakeConsequence(MildConsequence), "No third mild slot without Superb Will")
+}
+
+// TestRecalculateStressTracks_SkillChangeMidGame verifies that changing Physique or Will
+// mid-game resizes the track while preserving already-checked boxes.
+func TestRecalculateStressTracks_SkillChangeMidGame(t *testing.T) {
+	char := NewCharacter("test", "Test") // 2 boxes initially
+
+	// Mark box 1 and 2
+	assert.True(t, char.TakeStress(PhysicalStress, 1))
+	assert.True(t, char.TakeStress(PhysicalStress, 2))
+
+	// Upgrade Physique to Good → expands to 4 boxes
+	char.SetSkill("Physique", dice.Good)
+	physTrack := char.GetStressTrack(PhysicalStress)
+	assert.Equal(t, 4, physTrack.MaxBoxes, "Should expand to 4 boxes")
+	assert.True(t, physTrack.Boxes[0], "Box 1 should remain checked after resize")
+	assert.True(t, physTrack.Boxes[1], "Box 2 should remain checked after resize")
+	assert.False(t, physTrack.Boxes[2], "Box 3 should start empty")
+	assert.False(t, physTrack.Boxes[3], "Box 4 should start empty")
+}
+
+// TestRecalculateStressTracks_InitDefaults verifies that InitDefaults recalculates
+// stress tracks from existing skills (simulates loading a saved character).
+func TestRecalculateStressTracks_InitDefaults(t *testing.T) {
+	// Simulate a character loaded from YAML with skills already set
+	char := &Character{
+		ID:     "saved",
+		Name:   "Loaded Hero",
+		Skills: map[string]dice.Ladder{"Physique": dice.Great, "Will": dice.Average},
+		Aspects: Aspects{
+			OtherAspects: make([]string, 0),
+		},
+		Consequences: make([]Consequence, 0),
+	}
+	char.InitDefaults()
+
+	physTrack := char.GetStressTrack(PhysicalStress)
+	mentalTrack := char.GetStressTrack(MentalStress)
+	require.NotNil(t, physTrack)
+	require.NotNil(t, mentalTrack)
+	assert.Equal(t, 4, physTrack.MaxBoxes, "Physique: Great (+4) should yield 4 physical boxes after InitDefaults")
+	assert.Equal(t, 3, mentalTrack.MaxBoxes, "Will: Average (+1) should yield 3 mental boxes after InitDefaults")
+}
+
+// TestRecalculateStressTracks_MainNPC verifies that a Main NPC created via NewMainNPC
+// also gets correct stress tracks after skills are set.
+func TestRecalculateStressTracks_MainNPC(t *testing.T) {
+	npc := NewMainNPC("boss-1", "The Warlord")
+	npc.SetSkill("Physique", dice.Good)
+	npc.SetSkill("Will", dice.Fair)
+
+	physTrack := npc.GetStressTrack(PhysicalStress)
+	mentalTrack := npc.GetStressTrack(MentalStress)
+	require.NotNil(t, physTrack)
+	require.NotNil(t, mentalTrack)
+	assert.Equal(t, 4, physTrack.MaxBoxes, "Main NPC Physique: Good → 4 physical boxes")
+	assert.Equal(t, 3, mentalTrack.MaxBoxes, "Main NPC Will: Fair → 3 mental boxes")
+}
+
+// TestRecalculateStressTracks_SupportingNPC verifies that a Supporting NPC gets
+// skill-based stress tracks when Physique/Will are set.
+func TestRecalculateStressTracks_SupportingNPC(t *testing.T) {
+	npc := NewSupportingNPC("innkeeper-1", "Boris the Innkeeper", "Knows Everyone's Business")
+
+	// Default: no skills → 2 boxes each
+	physTrack := npc.GetStressTrack(PhysicalStress)
+	mentalTrack := npc.GetStressTrack(MentalStress)
+	require.NotNil(t, physTrack)
+	require.NotNil(t, mentalTrack)
+	assert.Equal(t, 2, physTrack.MaxBoxes, "Supporting NPC default → 2 physical boxes")
+	assert.Equal(t, 2, mentalTrack.MaxBoxes, "Supporting NPC default → 2 mental boxes")
+
+	// Set Physique: Good → grows to 4
+	npc.SetSkill("Physique", dice.Good)
+	assert.Equal(t, 4, npc.GetStressTrack(PhysicalStress).MaxBoxes, "After Physique: Good → 4 physical boxes")
+}
+
+// TestStressBoxesForSkill covers all tiers in the Fate Core table.
+func TestStressBoxesForSkill(t *testing.T) {
+	tests := []struct {
+		level    dice.Ladder
+		expected int
+	}{
+		{dice.Mediocre, 2},
+		{dice.Average, 3},
+		{dice.Fair, 3},
+		{dice.Good, 4},
+		{dice.Great, 4},
+		{dice.Superb, 4},
+		{dice.Fantastic, 4},
+	}
+
+	for _, tt := range tests {
+		assert.Equal(t, tt.expected, stressBoxesForSkill(tt.level),
+			"stressBoxesForSkill(%s)", tt.level)
+	}
+}
