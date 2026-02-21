@@ -45,12 +45,13 @@ type SceneManager struct {
 	lastTransition        *prompt.SceneTransition // Captured transition hint when scene ends
 	aspectGenerator       AspectGenerator
 	sessionLogger         *session.Logger
-	takenOutChars         []string       // Characters taken out during this scene
-	sceneEndReason        SceneEndReason // Why the scene ended
-	playerTakenOutHint    string         // Transition hint if player was taken out
-	scenePurpose          string         // Dramatic question driving the current scene
-	pendingInvoke         *invokeState   // Non-nil when awaiting an InvokeResponse
-	pendingMidFlow        *midFlowState  // Non-nil when awaiting a MidFlowResponse
+	takenOutChars         []string         // Characters taken out during this scene
+	sceneEndReason        SceneEndReason   // Why the scene ended
+	playerTakenOutHint    string           // Transition hint if player was taken out
+	scenePurpose          string           // Dramatic question driving the current scene
+	pendingInvoke         *invokeState     // Non-nil when awaiting an InvokeResponse
+	pendingMidFlow        *midFlowState    // Non-nil when awaiting a MidFlowResponse
+	conflict              *ConflictManager // Conflict subsystem (wired per-scene)
 }
 
 // SetScenePurpose sets the dramatic question driving the current scene,
@@ -62,23 +63,29 @@ func (sm *SceneManager) SetScenePurpose(purpose string) {
 // NewSceneManager creates a new scene manager with injected dependencies.
 // llmClient and actionParser may be nil when running without an LLM.
 func NewSceneManager(characters CharacterResolver, llmClient llm.LLMClient, actionParser ActionParser) *SceneManager {
+	roller := dice.NewRoller()
+	var ag AspectGenerator
+	if llmClient != nil {
+		ag = NewAspectGenerator(llmClient)
+	}
+
 	sm := &SceneManager{
 		llmClient:           llmClient,
 		characters:          characters,
 		actionParser:        actionParser,
-		roller:              dice.NewRoller(),
+		roller:              roller,
 		conversationHistory: make([]prompt.ConversationEntry, 0),
-	}
-	// Initialize aspect generator if LLM client is available
-	if llmClient != nil {
-		sm.aspectGenerator = NewAspectGenerator(llmClient)
+		aspectGenerator:     ag,
+		conflict:            newConflictManager(llmClient, characters, roller, ag),
 	}
 	return sm
 }
 
-// SetSessionLogger sets the session logger for recording game transcripts
+// SetSessionLogger sets the session logger for recording game transcripts.
+// It also propagates to the ConflictManager.
 func (sm *SceneManager) SetSessionLogger(logger *session.Logger) {
 	sm.sessionLogger = logger
+	sm.conflict.setSessionLogger(logger)
 }
 
 // SetExitOnSceneTransition configures whether the scene loop should exit on scene transition
@@ -90,6 +97,7 @@ func (sm *SceneManager) SetExitOnSceneTransition(exit bool) {
 func (sm *SceneManager) StartScene(scene *scene.Scene, player *character.Character) error {
 	sm.currentScene = scene
 	sm.player = player
+	sm.conflict.setSceneState(scene, player)
 
 	// Clear conversation history from previous scene — recap should only
 	// appear when restoring from a save (via Restore()), not on normal transitions.
@@ -211,6 +219,7 @@ func (sm *SceneManager) resetSceneState() {
 	sm.shouldExit = false
 	sm.pendingInvoke = nil
 	sm.pendingMidFlow = nil
+	sm.conflict.resetState()
 }
 
 // buildSceneEndResult constructs a SceneEndResult from the current state.
@@ -609,6 +618,7 @@ func (sm *SceneManager) Restore(state SceneState, player *character.Character) {
 	sm.player = player
 	sm.conversationHistory = state.ConversationHistory
 	sm.scenePurpose = state.ScenePurpose
+	sm.conflict.setSceneState(state.CurrentScene, player)
 
 	// Ensure player is in the scene (defensive — should already be from saved state)
 	if sm.currentScene != nil {
