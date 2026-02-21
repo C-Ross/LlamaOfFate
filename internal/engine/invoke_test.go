@@ -23,7 +23,7 @@ func buildInvokeTestSM(t *testing.T, fatePoints int) (*SceneManager, *MockUI) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
-	sm.roller = dice.NewSeededRoller(42)
+	sm.conflict.roller = dice.NewSeededRoller(42)
 
 	player := character.NewCharacter("player-1", "Test Hero")
 	player.Aspects.HighConcept = "Mighty Warrior"
@@ -37,7 +37,9 @@ func buildInvokeTestSM(t *testing.T, fatePoints int) (*SceneManager, *MockUI) {
 	testScene.AddSituationAspect(scene.NewSituationAspect("sit-1", "Burning Rafters", "gm", 2))
 
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
 	sm.player = player
+	sm.conflict.player = player
 
 	mockUI := &MockUI{}
 
@@ -51,8 +53,8 @@ func TestBuildInvokePrompt_NoAspectsAvailable(t *testing.T) {
 	// Zero FP and no free invokes on character aspects
 	sm.currentScene.SituationAspects = nil // remove situation aspects
 
-	result := sm.roller.RollWithModifier(dice.Mediocre, int(dice.Good))
-	prompt, _ := sm.buildInvokePrompt(result, dice.Superb, false, nil)
+	result := sm.conflict.roller.RollWithModifier(dice.Mediocre, int(dice.Good))
+	prompt, _ := sm.conflict.buildInvokePrompt(result, dice.Superb, false, nil)
 
 	assert.Nil(t, prompt, "no prompt when no invokes are possible")
 }
@@ -61,8 +63,8 @@ func TestBuildInvokePrompt_HasFatePoints(t *testing.T) {
 	sm, _ := buildInvokeTestSM(t, 3)
 
 	// Roll that needs improvement
-	result := sm.roller.RollWithModifier(dice.Mediocre, int(dice.Good))
-	prompt, available := sm.buildInvokePrompt(result, dice.Superb, false, nil)
+	result := sm.conflict.roller.RollWithModifier(dice.Mediocre, int(dice.Good))
+	prompt, available := sm.conflict.buildInvokePrompt(result, dice.Superb, false, nil)
 
 	require.NotNil(t, prompt, "should prompt when FP available")
 	assert.Equal(t, 3, prompt.FatePoints)
@@ -73,8 +75,8 @@ func TestBuildInvokePrompt_HasFatePoints(t *testing.T) {
 func TestBuildInvokePrompt_FreeInvokeAvailable_ZeroFP(t *testing.T) {
 	sm, _ := buildInvokeTestSM(t, 0)
 
-	result := sm.roller.RollWithModifier(dice.Mediocre, int(dice.Good))
-	prompt, available := sm.buildInvokePrompt(result, dice.Superb, false, nil)
+	result := sm.conflict.roller.RollWithModifier(dice.Mediocre, int(dice.Good))
+	prompt, available := sm.conflict.buildInvokePrompt(result, dice.Superb, false, nil)
 
 	require.NotNil(t, prompt, "should prompt when free invokes available")
 	assert.Equal(t, 0, prompt.FatePoints)
@@ -94,8 +96,8 @@ func TestBuildInvokePrompt_SkipsWhenSuccessWithStyle(t *testing.T) {
 	sm, _ := buildInvokeTestSM(t, 3)
 
 	// Use a very high modifier to guarantee success with style
-	result := sm.roller.RollWithModifier(dice.Mediocre, 10)
-	prompt, _ := sm.buildInvokePrompt(result, dice.Mediocre, false, nil)
+	result := sm.conflict.roller.RollWithModifier(dice.Mediocre, 10)
+	prompt, _ := sm.conflict.buildInvokePrompt(result, dice.Mediocre, false, nil)
 
 	assert.Nil(t, prompt, "should not prompt when already success with style")
 }
@@ -104,8 +106,8 @@ func TestBuildInvokePrompt_Defense_SkipsWhenDefenseWins(t *testing.T) {
 	sm, _ := buildInvokeTestSM(t, 3)
 
 	// Defense result is higher than attack difficulty
-	result := sm.roller.RollWithModifier(dice.Mediocre, 10)
-	prompt, _ := sm.buildInvokePrompt(result, dice.Good, true, nil)
+	result := sm.conflict.roller.RollWithModifier(dice.Mediocre, 10)
+	prompt, _ := sm.conflict.buildInvokePrompt(result, dice.Good, true, nil)
 
 	assert.Nil(t, prompt, "should not prompt for defense when already winning")
 }
@@ -114,8 +116,8 @@ func TestBuildInvokePrompt_Defense_PromptsWhenLosing(t *testing.T) {
 	sm, _ := buildInvokeTestSM(t, 3)
 
 	// Defense result is lower than attack
-	result := sm.roller.RollWithModifier(dice.Mediocre, 0)
-	prompt, _ := sm.buildInvokePrompt(result, dice.Superb, true, nil)
+	result := sm.conflict.roller.RollWithModifier(dice.Mediocre, 0)
+	prompt, _ := sm.conflict.buildInvokePrompt(result, dice.Superb, true, nil)
 
 	require.NotNil(t, prompt, "should prompt for defense when losing")
 	assert.Greater(t, prompt.ShiftsNeeded, 0)
@@ -127,7 +129,7 @@ func TestBeginInvokeLoop_NoInvokePossible_CallsFinishImmediately(t *testing.T) {
 	sm, _ := buildInvokeTestSM(t, 0)
 	sm.currentScene.SituationAspects = nil // no free invokes available
 
-	result := sm.roller.RollWithModifier(dice.Mediocre, int(dice.Good))
+	result := sm.conflict.roller.RollWithModifier(dice.Mediocre, int(dice.Good))
 	parsedAction := action.NewAction("act-1", "player-1", action.Overcome, "Fight", "test")
 
 	finishCalled := false
@@ -136,19 +138,19 @@ func TestBeginInvokeLoop_NoInvokePossible_CallsFinishImmediately(t *testing.T) {
 		return append(events, SystemMessageEvent{Message: "finished"})
 	}
 
-	events, awaiting := sm.beginInvokeLoop(context.Background(), result, dice.Superb, parsedAction, false, nil, finish)
+	events, awaiting := sm.conflict.beginInvokeLoop(context.Background(), result, dice.Superb, parsedAction, false, nil, finish)
 
 	assert.True(t, finishCalled, "finish should be called immediately")
 	assert.False(t, awaiting, "should not be awaiting invoke")
 	require.Len(t, events, 1)
 	assert.Equal(t, "finished", events[0].(SystemMessageEvent).Message)
-	assert.Nil(t, sm.pendingInvoke, "no pending invoke state")
+	assert.Nil(t, sm.conflict.pendingInvoke, "no pending invoke state")
 }
 
 func TestBeginInvokeLoop_InvokePossible_SetsPendingState(t *testing.T) {
 	sm, _ := buildInvokeTestSM(t, 3)
 
-	result := sm.roller.RollWithModifier(dice.Mediocre, int(dice.Good))
+	result := sm.conflict.roller.RollWithModifier(dice.Mediocre, int(dice.Good))
 	parsedAction := action.NewAction("act-1", "player-1", action.Overcome, "Fight", "test")
 
 	finish := func(ctx context.Context, r *dice.CheckResult, events []GameEvent) []GameEvent {
@@ -156,10 +158,10 @@ func TestBeginInvokeLoop_InvokePossible_SetsPendingState(t *testing.T) {
 		return events
 	}
 
-	events, awaiting := sm.beginInvokeLoop(context.Background(), result, dice.Superb, parsedAction, false, nil, finish)
+	events, awaiting := sm.conflict.beginInvokeLoop(context.Background(), result, dice.Superb, parsedAction, false, nil, finish)
 
 	assert.True(t, awaiting, "should be awaiting invoke")
-	require.NotNil(t, sm.pendingInvoke, "pending invoke state should be set")
+	require.NotNil(t, sm.conflict.pendingInvoke, "pending invoke state should be set")
 	assert.True(t, sm.HasPendingInvoke())
 
 	// Last event should be InvokePromptEvent
@@ -176,7 +178,7 @@ func TestBeginInvokeLoop_InvokePossible_SetsPendingState(t *testing.T) {
 func TestProvideInvokeResponse_Skip(t *testing.T) {
 	sm, _ := buildInvokeTestSM(t, 3)
 
-	result := sm.roller.RollWithModifier(dice.Mediocre, int(dice.Good))
+	result := sm.conflict.roller.RollWithModifier(dice.Mediocre, int(dice.Good))
 	parsedAction := action.NewAction("act-1", "player-1", action.Overcome, "Fight", "test")
 	initialFP := sm.player.FatePoints
 
@@ -186,7 +188,7 @@ func TestProvideInvokeResponse_Skip(t *testing.T) {
 		return append(events, SystemMessageEvent{Message: "done"})
 	}
 
-	sm.beginInvokeLoop(context.Background(), result, dice.Superb, parsedAction, false, nil, finish)
+	sm.conflict.beginInvokeLoop(context.Background(), result, dice.Superb, parsedAction, false, nil, finish)
 	require.True(t, sm.HasPendingInvoke())
 
 	// Skip
@@ -197,14 +199,14 @@ func TestProvideInvokeResponse_Skip(t *testing.T) {
 
 	assert.True(t, finishCalled, "finish should be called on skip")
 	assert.False(t, resp.AwaitingInvoke)
-	assert.Nil(t, sm.pendingInvoke, "pending state cleared")
+	assert.Nil(t, sm.conflict.pendingInvoke, "pending state cleared")
 	assert.Equal(t, initialFP, sm.player.FatePoints, "no FP should be spent on skip")
 }
 
 func TestProvideInvokeResponse_PlusTwoBonus(t *testing.T) {
 	sm, _ := buildInvokeTestSM(t, 3)
 
-	result := sm.roller.RollWithModifier(dice.Mediocre, int(dice.Good))
+	result := sm.conflict.roller.RollWithModifier(dice.Mediocre, int(dice.Good))
 	initialFinal := result.FinalValue
 	parsedAction := action.NewAction("act-1", "player-1", action.Overcome, "Fight", "test")
 
@@ -216,12 +218,12 @@ func TestProvideInvokeResponse_PlusTwoBonus(t *testing.T) {
 		return events
 	}
 
-	sm.beginInvokeLoop(context.Background(), result, dice.Superb, parsedAction, false, nil, finish)
+	sm.conflict.beginInvokeLoop(context.Background(), result, dice.Superb, parsedAction, false, nil, finish)
 	require.True(t, sm.HasPendingInvoke())
 
 	// Find a character aspect index (not a free invoke)
 	var charIdx int
-	for i, a := range sm.pendingInvoke.available {
+	for i, a := range sm.conflict.pendingInvoke.available {
 		if a.Source == "character" && a.FreeInvokes == 0 {
 			charIdx = i
 			break
@@ -256,19 +258,19 @@ func TestProvideInvokeResponse_PlusTwoBonus(t *testing.T) {
 func TestProvideInvokeResponse_Reroll(t *testing.T) {
 	sm, _ := buildInvokeTestSM(t, 3)
 
-	result := sm.roller.RollWithModifier(dice.Mediocre, int(dice.Good))
+	result := sm.conflict.roller.RollWithModifier(dice.Mediocre, int(dice.Good))
 	parsedAction := action.NewAction("act-1", "player-1", action.Overcome, "Fight", "test")
 
 	finish := func(ctx context.Context, r *dice.CheckResult, events []GameEvent) []GameEvent {
 		return events
 	}
 
-	sm.beginInvokeLoop(context.Background(), result, dice.Superb, parsedAction, false, nil, finish)
+	sm.conflict.beginInvokeLoop(context.Background(), result, dice.Superb, parsedAction, false, nil, finish)
 	require.True(t, sm.HasPendingInvoke())
 
 	// Find a character aspect
 	var charIdx int
-	for i, a := range sm.pendingInvoke.available {
+	for i, a := range sm.conflict.pendingInvoke.available {
 		if a.Source == "character" && a.FreeInvokes == 0 {
 			charIdx = i
 			break
@@ -298,20 +300,20 @@ func TestProvideInvokeResponse_Reroll(t *testing.T) {
 func TestProvideInvokeResponse_FreeInvoke(t *testing.T) {
 	sm, _ := buildInvokeTestSM(t, 0) // Zero FP — must use free invoke
 
-	result := sm.roller.RollWithModifier(dice.Mediocre, int(dice.Good))
+	result := sm.conflict.roller.RollWithModifier(dice.Mediocre, int(dice.Good))
 	parsedAction := action.NewAction("act-1", "player-1", action.Overcome, "Fight", "test")
 
 	finish := func(ctx context.Context, r *dice.CheckResult, events []GameEvent) []GameEvent {
 		return events
 	}
 
-	sm.beginInvokeLoop(context.Background(), result, dice.Superb, parsedAction, false, nil, finish)
+	sm.conflict.beginInvokeLoop(context.Background(), result, dice.Superb, parsedAction, false, nil, finish)
 	require.True(t, sm.HasPendingInvoke())
 
 	// Find the free invoke aspect
 	var freeIdx int
 	found := false
-	for i, a := range sm.pendingInvoke.available {
+	for i, a := range sm.conflict.pendingInvoke.available {
 		if a.FreeInvokes > 0 {
 			freeIdx = i
 			found = true
@@ -348,14 +350,14 @@ func TestProvideInvokeResponse_FreeInvoke(t *testing.T) {
 func TestProvideInvokeResponse_InvalidIndex(t *testing.T) {
 	sm, _ := buildInvokeTestSM(t, 3)
 
-	result := sm.roller.RollWithModifier(dice.Mediocre, int(dice.Good))
+	result := sm.conflict.roller.RollWithModifier(dice.Mediocre, int(dice.Good))
 	parsedAction := action.NewAction("act-1", "player-1", action.Overcome, "Fight", "test")
 
 	finish := func(ctx context.Context, r *dice.CheckResult, events []GameEvent) []GameEvent {
 		return events
 	}
 
-	sm.beginInvokeLoop(context.Background(), result, dice.Superb, parsedAction, false, nil, finish)
+	sm.conflict.beginInvokeLoop(context.Background(), result, dice.Superb, parsedAction, false, nil, finish)
 	require.True(t, sm.HasPendingInvoke())
 
 	_, err := sm.ProvideInvokeResponse(context.Background(), InvokeResponse{
@@ -379,7 +381,7 @@ func TestHandleInput_RejectsDuringPendingInvoke(t *testing.T) {
 	sm, _ := buildInvokeTestSM(t, 3)
 
 	// Manually set a pending invoke
-	sm.pendingInvoke = &invokeState{}
+	sm.conflict.pendingInvoke = &invokeState{}
 
 	_, err := sm.HandleInput(context.Background(), "hello")
 	assert.Error(t, err, "should reject HandleInput during pending invoke")
@@ -395,7 +397,7 @@ func TestHasPendingInvoke_False(t *testing.T) {
 
 func TestHasPendingInvoke_True(t *testing.T) {
 	sm, _ := buildInvokeTestSM(t, 0)
-	sm.pendingInvoke = &invokeState{}
+	sm.conflict.pendingInvoke = &invokeState{}
 	assert.True(t, sm.HasPendingInvoke())
 }
 

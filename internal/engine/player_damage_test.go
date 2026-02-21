@@ -41,9 +41,11 @@ func setupConflictSM(t *testing.T, llmClient *capturingMockLLMClient) (*SceneMan
 	testScene.AddCharacter(player.ID)
 	testScene.AddCharacter(attacker.ID)
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
 	sm.player = player
+	sm.conflict.player = player
 
-	err = sm.initiateConflict(scene.PhysicalConflict, attacker.ID)
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, attacker.ID)
 	require.NoError(t, err)
 
 	return sm, player, attacker
@@ -72,7 +74,7 @@ func TestApplyAttackDamageToPlayer_SuccessStressAbsorbed(t *testing.T) {
 	outcome := &dice.Outcome{Type: dice.Success, Shifts: 1}
 	atkCtx := testAttackCtx()
 
-	events := sm.applyAttackDamageToPlayer(context.Background(), outcome, attacker, atkCtx)
+	events := sm.conflict.applyAttackDamageToPlayer(context.Background(), outcome, attacker, atkCtx)
 	require.Len(t, events, 1)
 
 	stressEvt, ok := events[0].(PlayerStressEvent)
@@ -94,7 +96,7 @@ func TestApplyAttackDamageToPlayer_SuccessWithStyle_HighShiftsAbsorbed(t *testin
 	outcome := &dice.Outcome{Type: dice.SuccessWithStyle, Shifts: 2}
 	atkCtx := testAttackCtx()
 
-	events := sm.applyAttackDamageToPlayer(context.Background(), outcome, attacker, atkCtx)
+	events := sm.conflict.applyAttackDamageToPlayer(context.Background(), outcome, attacker, atkCtx)
 	require.Len(t, events, 1)
 
 	stressEvt, ok := events[0].(PlayerStressEvent)
@@ -114,7 +116,7 @@ func TestApplyAttackDamageToPlayer_SuccessMinimumOneShift(t *testing.T) {
 	outcome := &dice.Outcome{Type: dice.Success, Shifts: 0}
 	atkCtx := testAttackCtx()
 
-	events := sm.applyAttackDamageToPlayer(context.Background(), outcome, attacker, atkCtx)
+	events := sm.conflict.applyAttackDamageToPlayer(context.Background(), outcome, attacker, atkCtx)
 	require.Len(t, events, 1)
 
 	stressEvt, ok := events[0].(PlayerStressEvent)
@@ -135,7 +137,7 @@ func TestApplyAttackDamageToPlayer_StressOverflow_PromptsMidFlow(t *testing.T) {
 	outcome := &dice.Outcome{Type: dice.Success, Shifts: 3}
 	atkCtx := testAttackCtx()
 
-	events := sm.applyAttackDamageToPlayer(context.Background(), outcome, attacker, atkCtx)
+	events := sm.conflict.applyAttackDamageToPlayer(context.Background(), outcome, attacker, atkCtx)
 
 	// Should contain a StressOverflowEvent.
 	var hasOverflow bool
@@ -148,16 +150,16 @@ func TestApplyAttackDamageToPlayer_StressOverflow_PromptsMidFlow(t *testing.T) {
 	assert.True(t, hasOverflow, "expected StressOverflowEvent for 3-shift hit on 2-box track")
 
 	// pendingMidFlow should be set with consequence choices per Fate Core.
-	require.NotNil(t, sm.pendingMidFlow, "expected pendingMidFlow to be set for consequence choice")
-	assert.Contains(t, sm.pendingMidFlow.event.Prompt, "choose")
+	require.NotNil(t, sm.conflict.pendingMidFlow, "expected pendingMidFlow to be set for consequence choice")
+	assert.Contains(t, sm.conflict.pendingMidFlow.event.Prompt, "choose")
 
 	// Available consequences: mild(2), moderate(4), severe(6) + "Be Taken Out".
 	slots := player.AvailableConsequenceSlots()
 	expectedOptions := len(slots) + 1 // +1 for "Be Taken Out"
-	assert.Equal(t, expectedOptions, len(sm.pendingMidFlow.event.Options))
+	assert.Equal(t, expectedOptions, len(sm.conflict.pendingMidFlow.event.Options))
 
 	// Last option should be "Be Taken Out".
-	lastOpt := sm.pendingMidFlow.event.Options[len(sm.pendingMidFlow.event.Options)-1]
+	lastOpt := sm.conflict.pendingMidFlow.event.Options[len(sm.conflict.pendingMidFlow.event.Options)-1]
 	assert.Equal(t, "Be Taken Out", lastOpt.Label)
 }
 
@@ -168,7 +170,7 @@ func TestApplyAttackDamageToPlayer_Tie_NoStress(t *testing.T) {
 	outcome := &dice.Outcome{Type: dice.Tie, Shifts: 0}
 	atkCtx := testAttackCtx()
 
-	events := sm.applyAttackDamageToPlayer(context.Background(), outcome, attacker, atkCtx)
+	events := sm.conflict.applyAttackDamageToPlayer(context.Background(), outcome, attacker, atkCtx)
 	require.Len(t, events, 1)
 
 	defEvt, ok := events[0].(PlayerDefendedEvent)
@@ -189,7 +191,7 @@ func TestApplyAttackDamageToPlayer_Failure_NoStress(t *testing.T) {
 	outcome := &dice.Outcome{Type: dice.Failure, Shifts: -2}
 	atkCtx := testAttackCtx()
 
-	events := sm.applyAttackDamageToPlayer(context.Background(), outcome, attacker, atkCtx)
+	events := sm.conflict.applyAttackDamageToPlayer(context.Background(), outcome, attacker, atkCtx)
 	require.Len(t, events, 1)
 
 	defEvt, ok := events[0].(PlayerDefendedEvent)
@@ -219,16 +221,18 @@ func TestApplyAttackDamageToPlayer_MentalConflict_UsesMentalStress(t *testing.T)
 	testScene.AddCharacter(player.ID)
 	testScene.AddCharacter(attacker.ID)
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
 	sm.player = player
+	sm.conflict.player = player
 
 	// Start a MENTAL conflict.
-	err = sm.initiateConflict(scene.MentalConflict, attacker.ID)
+	err = sm.conflict.initiateConflict(scene.MentalConflict, attacker.ID)
 	require.NoError(t, err)
 
 	outcome := &dice.Outcome{Type: dice.Success, Shifts: 1}
 	atkCtx := prompt.AttackContext{Skill: "Provoke", Description: "mind assault", Shifts: 1}
 
-	events := sm.applyAttackDamageToPlayer(context.Background(), outcome, attacker, atkCtx)
+	events := sm.conflict.applyAttackDamageToPlayer(context.Background(), outcome, attacker, atkCtx)
 	require.Len(t, events, 1)
 
 	stressEvt, ok := events[0].(PlayerStressEvent)
@@ -260,7 +264,7 @@ func TestHandleStressOverflow_NoConsequencesAvailable_TakenOut(t *testing.T) {
 	player.AddConsequence(character.Consequence{ID: "c2", Type: character.ModerateConsequence, Aspect: "Broken Arm"})
 	player.AddConsequence(character.Consequence{ID: "c3", Type: character.SevereConsequence, Aspect: "Shattered"})
 
-	events := sm.handleStressOverflow(context.Background(), 3, character.PhysicalStress, attacker, testAttackCtx())
+	events := sm.conflict.handleStressOverflow(context.Background(), 3, character.PhysicalStress, attacker, testAttackCtx())
 
 	// Should include StressOverflowEvent with NoConsequences=true and PlayerTakenOutEvent.
 	var hasNoConseq, hasTakenOut bool
@@ -283,7 +287,7 @@ func TestHandleStressOverflow_NoConsequencesAvailable_TakenOut(t *testing.T) {
 func TestHandleStressOverflow_ConsequencesAvailable_SetsMidFlow(t *testing.T) {
 	sm, _, attacker := setupConflictSM(t, nil)
 
-	events := sm.handleStressOverflow(context.Background(), 3, character.PhysicalStress, attacker, testAttackCtx())
+	events := sm.conflict.handleStressOverflow(context.Background(), 3, character.PhysicalStress, attacker, testAttackCtx())
 
 	// First event is StressOverflowEvent.
 	require.NotEmpty(t, events)
@@ -292,9 +296,9 @@ func TestHandleStressOverflow_ConsequencesAvailable_SetsMidFlow(t *testing.T) {
 	assert.Equal(t, 3, overflowEvt.Shifts)
 
 	// pendingMidFlow should be set.
-	require.NotNil(t, sm.pendingMidFlow)
+	require.NotNil(t, sm.conflict.pendingMidFlow)
 	// Options: mild, moderate, severe, + Be Taken Out = 4.
-	assert.Len(t, sm.pendingMidFlow.event.Options, 4)
+	assert.Len(t, sm.conflict.pendingMidFlow.event.Options, 4)
 }
 
 // --- applyConsequence ---
@@ -308,7 +312,7 @@ func TestApplyConsequence_MildAbsorbsAll(t *testing.T) {
 	sm, player, attacker := setupConflictSM(t, mockLLM)
 
 	// 2-shift hit → mild (value=2) absorbs all.
-	events := sm.applyConsequence(context.Background(), character.MildConsequence, 2, attacker, testAttackCtx())
+	events := sm.conflict.applyConsequence(context.Background(), character.MildConsequence, 2, attacker, testAttackCtx())
 
 	require.NotEmpty(t, events)
 	pce, ok := events[0].(PlayerConsequenceEvent)
@@ -332,7 +336,7 @@ func TestApplyConsequence_ModerateWithRemainingStress(t *testing.T) {
 	sm, player, attacker := setupConflictSM(t, mockLLM)
 
 	// 5-shift hit → moderate (value=4) absorbs 4, remaining 1 goes to stress.
-	events := sm.applyConsequence(context.Background(), character.ModerateConsequence, 5, attacker, testAttackCtx())
+	events := sm.conflict.applyConsequence(context.Background(), character.ModerateConsequence, 5, attacker, testAttackCtx())
 
 	require.NotEmpty(t, events)
 	pce, ok := events[0].(PlayerConsequenceEvent)
@@ -354,7 +358,7 @@ func TestApplyConsequence_LLMFallbackNaming(t *testing.T) {
 	// No LLM client → generateConsequenceAspect returns error → fallback.
 	sm, _, attacker := setupConflictSM(t, nil)
 
-	events := sm.applyConsequence(context.Background(), character.MildConsequence, 2, attacker, testAttackCtx())
+	events := sm.conflict.applyConsequence(context.Background(), character.MildConsequence, 2, attacker, testAttackCtx())
 
 	require.NotEmpty(t, events)
 	pce, ok := events[0].(PlayerConsequenceEvent)
@@ -374,7 +378,7 @@ func TestApplyConsequence_RecursiveOverflow(t *testing.T) {
 
 	// 4-shift hit with mild consequence (absorbs 2), remaining 2 can't go to
 	// stress (both boxes full) → recursive overflow → pendingMidFlow.
-	events := sm.applyConsequence(context.Background(), character.MildConsequence, 4, attacker, testAttackCtx())
+	events := sm.conflict.applyConsequence(context.Background(), character.MildConsequence, 4, attacker, testAttackCtx())
 
 	var hasOverflow bool
 	for _, e := range events {
@@ -385,7 +389,7 @@ func TestApplyConsequence_RecursiveOverflow(t *testing.T) {
 	}
 	assert.True(t, hasOverflow, "should emit StressOverflowEvent for remaining shifts")
 	// pendingMidFlow should be set (moderate and severe still available).
-	require.NotNil(t, sm.pendingMidFlow, "recursive overflow should set pendingMidFlow")
+	require.NotNil(t, sm.conflict.pendingMidFlow, "recursive overflow should set pendingMidFlow")
 }
 
 // --- handleTakenOut ---
@@ -398,7 +402,7 @@ func TestHandleTakenOut_GameOver(t *testing.T) {
 	}
 	sm, _, attacker := setupConflictSM(t, mockLLM)
 
-	events := sm.handleTakenOut(context.Background(), attacker, testAttackCtx())
+	events := sm.conflict.handleTakenOut(context.Background(), attacker, testAttackCtx())
 
 	require.NotEmpty(t, events)
 	ptoEvt, ok := events[0].(PlayerTakenOutEvent)
@@ -408,9 +412,9 @@ func TestHandleTakenOut_GameOver(t *testing.T) {
 	assert.Equal(t, "The bandit delivers the final blow.", ptoEvt.Narrative)
 
 	// Side effects.
-	assert.True(t, sm.shouldExit, "game_over should set shouldExit")
-	assert.Equal(t, SceneEndPlayerTakenOut, sm.sceneEndReason)
-	assert.Empty(t, sm.playerTakenOutHint)
+	assert.True(t, sm.conflict.shouldExit, "game_over should set shouldExit")
+	assert.Equal(t, SceneEndPlayerTakenOut, sm.conflict.sceneEndReason)
+	assert.Empty(t, sm.conflict.playerTakenOutHint)
 }
 
 // SRD: Outcome "transition" means the scene changes (captured, driven out).
@@ -419,9 +423,9 @@ func TestHandleTakenOut_Transition(t *testing.T) {
 		response: `{"narrative":"You collapse and are dragged away.","outcome":"transition","new_scene_hint":"You awaken in a dark cell."}`,
 	}
 	sm, _, attacker := setupConflictSM(t, mockLLM)
-	sm.exitOnSceneTransition = true
+	sm.conflict.exitOnSceneTransition = true
 
-	events := sm.handleTakenOut(context.Background(), attacker, testAttackCtx())
+	events := sm.conflict.handleTakenOut(context.Background(), attacker, testAttackCtx())
 
 	require.NotEmpty(t, events)
 	ptoEvt, ok := events[0].(PlayerTakenOutEvent)
@@ -429,9 +433,9 @@ func TestHandleTakenOut_Transition(t *testing.T) {
 	assert.Equal(t, "transition", ptoEvt.Outcome)
 	assert.Equal(t, "You awaken in a dark cell.", ptoEvt.NewSceneHint)
 
-	assert.True(t, sm.shouldExit, "exitOnSceneTransition=true should set shouldExit")
-	assert.Equal(t, SceneEndPlayerTakenOut, sm.sceneEndReason)
-	assert.Equal(t, "You awaken in a dark cell.", sm.playerTakenOutHint)
+	assert.True(t, sm.conflict.shouldExit, "exitOnSceneTransition=true should set shouldExit")
+	assert.Equal(t, SceneEndPlayerTakenOut, sm.conflict.sceneEndReason)
+	assert.Equal(t, "You awaken in a dark cell.", sm.conflict.playerTakenOutHint)
 }
 
 // Transition with exitOnSceneTransition=false should NOT set shouldExit.
@@ -440,16 +444,16 @@ func TestHandleTakenOut_Transition_NoExitFlag(t *testing.T) {
 		response: `{"narrative":"You fall.","outcome":"transition","new_scene_hint":"Later..."}`,
 	}
 	sm, _, attacker := setupConflictSM(t, mockLLM)
-	sm.exitOnSceneTransition = false
+	sm.conflict.exitOnSceneTransition = false
 
-	events := sm.handleTakenOut(context.Background(), attacker, testAttackCtx())
+	events := sm.conflict.handleTakenOut(context.Background(), attacker, testAttackCtx())
 
 	require.NotEmpty(t, events)
 	ptoEvt := events[0].(PlayerTakenOutEvent)
 	assert.Equal(t, "transition", ptoEvt.Outcome)
 
-	assert.False(t, sm.shouldExit, "exitOnSceneTransition=false should NOT set shouldExit")
-	assert.Equal(t, SceneEndPlayerTakenOut, sm.sceneEndReason)
+	assert.False(t, sm.conflict.shouldExit, "exitOnSceneTransition=false should NOT set shouldExit")
+	assert.Equal(t, SceneEndPlayerTakenOut, sm.conflict.sceneEndReason)
 }
 
 // Outcome "continue" means the scene keeps going (stunned, knocked down).
@@ -459,14 +463,14 @@ func TestHandleTakenOut_Continue(t *testing.T) {
 	}
 	sm, _, attacker := setupConflictSM(t, mockLLM)
 
-	events := sm.handleTakenOut(context.Background(), attacker, testAttackCtx())
+	events := sm.conflict.handleTakenOut(context.Background(), attacker, testAttackCtx())
 
 	require.NotEmpty(t, events)
 	ptoEvt := events[0].(PlayerTakenOutEvent)
 	assert.Equal(t, "continue", ptoEvt.Outcome)
 
-	assert.False(t, sm.shouldExit, "continue should NOT set shouldExit")
-	assert.Empty(t, string(sm.sceneEndReason), "continue should NOT set sceneEndReason")
+	assert.False(t, sm.conflict.shouldExit, "continue should NOT set shouldExit")
+	assert.Empty(t, string(sm.conflict.sceneEndReason), "continue should NOT set sceneEndReason")
 }
 
 // When LLM errors, handleTakenOut should fall back to a default narrative
@@ -474,7 +478,7 @@ func TestHandleTakenOut_Continue(t *testing.T) {
 func TestHandleTakenOut_LLMError_Fallback(t *testing.T) {
 	sm, _, attacker := setupConflictSM(t, nil) // No LLM → error path
 
-	events := sm.handleTakenOut(context.Background(), attacker, testAttackCtx())
+	events := sm.conflict.handleTakenOut(context.Background(), attacker, testAttackCtx())
 
 	require.NotEmpty(t, events)
 	ptoEvt, ok := events[0].(PlayerTakenOutEvent)
@@ -494,7 +498,7 @@ func TestHandleTakenOut_EndsConflictAndClearsStress(t *testing.T) {
 	player.TakeStress(character.PhysicalStress, 1)
 	assert.True(t, player.StressTracks["physical"].Boxes[0])
 
-	sm.handleTakenOut(context.Background(), attacker, testAttackCtx())
+	sm.conflict.handleTakenOut(context.Background(), attacker, testAttackCtx())
 
 	// Conflict should be ended.
 	assert.False(t, sm.currentScene.IsConflict, "conflict should be ended after taken out")
@@ -516,11 +520,11 @@ func TestStressOverflow_MidFlowContinuation_SelectConsequence(t *testing.T) {
 	sm, player, attacker := setupConflictSM(t, mockLLM)
 
 	// Trigger overflow.
-	sm.handleStressOverflow(context.Background(), 3, character.PhysicalStress, attacker, testAttackCtx())
-	require.NotNil(t, sm.pendingMidFlow)
+	sm.conflict.handleStressOverflow(context.Background(), 3, character.PhysicalStress, attacker, testAttackCtx())
+	require.NotNil(t, sm.conflict.pendingMidFlow)
 
 	// Player picks choice 0 (mild consequence).
-	contEvents := sm.pendingMidFlow.continuation(context.Background(), MidFlowResponse{ChoiceIndex: 0})
+	contEvents := sm.conflict.pendingMidFlow.continuation(context.Background(), MidFlowResponse{ChoiceIndex: 0})
 
 	var hasConseq bool
 	for _, e := range contEvents {
@@ -542,13 +546,13 @@ func TestStressOverflow_MidFlowContinuation_SelectTakenOut(t *testing.T) {
 	}
 	sm, _, _ := setupConflictSM(t, mockLLM)
 
-	sm.handleStressOverflow(context.Background(), 3, character.PhysicalStress,
+	sm.conflict.handleStressOverflow(context.Background(), 3, character.PhysicalStress,
 		sm.characters.GetCharacter("npc-1"), testAttackCtx())
-	require.NotNil(t, sm.pendingMidFlow)
+	require.NotNil(t, sm.conflict.pendingMidFlow)
 
 	// "Be Taken Out" is the last option (index = len(consequences)).
-	takenOutIdx := len(sm.pendingMidFlow.event.Options) - 1
-	contEvents := sm.pendingMidFlow.continuation(context.Background(), MidFlowResponse{ChoiceIndex: takenOutIdx})
+	takenOutIdx := len(sm.conflict.pendingMidFlow.event.Options) - 1
+	contEvents := sm.conflict.pendingMidFlow.continuation(context.Background(), MidFlowResponse{ChoiceIndex: takenOutIdx})
 
 	var hasTakenOut bool
 	for _, e := range contEvents {

@@ -28,11 +28,11 @@ type invokeState struct {
 type invokeFinishFunc func(ctx context.Context, result *dice.CheckResult, events []GameEvent) []GameEvent
 
 // beginInvokeLoop checks whether a post-roll invoke prompt is needed and, if so,
-// returns the events including an InvokePromptEvent and populates sm.pendingInvoke.
+// returns the events including an InvokePromptEvent and populates cm.pendingInvoke.
 // Returns (events, awaitingInvoke).
 // If no invoke is possible the continuation is called immediately and
 // (events, false) is returned.
-func (sm *SceneManager) beginInvokeLoop(
+func (cm *ConflictManager) beginInvokeLoop(
 	ctx context.Context,
 	result *dice.CheckResult,
 	difficulty dice.Ladder,
@@ -43,16 +43,16 @@ func (sm *SceneManager) beginInvokeLoop(
 ) ([]GameEvent, bool) {
 	usedAspects := make(map[string]bool)
 
-	promptEvent, available := sm.buildInvokePrompt(result, difficulty, isDefense, usedAspects)
+	promptEvent, available := cm.buildInvokePrompt(result, difficulty, isDefense, usedAspects)
 	if promptEvent == nil {
 		// No invoke possible — finish immediately.
 		events := finish(ctx, result, preEvents)
 		// The continuation may have started its own invoke loop
 		// (e.g. NPC defense invoke inside advanceConflictTurns).
-		return events, sm.pendingInvoke != nil
+		return events, cm.pendingInvoke != nil
 	}
 
-	sm.pendingInvoke = &invokeState{
+	cm.pendingInvoke = &invokeState{
 		result:       result,
 		difficulty:   difficulty,
 		parsedAction: parsedAction,
@@ -69,22 +69,22 @@ func (sm *SceneManager) beginInvokeLoop(
 // ProvideInvokeResponse processes the player's invoke decision and either
 // returns another InvokePromptEvent (more invokes available) or finalises the
 // action and returns all remaining events.
-func (sm *SceneManager) ProvideInvokeResponse(ctx context.Context, resp InvokeResponse) (*InputResult, error) {
-	if sm.pendingInvoke == nil {
+func (cm *ConflictManager) ProvideInvokeResponse(ctx context.Context, resp InvokeResponse) (*InputResult, error) {
+	if cm.pendingInvoke == nil {
 		return nil, fmt.Errorf("ProvideInvokeResponse called with no pending invoke")
 	}
 
-	is := sm.pendingInvoke
+	is := cm.pendingInvoke
 	var events []GameEvent
 
 	if resp.AspectIndex == uicontract.InvokeSkip {
 		// Player chose to skip — finalise.
 		// Pass empty events since preEvents were already rendered by the caller.
-		sm.pendingInvoke = nil
+		cm.pendingInvoke = nil
 		events = is.continuation(ctx, is.result, nil)
 		// If this invoke was for a defense roll during NPC turns, resume turns.
-		events = sm.maybeResumeConflictTurns(ctx, is, events)
-		return sm.wrapInvokeResult(events), nil
+		events = cm.maybeResumeConflictTurns(ctx, is, events)
+		return cm.wrapInvokeResult(events), nil
 	}
 
 	// Validate index.
@@ -99,7 +99,7 @@ func (sm *SceneManager) ProvideInvokeResponse(ctx context.Context, resp InvokeRe
 	useFree := selected.FreeInvokes > 0
 
 	// Spend fate point or use free invoke.
-	invokeEvents := sm.applyInvokeChoice(is, selected, useFree, resp.IsReroll)
+	invokeEvents := cm.applyInvokeChoice(is, selected, useFree, resp.IsReroll)
 
 	// Mark used.
 	is.usedAspects[selected.Name] = true
@@ -126,15 +126,15 @@ func (sm *SceneManager) ProvideInvokeResponse(ctx context.Context, resp InvokeRe
 	})
 
 	// Check if another invoke is possible.
-	promptEvent, available := sm.buildInvokePrompt(is.result, is.difficulty, is.isDefense, is.usedAspects)
+	promptEvent, available := cm.buildInvokePrompt(is.result, is.difficulty, is.isDefense, is.usedAspects)
 	if promptEvent == nil {
 		// No more invokes — finalise.
 		// Pass only the invoke events from this round (prior events already rendered).
-		sm.pendingInvoke = nil
+		cm.pendingInvoke = nil
 		events = is.continuation(ctx, is.result, invokeEvents)
 		// If this invoke was for a defense roll during NPC turns, resume turns.
-		events = sm.maybeResumeConflictTurns(ctx, is, events)
-		return sm.wrapInvokeResult(events), nil
+		events = cm.maybeResumeConflictTurns(ctx, is, events)
+		return cm.wrapInvokeResult(events), nil
 	}
 
 	// Another invoke prompt — return only new events from this round.
@@ -149,41 +149,39 @@ func (sm *SceneManager) ProvideInvokeResponse(ctx context.Context, resp InvokeRe
 // wrapInvokeResult packages the final events after invoke completion, detecting
 // whether the scene ended or a nested invoke loop was started by the
 // continuation (e.g. NPC defense invoke inside advanceConflictTurns).
-func (sm *SceneManager) wrapInvokeResult(events []GameEvent) *InputResult {
+func (cm *ConflictManager) wrapInvokeResult(events []GameEvent) *InputResult {
 	result := &InputResult{Events: events}
-	if sm.pendingInvoke != nil {
+	if cm.pendingInvoke != nil {
 		result.AwaitingInvoke = true
 	}
-	if sm.shouldExit {
-		result.SceneEnded = true
-		result.EndResult = sm.buildSceneEndResult()
-	}
+	// Scene-end wrapping is handled by SceneManager.applySceneEnd via the
+	// public delegator, not here.
 	return result
 }
 
 // maybeResumeConflictTurns resumes NPC turn processing after a defense invoke
 // resolves. Only called when is.resumeTurns is true and no nested invoke was
 // started by the continuation.
-func (sm *SceneManager) maybeResumeConflictTurns(ctx context.Context, is *invokeState, events []GameEvent) []GameEvent {
+func (cm *ConflictManager) maybeResumeConflictTurns(ctx context.Context, is *invokeState, events []GameEvent) []GameEvent {
 	if !is.resumeTurns {
 		return events
 	}
-	if sm.pendingInvoke != nil {
+	if cm.pendingInvoke != nil {
 		// A nested invoke was started (shouldn't happen for the continuation,
 		// but guard against it). Turn resumption will happen when that resolves.
 		return events
 	}
-	if !sm.currentScene.IsConflict {
+	if !cm.currentScene.IsConflict {
 		return events
 	}
-	turnEvents, _ := sm.advanceConflictTurns(ctx)
+	turnEvents, _ := cm.advanceConflictTurns(ctx)
 	return append(events, turnEvents...)
 }
 
 // buildInvokePrompt determines whether the player can invoke an aspect and
 // returns the prompt event and available aspects. Returns (nil, nil) when
 // no invoke is possible.
-func (sm *SceneManager) buildInvokePrompt(
+func (cm *ConflictManager) buildInvokePrompt(
 	result *dice.CheckResult,
 	difficulty dice.Ladder,
 	isDefense bool,
@@ -208,14 +206,14 @@ func (sm *SceneManager) buildInvokePrompt(
 		}
 	}
 
-	available := sm.gatherInvokableAspects(usedAspects)
+	available := cm.gatherInvokableAspects(usedAspects)
 
 	canInvoke := false
 	for _, aspect := range available {
 		if aspect.AlreadyUsed {
 			continue
 		}
-		if aspect.FreeInvokes > 0 || sm.player.FatePoints > 0 {
+		if aspect.FreeInvokes > 0 || cm.player.FatePoints > 0 {
 			canInvoke = true
 			break
 		}
@@ -226,7 +224,7 @@ func (sm *SceneManager) buildInvokePrompt(
 
 	return &InvokePromptEvent{
 		Available:     available,
-		FatePoints:    sm.player.FatePoints,
+		FatePoints:    cm.player.FatePoints,
 		CurrentResult: result.FinalValue.String(),
 		ShiftsNeeded:  shiftsNeeded,
 	}, available
@@ -234,18 +232,18 @@ func (sm *SceneManager) buildInvokePrompt(
 
 // applyInvokeChoice spends the resource and applies the +2 or reroll effect.
 // Returns InvokeEvents describing what happened.
-func (sm *SceneManager) applyInvokeChoice(is *invokeState, selected *InvokableAspect, useFree bool, isReroll bool) []GameEvent {
+func (cm *ConflictManager) applyInvokeChoice(is *invokeState, selected *InvokableAspect, useFree bool, isReroll bool) []GameEvent {
 	var events []GameEvent
 
 	if useFree {
-		for i := range sm.currentScene.SituationAspects {
-			if sm.currentScene.SituationAspects[i].Aspect == selected.Name {
-				sm.currentScene.SituationAspects[i].UseFreeInvoke()
+		for i := range cm.currentScene.SituationAspects {
+			if cm.currentScene.SituationAspects[i].Aspect == selected.Name {
+				cm.currentScene.SituationAspects[i].UseFreeInvoke()
 				break
 			}
 		}
 	} else {
-		if !sm.player.SpendFatePoint() {
+		if !cm.player.SpendFatePoint() {
 			events = append(events, InvokeEvent{
 				AspectName: selected.Name,
 				Failed:     true,
@@ -256,7 +254,7 @@ func (sm *SceneManager) applyInvokeChoice(is *invokeState, selected *InvokableAs
 
 	var newRoll, newTotal string
 	if isReroll {
-		is.result = sm.roller.Reroll(is.result)
+		is.result = cm.roller.Reroll(is.result)
 		newRoll = is.result.Roll.String()
 		newTotal = is.result.FinalValue.String()
 	} else {
@@ -268,14 +266,14 @@ func (sm *SceneManager) applyInvokeChoice(is *invokeState, selected *InvokableAs
 		AspectName:     selected.Name,
 		IsFree:         useFree,
 		IsReroll:       isReroll,
-		FatePointsLeft: sm.player.FatePoints,
+		FatePointsLeft: cm.player.FatePoints,
 		NewRoll:        newRoll,
 		NewTotal:       newTotal,
 	})
 
 	// Log the invoke
-	if sm.sessionLogger != nil {
-		sm.sessionLogger.Log("invoke", map[string]any{
+	if cm.sessionLogger != nil {
+		cm.sessionLogger.Log("invoke", map[string]any{
 			"aspect":    selected.Name,
 			"source":    selected.Source,
 			"is_free":   useFree,
@@ -288,6 +286,6 @@ func (sm *SceneManager) applyInvokeChoice(is *invokeState, selected *InvokableAs
 }
 
 // HasPendingInvoke returns true when the engine is waiting for an InvokeResponse.
-func (sm *SceneManager) HasPendingInvoke() bool {
-	return sm.pendingInvoke != nil
+func (cm *ConflictManager) HasPendingInvoke() bool {
+	return cm.pendingInvoke != nil
 }

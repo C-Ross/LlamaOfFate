@@ -18,24 +18,24 @@ import (
 )
 
 // getNPCActionDecision uses the LLM to decide what action an NPC should take
-func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character.Character) (*prompt.NPCActionDecision, error) {
-	if sm.llmClient == nil {
+func (cm *ConflictManager) getNPCActionDecision(ctx context.Context, npc *character.Character) (*prompt.NPCActionDecision, error) {
+	if cm.llmClient == nil {
 		return nil, fmt.Errorf("LLM client required for NPC decisions")
 	}
 
 	// Determine conflict type string
 	conflictType := "physical"
-	if sm.currentScene.ConflictState.Type == scene.MentalConflict {
+	if cm.currentScene.ConflictState.Type == scene.MentalConflict {
 		conflictType = "mental"
 	}
 
 	// Build target list (all active participants except this NPC)
 	var targets []prompt.NPCTargetInfo
-	for _, p := range sm.currentScene.ConflictState.Participants {
+	for _, p := range cm.currentScene.ConflictState.Participants {
 		if p.CharacterID == npc.ID || p.Status != scene.StatusActive {
 			continue
 		}
-		char := sm.characters.GetCharacter(p.CharacterID)
+		char := cm.characters.GetCharacter(p.CharacterID)
 		if char == nil {
 			continue
 		}
@@ -70,9 +70,9 @@ func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character
 
 	data := prompt.NPCActionDecisionData{
 		ConflictType:      conflictType,
-		Round:             sm.currentScene.ConflictState.Round,
-		SceneName:         sm.currentScene.Name,
-		SceneDescription:  sm.currentScene.Description,
+		Round:             cm.currentScene.ConflictState.Round,
+		SceneName:         cm.currentScene.Name,
+		SceneDescription:  cm.currentScene.Description,
 		NPCName:           npc.Name,
 		NPCHighConcept:    npc.Aspects.HighConcept,
 		NPCTrouble:        npc.Aspects.Trouble,
@@ -81,7 +81,7 @@ func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character
 		NPCPhysicalStress: physicalStress,
 		NPCMentalStress:   mentalStress,
 		Targets:           targets,
-		SituationAspects:  sm.currentScene.SituationAspects,
+		SituationAspects:  cm.currentScene.SituationAspects,
 	}
 
 	promptText, err := prompt.RenderNPCActionDecision(data)
@@ -89,7 +89,7 @@ func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character
 		return nil, fmt.Errorf("failed to render NPC action decision template: %w", err)
 	}
 
-	content, err := llm.SimpleCompletion(ctx, sm.llmClient, promptText, 150, 0.7)
+	content, err := llm.SimpleCompletion(ctx, cm.llmClient, promptText, 150, 0.7)
 	if err != nil {
 		return nil, err
 	}
@@ -119,8 +119,8 @@ func (sm *SceneManager) getNPCActionDecision(ctx context.Context, npc *character
 // processNPCTurn handles an NPC's action during conflict.
 // Returns (events, awaitingInvoke) where awaitingInvoke is true if the player
 // needs to respond to a defense invoke prompt.
-func (sm *SceneManager) processNPCTurn(ctx context.Context, npcID string) ([]GameEvent, bool) {
-	npc := sm.characters.GetCharacter(npcID)
+func (cm *ConflictManager) processNPCTurn(ctx context.Context, npcID string) ([]GameEvent, bool) {
+	npc := cm.characters.GetCharacter(npcID)
 	if npc == nil {
 		slog.Warn("NPC not found for turn processing",
 			"component", componentSceneManager,
@@ -129,10 +129,10 @@ func (sm *SceneManager) processNPCTurn(ctx context.Context, npcID string) ([]Gam
 	}
 
 	var events []GameEvent
-	events = append(events, TurnAnnouncementEvent{CharacterName: npc.Name, TurnNumber: sm.currentScene.ConflictState.Round, IsPlayer: false})
+	events = append(events, TurnAnnouncementEvent{CharacterName: npc.Name, TurnNumber: cm.currentScene.ConflictState.Round, IsPlayer: false})
 
 	// Get LLM decision for NPC action
-	decision, err := sm.getNPCActionDecision(ctx, npc)
+	decision, err := cm.getNPCActionDecision(ctx, npc)
 	if err != nil {
 		slog.Warn("Failed to get NPC action decision, defaulting to attack",
 			"component", componentSceneManager,
@@ -141,8 +141,8 @@ func (sm *SceneManager) processNPCTurn(ctx context.Context, npcID string) ([]Gam
 		// Fallback to simple attack
 		decision = &prompt.NPCActionDecision{
 			ActionType:  "ATTACK",
-			Skill:       sm.getDefaultAttackSkill(),
-			TargetID:    sm.player.ID,
+			Skill:       cm.getDefaultAttackSkill(),
+			TargetID:    cm.player.ID,
 			Description: fmt.Sprintf("%s attacks!", npc.Name),
 		}
 	}
@@ -150,13 +150,13 @@ func (sm *SceneManager) processNPCTurn(ctx context.Context, npcID string) ([]Gam
 	// Process the decision based on action type
 	switch strings.ToUpper(decision.ActionType) {
 	case "DEFEND":
-		events = append(events, sm.processNPCDefend(ctx, npc, decision)...)
+		events = append(events, cm.processNPCDefend(ctx, npc, decision)...)
 	case "CREATE_ADVANTAGE":
-		events = append(events, sm.processNPCCreateAdvantage(ctx, npc, decision)...)
+		events = append(events, cm.processNPCCreateAdvantage(ctx, npc, decision)...)
 	case "OVERCOME":
-		events = append(events, sm.processNPCOvercome(ctx, npc, decision)...)
+		events = append(events, cm.processNPCOvercome(ctx, npc, decision)...)
 	default: // ATTACK or unknown
-		attackEvents, awaiting := sm.processNPCAttack(ctx, npc, decision)
+		attackEvents, awaiting := cm.processNPCAttack(ctx, npc, decision)
 		events = append(events, attackEvents...)
 		return events, awaiting
 	}
@@ -165,14 +165,14 @@ func (sm *SceneManager) processNPCTurn(ctx context.Context, npcID string) ([]Gam
 }
 
 // getDefaultAttackSkill returns the default attack skill based on conflict type
-func (sm *SceneManager) getDefaultAttackSkill() string {
-	return core.DefaultAttackSkillForConflict(sm.currentScene.ConflictState.Type)
+func (cm *ConflictManager) getDefaultAttackSkill() string {
+	return core.DefaultAttackSkillForConflict(cm.currentScene.ConflictState.Type)
 }
 
 // processNPCDefend handles an NPC choosing full defense
-func (sm *SceneManager) processNPCDefend(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) []GameEvent {
+func (cm *ConflictManager) processNPCDefend(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) []GameEvent {
 	// Set full defense flag
-	sm.currentScene.SetFullDefense(npc.ID)
+	cm.currentScene.SetFullDefense(npc.ID)
 
 	var events []GameEvent
 	events = append(events, NPCActionResultEvent{
@@ -191,7 +191,7 @@ func (sm *SceneManager) processNPCDefend(ctx context.Context, npc *character.Cha
 }
 
 // processNPCCreateAdvantage handles an NPC creating an advantage
-func (sm *SceneManager) processNPCCreateAdvantage(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) []GameEvent {
+func (cm *ConflictManager) processNPCCreateAdvantage(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) []GameEvent {
 	skill := decision.Skill
 	if skill == "" {
 		skill = "Notice" // Default
@@ -201,7 +201,7 @@ func (sm *SceneManager) processNPCCreateAdvantage(ctx context.Context, npc *char
 	npcSkillLevel := npc.GetSkill(skill)
 
 	// Roll against Fair (+2) difficulty for creating aspects
-	npcRoll := sm.roller.RollWithModifier(dice.Mediocre, int(npcSkillLevel))
+	npcRoll := cm.roller.RollWithModifier(dice.Mediocre, int(npcSkillLevel))
 	difficulty := dice.Fair
 	outcome := npcRoll.CompareAgainst(difficulty)
 
@@ -226,7 +226,7 @@ func (sm *SceneManager) processNPCCreateAdvantage(ctx context.Context, npc *char
 
 		aspectID := fmt.Sprintf("npc-advantage-%d", time.Now().UnixNano())
 		situationAspect := scene.NewSituationAspect(aspectID, aspectName, npc.ID, freeInvokes)
-		sm.currentScene.AddSituationAspect(situationAspect)
+		cm.currentScene.AddSituationAspect(situationAspect)
 		events = append(events, NPCActionResultEvent{
 			NPCName:       npc.Name,
 			ActionType:    "create_advantage",
@@ -264,7 +264,7 @@ func (sm *SceneManager) processNPCCreateAdvantage(ctx context.Context, npc *char
 }
 
 // processNPCOvercome handles an NPC attempting to overcome an obstacle
-func (sm *SceneManager) processNPCOvercome(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) []GameEvent {
+func (cm *ConflictManager) processNPCOvercome(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) []GameEvent {
 	skill := decision.Skill
 	if skill == "" {
 		skill = "Athletics" // Default
@@ -274,7 +274,7 @@ func (sm *SceneManager) processNPCOvercome(ctx context.Context, npc *character.C
 	npcSkillLevel := npc.GetSkill(skill)
 
 	// Roll against Fair (+2) difficulty
-	npcRoll := sm.roller.RollWithModifier(dice.Mediocre, int(npcSkillLevel))
+	npcRoll := cm.roller.RollWithModifier(dice.Mediocre, int(npcSkillLevel))
 	difficulty := dice.Fair
 	outcome := npcRoll.CompareAgainst(difficulty)
 
@@ -307,15 +307,15 @@ func (sm *SceneManager) processNPCOvercome(ctx context.Context, npc *character.C
 // processNPCAttack handles an NPC attacking a target.
 // Returns (events, awaitingInvoke).
 // When the target is the player and defense
-// invokes are available, sm.pendingInvoke is set and awaitingInvoke is true.
+// invokes are available, cm.pendingInvoke is set and awaitingInvoke is true.
 // The invoke continuation finishes the attack (narrative, damage) and resumes
 // processing remaining NPC turns via advanceConflictTurns.
-func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) ([]GameEvent, bool) {
+func (cm *ConflictManager) processNPCAttack(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) ([]GameEvent, bool) {
 	// Determine target
-	target := sm.player // Default to player
+	target := cm.player // Default to player
 	targetID := decision.TargetID
-	if targetID != "" && targetID != sm.player.ID {
-		if t := sm.characters.GetCharacter(targetID); t != nil {
+	if targetID != "" && targetID != cm.player.ID {
+		if t := cm.characters.GetCharacter(targetID); t != nil {
 			target = t
 		}
 	}
@@ -323,7 +323,7 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 	// Use the skill from the decision, or default based on conflict type
 	attackSkill := decision.Skill
 	if attackSkill == "" {
-		attackSkill = sm.getDefaultAttackSkill()
+		attackSkill = cm.getDefaultAttackSkill()
 	}
 
 	// Determine defense skill based on attack skill
@@ -333,15 +333,15 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 	npcSkillLevel := npc.GetSkill(attackSkill)
 
 	// Roll NPC's attack
-	npcRoll := sm.roller.RollWithModifier(dice.Mediocre, int(npcSkillLevel))
+	npcRoll := cm.roller.RollWithModifier(dice.Mediocre, int(npcSkillLevel))
 
 	// Get target's defense (check for full defense bonus)
 	targetDefenseLevel := target.GetSkill(defenseSkill)
 	defenseBonus := 0
-	if participant := sm.currentScene.GetParticipant(target.ID); participant != nil && participant.FullDefense {
+	if participant := cm.currentScene.GetParticipant(target.ID); participant != nil && participant.FullDefense {
 		defenseBonus = 2
 	}
-	targetDefense := sm.roller.RollWithModifier(dice.Mediocre, int(targetDefenseLevel)+defenseBonus)
+	targetDefense := cm.roller.RollWithModifier(dice.Mediocre, int(targetDefenseLevel)+defenseBonus)
 
 	fullDefense := defenseBonus > 0
 
@@ -349,7 +349,7 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 	initialOutcome := npcRoll.CompareAgainst(targetDefense.FinalValue)
 
 	// If target is the player, use the event-driven invoke path for defense
-	if target.ID == sm.player.ID {
+	if target.ID == cm.player.ID {
 		// Show attack setup before the invoke prompt
 		preEvents := []GameEvent{
 			NPCAttackEvent{
@@ -365,7 +365,7 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 			},
 		}
 
-		defenseAction := action.NewAction("defense-invoke", sm.player.ID, action.Defend, defenseSkill, "Defending against attack")
+		defenseAction := action.NewAction("defense-invoke", cm.player.ID, action.Defend, defenseSkill, "Defending against attack")
 
 		// Capture variables for the continuation closure
 		capturedNPC := npc
@@ -374,13 +374,13 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 		capturedInitialOutcome := initialOutcome
 
 		finish := func(finishCtx context.Context, result *dice.CheckResult, accEvents []GameEvent) []GameEvent {
-			return sm.finishNPCAttackOnPlayer(finishCtx, result, accEvents, capturedNPC, capturedAttackSkill, capturedNPCRoll, capturedInitialOutcome)
+			return cm.finishNPCAttackOnPlayer(finishCtx, result, accEvents, capturedNPC, capturedAttackSkill, capturedNPCRoll, capturedInitialOutcome)
 		}
 
-		evts, awaiting := sm.beginInvokeLoop(ctx, targetDefense, npcRoll.FinalValue, defenseAction, true, preEvents, finish)
+		evts, awaiting := cm.beginInvokeLoop(ctx, targetDefense, npcRoll.FinalValue, defenseAction, true, preEvents, finish)
 		// Mark the pending invoke for NPC turn resumption after it resolves.
-		if awaiting && sm.pendingInvoke != nil {
-			sm.pendingInvoke.resumeTurns = true
+		if awaiting && cm.pendingInvoke != nil {
+			cm.pendingInvoke.resumeTurns = true
 		}
 		return evts, awaiting
 	}
@@ -388,7 +388,7 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 	// Non-player target: compute outcome directly (no invoke opportunity)
 	outcome := npcRoll.CompareAgainst(targetDefense.FinalValue)
 
-	npcNarrative, err := sm.generateNPCAttackNarrative(ctx, npc, attackSkill, outcome)
+	npcNarrative, err := cm.generateNPCAttackNarrative(ctx, npc, attackSkill, outcome)
 	if err != nil {
 		slog.Error("Failed to generate NPC attack narrative",
 			"component", componentSceneManager,
@@ -422,7 +422,7 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 // the player. It computes the final outcome after defense invokes, generates
 // narrative, and applies damage. NPC turn resumption is handled separately
 // by maybeResumeConflictTurns in ProvideInvokeResponse.
-func (sm *SceneManager) finishNPCAttackOnPlayer(
+func (cm *ConflictManager) finishNPCAttackOnPlayer(
 	ctx context.Context,
 	defenseResult *dice.CheckResult,
 	accEvents []GameEvent,
@@ -445,7 +445,7 @@ func (sm *SceneManager) finishNPCAttackOnPlayer(
 	}
 
 	// Generate narrative for the final outcome
-	npcNarrative, err := sm.generateNPCAttackNarrative(ctx, npc, attackSkill, outcome)
+	npcNarrative, err := cm.generateNPCAttackNarrative(ctx, npc, attackSkill, outcome)
 	if err != nil {
 		slog.Error("Failed to generate NPC attack narrative",
 			"component", componentSceneManager,
@@ -461,15 +461,15 @@ func (sm *SceneManager) finishNPCAttackOnPlayer(
 		Description: npcNarrative,
 		Shifts:      outcome.Shifts,
 	}
-	damageEvents := sm.applyAttackDamageToPlayer(ctx, outcome, npc, attackCtx)
+	damageEvents := cm.applyAttackDamageToPlayer(ctx, outcome, npc, attackCtx)
 	events = append(events, damageEvents...)
 
 	return events
 }
 
 // generateNPCAttackNarrative generates narrative for an NPC's attack
-func (sm *SceneManager) generateNPCAttackNarrative(ctx context.Context, npc *character.Character, skill string, outcome *dice.Outcome) (string, error) {
-	if sm.llmClient == nil {
+func (cm *ConflictManager) generateNPCAttackNarrative(ctx context.Context, npc *character.Character, skill string, outcome *dice.Outcome) (string, error) {
+	if cm.llmClient == nil {
 		return "", fmt.Errorf("LLM client required for NPC narratives")
 	}
 
@@ -488,28 +488,28 @@ func (sm *SceneManager) generateNPCAttackNarrative(ctx context.Context, npc *cha
 
 	// Determine conflict type string
 	conflictType := "physical"
-	if sm.currentScene.ConflictState != nil && sm.currentScene.ConflictState.Type == scene.MentalConflict {
+	if cm.currentScene.ConflictState != nil && cm.currentScene.ConflictState.Type == scene.MentalConflict {
 		conflictType = "mental"
 	}
 
 	// Get round number
 	round := 1
-	if sm.currentScene.ConflictState != nil {
-		round = sm.currentScene.ConflictState.Round
+	if cm.currentScene.ConflictState != nil {
+		round = cm.currentScene.ConflictState.Round
 	}
 
 	// Build template data with full context
 	data := prompt.NPCAttackData{
 		ConflictType:       conflictType,
 		Round:              round,
-		SceneName:          sm.currentScene.Name,
+		SceneName:          cm.currentScene.Name,
 		NPCName:            npc.Name,
 		NPCHighConcept:     npc.Aspects.HighConcept,
 		NPCAspects:         npc.Aspects.GetAll(),
 		Skill:              skill,
-		TargetName:         sm.player.Name,
-		TargetHighConcept:  sm.player.Aspects.HighConcept,
-		SituationAspects:   sm.currentScene.SituationAspects,
+		TargetName:         cm.player.Name,
+		TargetHighConcept:  cm.player.Aspects.HighConcept,
+		SituationAspects:   cm.currentScene.SituationAspects,
 		OutcomeDescription: outcomeDesc,
 	}
 
@@ -518,7 +518,7 @@ func (sm *SceneManager) generateNPCAttackNarrative(ctx context.Context, npc *cha
 		return "", fmt.Errorf("failed to render NPC attack template: %w", err)
 	}
 
-	return llm.SimpleCompletion(ctx, sm.llmClient, promptText, 100, 0.8)
+	return llm.SimpleCompletion(ctx, cm.llmClient, promptText, 100, 0.8)
 }
 
 // npcAttackFallbackNarrative returns a simple hit/miss narrative when LLM

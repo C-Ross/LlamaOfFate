@@ -28,7 +28,7 @@ func TestNewSceneManager(t *testing.T) {
 
 	assert.NotNil(t, sm)
 	assert.Equal(t, engine, sm.characters)
-	assert.NotNil(t, sm.roller)
+	assert.NotNil(t, sm.conflict.roller)
 }
 
 func TestSceneManager_StartScene(t *testing.T) {
@@ -113,6 +113,7 @@ func TestBuildCharacterContext_OtherAspects(t *testing.T) {
 	player.Aspects.AddAspect("Well Connected")
 	player.Aspects.AddAspect("Silver Tongue")
 	sm.player = player
+	sm.conflict.player = player
 
 	ctx := sm.buildCharacterContext()
 	assert.Contains(t, ctx, "Well Connected")
@@ -131,7 +132,9 @@ func TestBuildAspectsContext_FreeInvokes(t *testing.T) {
 		FreeInvokes: 2,
 	})
 	sm.player = player
+	sm.conflict.player = player
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
 
 	ctx := sm.buildAspectsContext()
 	assert.Contains(t, ctx, "On Fire (2 free invokes)")
@@ -140,8 +143,10 @@ func TestBuildAspectsContext_FreeInvokes(t *testing.T) {
 func TestBuildAspectsContext_Empty(t *testing.T) {
 	sm := NewSceneManager(nil, nil, nil)
 	sm.player = nil
+	sm.conflict.player = nil
 	testScene := scene.NewScene("s1", "Hall", "Empty hall")
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
 
 	ctx := sm.buildAspectsContext()
 	assert.Equal(t, "No special aspects currently in play.", ctx)
@@ -160,8 +165,8 @@ func TestAddToConversationHistory_TrimsBeyond10(t *testing.T) {
 
 func TestBuildSceneEndResult_PlayerTakenOut(t *testing.T) {
 	sm := NewSceneManager(nil, nil, nil)
-	sm.sceneEndReason = SceneEndPlayerTakenOut
-	sm.playerTakenOutHint = "You collapse in a heap."
+	sm.conflict.sceneEndReason = SceneEndPlayerTakenOut
+	sm.conflict.playerTakenOutHint = "You collapse in a heap."
 
 	result := sm.buildSceneEndResult()
 	assert.Equal(t, SceneEndPlayerTakenOut, result.Reason)
@@ -196,7 +201,7 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage(t *testing.T) {
 	testAction.Outcome = result.CompareAgainst(dice.Fair)
 
 	initialAspectCount := len(sm.currentScene.SituationAspects)
-	events := sm.applyActionEffects(context.Background(), testAction, nil) // nil target for create advantage
+	events := sm.conflict.applyActionEffects(context.Background(), testAction, nil) // nil target for create advantage
 
 	assert.Equal(t, initialAspectCount+1, len(sm.currentScene.SituationAspects))
 
@@ -244,7 +249,7 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage_WithLLM(t *testing.T) {
 	testAction.Outcome = result.CompareAgainst(dice.Fair)
 
 	initialAspectCount := len(sm.currentScene.SituationAspects)
-	events := sm.applyActionEffects(context.Background(), testAction, nil)
+	events := sm.conflict.applyActionEffects(context.Background(), testAction, nil)
 
 	assert.Equal(t, initialAspectCount+1, len(sm.currentScene.SituationAspects))
 
@@ -544,6 +549,7 @@ func TestClassifyInput_TrimsExtraText(t *testing.T) {
 
 			sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 			sm.currentScene = scene.NewScene("test", "Test", "Test scene")
+			sm.conflict.currentScene = scene.NewScene("test", "Test", "Test scene")
 
 			result, err := sm.classifyInput(context.Background(), "test input")
 			require.NoError(t, err)
@@ -565,9 +571,11 @@ func TestProcessInput_NarrativeRoutesToDialog(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	testScene := scene.NewScene("test-scene", "Tavern", "A cozy tavern")
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
 
 	player := character.NewCharacter("player-1", "Test Player")
 	sm.player = player
+	sm.conflict.player = player
 
 	result, err := sm.HandleInput(context.Background(), "I walk to the table")
 	require.NoError(t, err)
@@ -647,7 +655,9 @@ func TestHandleInput_DialogReturnsDialogEvent(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	testScene := scene.NewScene("tavern", "Tavern", "A dimly lit tavern")
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
 	sm.player = character.NewCharacter("player-1", "Hero")
+	sm.conflict.player = character.NewCharacter("player-1", "Hero")
 
 	result, err := sm.HandleInput(context.Background(), "I greet the bartender")
 	require.NoError(t, err)
@@ -674,10 +684,12 @@ func TestHandleInput_DialogWithSceneTransition(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
-	sm.exitOnSceneTransition = true
+	sm.conflict.exitOnSceneTransition = true
 	testScene := scene.NewScene("tavern", "Tavern", "A dimly lit tavern")
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
 	sm.player = character.NewCharacter("player-1", "Hero")
+	sm.conflict.player = character.NewCharacter("player-1", "Hero")
 
 	result, err := sm.HandleInput(context.Background(), "I leave the tavern")
 	require.NoError(t, err)
@@ -714,7 +726,7 @@ func TestHandleInput_ActionPath_ReturnsEvents(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
-	sm.roller = dice.NewSeededRoller(12345)
+	sm.conflict.roller = dice.NewSeededRoller(12345)
 	testScene := scene.NewScene("arena", "Arena", "A fighting arena")
 
 	player := character.NewCharacter("player-1", "Hero")
@@ -727,7 +739,9 @@ func TestHandleInput_ActionPath_ReturnsEvents(t *testing.T) {
 	testScene.AddCharacter(player.ID)
 	testScene.AddCharacter(enemy.ID)
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
 	sm.player = player
+	sm.conflict.player = player
 
 	result, err := sm.HandleInput(context.Background(), "I swing my sword at the goblin")
 	require.NoError(t, err)
@@ -749,7 +763,9 @@ func TestHandleInput_ClassificationFallbackToDialog(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	testScene := scene.NewScene("room", "Room", "A quiet room")
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
 	sm.player = character.NewCharacter("player-1", "Hero")
+	sm.conflict.player = character.NewCharacter("player-1", "Hero")
 
 	result, err := sm.HandleInput(context.Background(), "I look around")
 	require.NoError(t, err)

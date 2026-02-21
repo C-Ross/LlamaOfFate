@@ -25,13 +25,13 @@ type midFlowContinuation func(ctx context.Context, resp MidFlowResponse) []GameE
 // ProvideMidFlowResponse processes the player's response to an InputRequestEvent
 // and returns the resulting events. This is the mid-flow equivalent of
 // ProvideInvokeResponse.
-func (sm *SceneManager) ProvideMidFlowResponse(ctx context.Context, resp MidFlowResponse) (*InputResult, error) {
-	if sm.pendingMidFlow == nil {
+func (cm *ConflictManager) ProvideMidFlowResponse(ctx context.Context, resp MidFlowResponse) (*InputResult, error) {
+	if cm.pendingMidFlow == nil {
 		return nil, fmt.Errorf("ProvideMidFlowResponse called with no pending mid-flow request")
 	}
 
-	mf := sm.pendingMidFlow
-	sm.pendingMidFlow = nil
+	mf := cm.pendingMidFlow
+	cm.pendingMidFlow = nil
 
 	// Validate numbered choice index.
 	if mf.event.Type == uicontract.InputRequestNumberedChoice {
@@ -49,15 +49,13 @@ func (sm *SceneManager) ProvideMidFlowResponse(ctx context.Context, resp MidFlow
 	result := &InputResult{Events: events}
 
 	// Check for nested mid-flow (e.g. recursive stress overflow).
-	if sm.pendingMidFlow != nil {
-		result.Events = append(result.Events, sm.pendingMidFlow.event)
+	if cm.pendingMidFlow != nil {
+		result.Events = append(result.Events, cm.pendingMidFlow.event)
 		result.AwaitingMidFlow = true
 	}
 
-	if sm.shouldExit && !result.AwaitingMidFlow {
-		result.SceneEnded = true
-		result.EndResult = sm.buildSceneEndResult()
-	}
+	// Scene-end wrapping is handled by SceneManager.applySceneEnd via the
+	// public delegator, not here.
 
 	return result, nil
 }

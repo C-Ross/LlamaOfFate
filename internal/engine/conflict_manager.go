@@ -1,6 +1,9 @@
 package engine
 
 import (
+	"context"
+
+	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
@@ -8,9 +11,9 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 )
 
-// ConflictManager owns conflict-specific state and will (in a later phase)
-// receive all conflict/NPC/invoke/midflow methods. For now it is a struct
-// definition that SceneManager holds and wires per-scene.
+// ConflictManager owns conflict resolution, NPC turns, invoke loops,
+// and mid-flow prompts. SceneManager delegates to it and wraps the
+// results with scene-level concerns (narrative, scene-end).
 type ConflictManager struct {
 	// Shared dependencies — set once at construction.
 	llmClient       llm.LLMClient
@@ -27,9 +30,25 @@ type ConflictManager struct {
 	pendingInvoke  *invokeState
 	pendingMidFlow *midFlowState
 	takenOutChars  []string
+
+	// Scene-exit state — set by conflict methods, read by SceneManager to
+	// build SceneEndResult. Moved here so conflict methods don't need a
+	// back-pointer to SceneManager. Phase 4 will replace with return types.
+	shouldExit            bool
+	sceneEndReason        SceneEndReason
+	playerTakenOutHint    string
+	exitOnSceneTransition bool
+
+	// Narrative callbacks — wired by SceneManager after construction so that
+	// conflict methods can generate narrative and record conversation history
+	// without a direct dependency on SceneManager.
+	generateActionNarrative  func(ctx context.Context, a *action.Action) (string, error)
+	buildMechanicalNarrative func(a *action.Action) string
+	addToConversationHistory func(playerInput, gmResponse, interactionType string)
 }
 
 // newConflictManager creates a ConflictManager sharing the given dependencies.
+// Narrative callbacks must be wired separately after construction.
 func newConflictManager(
 	llmClient llm.LLMClient,
 	characters CharacterResolver,
@@ -55,6 +74,9 @@ func (cm *ConflictManager) resetState() {
 	cm.pendingInvoke = nil
 	cm.pendingMidFlow = nil
 	cm.takenOutChars = nil
+	cm.shouldExit = false
+	cm.sceneEndReason = ""
+	cm.playerTakenOutHint = ""
 }
 
 // setSessionLogger updates the session logger (may be called after construction).

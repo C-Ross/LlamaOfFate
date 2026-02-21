@@ -53,6 +53,7 @@ func TestClassifyInput_LLMError(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
 
 	_, err = sm.classifyInput(context.Background(), "test input")
 
@@ -68,6 +69,7 @@ func TestClassifyInput_EmptyResponse(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
 
 	_, err = sm.classifyInput(context.Background(), "test input")
 
@@ -83,6 +85,7 @@ func TestClassifyInput_UnexpectedClassification(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
 
 	_, err = sm.classifyInput(context.Background(), "test input")
 
@@ -114,6 +117,7 @@ func TestClassifyInput_ValidTypes(t *testing.T) {
 			sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 			testScene := scene.NewScene("test", "Test", "Test scene")
 			sm.currentScene = testScene
+			sm.conflict.currentScene = testScene
 
 			result, err := sm.classifyInput(context.Background(), "test input")
 
@@ -143,7 +147,9 @@ func TestGenerateSceneResponse_LLMError(t *testing.T) {
 	player := character.NewCharacter("p1", "Player")
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.player = player
+	sm.conflict.player = player
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
 	engine.AddCharacter(player)
 
 	_, err = sm.generateSceneResponse(context.Background(), "hello", inputTypeDialog)
@@ -161,7 +167,9 @@ func TestGenerateSceneResponse_EmptyResponse(t *testing.T) {
 	player := character.NewCharacter("p1", "Player")
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.player = player
+	sm.conflict.player = player
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
 	engine.AddCharacter(player)
 
 	_, err = sm.generateSceneResponse(context.Background(), "hello", inputTypeDialog)
@@ -193,7 +201,9 @@ func TestGenerateActionNarrative_LLMError(t *testing.T) {
 	player := character.NewCharacter("p1", "Player")
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.player = player
+	sm.conflict.player = player
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
 	engine.AddCharacter(player)
 
 	testAction := action.NewAction("a1", "p1", action.Overcome, "Athletics", "Jump")
@@ -287,7 +297,9 @@ func TestProcessInput_ClassificationFallback(t *testing.T) {
 	player := character.NewCharacter("p1", "Player")
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.player = player
+	sm.conflict.player = player
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
 	engine.AddCharacter(player)
 
 	// This should fail classification but still handle as dialog
