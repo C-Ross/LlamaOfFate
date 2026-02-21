@@ -22,6 +22,29 @@ syncdriver.Run()     ← blocking terminal loop (wraps async engine API)
 
 **syncdriver** wraps the async engine for blocking UIs. Engine itself is purely event-driven. Each layer creates/configures the layer below. **Do not skip layers.**
 
+## Configuration System (`internal/config/`)
+
+Scenarios and characters are defined in YAML files under `configs/scenarios/` and `configs/characters/`. The loader unmarshals directly into domain types (`character.Character`, `scene.Scene`) which carry `yaml:` struct tags, then calls `InitDefaults()` to initialize runtime fields (stress tracks, timestamps, empty slices).
+
+```go
+// Load all scenarios and characters from configs/ directory
+scenarios, _ := config.LoadAll("configs")
+ls := scenarios["saloon"]
+player := ls.Player         // *character.Character (default player for scenario)
+scenario := ls.Scenario     // *scene.Scenario
+npcs := ls.NPCs             // []*character.Character
+initialScene := ls.Scene    // *scene.Scene (may be nil)
+
+// Load individual files
+char, _ := config.LoadCharacter("configs/characters/jesse-calhoun.yaml")
+ls, _ := config.LoadScenario("configs/scenarios/heist.yaml", charMap)
+```
+
+**Key types**:
+- `config.LoadedScenario` — result of loading a scenario (includes Scenario, Player, NPCs, Scene, Farewell)
+- `config.ScenarioFile` — on-disk YAML shape
+- `config.NPCDef` — NPC definition in scenario YAML (type: supporting, nameless_good/fair/average, main)
+
 ## Engine (`engine.go`)
 
 Shared kernel: LLM client, character registry, creates `SceneManager` + `ActionParser`.
@@ -200,6 +223,8 @@ Data types shared between engine and UI:
 
 | Feature | File(s) |
 |---------|---------|
+| Scenario/character data | `configs/scenarios/*.yaml` or `configs/characters/*.yaml` |
+| Config loading logic | `internal/config/loader.go` |
 | Meta-command | `internal/ui/terminal/terminal.go` `handleSpecialCommands()` |
 | Blocking loop behavior | `internal/syncdriver/syncdriver.go` `Run()`, `driveBlockingPrompts()` |
 | Input classification type | `scene_manager.go` constants + `HandleInput()` switch |
