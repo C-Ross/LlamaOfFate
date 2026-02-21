@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
+import { toast } from "sonner"
 import { GameSidebar } from "@/components/game/GameSidebar"
 import { ChatPanel } from "@/components/game/ChatPanel"
 import { ChatInput } from "@/components/game/ChatInput"
@@ -21,6 +22,7 @@ import type {
   InvokePromptEventData,
   InputRequestEventData,
   SetupRequestEventData,
+  ErrorNotificationEventData,
 } from "@/lib/types"
 
 function getWebSocketUrl(): string {
@@ -90,6 +92,18 @@ function App() {
   }, [events, awaitingMidFlow])
 
   const inputDisabled = !isConnected || isPending || awaitingInvoke || awaitingMidFlow || gameOver
+
+  // Show a toast for error_notification events (e.g. save load failures).
+  const lastToastedIndex = useRef(-1)
+  useEffect(() => {
+    for (let i = lastToastedIndex.current + 1; i < events.length; i++) {
+      if (events[i].event === "error_notification") {
+        const data = events[i].data as ErrorNotificationEventData
+        toast.error(data.Message)
+      }
+    }
+    lastToastedIndex.current = events.length - 1
+  }, [events])
 
   // If the server sent a setup_request, show the setup screen instead of the game.
   if (setupRequest || setupGeneratingMessage) {

@@ -60,6 +60,10 @@ func (s *YAMLSaver) Load() (*engine.GameState, error) {
 		return nil, fmt.Errorf("unmarshal game state: %w", err)
 	}
 
+	if err := state.Validate(); err != nil {
+		return nil, fmt.Errorf("save file is corrupt or incompatible: %w", err)
+	}
+
 	return &state, nil
 }
 

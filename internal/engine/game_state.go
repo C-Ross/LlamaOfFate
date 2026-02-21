@@ -1,6 +1,9 @@
 package engine
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
@@ -12,6 +15,44 @@ import (
 type GameState struct {
 	Scenario ScenarioState `yaml:"scenario"`
 	Scene    SceneState    `yaml:"scene"`
+}
+
+// Validate checks that a loaded GameState contains the minimum required data
+// for resuming a game. It returns an error describing all missing fields if
+// the state is incomplete (e.g. from an incompatible older save format).
+func (gs *GameState) Validate() error {
+	var problems []string
+
+	if gs.Scenario.Player == nil {
+		problems = append(problems, "missing player")
+	} else {
+		p := gs.Scenario.Player
+		if p.Name == "" {
+			problems = append(problems, "player has no name")
+		}
+		if p.Aspects.HighConcept == "" {
+			problems = append(problems, "player has no high concept")
+		}
+		if p.Aspects.Trouble == "" {
+			problems = append(problems, "player has no trouble")
+		}
+		if len(p.StressTracks) == 0 {
+			problems = append(problems, "player has no stress tracks")
+		}
+	}
+
+	if gs.Scenario.Scenario == nil {
+		problems = append(problems, "missing scenario")
+	}
+
+	if gs.Scene.CurrentScene == nil {
+		problems = append(problems, "missing current scene")
+	}
+
+	if len(problems) > 0 {
+		return fmt.Errorf("invalid save state: %s", strings.Join(problems, "; "))
+	}
+	return nil
 }
 
 // ScenarioState holds state managed by ScenarioManager and GameManager:

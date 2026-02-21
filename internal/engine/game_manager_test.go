@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
@@ -307,6 +308,28 @@ func TestGameManager_Start_ResumeFromSave(t *testing.T) {
 	require.True(t, len(events) >= 2, "expected at least 2 events (resumed + narrative)")
 }
 
+func TestGameManager_Start_LoadFailure_EmitsErrorNotification(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	player.Aspects.HighConcept = "Brave Knight"
+
+	gm := NewGameManager(engine)
+	gm.SetPlayer(player)
+	gm.SetScenario(&scene.Scenario{Title: "The Tournament", Genre: "Fantasy"})
+	gm.SetSaver(&mockSaver{loadErr: fmt.Errorf("save file is corrupt or incompatible: invalid save state: player has no high concept")})
+
+	events, err := gm.Start(context.Background())
+	require.NoError(t, err, "load failure should not prevent game start")
+	require.NotEmpty(t, events)
+
+	// First event should be ErrorNotificationEvent
+	notification, ok := events[0].(ErrorNotificationEvent)
+	require.True(t, ok, "first event should be ErrorNotificationEvent, got %T", events[0])
+	assert.Contains(t, notification.Message, "saved game could not be loaded")
+}
+
 func TestInputResult_GameOverFields(t *testing.T) {
 	result := InputResult{
 		GameOver: true,
@@ -322,6 +345,7 @@ func TestInputResult_GameOverFields(t *testing.T) {
 type mockSaver struct {
 	savedState *GameState
 	lastSaved  *GameState
+	loadErr    error
 }
 
 func (m *mockSaver) Save(state GameState) error {
@@ -330,5 +354,8 @@ func (m *mockSaver) Save(state GameState) error {
 }
 
 func (m *mockSaver) Load() (*GameState, error) {
+	if m.loadErr != nil {
+		return nil, m.loadErr
+	}
 	return m.savedState, nil
 }

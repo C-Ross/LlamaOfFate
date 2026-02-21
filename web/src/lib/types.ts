@@ -88,6 +88,10 @@ export interface SystemMessageEventData {
   Message: string
 }
 
+export interface ErrorNotificationEventData {
+  Message: string
+}
+
 export interface ActionAttemptEventData {
   Description: string
 }
@@ -419,6 +423,7 @@ export type GameEventType =
   | "milestone"
   | "game_resumed"
   | "game_state_snapshot"
+  | "error_notification"
   | "session_init"
   | "result_meta"
   | "setup_request"

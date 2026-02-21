@@ -422,3 +422,20 @@ func TestMarshalSessionInit(t *testing.T) {
 	require.NoError(t, json.Unmarshal(msg.Data, &parsed))
 	assert.Equal(t, "game-42", parsed.GameID)
 }
+
+func TestMarshalEvent_ErrorNotificationEvent(t *testing.T) {
+	event := uicontract.ErrorNotificationEvent{
+		Message: "Your saved game could not be loaded and a new game has been started.",
+	}
+
+	data, err := MarshalEvent(event)
+	require.NoError(t, err)
+
+	var msg ServerMessage
+	require.NoError(t, json.Unmarshal(data, &msg))
+	assert.Equal(t, "error_notification", msg.Event)
+
+	var parsed uicontract.ErrorNotificationEvent
+	require.NoError(t, json.Unmarshal(msg.Data, &parsed))
+	assert.Equal(t, "Your saved game could not be loaded and a new game has been started.", parsed.Message)
+}

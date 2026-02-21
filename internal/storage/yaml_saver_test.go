@@ -38,18 +38,33 @@ func TestYAMLSaver_Load_NoFile(t *testing.T) {
 	assert.Nil(t, state, "Load should return nil when no save file exists")
 }
 
+// validMinimalState returns a GameState with the minimum required fields to
+// pass Validate(). Tests that don't care about specific field values should
+// start from this and override what they need.
+func validMinimalState() engine.GameState {
+	player := character.NewCharacter("player1", "Test Hero")
+	player.Aspects.HighConcept = "Test Concept"
+	player.Aspects.Trouble = "Test Trouble"
+	return engine.GameState{
+		Scenario: engine.ScenarioState{
+			Player:   player,
+			Scenario: &scene.Scenario{Title: "Test", Genre: "Fantasy"},
+		},
+		Scene: engine.SceneState{
+			CurrentScene: scene.NewScene("s1", "Test Room", "A test room"),
+		},
+	}
+}
+
 // --- Minimal round-trip ---
 
 func TestYAMLSaver_RoundTrip_Minimal(t *testing.T) {
 	dir := t.TempDir()
 	saver := NewYAMLSaver(dir)
 
-	original := engine.GameState{
-		Scenario: engine.ScenarioState{
-			ScenarioCount: 1,
-			SceneCount:    2,
-		},
-	}
+	original := validMinimalState()
+	original.Scenario.ScenarioCount = 1
+	original.Scenario.SceneCount = 2
 
 	require.NoError(t, saver.Save(original))
 
@@ -190,12 +205,11 @@ func TestYAMLSaver_Save_Overwrites(t *testing.T) {
 	dir := t.TempDir()
 	saver := NewYAMLSaver(dir)
 
-	state1 := engine.GameState{
-		Scenario: engine.ScenarioState{ScenarioCount: 1},
-	}
-	state2 := engine.GameState{
-		Scenario: engine.ScenarioState{ScenarioCount: 2},
-	}
+	state1 := validMinimalState()
+	state1.Scenario.ScenarioCount = 1
+
+	state2 := validMinimalState()
+	state2.Scenario.ScenarioCount = 2
 
 	require.NoError(t, saver.Save(state1))
 	require.NoError(t, saver.Save(state2))
@@ -281,6 +295,189 @@ func TestYAMLSaver_Save_ReadOnlyDir(t *testing.T) {
 
 	err := saver.Save(engine.GameState{})
 	assert.Error(t, err, "saving to read-only directory should error")
+}
+
+// --- Round-trip: stress tracks, consequences, situation aspects, NPCs ---
+
+// TestYAMLSaver_RoundTrip_StressTracksAndConsequences verifies that stress
+// tracks and consequences survive serialisation — these were previously lost
+// because StressTrack / Consequence lacked yaml struct tags.
+func TestYAMLSaver_RoundTrip_StressTracksAndConsequences(t *testing.T) {
+	dir := t.TempDir()
+	saver := NewYAMLSaver(dir)
+
+	player := character.NewCharacter("player1", "Zero")
+	player.Aspects.HighConcept = "Ghost in the Machine Netrunner"
+	player.Aspects.Trouble = "Wanted by Three Megacorps"
+	player.Aspects.AddAspect("Military-Grade Cybernetic Reflexes")
+	player.SetSkill("Burglary", dice.Superb)
+	player.SetSkill("Stealth", dice.Great)
+	player.FatePoints = 2
+	player.Refresh = 3
+
+	// Mark a stress box as used
+	player.StressTracks[string(character.PhysicalStress)].Boxes[0] = true
+
+	// Give the player a consequence
+	player.Consequences = append(player.Consequences, character.Consequence{
+		ID:     "c1",
+		Type:   character.MildConsequence,
+		Aspect: "Bruised Ribs",
+	})
+
+	npc := character.NewSupportingNPC("npc_nova", "Nova", "Slick Info Broker")
+
+	testScene := scene.NewScene("scene_2", "Rainy Street", "Rain-soaked neon street.")
+	testScene.AddSituationAspect(scene.SituationAspect{
+		ID: "sa1", Aspect: "Rainy Night Visibility", Duration: "scene", FreeInvokes: 1,
+	})
+	testScene.AddSituationAspect(scene.SituationAspect{
+		ID: "sa2", Aspect: "Hovercar at the Curb", Duration: "scene",
+	})
+	testScene.AddCharacter("player1")
+	testScene.AddCharacter("npc_nova")
+
+	original := engine.GameState{
+		Scenario: engine.ScenarioState{
+			Player: player,
+			Scenario: &scene.Scenario{
+				Title:   "The Prometheus Job",
+				Problem: "Extract the data core",
+				Genre:   "Cyberpunk",
+				Setting: "Dark near-future city",
+			},
+			NPCRegistry:  map[string]*character.Character{"nova": npc},
+			NPCAttitudes: map[string]string{"nova": "friendly"},
+		},
+		Scene: engine.SceneState{
+			CurrentScene: testScene,
+			ScenePurpose: "Uncover the buyer's identity",
+		},
+	}
+
+	require.NoError(t, saver.Save(original))
+
+	loaded, err := saver.Load()
+	require.NoError(t, err)
+	require.NotNil(t, loaded)
+
+	lp := loaded.Scenario.Player
+
+	// --- Player character fields ---
+	assert.Equal(t, "Zero", lp.Name)
+	assert.Equal(t, "Ghost in the Machine Netrunner", lp.Aspects.HighConcept, "high concept must round-trip")
+	assert.Equal(t, "Wanted by Three Megacorps", lp.Aspects.Trouble, "trouble must round-trip")
+	assert.Contains(t, lp.Aspects.OtherAspects, "Military-Grade Cybernetic Reflexes")
+	assert.Equal(t, 2, lp.FatePoints)
+	assert.Equal(t, 3, lp.Refresh)
+	assert.Equal(t, dice.Superb, lp.GetSkill("Burglary"))
+	assert.Equal(t, dice.Great, lp.GetSkill("Stealth"))
+
+	// --- Stress tracks must survive ---
+	require.NotNil(t, lp.StressTracks, "stress tracks must not be nil after load")
+	require.Contains(t, lp.StressTracks, string(character.PhysicalStress), "physical stress track missing")
+	require.Contains(t, lp.StressTracks, string(character.MentalStress), "mental stress track missing")
+
+	physical := lp.StressTracks[string(character.PhysicalStress)]
+	assert.Equal(t, character.PhysicalStress, physical.Type)
+	assert.Equal(t, 2, physical.MaxBoxes, "physical max boxes")
+	require.Len(t, physical.Boxes, 2, "physical boxes length")
+	assert.True(t, physical.Boxes[0], "first physical box should still be checked")
+	assert.False(t, physical.Boxes[1], "second physical box should be unchecked")
+
+	mental := lp.StressTracks[string(character.MentalStress)]
+	assert.Equal(t, character.MentalStress, mental.Type)
+	assert.Equal(t, 2, mental.MaxBoxes, "mental max boxes")
+	require.Len(t, mental.Boxes, 2, "mental boxes length")
+
+	// --- Consequences must survive ---
+	require.Len(t, lp.Consequences, 1, "consequences must round-trip")
+	assert.Equal(t, character.MildConsequence, lp.Consequences[0].Type)
+	assert.Equal(t, "Bruised Ribs", lp.Consequences[0].Aspect)
+
+	// --- NPC registry ---
+	require.Contains(t, loaded.Scenario.NPCRegistry, "nova")
+	loadedNPC := loaded.Scenario.NPCRegistry["nova"]
+	assert.Equal(t, "Nova", loadedNPC.Name)
+	assert.Equal(t, "Slick Info Broker", loadedNPC.Aspects.HighConcept)
+	require.NotNil(t, loadedNPC.StressTracks, "NPC stress tracks must not be nil")
+	require.Contains(t, loadedNPC.StressTracks, string(character.PhysicalStress))
+
+	// --- Scene ---
+	require.NotNil(t, loaded.Scene.CurrentScene)
+	assert.Equal(t, "Rainy Street", loaded.Scene.CurrentScene.Name)
+	require.Len(t, loaded.Scene.CurrentScene.SituationAspects, 2, "situation aspects must round-trip")
+	assert.Equal(t, "Rainy Night Visibility", loaded.Scene.CurrentScene.SituationAspects[0].Aspect)
+	assert.Equal(t, 1, loaded.Scene.CurrentScene.SituationAspects[0].FreeInvokes)
+	assert.Equal(t, "Hovercar at the Curb", loaded.Scene.CurrentScene.SituationAspects[1].Aspect)
+
+	// Characters in scene
+	assert.Contains(t, loaded.Scene.CurrentScene.Characters, "player1")
+	assert.Contains(t, loaded.Scene.CurrentScene.Characters, "npc_nova")
+}
+
+// TestYAMLSaver_Load_OldFormatSave_Rejected verifies that a save file created
+// by an older version of the code (before yaml struct tags were added) is
+// rejected by Validate. Old saves used Go's default lowercase keys (e.g.
+// "stresstracks", "highconcept") which no longer deserialize into the current
+// struct tags ("stress_tracks", "high_concept"), producing empty fields.
+func TestYAMLSaver_Load_OldFormatSave_Rejected(t *testing.T) {
+	dir := t.TempDir()
+	oldFormatYAML := `scenario:
+    player:
+        id: player1
+        name: Jesse Calhoun
+        charactertype: 0
+        aspects:
+            highconcept: Haunted Former Rancher
+            trouble: Vengeance Burns Hotter Than Reason
+            otheraspects: []
+        skills:
+            Shoot: 4
+        fatepoints: 4
+        refresh: 3
+        stresstracks:
+            physical:
+                type: physical
+                boxes:
+                    - true
+                    - false
+                maxboxes: 2
+            mental:
+                type: mental
+                boxes:
+                    - false
+                    - false
+                maxboxes: 2
+    scenario:
+        title: Trouble in Redemption Gulch
+        problem: The town is under threat
+        genre: Western
+        is_resolved: false
+    scenario_count: 0
+    scene_count: 1
+scene:
+    current_scene:
+        id: scene_1
+        name: The Saloon
+        description: A dusty saloon
+        characters:
+            - player1
+    conversation_history: []
+`
+	err := os.WriteFile(filepath.Join(dir, saveFileName), []byte(oldFormatYAML), 0o644)
+	require.NoError(t, err)
+
+	saver := NewYAMLSaver(dir)
+	loaded, loadErr := saver.Load()
+
+	// The old-format save should be rejected because its YAML keys don't match
+	// the current struct tags, leaving high concept and stress tracks empty.
+	assert.Error(t, loadErr, "old-format save should be rejected by validation")
+	assert.Nil(t, loaded)
+	assert.Contains(t, loadErr.Error(), "invalid save state")
+	assert.Contains(t, loadErr.Error(), "high concept")
+	assert.Contains(t, loadErr.Error(), "stress tracks")
 }
 
 // --- Save produces valid YAML ---

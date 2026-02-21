@@ -1,6 +1,7 @@
-import { render, screen } from "@testing-library/react"
+import { render, screen, act, waitFor } from "@testing-library/react"
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import App from "../App"
+import { Toaster } from "@/components/ui/sonner"
 
 // Mock WebSocket — App creates a WebSocket on mount via useGameSocket
 class MockWebSocket {
@@ -60,5 +61,36 @@ describe("App", () => {
   it("renders a mobile sidebar toggle button", () => {
     render(<App />)
     expect(screen.getByRole("button", { name: "Open game sidebar" })).toBeInTheDocument()
+  })
+
+  it("shows a toast when an error_notification event arrives", async () => {
+    render(
+      <>
+        <App />
+        <Toaster />
+      </>
+    )
+
+    // Simulate WebSocket open + error_notification event
+    const ws = MockWebSocket.instances[0]
+    act(() => {
+      ws.readyState = 1
+      ws.onopen?.()
+    })
+
+    act(() => {
+      ws.onmessage?.({
+        data: JSON.stringify({
+          event: "error_notification",
+          data: { Message: "Your saved game could not be loaded and a new game has been started." },
+        }),
+      })
+    })
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Your saved game could not be loaded and a new game has been started.")
+      ).toBeInTheDocument()
+    })
   })
 })

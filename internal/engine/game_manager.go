@@ -117,6 +117,7 @@ func (g *GameManager) Start(ctx context.Context) ([]GameEvent, error) {
 	// Check for a saved game to resume (skip when an initial scene is
 	// explicitly configured — RunWithInitialScene always starts fresh).
 	var savedState *GameState
+	var loadError error
 	if g.initialScene == nil {
 		var err error
 		savedState, err = g.saver.Load()
@@ -124,6 +125,7 @@ func (g *GameManager) Start(ctx context.Context) ([]GameEvent, error) {
 			slog.Warn("Failed to load saved game, starting fresh",
 				"error", err,
 			)
+			loadError = err
 			savedState = nil
 		}
 	}
@@ -152,6 +154,14 @@ func (g *GameManager) Start(ctx context.Context) ([]GameEvent, error) {
 	events, err := g.scenarioManager.Start(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	// Notify the player if their saved game could not be loaded.
+	if loadError != nil {
+		notification := ErrorNotificationEvent{
+			Message: "Your saved game could not be loaded and a new game has been started.",
+		}
+		events = append([]GameEvent{notification}, events...)
 	}
 
 	// Append a full-state snapshot so web UIs can initialise sidebar state.

@@ -49,6 +49,7 @@ type RecoveryEvent = uicontract.RecoveryEvent
 type StressOverflowEvent = uicontract.StressOverflowEvent
 type MilestoneEvent = uicontract.MilestoneEvent
 type GameResumedEvent = uicontract.GameResumedEvent
+type ErrorNotificationEvent = uicontract.ErrorNotificationEvent
 type GameStateSnapshotEvent = uicontract.GameStateSnapshotEvent
 type PlayerSnapshot = uicontract.PlayerSnapshot
 type StressTrackSnapshot = uicontract.StressTrackSnapshot

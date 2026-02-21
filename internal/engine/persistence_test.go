@@ -686,3 +686,150 @@ func TestGameManager_Start_NoSave_FreshStart(t *testing.T) {
 	lastSave := recorder.savedStates[len(recorder.savedStates)-1]
 	assert.Equal(t, "Saloon", lastSave.Scene.CurrentScene.Name)
 }
+
+// --- GameState.Validate tests ---
+
+func TestGameState_Validate_ValidState(t *testing.T) {
+	player := character.NewCharacter("player1", "Jesse")
+	player.Aspects.HighConcept = "Gunslinger"
+	player.Aspects.Trouble = "Wanted Dead or Alive"
+
+	gs := GameState{
+		Scenario: ScenarioState{
+			Player:   player,
+			Scenario: &scene.Scenario{Title: "Test", Genre: "Western"},
+		},
+		Scene: SceneState{
+			CurrentScene: scene.NewScene("s1", "Saloon", "A saloon"),
+		},
+	}
+	assert.NoError(t, gs.Validate())
+}
+
+func TestGameState_Validate_MissingPlayer(t *testing.T) {
+	gs := GameState{
+		Scenario: ScenarioState{
+			Scenario: &scene.Scenario{Title: "Test"},
+		},
+		Scene: SceneState{
+			CurrentScene: scene.NewScene("s1", "Saloon", "A saloon"),
+		},
+	}
+	err := gs.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing player")
+}
+
+func TestGameState_Validate_MissingHighConcept(t *testing.T) {
+	player := character.NewCharacter("player1", "Jesse")
+	player.Aspects.Trouble = "Wanted Dead or Alive"
+	// HighConcept left empty
+
+	gs := GameState{
+		Scenario: ScenarioState{
+			Player:   player,
+			Scenario: &scene.Scenario{Title: "Test"},
+		},
+		Scene: SceneState{
+			CurrentScene: scene.NewScene("s1", "Saloon", "A saloon"),
+		},
+	}
+	err := gs.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "high concept")
+}
+
+func TestGameState_Validate_MissingTrouble(t *testing.T) {
+	player := character.NewCharacter("player1", "Jesse")
+	player.Aspects.HighConcept = "Gunslinger"
+	// Trouble left empty
+
+	gs := GameState{
+		Scenario: ScenarioState{
+			Player:   player,
+			Scenario: &scene.Scenario{Title: "Test"},
+		},
+		Scene: SceneState{
+			CurrentScene: scene.NewScene("s1", "Saloon", "A saloon"),
+		},
+	}
+	err := gs.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "trouble")
+}
+
+func TestGameState_Validate_MissingStressTracks(t *testing.T) {
+	player := character.NewCharacter("player1", "Jesse")
+	player.Aspects.HighConcept = "Gunslinger"
+	player.Aspects.Trouble = "Wanted Dead or Alive"
+	player.StressTracks = nil // Simulate deserialization from old format
+
+	gs := GameState{
+		Scenario: ScenarioState{
+			Player:   player,
+			Scenario: &scene.Scenario{Title: "Test"},
+		},
+		Scene: SceneState{
+			CurrentScene: scene.NewScene("s1", "Saloon", "A saloon"),
+		},
+	}
+	err := gs.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "stress tracks")
+}
+
+func TestGameState_Validate_MissingScenario(t *testing.T) {
+	player := character.NewCharacter("player1", "Jesse")
+	player.Aspects.HighConcept = "Gunslinger"
+	player.Aspects.Trouble = "Wanted Dead or Alive"
+
+	gs := GameState{
+		Scenario: ScenarioState{
+			Player: player,
+		},
+		Scene: SceneState{
+			CurrentScene: scene.NewScene("s1", "Saloon", "A saloon"),
+		},
+	}
+	err := gs.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing scenario")
+}
+
+func TestGameState_Validate_MissingScene(t *testing.T) {
+	player := character.NewCharacter("player1", "Jesse")
+	player.Aspects.HighConcept = "Gunslinger"
+	player.Aspects.Trouble = "Wanted Dead or Alive"
+
+	gs := GameState{
+		Scenario: ScenarioState{
+			Player:   player,
+			Scenario: &scene.Scenario{Title: "Test"},
+		},
+		Scene: SceneState{},
+	}
+	err := gs.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing current scene")
+}
+
+func TestGameState_Validate_MultipleProblems(t *testing.T) {
+	player := character.NewCharacter("player1", "Jesse")
+	// Both high concept and stress tracks missing
+	player.StressTracks = nil
+
+	gs := GameState{
+		Scenario: ScenarioState{
+			Player: player,
+			// Scenario also missing
+		},
+		Scene: SceneState{}, // Scene also missing
+	}
+	err := gs.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "high concept")
+	assert.Contains(t, err.Error(), "trouble")
+	assert.Contains(t, err.Error(), "stress tracks")
+	assert.Contains(t, err.Error(), "missing scenario")
+	assert.Contains(t, err.Error(), "missing current scene")
+}

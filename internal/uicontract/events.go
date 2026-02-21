@@ -340,6 +340,16 @@ type GameResumedEvent struct {
 
 func (GameResumedEvent) gameEvent() {}
 
+// ErrorNotificationEvent is emitted when a non-fatal error occurs that the
+// player should be informed about (e.g. a save file was incompatible and the
+// game started fresh instead of resuming). UIs should display this as a
+// prominent, transient notification (e.g. a toast).
+type ErrorNotificationEvent struct {
+	Message string
+}
+
+func (ErrorNotificationEvent) gameEvent() {}
+
 // ---------------------------------------------------------------------------
 // Full-state snapshot — sent once after Start() so the UI can initialise.
 // ---------------------------------------------------------------------------
