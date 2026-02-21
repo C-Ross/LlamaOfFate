@@ -36,15 +36,100 @@ web/
     main.tsx                  - React entry point
     App.tsx                   - Root layout (two-panel)
     index.css                 - Tailwind + theme variables
-    lib/utils.ts              - cn() helper (clsx + tailwind-merge)
+    lib/
+      utils.ts                - cn() helper (clsx + tailwind-merge)
+      types.ts                - TypeScript type definitions (GameEvent, ScenarioPreset, etc.)
+      dice.ts                 - Dice animation utilities
+    hooks/
+      useGameSocket.ts        - WebSocket connection & game state management
+      useGameState.ts         - Derived game state (player, NPCs, aspects, etc.)
     components/
-      SidebarCard.tsx          - Reusable sidebar card wrapper
-      ui/                      - shadcn/ui components (DO NOT edit manually)
+      SidebarCard.tsx         - Reusable sidebar card wrapper
+      game/                   - Game-specific components (21 files — see below)
+      ui/                     - shadcn/ui components (DO NOT edit manually)
     test/
-      setup.ts                 - Vitest setup (jest-dom matchers)
-      App.test.tsx             - App component tests
-      SidebarCard.test.tsx     - SidebarCard tests
+      setup.ts                - Vitest setup (jest-dom matchers)
+      *.test.tsx              - Component tests (one per component)
+      *.test.ts               - Hook/utility tests
 ```
+
+## Game Components & Hooks
+
+### Hooks
+
+#### `useGameSocket()`
+
+Manages WebSocket connection to the Go backend and game state.
+
+```tsx
+const {
+  events,              // GameEvent[] - all events received
+  isConnected,         // WebSocket connection status
+  gameId,              // Current game session ID
+  setupRequest,        // Setup phase data (presets, allow_custom)
+  hasSavedGame,        // True if localStorage has savedGameId
+  sendInput,           // (input: string) => void
+  newGame,             // () => void - store current gameId, reconnect
+  continueGame,        // () => void - restore savedGameId, reconnect
+  selectPreset,        // (presetId: string) => void
+  selectCustom,        // (custom: CustomSetup) => void
+  provideInvokeResponse, // (response: InvokeResponse) => void
+  provideMidFlowResponse, // (response: MidFlowResponse) => void
+} = useGameSocket()
+```
+
+**Setup flow:** Server sends `setup_request` → `setupRequest` populated → user selects preset/custom → `selectPreset`/`selectCustom` → game starts.
+
+**Session persistence:** `newGame()` saves the current `gameId` to `localStorage.savedGameId` and reconnects. `continueGame()` restores that ID and reconnects.
+
+#### `useGameState(events)`
+
+Derives character state, aspects, and turn info from event stream.
+
+```tsx
+const {
+  player,              // Character | null
+  npcs,                // Character[]
+  gameId,              // string | null
+  sceneAspects,        // string[]
+  activeConflict,      // ConflictState | null
+  currentTurn,         // Character | null
+  sceneName,           // string | null
+} = useGameState(events)
+```
+
+### Game Components (`src/components/game/`)
+
+| Component | Purpose |
+|-----------|---------|
+| `SetupScreen` | Scenario selection (preset cards, custom input, continue game) |
+| `ChatPanel` | Message feed + input (scrollable, filters system/narrative messages) |
+| `ChatMessage` | Single message bubble (player/system/narrative styling) |
+| `ChatInput` | Text input + submit button (disabled when pending) |
+| `GameSidebar` | Right panel layout (character, NPCs, aspects, fate points) |
+| `FatePointTracker` | Fate point display + dice icon |
+| `StressTrack` | Stress boxes with filled/empty state |
+| `AspectBadge` | Pill badge for aspects (high concept, trouble, other) |
+| `NpcPanel` | Collapsible NPC list with stats |
+| `ActionAttempt` | Player action roll display (dice, outcome, shifts) |
+| `DefenseRoll` | NPC/target defense roll display |
+| `NPCAction` | NPC turn display (action, roll, outcome) |
+| `RollResult` | Dice roll visualization (individual die + total) |
+| `FateDie` | Single die face with +/0/− display |
+| `OutcomeBadge` | Success/Tie/Failure badge |
+| `ConflictBanner` | Active conflict header (red/amber state) |
+| `ConflictEnd` | Conflict resolution message |
+| `TurnAnnouncement` | "Your turn" / "NPC's turn" banner |
+| `DamageResolution` | Stress/consequence UI (interactive consequence selection) |
+| `InvokePrompt` | Aspect invocation prompt (list selection + submit) |
+| `MidFlowPrompt` | Mid-flow prompt (text input + submit) |
+
+**Key patterns:**
+
+- All game components accept `GameEvent` data as props (not raw strings)
+- Use `OutcomeBadge`, `AspectBadge`, `FateDie` for consistent styling
+- `SetupScreen` uses `hasSavedGame` + `onContinue` for session resumption
+- `InvokePrompt` remounts on new `invoke_prompt` events via `key={eventId}` to reset state
 
 ## Justfile Targets
 
