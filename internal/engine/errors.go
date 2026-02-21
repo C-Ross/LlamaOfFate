@@ -1,6 +1,9 @@
 package engine
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // Sentinel errors for game operations
 var (
@@ -16,3 +19,18 @@ var (
 	ErrCharacterAlreadyActed    = errors.New("character has already acted this exchange")
 	ErrNotCharacterTurn         = errors.New("not this character's turn")
 )
+
+// SaveCorruptError indicates that a save file exists but could not be loaded
+// because it is corrupt or incompatible. Callers should enter the setup flow
+// and display the error message to the user.
+type SaveCorruptError struct {
+	Cause error
+}
+
+func (e *SaveCorruptError) Error() string {
+	return fmt.Sprintf("saved game could not be loaded: %v", e.Cause)
+}
+
+func (e *SaveCorruptError) Unwrap() error {
+	return e.Cause
+}

@@ -98,6 +98,18 @@ func newGameSession(ctx context.Context, llmClient llm.LLMClient, gameID string,
 	// If no setup is provided, try to resume a saved game.
 	// Return nil (no driver) when no save exists — the caller enters setup flow.
 	if setup == nil {
+		// Attempt to load a saved game. If the file doesn't exist, saver.Load
+		// returns (nil, nil) and we signal "no driver" for the setup flow.
+		// If the file exists but is corrupt/incompatible, return a SaveCorruptError
+		// so the handler can notify the user before entering setup.
+		state, loadErr := saver.Load()
+		if loadErr != nil {
+			return nil, &engine.SaveCorruptError{Cause: loadErr}
+		}
+		if state == nil || state.Scene.CurrentScene == nil {
+			return nil, nil // no saved game — enter setup flow
+		}
+
 		gameEngine, err := engine.NewWithLLM(llmClient)
 		if err != nil {
 			return nil, fmt.Errorf("create engine: %w", err)
@@ -105,14 +117,7 @@ func newGameSession(ctx context.Context, llmClient llm.LLMClient, gameID string,
 		gm := engine.NewGameManager(gameEngine)
 		gm.SetSaver(saver)
 
-		// Attempt to load a saved game. If the save file exists, set a
-		// placeholder player (Start will overwrite from the save). Otherwise
-		// signal "no driver" so the handler triggers the setup flow.
-		state, loadErr := saver.Load()
-		if loadErr != nil || state == nil || state.Scene.CurrentScene == nil {
-			return nil, nil // no saved game — enter setup flow
-		}
-		// Save exists: provide a placeholder player; Start() will hydrate from state.
+		// Save exists: provide the player from state; Start() will hydrate from state.
 		placeholder := state.Scenario.Player
 		if placeholder == nil {
 			return nil, nil

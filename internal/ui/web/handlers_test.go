@@ -143,6 +143,66 @@ func TestHandler_WebSocket_MultipleEvents(t *testing.T) {
 	assert.Equal(t, "result_meta", msg.Event)
 }
 
+func TestHandler_WebSocket_CorruptSave_SendsErrorNotification(t *testing.T) {
+	callCount := 0
+	factory := func(_ context.Context, _ string, setup *GameSetup) (engine.GameSessionManager, error) {
+		callCount++
+		if callCount == 1 {
+			// First call: resume attempt — save is corrupt
+			return nil, &engine.SaveCorruptError{
+				Cause: fmt.Errorf("save file is corrupt or incompatible: player has no high concept"),
+			}
+		}
+		// Second call: after setup, return a working driver
+		return &mockDriver{
+			startEvents: []uicontract.GameEvent{
+				uicontract.NarrativeEvent{Text: "Welcome!"},
+			},
+			handleInputResult: &engine.InputResult{
+				Events:   []uicontract.GameEvent{uicontract.GameOverEvent{Reason: "done"}},
+				GameOver: true,
+			},
+		}, nil
+	}
+
+	setupCfg := SetupConfig{
+		Presets:     []ScenarioPreset{{ID: "test", Title: "Test", Description: "A test"}},
+		AllowCustom: false,
+	}
+
+	h := NewHandler(factory, setupCfg, nil)
+	server := httptest.NewServer(h)
+	defer server.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	client, _, err := websocket.Dial(ctx, "ws"+server.URL[4:]+"/ws?game_id=corrupt123", nil)
+	require.NoError(t, err)
+	defer func() { _ = client.CloseNow() }()
+
+	// 1. Read session_init
+	var msg ServerMessage
+	err = wsjson.Read(ctx, client, &msg)
+	require.NoError(t, err)
+	assert.Equal(t, "session_init", msg.Event)
+
+	// 2. Read error_notification (the corrupt save message)
+	err = wsjson.Read(ctx, client, &msg)
+	require.NoError(t, err)
+	assert.Equal(t, "error_notification", msg.Event)
+
+	var notification uicontract.ErrorNotificationEvent
+	require.NoError(t, json.Unmarshal(msg.Data, &notification))
+	assert.Contains(t, notification.Message, "could not be loaded")
+	assert.Contains(t, notification.Message, "player has no high concept")
+
+	// 3. Read setup_request (the session falls through to setup flow)
+	err = wsjson.Read(ctx, client, &msg)
+	require.NoError(t, err)
+	assert.Equal(t, "setup_request", msg.Event)
+}
+
 func TestIsNormalClose(t *testing.T) {
 	tests := []struct {
 		name     string

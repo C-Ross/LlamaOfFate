@@ -93,20 +93,32 @@ func (h *Handler) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		h.logger.Info("resuming game", "game_id", gameID)
 	}
 
+	var session *Session
+
 	driver, err := h.factory(r.Context(), gameID, nil)
 	if err != nil {
-		h.logger.Error("failed to create game driver", "error", err)
-		_ = conn.Close(websocket.StatusInternalError, "failed to initialize game")
-		return
+		// If the save file is corrupt/incompatible, enter setup flow
+		// and notify the user with an error toast.
+		var saveErr *engine.SaveCorruptError
+		if errors.As(err, &saveErr) {
+			h.logger.Warn("corrupt save, entering setup", "game_id", gameID, "error", err)
+			session = NewSetupSession(conn, h.factory, h.setupConfig, h.logger, gameID)
+			session.loadError = saveErr.Error()
+		} else {
+			h.logger.Error("failed to create game driver", "error", err)
+			_ = conn.Close(websocket.StatusInternalError, "failed to initialize game")
+			return
+		}
 	}
 
 	// If the factory returned a driver (resumed game), skip setup.
 	// Otherwise begin the setup flow.
-	var session *Session
-	if driver != nil {
-		session = NewSession(conn, driver, h.logger, gameID)
-	} else {
-		session = NewSetupSession(conn, h.factory, h.setupConfig, h.logger, gameID)
+	if session == nil {
+		if driver != nil {
+			session = NewSession(conn, driver, h.logger, gameID)
+		} else {
+			session = NewSetupSession(conn, h.factory, h.setupConfig, h.logger, gameID)
+		}
 	}
 
 	h.logger.Info("websocket session started", "remote", r.RemoteAddr, "game_id", gameID)

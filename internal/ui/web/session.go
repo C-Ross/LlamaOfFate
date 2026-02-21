@@ -15,12 +15,13 @@ import (
 
 // Session manages a single WebSocket ↔ GameSessionManager interaction.
 type Session struct {
-	driver  engine.GameSessionManager
-	conn    *websocket.Conn
-	logger  *slog.Logger
-	gameID  string
-	factory GameSessionManagerFactory // non-nil only for setup sessions
-	setup   SetupConfig               // preset list for setup_request
+	driver    engine.GameSessionManager
+	conn      *websocket.Conn
+	logger    *slog.Logger
+	gameID    string
+	factory   GameSessionManagerFactory // non-nil only for setup sessions
+	setup     SetupConfig               // preset list for setup_request
+	loadError string                    // non-empty when a save load failed; sent as error_notification
 }
 
 // NewSession creates a session for the given WebSocket connection and game driver.
@@ -58,6 +59,14 @@ func (s *Session) Run(ctx context.Context) error {
 	// 0. Send session_init with game ID so the client can store it for reconnection.
 	if err := s.sendSessionInit(ctx); err != nil {
 		return fmt.Errorf("send session_init: %w", err)
+	}
+
+	// 0a. If a save load failed, notify the client before continuing.
+	if s.loadError != "" {
+		notification := uicontract.ErrorNotificationEvent{Message: s.loadError}
+		if err := s.sendEvents(ctx, []uicontract.GameEvent{notification}); err != nil {
+			return fmt.Errorf("send load error notification: %w", err)
+		}
 	}
 
 	// 0b. If we don't have a driver yet, run the setup flow to get one.
