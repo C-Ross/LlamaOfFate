@@ -30,6 +30,15 @@ type NarrativeProvider interface {
 	RecordConversationEntry(playerInput, gmResponse, interactionType string)
 }
 
+// diceFacesToInts converts a [4]FateDie array to a []int slice for event serialization.
+func diceFacesToInts(dice [4]dice.FateDie) []int {
+	out := make([]int, 4)
+	for i, d := range dice {
+		out[i] = int(d)
+	}
+	return out
+}
+
 // ActionResolver handles the generic action resolution pipeline: dice rolling,
 // invoke loops, mid-flow prompts, narrative coordination, and applying
 // mechanical effects (create-advantage aspects, attack damage delegation).

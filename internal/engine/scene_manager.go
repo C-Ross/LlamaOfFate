@@ -40,7 +40,6 @@ type SceneManager struct {
 	player              *character.Character
 	conversationHistory []prompt.ConversationEntry
 	lastTransition      *prompt.SceneTransition // Captured transition hint when scene ends
-	aspectGenerator     AspectGenerator
 	sessionLogger       *session.Logger
 	scenePurpose        string           // Dramatic question driving the current scene
 	actions             *ActionResolver  // Generic action resolution (dice, invokes, narrative)
@@ -78,7 +77,6 @@ func NewSceneManager(characters CharacterResolver, llmClient llm.LLMClient, acti
 		characters:          characters,
 		actionParser:        actionParser,
 		conversationHistory: make([]prompt.ConversationEntry, 0),
-		aspectGenerator:     ag,
 		actions:             ar,
 		conflict:            cm,
 	}
