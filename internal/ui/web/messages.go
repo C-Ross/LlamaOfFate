@@ -146,6 +146,8 @@ func eventTypeName(event uicontract.GameEvent) string {
 		return "game_state_snapshot"
 	case uicontract.ErrorNotificationEvent:
 		return "error_notification"
+	case uicontract.BoostExpiredEvent:
+		return "boost_expired"
 	default:
 		return "unknown"
 	}

@@ -104,6 +104,8 @@ func (ui *TerminalUI) Emit(event uicontract.GameEvent) {
 		ui.displayMilestone(e)
 	case uicontract.GameResumedEvent:
 		ui.displayGameResumed(e)
+	case uicontract.BoostExpiredEvent:
+		ui.displaySystemMessage(fmt.Sprintf("Boost '%s' has been consumed and removed.", e.AspectName))
 	}
 }
 

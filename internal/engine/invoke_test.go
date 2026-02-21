@@ -443,10 +443,20 @@ func TestApplyInvokeChoice_Boost_RemovedAfterFreeInvokeUsed(t *testing.T) {
 		FreeInvokes: 1,
 	}
 
-	sm.applyInvokeChoice(is, selected, true /* useFree */, false /* isReroll */)
+	events := sm.applyInvokeChoice(is, selected, true /* useFree */, false /* isReroll */)
 
 	// Boost should have been removed from the scene after its free invoke was used.
 	assert.Empty(t, sm.currentScene.SituationAspects, "boost should be removed after its free invoke is consumed")
+
+	// A BoostExpiredEvent should be emitted so the UI can update.
+	var foundExpiry bool
+	for _, e := range events {
+		if b, ok := e.(BoostExpiredEvent); ok {
+			assert.Equal(t, "Fleeting Opening", b.AspectName)
+			foundExpiry = true
+		}
+	}
+	assert.True(t, foundExpiry, "expected BoostExpiredEvent when boost is consumed")
 }
 
 // A regular situation aspect (non-boost) should NOT be removed after its last

@@ -430,3 +430,9 @@ func (sa *SituationAspect) UseFreeInvoke() bool {
 	}
 	return false
 }
+
+// IsExpiredBoost returns true when this is a boost whose free invoke has been fully consumed.
+// The engine should call Scene.RemoveSituationAspect to clean it up from the scene.
+func (sa *SituationAspect) IsExpiredBoost() bool {
+	return sa.IsBoost && sa.FreeInvokes == 0
+}

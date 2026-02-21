@@ -200,6 +200,15 @@ type AspectCreatedEvent struct {
 
 func (AspectCreatedEvent) gameEvent() {}
 
+// BoostExpiredEvent is emitted when a boost's single free invoke has been consumed
+// and the boost is automatically removed from the scene per Fate Core rules
+// ("A boost vanishes as soon as it's used for the first time.").
+type BoostExpiredEvent struct {
+	AspectName string // Name of the boost that was consumed and removed
+}
+
+func (BoostExpiredEvent) gameEvent() {}
+
 // NPCAttackEvent is emitted after an NPC's full attack sequence resolves
 // (attack roll, defense roll, initial outcome, optional narrative).
 type NPCAttackEvent struct {

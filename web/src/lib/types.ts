@@ -220,6 +220,10 @@ export interface AspectCreatedEventData {
   IsBoost: boolean
 }
 
+export interface BoostExpiredEventData {
+  AspectName: string
+}
+
 export interface NPCAttackEventData {
   AttackerName: string
   TargetName: string
@@ -426,6 +430,7 @@ export type GameEventType =
   | "game_resumed"
   | "game_state_snapshot"
   | "error_notification"
+  | "boost_expired"
   | "session_init"
   | "result_meta"
   | "setup_request"
@@ -474,6 +479,7 @@ export const CHAT_DISPLAYABLE_EVENTS: Set<string> = new Set([
   "outcome_changed",
   "invoke",
   "aspect_created",
+  "boost_expired",
   "npc_action_result",
   "recovery",
   "stress_overflow",

@@ -533,6 +533,50 @@ func (sm *SceneManager) createBoost(name, createdByID string) AspectCreatedEvent
 	return AspectCreatedEvent{AspectName: name, FreeInvokes: 1, IsBoost: true}
 }
 
+// generateBoostName generates a contextual name for a boost using the LLM aspect generator.
+// It constructs a synthetic CreateAdvantage action with a Tie outcome so the existing
+// aspect generation prompt can produce a thematic boost name.
+// Falls back to the provided fallback string if no generator is available or the call fails.
+func (sm *SceneManager) generateBoostName(ctx context.Context, char *character.Character, skill, description, fallback string) string {
+	if sm.aspectGenerator == nil {
+		return fallback
+	}
+
+	existingAspects := make([]string, 0, len(sm.currentScene.SituationAspects))
+	for _, sa := range sm.currentScene.SituationAspects {
+		existingAspects = append(existingAspects, sa.Aspect)
+	}
+
+	// Synthetic CreateAdvantage action with a Tie outcome so the prompt knows this is a boost.
+	syntheticAction := action.NewAction(
+		fmt.Sprintf("boost-gen-%d", time.Now().UnixNano()),
+		char.ID, action.CreateAdvantage, skill, description,
+	)
+	syntheticAction.Outcome = &dice.Outcome{Type: dice.Tie, Shifts: 0}
+
+	req := prompt.AspectGenerationRequest{
+		Character:       char,
+		Action:          syntheticAction,
+		Outcome:         syntheticAction.Outcome,
+		Context:         sm.currentScene.Description,
+		TargetType:      "situation",
+		ExistingAspects: existingAspects,
+	}
+
+	genCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	resp, err := sm.aspectGenerator.GenerateAspect(genCtx, req)
+	if err != nil || resp == nil || resp.AspectText == "" {
+		slog.Warn("Failed to generate boost name via LLM, using fallback",
+			"component", componentSceneManager,
+			"error", err)
+		return fallback
+	}
+
+	return resp.AspectText
+}
+
 // applyActionEffects applies mechanical effects based on action results
 // and returns composite events describing what happened.
 func (sm *SceneManager) applyActionEffects(ctx context.Context, parsedAction *action.Action, target *character.Character) []GameEvent {
@@ -601,16 +645,21 @@ func (sm *SceneManager) applyActionEffects(ctx context.Context, parsedAction *ac
 				TargetName: target.Name,
 				IsTie:      true,
 			})
-			events = append(events, sm.createBoost("Fleeting Opening", sm.player.ID))
+			boostName := sm.generateBoostName(ctx, sm.player, parsedAction.Skill, parsedAction.Description, "Fleeting Opening")
+			events = append(events, sm.createBoost(boostName, sm.player.ID))
 		} else if parsedAction.Outcome.Type == dice.Failure && parsedAction.Outcome.Shifts <= -3 {
 			// Target defended with style — defender gets a boost.
-			events = append(events, sm.createBoost("Deflected with Ease", target.ID))
+			defDesc := fmt.Sprintf("defending against %s's attack", sm.player.Name)
+			defSkill := core.DefenseSkillForAttack(parsedAction.Skill)
+			boostName := sm.generateBoostName(ctx, target, defSkill, defDesc, "Deflected with Ease")
+			events = append(events, sm.createBoost(boostName, target.ID))
 		}
 
 	case action.Overcome:
 		if parsedAction.IsSuccessWithStyle() {
 			// Overcome SWS grants a boost in addition to achieving the goal.
-			events = append(events, sm.createBoost("Strong Momentum", sm.player.ID))
+			boostName := sm.generateBoostName(ctx, sm.player, parsedAction.Skill, parsedAction.Description, "Strong Momentum")
+			events = append(events, sm.createBoost(boostName, sm.player.ID))
 		}
 	}
 
@@ -979,12 +1028,16 @@ func (sm *SceneManager) applyAttackDamageToPlayer(ctx context.Context, outcome *
 	case dice.Tie:
 		// Attacker gets a boost on a tie (no damage to player).
 		events = append(events, PlayerDefendedEvent{IsTie: true})
-		events = append(events, sm.createBoost("Fleeting Opening", attacker.ID))
+		boostName := sm.generateBoostName(ctx, attacker, attackCtx.Skill, attackCtx.Description, "Fleeting Opening")
+		events = append(events, sm.createBoost(boostName, attacker.ID))
 	default:
 		// Attack failed — check if player defended with style (3+ margin).
 		events = append(events, PlayerDefendedEvent{IsTie: false})
 		if outcome.Shifts <= -3 {
-			events = append(events, sm.createBoost("Deflected with Ease", sm.player.ID))
+			defDesc := fmt.Sprintf("defending against %s's attack", attacker.Name)
+			defSkill := core.DefenseSkillForAttack(attackCtx.Skill)
+			boostName := sm.generateBoostName(ctx, sm.player, defSkill, defDesc, "Deflected with Ease")
+			events = append(events, sm.createBoost(boostName, sm.player.ID))
 		}
 	}
 

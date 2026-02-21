@@ -174,6 +174,13 @@ describe("ChatMessage", () => {
     expect(screen.queryByText("concede")).not.toBeInTheDocument()
   })
 
+  it("renders boost_expired with aspect name", () => {
+    const event = makeEvent("boost_expired", { AspectName: "Fleeting Opening" })
+    render(<ChatMessage event={event} />)
+    expect(screen.getByText(/Boost Consumed:/i)).toBeInTheDocument()
+    expect(screen.getByText(/'Fleeting Opening'/i)).toBeInTheDocument()
+  })
+
   it("renders nothing for unknown event type", () => {
     const event = makeEvent("unknown_event" as string, {})
     const { container } = render(<ChatMessage event={event} />)

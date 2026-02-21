@@ -33,6 +33,7 @@ import type {
   OutcomeChangedEventData,
   InvokeEventData,
   AspectCreatedEventData,
+  BoostExpiredEventData,
   NPCActionResultEventData,
   RecoveryEventData,
   StressOverflowEventData,
@@ -106,6 +107,8 @@ function renderEvent(event: GameEvent) {
       return <InvokeMessage data={event.data as InvokeEventData} />
     case "aspect_created":
       return <AspectCreatedMessage data={event.data as AspectCreatedEventData} />
+    case "boost_expired":
+      return <BoostExpiredMessage data={event.data as BoostExpiredEventData} />
     case "npc_action_result":
       return <NPCActionResultMessage data={event.data as NPCActionResultEventData} />
     case "recovery":
@@ -450,6 +453,15 @@ function AspectCreatedMessage({ data }: { data: AspectCreatedEventData }) {
           ({data.FreeInvokes} free invoke{data.FreeInvokes !== 1 ? "s" : ""})
         </span>
       )}
+    </div>
+  )
+}
+
+function BoostExpiredMessage({ data }: { data: BoostExpiredEventData }) {
+  return (
+    <div className="rounded-lg border border-muted/40 bg-muted/5 px-4 py-2 text-sm font-body text-muted-foreground">
+      <span className="font-heading text-xs uppercase tracking-wide">Boost Consumed: </span>
+      <span className="italic">'{data.AspectName}'</span> has been used and removed.
     </div>
   )
 }

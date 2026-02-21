@@ -240,13 +240,11 @@ func (sm *SceneManager) processNPCCreateAdvantage(ctx context.Context, npc *char
 		events = append(events, NarrativeEvent{Text: fmt.Sprintf("%s gains a tactical advantage!", npc.Name)})
 	case dice.Tie:
 		// On a tie, NPC gets a boost instead of a full aspect.
-		boostName := fmt.Sprintf("%s's Opportunity", npc.Name)
-		if decision.Description != "" {
-			boostName = decision.Description
-			if len(boostName) > 40 {
-				boostName = boostName[:40]
-			}
+		boostDesc := decision.Description
+		if boostDesc == "" {
+			boostDesc = fmt.Sprintf("%s creates a fleeting advantage", npc.Name)
 		}
+		boostName := sm.generateBoostName(ctx, npc, skill, boostDesc, fmt.Sprintf("%s's Opportunity", npc.Name))
 		events = append(events, NPCActionResultEvent{
 			NPCName:       npc.Name,
 			ActionType:    "create_advantage",
@@ -307,7 +305,12 @@ func (sm *SceneManager) processNPCOvercome(ctx context.Context, npc *character.C
 		}
 		events = append(events, NarrativeEvent{Text: narrative})
 		// Overcome SWS grants a boost in addition to achieving the goal.
-		events = append(events, sm.createBoost("Strong Momentum", npc.ID))
+		overcomeSWS := decision.Description
+		if overcomeSWS == "" {
+			overcomeSWS = fmt.Sprintf("%s overcomes with style", npc.Name)
+		}
+		boostName := sm.generateBoostName(ctx, npc, skill, overcomeSWS, "Strong Momentum")
+		events = append(events, sm.createBoost(boostName, npc.ID))
 	case dice.Success:
 		narrative := decision.Description
 		if narrative == "" {
@@ -434,10 +437,15 @@ func (sm *SceneManager) processNPCAttack(ctx context.Context, npc *character.Cha
 		events = append(events, NarrativeEvent{Text: fmt.Sprintf("%s takes %d shifts of stress!", target.Name, outcome.Shifts)})
 	} else if outcome.Type == dice.Tie {
 		// On a tie, attacker (NPC) gets a boost (no damage to target).
-		events = append(events, sm.createBoost("Fleeting Opening", npc.ID))
+		tieDesc := fmt.Sprintf("%s attacks %s but is evenly matched", npc.Name, target.Name)
+		boostName := sm.generateBoostName(ctx, npc, attackSkill, tieDesc, "Fleeting Opening")
+		events = append(events, sm.createBoost(boostName, npc.ID))
 	} else if outcome.Type == dice.Failure && outcome.Shifts <= -3 {
 		// Target defended with style — target gets a boost.
-		events = append(events, sm.createBoost("Deflected with Ease", target.ID))
+		defDesc := fmt.Sprintf("defending against %s's attack", npc.Name)
+		defSkill := core.DefenseSkillForAttack(attackSkill)
+		boostName := sm.generateBoostName(ctx, target, defSkill, defDesc, "Deflected with Ease")
+		events = append(events, sm.createBoost(boostName, target.ID))
 	}
 
 	return events, false

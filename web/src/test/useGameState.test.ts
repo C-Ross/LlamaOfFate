@@ -87,6 +87,25 @@ describe("deriveState", () => {
     expect(state.situationAspects[0]).toEqual({ name: "Fleeting Opening", freeInvokes: 1, isBoost: true })
   })
 
+  it("removes boost from situation aspects when boost_expired fires", () => {
+    const events = [
+      makeEvent("game_state_snapshot", {
+        player: { name: "Zara", highConcept: "", trouble: "", aspects: [], fatePoints: 3, refresh: 3, stressTracks: {}, consequences: [] },
+        sceneName: "Test",
+        situationAspects: [{ name: "On Fire", freeInvokes: 0, isBoost: false }],
+        npcs: [],
+        inConflict: false,
+      }),
+      makeEvent("aspect_created", { AspectName: "Fleeting Opening", FreeInvokes: 1, IsBoost: true }),
+      makeEvent("boost_expired", { AspectName: "Fleeting Opening" }),
+    ]
+
+    const state = deriveState(events)
+    // Boost should be removed; the regular aspect should remain.
+    expect(state.situationAspects).toHaveLength(1)
+    expect(state.situationAspects[0].name).toBe("On Fire")
+  })
+
   it("resets situation aspects on new scene narrative", () => {
     const events = [
       makeEvent("game_state_snapshot", {
