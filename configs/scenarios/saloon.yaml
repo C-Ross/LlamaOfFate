@@ -49,4 +49,5 @@ initial_scene:
     - id: nervous-tension
       aspect: "Strangers Ain't Welcome"
       duration: scene
-  farewell: "You tip your hat and step back into the dusty street. The hunt continues."
+
+farewell: "You tip your hat and step back into the dusty street. The hunt continues."

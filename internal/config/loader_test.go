@@ -42,6 +42,13 @@ refresh: 3
 	assert.Equal(t, dice.Good, c.Skills["Athletics"])
 	assert.Equal(t, 3, c.FatePoints)
 	assert.Equal(t, 3, c.Refresh)
+
+	// InitDefaults should have set up stress tracks and timestamps.
+	require.NotNil(t, c.StressTracks)
+	assert.Contains(t, c.StressTracks, "physical")
+	assert.Contains(t, c.StressTracks, "mental")
+	assert.False(t, c.CreatedAt.IsZero())
+	assert.NotNil(t, c.Consequences)
 }
 
 func TestLoadCharacters_Directory(t *testing.T) {
@@ -247,7 +254,7 @@ initial_scene:
     - id: warm-fire
       aspect: "Roaring Fireplace"
       duration: scene
-  farewell: "You leave the tavern."
+farewell: "You leave the tavern."
 `)
 
 	ls, err := LoadScenario(path, nil)
@@ -259,7 +266,13 @@ initial_scene:
 	assert.Equal(t, "A cozy tavern.", ls.Scene.Description)
 	require.Len(t, ls.Scene.SituationAspects, 1)
 	assert.Equal(t, "Roaring Fireplace", ls.Scene.SituationAspects[0].Aspect)
+	assert.Equal(t, "scene", ls.Scene.SituationAspects[0].Duration)
 	assert.Equal(t, "You leave the tavern.", ls.Farewell)
+
+	// InitDefaults should have set up runtime fields.
+	assert.NotNil(t, ls.Scene.Characters)
+	assert.NotNil(t, ls.Scene.TakenOutCharacters)
+	assert.False(t, ls.Scene.CreatedAt.IsZero())
 }
 
 func TestLoadScenario_NamelessNPC_MissingPrimarySkill(t *testing.T) {

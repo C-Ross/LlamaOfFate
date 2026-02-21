@@ -62,4 +62,5 @@ initial_scene:
     - id: biometric-lockdown
       aspect: "Biometric Lockdown Protocols Active"
       duration: scene
-  farewell: "You slip back into the neon-lit streets. The data burns in your pocket."
+
+farewell: "You slip back into the neon-lit streets. The data burns in your pocket."

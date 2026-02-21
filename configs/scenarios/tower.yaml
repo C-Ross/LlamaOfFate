@@ -33,4 +33,5 @@ initial_scene:
     deep into the stone archway, still glowing faintly with magical energy. The
     air hums with residual magic, and you hear the distant sound of something
     large moving inside.
-  farewell: "Thanks for exploring the tower!"
+
+farewell: "Thanks for exploring the tower!"

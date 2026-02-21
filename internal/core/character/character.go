@@ -18,28 +18,28 @@ type TakenOutFate struct {
 
 // Character represents a player character or NPC
 type Character struct {
-	ID            string        `json:"id"`
-	Name          string        `json:"name"`
-	Description   string        `json:"description"`
-	CharacterType CharacterType `json:"character_type,omitempty"` // PC or NPC type (0 = PC)
+	ID            string        `json:"id" yaml:"id"`
+	Name          string        `json:"name" yaml:"name"`
+	Description   string        `json:"description" yaml:"description,omitempty"`
+	CharacterType CharacterType `json:"character_type,omitempty" yaml:"character_type,omitempty"` // PC or NPC type (0 = PC)
 
 	// Core Character Elements
-	Aspects Aspects                `json:"aspects"`
-	Skills  map[string]dice.Ladder `json:"skills"`
-	Stunts  []Stunt                `json:"stunts"`
+	Aspects Aspects                `json:"aspects" yaml:"aspects"`
+	Skills  map[string]dice.Ladder `json:"skills" yaml:"skills"`
+	Stunts  []Stunt                `json:"stunts" yaml:"stunts,omitempty"`
 
 	// Resources
-	FatePoints int `json:"fate_points"`
-	Refresh    int `json:"refresh"`
+	FatePoints int `json:"fate_points" yaml:"fate_points"`
+	Refresh    int `json:"refresh" yaml:"refresh"`
 
 	// Health and Status
-	StressTracks map[string]*StressTrack `json:"stress_tracks"`
-	Consequences []Consequence           `json:"consequences"`
+	StressTracks map[string]*StressTrack `json:"stress_tracks" yaml:"stress_tracks,omitempty"`
+	Consequences []Consequence           `json:"consequences" yaml:"consequences,omitempty"`
 	Fate         *TakenOutFate           `json:"fate,omitempty" yaml:"fate,omitempty"` // Set when character is taken out
 
 	// Metadata
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	CreatedAt time.Time `json:"created_at" yaml:"created_at,omitempty"`
+	UpdatedAt time.Time `json:"updated_at" yaml:"updated_at,omitempty"`
 }
 
 // IsTakenOut returns true if this character has been taken out and assigned a fate.
@@ -55,9 +55,9 @@ func (c *Character) IsPermanentlyRemoved() bool {
 
 // Aspects holds the character aspects
 type Aspects struct {
-	HighConcept  string   `json:"high_concept"`
-	Trouble      string   `json:"trouble"`
-	OtherAspects []string `json:"other_aspects"`
+	HighConcept  string   `json:"high_concept" yaml:"high_concept"`
+	Trouble      string   `json:"trouble" yaml:"trouble"`
+	OtherAspects []string `json:"other_aspects" yaml:"other"`
 }
 
 // GetAll returns all aspects as a slice
@@ -287,6 +287,37 @@ func NewCharacter(id, name string) *Character {
 		Consequences: make([]Consequence, 0),
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
+	}
+}
+
+// InitDefaults fills in runtime fields (stress tracks, timestamps, nil slices/maps)
+// that are not present in serialized data. Call this after unmarshaling from YAML/JSON
+// into a zero-value Character.
+func (c *Character) InitDefaults() {
+	if c.Skills == nil {
+		c.Skills = make(map[string]dice.Ladder)
+	}
+	if c.Stunts == nil {
+		c.Stunts = make([]Stunt, 0)
+	}
+	if c.Aspects.OtherAspects == nil {
+		c.Aspects.OtherAspects = make([]string, 0)
+	}
+	if c.Consequences == nil {
+		c.Consequences = make([]Consequence, 0)
+	}
+	if c.StressTracks == nil {
+		c.StressTracks = map[string]*StressTrack{
+			string(PhysicalStress): NewStressTrack(PhysicalStress, 2),
+			string(MentalStress):   NewStressTrack(MentalStress, 2),
+		}
+	}
+	now := time.Now()
+	if c.CreatedAt.IsZero() {
+		c.CreatedAt = now
+	}
+	if c.UpdatedAt.IsZero() {
+		c.UpdatedAt = now
 	}
 }
 

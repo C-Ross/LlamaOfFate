@@ -3,6 +3,10 @@
 // YAML files live under configs/scenarios/ and configs/characters/. The loader
 // converts them into the core domain types (scene.Scenario, character.Character,
 // etc.) used by the rest of the codebase.
+//
+// Character YAML files unmarshal directly into character.Character (which carries
+// yaml struct tags). The loader then calls InitDefaults() to set up runtime
+// fields (stress tracks, timestamps, etc.) that are not stored on disk.
 package config
 
 import (
@@ -19,36 +23,23 @@ import (
 )
 
 // ---------- YAML data shapes -------------------------------------------------
-
-// CharacterFile is the on-disk YAML shape for a player character.
-type CharacterFile struct {
-	ID         string         `yaml:"id"`
-	Name       string         `yaml:"name"`
-	Aspects    AspectsDef     `yaml:"aspects"`
-	Skills     map[string]int `yaml:"skills"`
-	FatePoints int            `yaml:"fate_points"`
-	Refresh    int            `yaml:"refresh"`
-}
-
-// AspectsDef mirrors the aspects block in a character YAML.
-type AspectsDef struct {
-	HighConcept string   `yaml:"high_concept"`
-	Trouble     string   `yaml:"trouble"`
-	Other       []string `yaml:"other"`
-}
+//
+// Character YAML unmarshals directly into character.Character — no wrapper needed.
+// The types below cover scenario-level structures that have no direct domain equivalent.
 
 // ScenarioFile is the on-disk YAML shape for a scenario.
 type ScenarioFile struct {
-	ID             string    `yaml:"id"`
-	Title          string    `yaml:"title"`
-	Genre          string    `yaml:"genre"`
-	Description    string    `yaml:"description"`
-	Problem        string    `yaml:"problem"`
-	Setting        string    `yaml:"setting"`
-	StoryQuestions []string  `yaml:"story_questions"`
-	DefaultPlayer  string    `yaml:"default_player"`
-	NPCs           []NPCDef  `yaml:"npcs"`
-	InitialScene   *SceneDef `yaml:"initial_scene"`
+	ID             string       `yaml:"id"`
+	Title          string       `yaml:"title"`
+	Genre          string       `yaml:"genre"`
+	Description    string       `yaml:"description"`
+	Problem        string       `yaml:"problem"`
+	Setting        string       `yaml:"setting"`
+	StoryQuestions []string     `yaml:"story_questions"`
+	DefaultPlayer  string       `yaml:"default_player"`
+	NPCs           []NPCDef     `yaml:"npcs"`
+	InitialScene   *scene.Scene `yaml:"initial_scene"`
+	Farewell       string       `yaml:"farewell"`
 }
 
 // NPCDef describes an NPC in the scenario YAML.
@@ -61,22 +52,6 @@ type NPCDef struct {
 	PrimarySkill string         `yaml:"primary_skill"` // required for nameless NPCs
 	Skills       map[string]int `yaml:"skills"`
 	FatePoints   int            `yaml:"fate_points"`
-}
-
-// SceneDef describes an initial scene in the scenario YAML.
-type SceneDef struct {
-	ID               string            `yaml:"id"`
-	Name             string            `yaml:"name"`
-	Description      string            `yaml:"description"`
-	SituationAspects []SituationAspDef `yaml:"situation_aspects"`
-	Farewell         string            `yaml:"farewell"`
-}
-
-// SituationAspDef describes a situation aspect in the scene YAML.
-type SituationAspDef struct {
-	ID       string `yaml:"id"`
-	Aspect   string `yaml:"aspect"`
-	Duration string `yaml:"duration"`
 }
 
 // ---------- Loaded result types -----------------------------------------------
@@ -92,22 +67,25 @@ type LoadedScenario struct {
 	Player   *character.Character // nil when DefaultPlayer is empty
 	NPCs     []*character.Character
 	Scene    *scene.Scene // nil when InitialScene is absent
-	Farewell string       // from InitialScene
+	Farewell string       // scenario-level farewell message
 }
 
 // ---------- Public loader functions -------------------------------------------
 
 // LoadCharacter reads a single character YAML file and returns a Character.
+// The YAML is unmarshaled directly into character.Character, then InitDefaults
+// is called to set up stress tracks and other runtime fields.
 func LoadCharacter(path string) (*character.Character, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read character file %s: %w", path, err)
 	}
-	var cf CharacterFile
-	if err := yaml.Unmarshal(data, &cf); err != nil {
+	var c character.Character
+	if err := yaml.Unmarshal(data, &c); err != nil {
 		return nil, fmt.Errorf("parse character file %s: %w", path, err)
 	}
-	return buildCharacter(cf)
+	c.InitDefaults()
+	return &c, nil
 }
 
 // LoadCharacters reads all .yaml files in a directory and returns a map keyed
@@ -222,26 +200,12 @@ func resolveScenario(sf *ScenarioFile, characters map[string]*character.Characte
 
 	// Build initial scene
 	if sf.InitialScene != nil {
-		ls.Scene = buildScene(sf.InitialScene)
-		ls.Farewell = sf.InitialScene.Farewell
+		sf.InitialScene.InitDefaults()
+		ls.Scene = sf.InitialScene
 	}
+	ls.Farewell = sf.Farewell
 
 	return ls, nil
-}
-
-func buildCharacter(cf CharacterFile) (*character.Character, error) {
-	c := character.NewCharacter(cf.ID, cf.Name)
-	c.Aspects.HighConcept = cf.Aspects.HighConcept
-	c.Aspects.Trouble = cf.Aspects.Trouble
-	for _, a := range cf.Aspects.Other {
-		c.Aspects.AddAspect(a)
-	}
-	for skill, level := range cf.Skills {
-		c.SetSkill(skill, dice.Ladder(level))
-	}
-	c.FatePoints = cf.FatePoints
-	c.Refresh = cf.Refresh
-	return c, nil
 }
 
 func buildNPC(nd NPCDef) (*character.Character, error) {
@@ -286,14 +250,6 @@ func buildNPC(nd NPCDef) (*character.Character, error) {
 	}
 
 	return npc, nil
-}
-
-func buildScene(sd *SceneDef) *scene.Scene {
-	s := scene.NewScene(sd.ID, sd.Name, sd.Description)
-	for _, sa := range sd.SituationAspects {
-		s.AddSituationAspect(scene.NewSituationAspect(sa.ID, sa.Aspect, sa.Duration, 0))
-	}
-	return s
 }
 
 func isYAML(name string) bool {

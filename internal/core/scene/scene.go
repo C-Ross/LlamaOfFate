@@ -7,33 +7,33 @@ import (
 
 // Scene represents the current game scene
 type Scene struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	ID          string `json:"id" yaml:"id"`
+	Name        string `json:"name" yaml:"name"`
+	Description string `json:"description" yaml:"description"`
 
 	// Scene Elements
-	SituationAspects []SituationAspect `json:"situation_aspects"`
-	Characters       []string          `json:"character_ids"`
-	ActiveCharacter  string            `json:"active_character_id,omitempty"`
+	SituationAspects []SituationAspect `json:"situation_aspects" yaml:"situation_aspects"`
+	Characters       []string          `json:"character_ids" yaml:"character_ids,omitempty"`
+	ActiveCharacter  string            `json:"active_character_id,omitempty" yaml:"active_character_id,omitempty"`
 
 	// Scene State
-	IsConflict         bool            `json:"is_conflict"`
-	ConflictState      *ConflictState  `json:"conflict_state,omitempty"`
-	TakenOutCharacters map[string]bool `json:"taken_out_characters,omitempty"` // Characters taken out this scene
+	IsConflict         bool            `json:"is_conflict" yaml:"is_conflict,omitempty"`
+	ConflictState      *ConflictState  `json:"conflict_state,omitempty" yaml:"conflict_state,omitempty"`
+	TakenOutCharacters map[string]bool `json:"taken_out_characters,omitempty" yaml:"taken_out_characters,omitempty"` // Characters taken out this scene
 
 	// Metadata
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	CreatedAt time.Time `json:"created_at" yaml:"created_at,omitempty"`
+	UpdatedAt time.Time `json:"updated_at" yaml:"updated_at,omitempty"`
 }
 
 // SituationAspect represents environmental or temporary aspects
 type SituationAspect struct {
-	ID          string    `json:"id"`
-	Aspect      string    `json:"aspect"`
-	FreeInvokes int       `json:"free_invokes"`
-	Duration    string    `json:"duration"`   // "scene", "scenario", "permanent"
-	CreatedBy   string    `json:"created_by"` // character ID
-	CreatedAt   time.Time `json:"created_at"`
+	ID          string    `json:"id" yaml:"id"`
+	Aspect      string    `json:"aspect" yaml:"aspect"`
+	FreeInvokes int       `json:"free_invokes" yaml:"free_invokes,omitempty"`
+	Duration    string    `json:"duration" yaml:"duration"`               // "scene", "scenario", "permanent"
+	CreatedBy   string    `json:"created_by" yaml:"created_by,omitempty"` // character ID
+	CreatedAt   time.Time `json:"created_at" yaml:"created_at,omitempty"`
 }
 
 // ConflictType distinguishes physical from mental conflicts
@@ -102,6 +102,27 @@ func NewScene(id, name, description string) *Scene {
 		IsConflict:         false,
 		CreatedAt:          time.Now(),
 		UpdatedAt:          time.Now(),
+	}
+}
+
+// InitDefaults fills in runtime fields (nil slices/maps, timestamps) that are
+// not present in serialized data. Call after unmarshaling from YAML/JSON.
+func (s *Scene) InitDefaults() {
+	if s.SituationAspects == nil {
+		s.SituationAspects = make([]SituationAspect, 0)
+	}
+	if s.Characters == nil {
+		s.Characters = make([]string, 0)
+	}
+	if s.TakenOutCharacters == nil {
+		s.TakenOutCharacters = make(map[string]bool)
+	}
+	now := time.Now()
+	if s.CreatedAt.IsZero() {
+		s.CreatedAt = now
+	}
+	if s.UpdatedAt.IsZero() {
+		s.UpdatedAt = now
 	}
 }
 
