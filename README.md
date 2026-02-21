@@ -29,6 +29,12 @@ Fate™ is a trademark of Evil Hat Productions, LLC.
 
 ## Key Features
 
+### Pre-Game Setup
+- **Preset Scenarios**: Choose from curated scenarios (Saloon, Heist, Tower) with pre-built characters
+- **Custom Character Creation**: Create your own character with custom name, high concept, trouble, and skills
+- **LLM-Generated Scenarios**: Provide a genre description and let the LLM generate a unique scenario
+- **Continue Game**: Resume your last saved game from the setup screen
+
 ### Natural Language Processing
 - **Action Parsing**: Convert free-form text like "I sneak past the guards using the shadows" into structured game actions
 - **Context Awareness**: LLM maintains awareness of current scene, character capabilities, and recent events
@@ -46,6 +52,15 @@ Fate™ is a trademark of Evil Hat Productions, LLC.
 - **Narrative Continuity**: Maintain story context across scenes and sessions
 
 ## Configuration
+
+### Preset Scenarios and Characters
+
+LlamaOfFate includes preset scenarios and characters stored as YAML files in the `configs/` directory:
+
+- **Scenarios**: `configs/scenarios/*.yaml` - Pre-built scenarios (saloon, heist, tower)
+- **Characters**: `configs/characters/*.yaml` - Pre-built player characters (jesse-calhoun, zero, lyra-moonwhisper)
+
+These YAML files define characters with their aspects, skills, stress tracks, and scenario details including initial scenes and NPCs. You can create your own by following the structure in the existing files.
 
 ### Azure ML Setup
 
@@ -156,10 +171,11 @@ just web-dev
 
 ## Saving and Loading Games
 
-LlamaOfFate automatically saves your game progress at key points during play. When you restart the application, it will automatically resume from your last save.
+LlamaOfFate automatically saves your game progress at key points during play.
 
 - **Auto-save**: The game saves automatically at scene transitions and key moments
-- **Auto-resume**: On startup, the game resumes from the last unfinished scenario
+- **Continue Game**: On the setup screen, select "Continue Game" to resume from your last save
+- **Save validation**: Corrupted or incompatible saves are detected and you'll be notified with an error message
 - **Save location**: Game saves are stored as YAML files (configurable via `GameSaver` interface)
 
 ## Package Structure
@@ -177,6 +193,7 @@ LlamaOfFate/
 │   │   └── scene/              # Scene and conflict management
 │   ├── engine/                 # Game engine (scene/scenario managers, action parsing, conflict resolution)
 │   ├── syncdriver/             # Synchronous blocking game loop (wraps async engine API)
+│   ├── config/                 # Configuration loader (YAML scenarios and characters)
 │   ├── llm/                    # LLM integration layer
 │   │   └── azure/              # Azure OpenAI implementation
 │   ├── prompt/                 # LLM prompt templates and response parsing
@@ -193,7 +210,10 @@ LlamaOfFate/
 │   ├── scenario-generator/     # Scenario generation example
 │   ├── scenario-walkthrough/   # Scenario walkthrough example
 │   └── scene-generator/        # Scene generation example
-├── configs/                    # Configuration files (azure-llm.yaml)
+├── configs/                    # Configuration files
+│   ├── azure-llm.yaml          # LLM configuration
+│   ├── characters/*.yaml       # Preset player characters
+│   └── scenarios/*.yaml        # Preset scenarios
 ├── docs/                       # Documentation
 │   └── architecture.md         # Architecture documentation
 ├── test/                       # Tests
@@ -209,16 +229,17 @@ LlamaOfFate/
 - **`internal/core/`**: Core Fate mechanics implementation (character, dice, scene, action, skills)
 - **`internal/engine/`**: Purely async/event-driven game engine (GameSessionManager interface: Start/HandleInput/ProvideInvokeResponse/ProvideMidFlowResponse/Save); emits GameEvents for UI rendering
 - **`internal/syncdriver/`**: Synchronous blocking game loop that wraps the engine's async API for terminal-style UIs (Run function drives: ReadInput → HandleInput → Emit events → drive prompts → repeat)
+- **`internal/config/`**: Configuration loader for YAML-based scenarios and characters (LoadAll, LoadCharacter, LoadScenario)
 - **`internal/llm/`**: LLM integration with Azure OpenAI backend, including retry logic and response handling
 - **`internal/prompt/`**: LLM prompt template rendering and response parsing (template data types, render functions, marker extraction)
 - **`internal/session/`**: Session logging for game transcripts
-- **`internal/storage/`**: Game state persistence with YAML-based save/load
+- **`internal/storage/`**: Game state persistence with YAML-based save/load and validation
 - **`internal/uicontract/`**: UI interface contracts (UI, SceneInfo, GameEvent types, etc.) for decoupling engine from UI implementations
 - **`internal/ui/terminal/`**: Terminal UI implementation; handles meta-commands and renders GameEvents to console
 - **`internal/ui/web/`**: WebSocket UI implementation; bridges engine events to WebSocket clients
-- **`web/`**: React frontend — Vite 7, React 19, TypeScript, Tailwind CSS v4, shadcn/ui, Vitest
+- **`web/`**: React frontend — Vite 7, React 19, TypeScript, Tailwind CSS v4, shadcn/ui, Vitest; includes setup screen with preset picker and custom character creation
 - **`examples/`**: Example programs demonstrating LLM scene loops, scenario generation, and walkthroughs
-- **`configs/`**: YAML configuration files (azure-llm.yaml)
+- **`configs/`**: YAML configuration files (azure-llm.yaml, characters/*.yaml, scenarios/*.yaml)
 - **`test/integration/`**: Integration tests for the game system
 - **`test/llmeval/`**: LLM evaluation tests for prompt behavior
 
@@ -234,14 +255,17 @@ LlamaOfFate/
 - ✅ Conflict resolution system with stress and consequences
 - ✅ CLI interface for game interaction
 - ✅ Session logging for game transcripts
-- ✅ Game state persistence (save/load functionality via YAML)
+- ✅ Game state persistence (save/load functionality via YAML with validation)
 - ✅ Event-driven UI architecture with async invoke/input support
 - ✅ Integration tests and LLM evaluation tests
-- ✅ Web UI scaffold (React + Vite + Tailwind + shadcn/ui)
+- ✅ Web UI with full gameplay support (React + Vite + Tailwind + shadcn/ui)
 - ✅ WebSocket server backend
+- ✅ Pre-game setup flow with preset scenarios and custom character creation
+- ✅ LLM-powered scenario generation from genre descriptions
+- ✅ YAML-based configuration system for scenarios and characters
 
 ### Planned Features
 - 📋 Additional LLM backends (Ollama, OpenAI direct)
-- 📋 WebSocket integration connecting web UI to game engine
 - 📋 Public API packages for external integrations
 - 📋 Database backends for long-term storage
+- 📋 Character sheet editor in web UI
