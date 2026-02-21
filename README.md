@@ -77,6 +77,20 @@ model_name: "Llama-4-Maverick-17B-128E-Instruct-FP8"
 timeout: 300
 ```
 
+### Characters and Scenarios
+
+Characters and scenarios are now defined in YAML configuration files, making it easy to create custom content without modifying code:
+
+**Character Files** (`configs/characters/*.yaml`):
+- Define character aspects, skills, stress tracks, and consequences
+- Example characters: `jesse-calhoun.yaml`, `zero.yaml`, `lyra-moonwhisper.yaml`
+
+**Scenario Files** (`configs/scenarios/*.yaml`):
+- Define scenario setup, initial scenes, and narrative context
+- Example scenarios: `saloon.yaml`, `heist.yaml`, `tower.yaml`
+
+The game automatically loads all character and scenario files from these directories at startup. You can add your own custom YAML files to extend the game's content.
+
 ## Building and Running
 
 LlamaOfFate uses [`just`](https://github.com/casey/just) as a command runner for common development tasks.
@@ -156,10 +170,11 @@ just web-dev
 
 ## Saving and Loading Games
 
-LlamaOfFate automatically saves your game progress at key points during play. When you restart the application, it will automatically resume from your last save.
+LlamaOfFate automatically saves your game progress at key points during play. 
 
 - **Auto-save**: The game saves automatically at scene transitions and key moments
-- **Auto-resume**: On startup, the game resumes from the last unfinished scenario
+- **Continue Game**: The web UI displays a "Continue Game" option on the setup screen when a saved game exists
+- **Save Validation**: Game saves are validated on load to ensure compatibility; incompatible saves display an error notification and start a fresh game
 - **Save location**: Game saves are stored as YAML files (configurable via `GameSaver` interface)
 
 ## Package Structure
@@ -177,6 +192,7 @@ LlamaOfFate/
 │   │   └── scene/              # Scene and conflict management
 │   ├── engine/                 # Game engine (scene/scenario managers, action parsing, conflict resolution)
 │   ├── syncdriver/             # Synchronous blocking game loop (wraps async engine API)
+│   ├── config/                 # Configuration loading (characters, scenarios)
 │   ├── llm/                    # LLM integration layer
 │   │   └── azure/              # Azure OpenAI implementation
 │   ├── prompt/                 # LLM prompt templates and response parsing
@@ -209,10 +225,11 @@ LlamaOfFate/
 - **`internal/core/`**: Core Fate mechanics implementation (character, dice, scene, action, skills)
 - **`internal/engine/`**: Purely async/event-driven game engine (GameSessionManager interface: Start/HandleInput/ProvideInvokeResponse/ProvideMidFlowResponse/Save); emits GameEvents for UI rendering
 - **`internal/syncdriver/`**: Synchronous blocking game loop that wraps the engine's async API for terminal-style UIs (Run function drives: ReadInput → HandleInput → Emit events → drive prompts → repeat)
+- **`internal/config/`**: Configuration loading system for characters and scenarios from YAML files
 - **`internal/llm/`**: LLM integration with Azure OpenAI backend, including retry logic and response handling
-- **`internal/prompt/`**: LLM prompt template rendering and response parsing (template data types, render functions, marker extraction)
+- **`internal/prompt/`**: LLM prompt template rendering and response parsing (template data types, render functions, marker extraction); includes scenario generation templates
 - **`internal/session/`**: Session logging for game transcripts
-- **`internal/storage/`**: Game state persistence with YAML-based save/load
+- **`internal/storage/`**: Game state persistence with YAML-based save/load and validation
 - **`internal/uicontract/`**: UI interface contracts (UI, SceneInfo, GameEvent types, etc.) for decoupling engine from UI implementations
 - **`internal/ui/terminal/`**: Terminal UI implementation; handles meta-commands and renders GameEvents to console
 - **`internal/ui/web/`**: WebSocket UI implementation; bridges engine events to WebSocket clients
@@ -242,6 +259,7 @@ LlamaOfFate/
 
 ### Planned Features
 - 📋 Additional LLM backends (Ollama, OpenAI direct)
-- 📋 WebSocket integration connecting web UI to game engine
+- 📋 Full WebSocket integration for web UI gameplay
 - 📋 Public API packages for external integrations
 - 📋 Database backends for long-term storage
+- 📋 Custom character and scenario creation UI
