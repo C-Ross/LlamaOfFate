@@ -32,6 +32,10 @@ interface SetupScreenProps {
   generatingMessage: string | null
   onSelectPreset: (presetId: string) => void
   onSelectCustom: (custom: CustomSetup) => void
+  /** True when the player has a saved game they can resume. */
+  hasSavedGame?: boolean
+  /** Called when the player clicks "Continue" to resume their saved game. */
+  onContinue?: () => void
 }
 
 // ---------------------------------------------------------------------------
@@ -44,6 +48,8 @@ export function SetupScreen({
   generatingMessage,
   onSelectPreset,
   onSelectCustom,
+  hasSavedGame = false,
+  onContinue,
 }: SetupScreenProps) {
   const [mode, setMode] = useState<"pick" | "custom">("pick")
 
@@ -119,6 +125,20 @@ export function SetupScreen({
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {hasSavedGame && (
+            <Card
+              className="cursor-pointer border-primary/50 bg-primary/5 transition-shadow hover:shadow-md"
+              onClick={onContinue}
+              data-testid="continue-game"
+            >
+              <CardHeader>
+                <CardTitle className="font-heading text-base">Continue Game</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground font-body">Resume your previous adventure where you left off.</p>
+              </CardContent>
+            </Card>
+          )}
           {presets.map((preset) => (
             <Card
               key={preset.id}

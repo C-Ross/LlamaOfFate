@@ -169,4 +169,39 @@ describe("SetupScreen", () => {
     // Preset cards should NOT be visible
     expect(screen.queryByTestId("setup-picker")).not.toBeInTheDocument()
   })
+
+  it("shows Continue card when hasSavedGame is true", () => {
+    const onContinue = vi.fn()
+    render(
+      <SetupScreen
+        presets={presets}
+        allowCustom={false}
+        generatingMessage={null}
+        onSelectPreset={vi.fn()}
+        onSelectCustom={vi.fn()}
+        hasSavedGame={true}
+        onContinue={onContinue}
+      />,
+    )
+
+    expect(screen.getByTestId("continue-game")).toBeInTheDocument()
+    expect(screen.getByText("Continue Game")).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId("continue-game"))
+    expect(onContinue).toHaveBeenCalled()
+  })
+
+  it("does not show Continue card when hasSavedGame is false", () => {
+    render(
+      <SetupScreen
+        presets={presets}
+        allowCustom={false}
+        generatingMessage={null}
+        onSelectPreset={vi.fn()}
+        onSelectCustom={vi.fn()}
+        hasSavedGame={false}
+      />,
+    )
+
+    expect(screen.queryByTestId("continue-game")).not.toBeInTheDocument()
+  })
 })

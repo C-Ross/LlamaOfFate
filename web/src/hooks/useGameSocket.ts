@@ -11,6 +11,7 @@ import type {
 } from "@/lib/types"
 
 const GAME_ID_STORAGE_KEY = "llamaoffate_game_id"
+const SAVED_GAME_ID_KEY = "llamaoffate_saved_game_id"
 
 // ---------------------------------------------------------------------------
 // State
@@ -29,6 +30,8 @@ export interface GameSocketState {
   setupRequest: SetupRequestEventData | null
   /** Non-null while LLM scenario generation is in progress. */
   setupGeneratingMessage: string | null
+  /** True when the player has a saved game they can continue. */
+  hasSavedGame: boolean
 }
 
 const initialState: GameSocketState = {
@@ -42,6 +45,7 @@ const initialState: GameSocketState = {
   gameId: null,
   setupRequest: null,
   setupGeneratingMessage: null,
+  hasSavedGame: false,
 }
 
 // ---------------------------------------------------------------------------
@@ -58,7 +62,7 @@ type Action =
   | { type: "setup_request"; data: SetupRequestEventData }
   | { type: "setup_generating"; message: string }
   | { type: "setup_complete" }
-  | { type: "new_game" }
+  | { type: "new_game"; hasSavedGame: boolean }
 
 let nextEventId = 0
 
@@ -85,7 +89,7 @@ function reducer(state: GameSocketState, action: Action): GameSocketState {
     case "setup_complete":
       return { ...state, setupRequest: null, setupGeneratingMessage: null }
     case "new_game":
-      return { ...initialState }
+      return { ...initialState, hasSavedGame: action.hasSavedGame }
     case "event":
       return { ...state, events: [...state.events, action.event] }
     case "result_meta":
@@ -116,6 +120,8 @@ export interface UseGameSocketReturn extends GameSocketState {
   sendSetupCustom: (custom: CustomSetup) => void
   /** Disconnect, clear stored game ID, and reconnect for a fresh setup flow. */
   newGame: () => void
+  /** Reconnect to a previously saved game. Only available when hasSavedGame is true. */
+  continueGame: () => void
 }
 
 export function useGameSocket(url: string): UseGameSocketReturn {
@@ -175,9 +181,14 @@ export function useGameSocket(url: string): UseGameSocketReturn {
   const connectRef = useRef<(() => void) | null>(null)
 
   const newGame = useCallback(() => {
-    // Clear stored game ID so the server creates a fresh session.
+    // Stash the current game ID so the player can "Continue" later,
+    // then clear it so the server creates a fresh session.
+    const currentId = localStorage.getItem(GAME_ID_STORAGE_KEY)
+    if (currentId) {
+      localStorage.setItem(SAVED_GAME_ID_KEY, currentId)
+    }
     localStorage.removeItem(GAME_ID_STORAGE_KEY)
-    dispatch({ type: "new_game" })
+    dispatch({ type: "new_game", hasSavedGame: !!currentId })
 
     // Tear down the current WebSocket and reconnect without a game_id.
     if (reconnectTimer.current) {
@@ -187,6 +198,28 @@ export function useGameSocket(url: string): UseGameSocketReturn {
     const ws = wsRef.current
     if (ws) {
       ws.onclose = null // prevent auto-reconnect on this close
+      ws.close()
+      wsRef.current = null
+    }
+    inSetupRef.current = false
+    connectRef.current?.()
+  }, [])
+
+  const continueGame = useCallback(() => {
+    const savedId = localStorage.getItem(SAVED_GAME_ID_KEY)
+    if (!savedId) return
+    // Restore the saved game ID and reconnect.
+    localStorage.setItem(GAME_ID_STORAGE_KEY, savedId)
+    localStorage.removeItem(SAVED_GAME_ID_KEY)
+    dispatch({ type: "new_game", hasSavedGame: false })
+
+    if (reconnectTimer.current) {
+      clearTimeout(reconnectTimer.current)
+      reconnectTimer.current = null
+    }
+    const ws = wsRef.current
+    if (ws) {
+      ws.onclose = null
       ws.close()
       wsRef.current = null
     }
@@ -298,5 +331,6 @@ export function useGameSocket(url: string): UseGameSocketReturn {
     sendSetupPreset,
     sendSetupCustom,
     newGame,
+    continueGame,
   }
 }

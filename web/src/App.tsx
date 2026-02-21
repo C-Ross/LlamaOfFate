@@ -51,6 +51,8 @@ function App() {
     sendSetupPreset,
     sendSetupCustom,
     newGame,
+    continueGame,
+    hasSavedGame,
   } = useGameSocket(getWebSocketUrl())
 
   const gameState = useGameState(events)
@@ -98,6 +100,8 @@ function App() {
         generatingMessage={setupGeneratingMessage}
         onSelectPreset={sendSetupPreset}
         onSelectCustom={sendSetupCustom}
+        hasSavedGame={hasSavedGame}
+        onContinue={continueGame}
       />
     )
   }

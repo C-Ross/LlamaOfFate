@@ -346,11 +346,48 @@ describe("useGameSocket", () => {
     act(() => result.current.newGame())
 
     expect(localStorage.getItem("llamaoffate_game_id")).toBeNull()
+    expect(localStorage.getItem("llamaoffate_saved_game_id")).toBe("old-game")
     expect(result.current.events).toHaveLength(0)
     expect(result.current.gameId).toBeNull()
+    expect(result.current.hasSavedGame).toBe(true)
 
     // A new WebSocket should have been created without game_id
     const newWs = getLastWs()
     expect(newWs.url).toBe("ws://localhost/ws")
+  })
+
+  it("continueGame reconnects with saved game_id", () => {
+    const { result } = renderHook(() => useGameSocket("ws://localhost/ws"))
+    act(() => getLastWs().simulateOpen())
+
+    // Simulate having a saved game and starting new game
+    act(() => {
+      getLastWs().simulateMessage({ event: "session_init", data: { gameId: "saved-game" } })
+    })
+    act(() => result.current.newGame())
+
+    expect(result.current.hasSavedGame).toBe(true)
+
+    // Continue the saved game
+    act(() => result.current.continueGame())
+
+    expect(localStorage.getItem("llamaoffate_game_id")).toBe("saved-game")
+    expect(localStorage.getItem("llamaoffate_saved_game_id")).toBeNull()
+    expect(result.current.hasSavedGame).toBe(false)
+
+    // A new WebSocket should have been created with the saved game_id
+    const newWs = getLastWs()
+    expect(newWs.url).toBe("ws://localhost/ws?game_id=saved-game")
+  })
+
+  it("continueGame is a no-op when no saved game exists", () => {
+    const { result } = renderHook(() => useGameSocket("ws://localhost/ws"))
+    act(() => getLastWs().simulateOpen())
+
+    const wsBefore = getLastWs()
+    act(() => result.current.continueGame())
+
+    // No new WebSocket created — same instance
+    expect(getLastWs()).toBe(wsBefore)
   })
 })
