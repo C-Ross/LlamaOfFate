@@ -106,7 +106,7 @@ export function deriveState(events: GameEvent[]): GameState {
           ...state,
           situationAspects: [
             ...state.situationAspects,
-            { name: d.AspectName, freeInvokes: d.FreeInvokes },
+            { name: d.AspectName, freeInvokes: d.FreeInvokes, isBoost: d.IsBoost ?? false },
           ],
         }
         break

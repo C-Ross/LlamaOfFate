@@ -217,6 +217,7 @@ export interface PlayerAttackResultEventData {
 export interface AspectCreatedEventData {
   AspectName: string
   FreeInvokes: number
+  IsBoost: boolean
 }
 
 export interface NPCAttackEventData {
@@ -343,6 +344,7 @@ export interface PlayerSnapshot {
 export interface SituationAspectSnapshot {
   name: string
   freeInvokes: number
+  isBoost?: boolean
 }
 
 export interface NPCSnapshot {

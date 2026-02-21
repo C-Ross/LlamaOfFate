@@ -67,7 +67,24 @@ describe("deriveState", () => {
 
     const state = deriveState(events)
     expect(state.situationAspects).toHaveLength(1)
-    expect(state.situationAspects[0]).toEqual({ name: "On Fire", freeInvokes: 2 })
+    expect(state.situationAspects[0]).toEqual({ name: "On Fire", freeInvokes: 2, isBoost: false })
+  })
+
+  it("marks boost aspects with isBoost=true when aspect_created has IsBoost", () => {
+    const events = [
+      makeEvent("game_state_snapshot", {
+        player: { name: "Zara", highConcept: "", trouble: "", aspects: [], fatePoints: 3, refresh: 3, stressTracks: {}, consequences: [] },
+        sceneName: "Test",
+        situationAspects: [],
+        npcs: [],
+        inConflict: false,
+      }),
+      makeEvent("aspect_created", { AspectName: "Fleeting Opening", FreeInvokes: 1, IsBoost: true }),
+    ]
+
+    const state = deriveState(events)
+    expect(state.situationAspects).toHaveLength(1)
+    expect(state.situationAspects[0]).toEqual({ name: "Fleeting Opening", freeInvokes: 1, isBoost: true })
   })
 
   it("resets situation aspects on new scene narrative", () => {

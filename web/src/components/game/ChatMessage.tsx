@@ -432,6 +432,15 @@ function InvokeMessage({ data }: { data: InvokeEventData }) {
 }
 
 function AspectCreatedMessage({ data }: { data: AspectCreatedEventData }) {
+  if (data.IsBoost) {
+    return (
+      <div className="rounded-lg border border-boost/30 bg-boost/5 px-4 py-2 text-sm font-body">
+        <span className="font-heading text-xs uppercase tracking-wide text-boost">Boost Gained: </span>
+        <span className="font-bold">{data.AspectName}</span>
+        <span className="text-xs text-muted-foreground ml-1">(1 free invoke — vanishes after use)</span>
+      </div>
+    )
+  }
   return (
     <div className="rounded-lg border border-boost/30 bg-boost/5 px-4 py-2 text-sm font-body">
       <span className="font-heading text-xs uppercase tracking-wide text-boost">New Aspect: </span>

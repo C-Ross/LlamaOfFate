@@ -396,6 +396,7 @@ type ConsequenceSnapshotEntry struct {
 type SituationAspectSnapshot struct {
 	Name        string `json:"name"`
 	FreeInvokes int    `json:"freeInvokes"`
+	IsBoost     bool   `json:"isBoost,omitempty"`
 }
 
 // NPCSnapshot is a serialisable view of an NPC visible in the current scene.

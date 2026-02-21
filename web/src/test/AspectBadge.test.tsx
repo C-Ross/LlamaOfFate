@@ -26,4 +26,12 @@ describe("AspectBadge", () => {
     const badge = container.firstChild as HTMLElement
     expect(badge.className).toContain("aspect-trouble")
   })
+
+  it("renders boost kind with boost styling", () => {
+    const { container } = render(<AspectBadge name="Fleeting Opening" kind="boost" freeInvokes={1} />)
+    const badge = container.firstChild as HTMLElement
+    expect(badge.className).toContain("boost")
+    expect(screen.getByText("Fleeting Opening")).toBeInTheDocument()
+    expect(screen.getByText("1")).toBeInTheDocument()
+  })
 })
