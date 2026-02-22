@@ -249,7 +249,7 @@ describe("deriveState", () => {
       makeEvent("game_state_snapshot", {
         player: { name: "Zara", highConcept: "", trouble: "", aspects: [], fatePoints: 3, refresh: 3, stressTracks: {}, consequences: [] },
         sceneName: "Test",
-        situationAspects: [],
+        situationAspects: [{ name: "On Fire", freeInvokes: 2, isBoost: false }],
         npcs: [],
         inConflict: false,
       }),
@@ -258,6 +258,57 @@ describe("deriveState", () => {
 
     const state = deriveState(events)
     expect(state.fatePoints).toBe(3)
+  })
+
+  it("decrements free invokes on situation aspect from free invoke events", () => {
+    const events = [
+      makeEvent("game_state_snapshot", {
+        player: { name: "Zara", highConcept: "", trouble: "", aspects: [], fatePoints: 3, refresh: 3, stressTracks: {}, consequences: [] },
+        sceneName: "Test",
+        situationAspects: [{ name: "On Fire", freeInvokes: 2, isBoost: false }],
+        npcs: [],
+        inConflict: false,
+      }),
+      makeEvent("invoke", { AspectName: "On Fire", IsFree: true, IsReroll: false, FatePointsLeft: 0, NewTotal: "+5", Failed: false }),
+    ]
+
+    const state = deriveState(events)
+    expect(state.situationAspects).toHaveLength(1)
+    expect(state.situationAspects[0].freeInvokes).toBe(1)
+  })
+
+  it("decrements free invokes to zero after multiple free invokes", () => {
+    const events = [
+      makeEvent("game_state_snapshot", {
+        player: { name: "Zara", highConcept: "", trouble: "", aspects: [], fatePoints: 3, refresh: 3, stressTracks: {}, consequences: [] },
+        sceneName: "Test",
+        situationAspects: [{ name: "On Fire", freeInvokes: 2, isBoost: false }],
+        npcs: [],
+        inConflict: false,
+      }),
+      makeEvent("invoke", { AspectName: "On Fire", IsFree: true, IsReroll: false, FatePointsLeft: 0, NewTotal: "+5", Failed: false }),
+      makeEvent("invoke", { AspectName: "On Fire", IsFree: true, IsReroll: false, FatePointsLeft: 0, NewTotal: "+7", Failed: false }),
+    ]
+
+    const state = deriveState(events)
+    expect(state.situationAspects).toHaveLength(1)
+    expect(state.situationAspects[0].freeInvokes).toBe(0)
+  })
+
+  it("does not decrement free invokes on failed invoke", () => {
+    const events = [
+      makeEvent("game_state_snapshot", {
+        player: { name: "Zara", highConcept: "", trouble: "", aspects: [], fatePoints: 0, refresh: 3, stressTracks: {}, consequences: [] },
+        sceneName: "Test",
+        situationAspects: [{ name: "On Fire", freeInvokes: 1, isBoost: false }],
+        npcs: [],
+        inConflict: false,
+      }),
+      makeEvent("invoke", { AspectName: "On Fire", IsFree: false, IsReroll: false, FatePointsLeft: 0, NewTotal: "", Failed: true }),
+    ]
+
+    const state = deriveState(events)
+    expect(state.situationAspects[0].freeInvokes).toBe(1)
   })
 
   it("handles null arrays in snapshot gracefully", () => {

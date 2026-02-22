@@ -192,7 +192,18 @@ export function deriveState(events: GameEvent[]): GameState {
 
       case "invoke": {
         const d = evt.data as InvokeEventData
-        if (!d.IsFree && !d.Failed) {
+        if (d.Failed) break
+        if (d.IsFree) {
+          // Decrement the free invoke count on the matching situation aspect.
+          state = {
+            ...state,
+            situationAspects: state.situationAspects.map((a) =>
+              a.name === d.AspectName
+                ? { ...a, freeInvokes: Math.max(0, a.freeInvokes - 1) }
+                : a,
+            ),
+          }
+        } else {
           state = { ...state, fatePoints: d.FatePointsLeft }
         }
         break
