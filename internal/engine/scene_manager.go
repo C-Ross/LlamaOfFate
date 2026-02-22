@@ -454,66 +454,15 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 	// Get other characters in the scene
 	otherCharacters, takenOutCharacters := sm.sceneCharacters()
 
+	// Select prompt template based on active scene type.
 	var promptText string
 	var renderErr error
 
-	// Use conflict-specific template when in conflict
-	if sm.currentScene.IsConflict && sm.currentScene.ConflictState != nil {
-		// Build participant and character maps for conflict template
-		participantMap := make(map[string]*scene.ConflictParticipant)
-		for i := range sm.currentScene.ConflictState.Participants {
-			p := &sm.currentScene.ConflictState.Participants[i]
-			participantMap[p.CharacterID] = p
-		}
-
-		characterMap := make(map[string]*character.Character)
-		characterMap[sm.player.ID] = sm.player
-		for _, char := range otherCharacters {
-			characterMap[char.ID] = char
-		}
-		for _, char := range takenOutCharacters {
-			characterMap[char.ID] = char
-		}
-
-		// Determine current character name
-		currentCharName := "Unknown"
-		if sm.currentScene.ConflictState.CurrentTurn < len(sm.currentScene.ConflictState.InitiativeOrder) {
-			currentID := sm.currentScene.ConflictState.InitiativeOrder[sm.currentScene.ConflictState.CurrentTurn]
-			if char, ok := characterMap[currentID]; ok {
-				currentCharName = char.Name
-			}
-		}
-
-		conflictData := prompt.ConflictResponseData{
-			Scene:                sm.currentScene,
-			CharacterContext:     sm.buildCharacterContext(),
-			AspectsContext:       sm.buildAspectsContext(),
-			ConversationContext:  sm.buildConversationContext(),
-			PlayerInput:          input,
-			OtherCharacters:      otherCharacters,
-			TakenOutCharacters:   takenOutCharacters,
-			CurrentCharacterName: currentCharName,
-			ParticipantMap:       participantMap,
-			CharacterMap:         characterMap,
-			ScenePurpose:         sm.scenePurpose,
-		}
-
-		promptText, renderErr = prompt.RenderConflictResponse(conflictData)
-	} else {
-		// Use standard scene response template
-		data := prompt.SceneResponseData{
-			Scene:               sm.currentScene,
-			CharacterContext:    sm.buildCharacterContext(),
-			AspectsContext:      sm.buildAspectsContext(),
-			ConversationContext: sm.buildConversationContext(),
-			PlayerInput:         input,
-			InteractionType:     interactionType,
-			OtherCharacters:     otherCharacters,
-			TakenOutCharacters:  takenOutCharacters,
-			ScenePurpose:        sm.scenePurpose,
-		}
-
-		promptText, renderErr = prompt.RenderSceneResponse(data)
+	switch sm.currentScene.ActiveSceneType() {
+	case scene.SceneTypeConflict:
+		promptText, renderErr = sm.buildConflictPrompt(input, otherCharacters, takenOutCharacters)
+	default:
+		promptText, renderErr = sm.buildScenePrompt(input, interactionType, otherCharacters, takenOutCharacters)
 	}
 
 	if renderErr != nil {
@@ -526,6 +475,69 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 	}
 
 	return content, nil
+}
+
+// buildConflictPrompt assembles the data for the conflict-specific response
+// template and renders it. Extracted from generateSceneResponse for clarity.
+func (sm *SceneManager) buildConflictPrompt(input string, otherCharacters, takenOutCharacters []*character.Character) (string, error) {
+	// Build participant and character maps for conflict template
+	participantMap := make(map[string]*scene.ConflictParticipant)
+	for i := range sm.currentScene.ConflictState.Participants {
+		p := &sm.currentScene.ConflictState.Participants[i]
+		participantMap[p.CharacterID] = p
+	}
+
+	characterMap := make(map[string]*character.Character)
+	characterMap[sm.player.ID] = sm.player
+	for _, char := range otherCharacters {
+		characterMap[char.ID] = char
+	}
+	for _, char := range takenOutCharacters {
+		characterMap[char.ID] = char
+	}
+
+	// Determine current character name
+	currentCharName := "Unknown"
+	if sm.currentScene.ConflictState.CurrentTurn < len(sm.currentScene.ConflictState.InitiativeOrder) {
+		currentID := sm.currentScene.ConflictState.InitiativeOrder[sm.currentScene.ConflictState.CurrentTurn]
+		if char, ok := characterMap[currentID]; ok {
+			currentCharName = char.Name
+		}
+	}
+
+	conflictData := prompt.ConflictResponseData{
+		Scene:                sm.currentScene,
+		CharacterContext:     sm.buildCharacterContext(),
+		AspectsContext:       sm.buildAspectsContext(),
+		ConversationContext:  sm.buildConversationContext(),
+		PlayerInput:          input,
+		OtherCharacters:      otherCharacters,
+		TakenOutCharacters:   takenOutCharacters,
+		CurrentCharacterName: currentCharName,
+		ParticipantMap:       participantMap,
+		CharacterMap:         characterMap,
+		ScenePurpose:         sm.scenePurpose,
+	}
+
+	return prompt.RenderConflictResponse(conflictData)
+}
+
+// buildScenePrompt assembles the data for the standard scene response template
+// and renders it. Extracted from generateSceneResponse for clarity.
+func (sm *SceneManager) buildScenePrompt(input, interactionType string, otherCharacters, takenOutCharacters []*character.Character) (string, error) {
+	data := prompt.SceneResponseData{
+		Scene:               sm.currentScene,
+		CharacterContext:    sm.buildCharacterContext(),
+		AspectsContext:      sm.buildAspectsContext(),
+		ConversationContext: sm.buildConversationContext(),
+		PlayerInput:         input,
+		InteractionType:     interactionType,
+		OtherCharacters:     otherCharacters,
+		TakenOutCharacters:  takenOutCharacters,
+		ScenePurpose:        sm.scenePurpose,
+	}
+
+	return prompt.RenderSceneResponse(data)
 }
 
 // GenerateActionNarrative generates narrative text for action results.

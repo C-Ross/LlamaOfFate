@@ -142,7 +142,7 @@ func (ar *ActionResolver) resolveAction(ctx context.Context, parsedAction *actio
 	if parsedAction.Type == action.Attack {
 		actionConflictType := core.ConflictTypeForSkill(parsedAction.Skill)
 
-		if !ar.currentScene.IsConflict {
+		if ar.currentScene.ActiveSceneType() == scene.SceneTypeNone {
 			// Auto-initiate conflict for attack actions
 			if err := ar.conflict.initiateConflict(actionConflictType, ar.player.ID); err != nil {
 				slog.Warn("Failed to auto-initiate conflict",
@@ -337,7 +337,7 @@ func (ar *ActionResolver) finishResolveAction(
 	events = append(events, effectEvents...)
 
 	// If we're in a conflict, advance turn and process NPC turns
-	if ar.currentScene.IsConflict {
+	if ar.currentScene.ActiveSceneType() == scene.SceneTypeConflict {
 		turnEvents, _ := ar.conflict.advanceConflictTurns(ctx)
 		events = append(events, turnEvents...)
 	}
