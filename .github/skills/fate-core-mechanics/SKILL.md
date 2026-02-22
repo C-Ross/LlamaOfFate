@@ -66,6 +66,16 @@ The difference between your roll and opposition determines the outcome. See [SRD
 
 **Shifts** = your result - opposition. Positive shifts on an attack become the hit value the target must absorb.
 
+### Active vs Passive Opposition
+
+For **Overcome** and **Create Advantage** actions, opposition can be:
+- **Passive**: Fixed difficulty (static environment, inanimate obstacles)
+- **Active**: NPC rolls their skill as opposition (active resistance)
+
+The LLM action parser classifies opposition type and identifies the opposing NPC and skill. For active opposition, the engine rolls the NPC's skill instead of using a flat difficulty.
+
+**Code:** `internal/engine/action_parser.go` sets `OpposingNPCID` and `OpposingSkill` fields; `internal/engine/action_resolver.go` rolls the NPC's skill when present (lines 197–224).
+
 ## Four Actions
 
 Every skill roll is one of four action types. See [SRD: Four Actions](https://fate-srd.com/fate-core/four-actions).

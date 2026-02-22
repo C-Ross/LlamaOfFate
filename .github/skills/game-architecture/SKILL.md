@@ -179,6 +179,8 @@ Fallback: Attack with DefaultAttackSkillForConflict targeting player.
 
 `ActionParseRequest` → LLM (temp=0.3) → `ActionParseResponse` → `action.NewAction()`. Uses `parseActionType()` to handle LLM mistakes (e.g., skill name instead of action type).
 
+`ActionParseResponse` includes `OppositionType` ("passive"/"active"), `OpposingNPCID`, and `OpposingSkill` for Overcome/Create Advantage actions. Active opposition triggers NPC skill rolls instead of flat difficulty.
+
 ## UI Interfaces
 
 ### `syncdriver.BlockingUI` (`syncdriver/syncdriver.go`)
