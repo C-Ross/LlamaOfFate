@@ -37,7 +37,7 @@ Fate™ is a trademark of Evil Hat Productions, LLC.
 ### Fate Core Mechanics
 - **Aspect System**: Full support for character, situation, and consequence aspects
 - **Complete Skill System**: All 18 default Fate Core skills with proper action mappings
-- **Stress and Consequences**: Proper implementation of physical and mental damage
+- **Stress and Consequences**: Dynamic stress tracks that scale with Physique (physical) and Will (mental) skills per Fate Core SRD; automatic extra mild consequence slots at Superb (+5) or higher
 - **Fate Point Economy**: Track and manage fate point spending and gaining
 
 ### Scene Management
