@@ -172,9 +172,8 @@ func TestScene_EndConflict(t *testing.T) {
 func TestScene_GetCurrentActor(t *testing.T) {
 	scene := NewScene("test", "Test Scene", "Test")
 
-	// Test with no conflict
-	actor := scene.GetCurrentActor()
-	assert.Empty(t, actor)
+	// No conflict → ConflictState is nil
+	assert.Nil(t, scene.ConflictState)
 
 	// Start conflict
 	participants := []ConflictParticipant{
@@ -184,15 +183,12 @@ func TestScene_GetCurrentActor(t *testing.T) {
 	scene.StartConflict(PhysicalConflict, participants)
 
 	// Test getting current actor
-	actor = scene.GetCurrentActor()
+	actor := scene.ConflictState.GetCurrentActor()
 	assert.Equal(t, "char-1", actor)
 }
 
 func TestScene_NextTurn(t *testing.T) {
 	scene := NewScene("test", "Test Scene", "Test")
-
-	// Test with no conflict
-	scene.NextTurn() // Should not crash
 
 	// Start conflict
 	participants := []ConflictParticipant{
@@ -201,23 +197,19 @@ func TestScene_NextTurn(t *testing.T) {
 	}
 	scene.StartConflict(PhysicalConflict, participants)
 
-	originalTime := scene.UpdatedAt
-	time.Sleep(1 * time.Millisecond)
-
 	// Test advancing turn - first actor should be marked as having acted
-	scene.NextTurn()
+	scene.ConflictState.NextTurn()
 	assert.Equal(t, 1, scene.ConflictState.CurrentTurn)
 	assert.Equal(t, 1, scene.ConflictState.Round)
 	assert.True(t, scene.ConflictState.Participants[0].HasActed)
 
 	// Test wrapping to next round
-	scene.NextTurn()
+	scene.ConflictState.NextTurn()
 	assert.Equal(t, 0, scene.ConflictState.CurrentTurn, "Should wrap to turn 0")
 	assert.Equal(t, 2, scene.ConflictState.Round)
 	// HasActed should be reset for new round
 	assert.False(t, scene.ConflictState.Participants[0].HasActed)
 	assert.False(t, scene.ConflictState.Participants[1].HasActed)
-	assert.True(t, scene.UpdatedAt.After(originalTime))
 }
 
 func TestScene_NextTurn_SkipsInactiveParticipants(t *testing.T) {
@@ -231,20 +223,20 @@ func TestScene_NextTurn_SkipsInactiveParticipants(t *testing.T) {
 	scene.StartConflict(PhysicalConflict, participants)
 
 	// Mark char-2 as taken out
-	scene.SetParticipantStatus("char-2", StatusTakenOut)
+	scene.ConflictState.SetParticipantStatus("char-2", StatusTakenOut)
 
 	// Advance from char-1
-	scene.NextTurn()
+	scene.ConflictState.NextTurn()
 
 	// Should skip char-2 and go to char-3
-	assert.Equal(t, "char-3", scene.GetCurrentActor())
+	assert.Equal(t, "char-3", scene.ConflictState.GetCurrentActor())
 }
 
 func TestScene_SetParticipantStatus(t *testing.T) {
 	scene := NewScene("test", "Test Scene", "Test")
 
-	// Test with no conflict
-	assert.False(t, scene.SetParticipantStatus("char-1", StatusConceded))
+	// No conflict → ConflictState is nil
+	assert.Nil(t, scene.ConflictState)
 
 	// Start conflict
 	participants := []ConflictParticipant{
@@ -254,19 +246,18 @@ func TestScene_SetParticipantStatus(t *testing.T) {
 	scene.StartConflict(PhysicalConflict, participants)
 
 	// Test setting status
-	assert.True(t, scene.SetParticipantStatus("char-1", StatusConceded))
-	assert.Equal(t, StatusConceded, scene.GetParticipant("char-1").Status)
+	assert.True(t, scene.ConflictState.SetParticipantStatus("char-1", StatusConceded))
+	assert.Equal(t, StatusConceded, scene.ConflictState.GetParticipant("char-1").Status)
 
 	// Test setting status for non-existent character
-	assert.False(t, scene.SetParticipantStatus("non-existent", StatusTakenOut))
+	assert.False(t, scene.ConflictState.SetParticipantStatus("non-existent", StatusTakenOut))
 }
 
 func TestScene_FullDefense(t *testing.T) {
 	scene := NewScene("test", "Test Scene", "Test")
 
-	// Test with no conflict
-	assert.False(t, scene.SetFullDefense("char-1"))
-	assert.False(t, scene.IsFullDefense("char-1"))
+	// No conflict → ConflictState is nil
+	assert.Nil(t, scene.ConflictState)
 
 	// Start conflict
 	participants := []ConflictParticipant{
@@ -276,14 +267,14 @@ func TestScene_FullDefense(t *testing.T) {
 	scene.StartConflict(PhysicalConflict, participants)
 
 	// Test setting full defense
-	assert.True(t, scene.SetFullDefense("char-1"))
-	assert.True(t, scene.IsFullDefense("char-1"))
+	assert.True(t, scene.ConflictState.SetFullDefense("char-1"))
+	assert.True(t, scene.ConflictState.IsFullDefense("char-1"))
 	// Full defense should mark as having acted
-	assert.True(t, scene.GetParticipant("char-1").HasActed)
+	assert.True(t, scene.ConflictState.GetParticipant("char-1").HasActed)
 
 	// Test non-existent character
-	assert.False(t, scene.SetFullDefense("non-existent"))
-	assert.False(t, scene.IsFullDefense("non-existent"))
+	assert.False(t, scene.ConflictState.SetFullDefense("non-existent"))
+	assert.False(t, scene.ConflictState.IsFullDefense("non-existent"))
 }
 
 func TestScene_CountActiveParticipants(t *testing.T) {
@@ -296,20 +287,20 @@ func TestScene_CountActiveParticipants(t *testing.T) {
 	}
 	scene.StartConflict(PhysicalConflict, participants)
 
-	assert.Equal(t, 3, scene.CountActiveParticipants())
+	assert.Equal(t, 3, scene.ConflictState.CountActiveParticipants())
 
-	scene.SetParticipantStatus("char-1", StatusConceded)
-	assert.Equal(t, 2, scene.CountActiveParticipants())
+	scene.ConflictState.SetParticipantStatus("char-1", StatusConceded)
+	assert.Equal(t, 2, scene.ConflictState.CountActiveParticipants())
 
-	scene.SetParticipantStatus("char-2", StatusTakenOut)
-	assert.Equal(t, 1, scene.CountActiveParticipants())
+	scene.ConflictState.SetParticipantStatus("char-2", StatusTakenOut)
+	assert.Equal(t, 1, scene.ConflictState.CountActiveParticipants())
 }
 
 func TestScene_GetParticipant(t *testing.T) {
 	scene := NewScene("test", "Test Scene", "Test")
 
-	// Test with no conflict
-	assert.Nil(t, scene.GetParticipant("char-1"))
+	// No conflict → ConflictState is nil
+	assert.Nil(t, scene.ConflictState)
 
 	// Start conflict
 	participants := []ConflictParticipant{
@@ -318,13 +309,13 @@ func TestScene_GetParticipant(t *testing.T) {
 	scene.StartConflict(MentalConflict, participants)
 
 	// Test getting participant
-	p := scene.GetParticipant("char-1")
+	p := scene.ConflictState.GetParticipant("char-1")
 	require.NotNil(t, p)
 	assert.Equal(t, "char-1", p.CharacterID)
 	assert.Equal(t, 3, p.Initiative)
 
 	// Test non-existent participant
-	assert.Nil(t, scene.GetParticipant("non-existent"))
+	assert.Nil(t, scene.ConflictState.GetParticipant("non-existent"))
 }
 
 func TestNewSituationAspect(t *testing.T) {

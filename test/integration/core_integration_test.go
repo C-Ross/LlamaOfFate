@@ -141,16 +141,16 @@ func TestIntegration_ConflictManagement(t *testing.T) {
 	require.NotNil(t, battleScene.ConflictState)
 
 	// Test turn management
-	currentActor := battleScene.GetCurrentActor()
+	currentActor := battleScene.ConflictState.GetCurrentActor()
 	assert.Equal(t, hero.ID, currentActor, "Current actor should be hero (higher initiative)")
 
 	// Advance turn
-	battleScene.NextTurn()
-	currentActor = battleScene.GetCurrentActor()
+	battleScene.ConflictState.NextTurn()
+	currentActor = battleScene.ConflictState.GetCurrentActor()
 	assert.Equal(t, villain.ID, currentActor, "After next turn, current actor should be villain")
 
 	// Advance to next round
-	battleScene.NextTurn()
+	battleScene.ConflictState.NextTurn()
 	assert.Equal(t, 2, battleScene.ConflictState.Round)
 	assert.Equal(t, 0, battleScene.ConflictState.CurrentTurn)
 

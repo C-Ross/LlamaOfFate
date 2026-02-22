@@ -168,7 +168,7 @@ func (cm *ConflictManager) getDefaultAttackSkill() string {
 // processNPCDefend handles an NPC choosing full defense
 func (cm *ConflictManager) processNPCDefend(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) []GameEvent {
 	// Set full defense flag
-	cm.currentScene.SetFullDefense(npc.ID)
+	cm.currentScene.ConflictState.SetFullDefense(npc.ID)
 
 	var events []GameEvent
 	events = append(events, NPCActionResultEvent{
@@ -356,7 +356,7 @@ func (cm *ConflictManager) processNPCAttack(ctx context.Context, npc *character.
 	// Get target's defense (check for full defense bonus)
 	targetDefenseLevel := target.GetSkill(defenseSkill)
 	defenseBonus := 0
-	if participant := cm.currentScene.GetParticipant(target.ID); participant != nil && participant.FullDefense {
+	if participant := cm.currentScene.ConflictState.GetParticipant(target.ID); participant != nil && participant.FullDefense {
 		defenseBonus = 2
 	}
 	targetDefense := cm.actions.roller.RollWithModifier(dice.Mediocre, int(targetDefenseLevel)+defenseBonus)

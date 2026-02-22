@@ -219,11 +219,11 @@ func (cm *ConflictManager) advanceConflictTurns(ctx context.Context) ([]GameEven
 	var events []GameEvent
 
 	// Advance past the current actor's turn
-	cm.currentScene.NextTurn()
+	cm.currentScene.ConflictState.NextTurn()
 
 	// Process NPC turns until we get back to the player or conflict ends
 	for cm.currentScene.IsConflict {
-		currentActor := cm.currentScene.GetCurrentActor()
+		currentActor := cm.currentScene.ConflictState.GetCurrentActor()
 		if currentActor == "" {
 			break
 		}
@@ -245,7 +245,7 @@ func (cm *ConflictManager) advanceConflictTurns(ctx context.Context) ([]GameEven
 		}
 
 		// Advance to next turn
-		cm.currentScene.NextTurn()
+		cm.currentScene.ConflictState.NextTurn()
 	}
 
 	return events, false
@@ -367,7 +367,7 @@ func (cm *ConflictManager) applyTargetTakenOut(ctx context.Context, target *char
 
 	// Mark the target as taken out in the conflict
 	if cm.currentScene.IsConflict && cm.currentScene.ConflictState != nil {
-		cm.currentScene.SetParticipantStatus(target.ID, scene.StatusTakenOut)
+		cm.currentScene.ConflictState.SetParticipantStatus(target.ID, scene.StatusTakenOut)
 
 		// Check if conflict should end (all opponents taken out)
 		activeOpponents := 0
@@ -774,7 +774,7 @@ func (cm *ConflictManager) handleConcession(ctx context.Context) []GameEvent {
 
 	// Mark player as conceded and end the conflict
 	if cm.currentScene.ConflictState != nil {
-		cm.currentScene.SetParticipantStatus(cm.player.ID, scene.StatusConceded)
+		cm.currentScene.ConflictState.SetParticipantStatus(cm.player.ID, scene.StatusConceded)
 		cm.clearConflictStress()
 		cm.currentScene.EndConflict()
 		events = append(events, ConflictEndEvent{Reason: "You have conceded the conflict."})
@@ -825,7 +825,7 @@ func (cm *ConflictManager) handleTakenOut(ctx context.Context, attacker *charact
 
 	// Mark player as taken out and end the conflict
 	if cm.currentScene.ConflictState != nil {
-		cm.currentScene.SetParticipantStatus(cm.player.ID, scene.StatusTakenOut)
+		cm.currentScene.ConflictState.SetParticipantStatus(cm.player.ID, scene.StatusTakenOut)
 		cm.clearConflictStress()
 		cm.currentScene.EndConflict()
 	}

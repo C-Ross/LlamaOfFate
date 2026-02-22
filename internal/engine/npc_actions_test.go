@@ -76,7 +76,7 @@ func TestProcessNPCDefend_Default(t *testing.T) {
 	assert.Contains(t, narrEvt.Text, npc.Name)
 
 	// Full defense flag should be set on the scene participant.
-	assert.True(t, sm.currentScene.IsFullDefense(npc.ID))
+	assert.True(t, sm.currentScene.ConflictState.IsFullDefense(npc.ID))
 }
 
 func TestProcessNPCDefend_CustomDescription(t *testing.T) {
@@ -365,7 +365,7 @@ func TestProcessNPCTurn_DispatchDefend(t *testing.T) {
 	assert.True(t, hasAnnounce, "expected TurnAnnouncementEvent")
 	assert.True(t, hasAction, "expected NPCActionResultEvent for defend")
 
-	assert.True(t, sm.currentScene.IsFullDefense(npc.ID))
+	assert.True(t, sm.currentScene.ConflictState.IsFullDefense(npc.ID))
 }
 
 // When LLM fails, processNPCTurn should fall back to an attack.

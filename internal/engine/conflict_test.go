@@ -757,7 +757,7 @@ func TestSceneManager_HandleTargetTakenOut(t *testing.T) {
 	assert.True(t, dmgEvent.TakenOut)
 
 	// Check that target is marked as taken out (conflict still active because of otherEnemy)
-	participant := sm.currentScene.GetParticipant(target.ID)
+	participant := sm.currentScene.ConflictState.GetParticipant(target.ID)
 	require.NotNil(t, participant)
 	assert.Equal(t, scene.StatusTakenOut, participant.Status)
 
@@ -881,12 +881,12 @@ func TestSceneManager_InitiateConflict_ExcludesTakenOutCharacters(t *testing.T) 
 	require.NoError(t, err)
 
 	// enemy1 should NOT be in the new conflict since they were taken out
-	participant := sm.currentScene.GetParticipant(enemy1.ID)
+	participant := sm.currentScene.ConflictState.GetParticipant(enemy1.ID)
 	assert.Nil(t, participant, "Taken-out character should not be in new conflict")
 
 	// enemy2 and player should be in the conflict
-	assert.NotNil(t, sm.currentScene.GetParticipant(enemy2.ID))
-	assert.NotNil(t, sm.currentScene.GetParticipant(player.ID))
+	assert.NotNil(t, sm.currentScene.ConflictState.GetParticipant(enemy2.ID))
+	assert.NotNil(t, sm.currentScene.ConflictState.GetParticipant(player.ID))
 }
 
 func TestSceneManager_InitiateConflict_TakenOutInitiatorFails(t *testing.T) {

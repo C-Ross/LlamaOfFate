@@ -257,66 +257,59 @@ func (s *Scene) EndConflict() {
 	s.UpdatedAt = time.Now()
 }
 
-// GetCurrentActor returns the character ID of the current actor in conflict
-func (s *Scene) GetCurrentActor() string {
-	if !s.IsConflict || s.ConflictState == nil || len(s.ConflictState.InitiativeOrder) == 0 {
+// GetCurrentActor returns the character ID of the current actor in the conflict.
+func (cs *ConflictState) GetCurrentActor() string {
+	if len(cs.InitiativeOrder) == 0 {
 		return ""
 	}
-
-	return s.ConflictState.InitiativeOrder[s.ConflictState.CurrentTurn]
+	return cs.InitiativeOrder[cs.CurrentTurn]
 }
 
-// NextTurn advances to the next turn in conflict
-// Skips participants who are no longer active (conceded or taken out)
-func (s *Scene) NextTurn() {
-	if !s.IsConflict || s.ConflictState == nil {
-		return
-	}
-
+// NextTurn advances to the next turn in the conflict.
+// Skips participants who are no longer active (conceded or taken out).
+func (cs *ConflictState) NextTurn() {
 	// Mark current actor as having acted
-	currentActor := s.GetCurrentActor()
-	for i := range s.ConflictState.Participants {
-		if s.ConflictState.Participants[i].CharacterID == currentActor {
-			s.ConflictState.Participants[i].HasActed = true
+	currentActor := cs.GetCurrentActor()
+	for i := range cs.Participants {
+		if cs.Participants[i].CharacterID == currentActor {
+			cs.Participants[i].HasActed = true
 			break
 		}
 	}
 
 	// Find next active participant
 	for {
-		s.ConflictState.CurrentTurn++
-		if s.ConflictState.CurrentTurn >= len(s.ConflictState.InitiativeOrder) {
-			s.ConflictState.CurrentTurn = 0
-			s.ConflictState.Round++
-			s.resetExchangeState()
+		cs.CurrentTurn++
+		if cs.CurrentTurn >= len(cs.InitiativeOrder) {
+			cs.CurrentTurn = 0
+			cs.Round++
+			cs.resetExchangeState()
 		}
 
 		// Check if current actor is still active
-		actorID := s.ConflictState.InitiativeOrder[s.ConflictState.CurrentTurn]
-		if s.isParticipantActive(actorID) {
+		actorID := cs.InitiativeOrder[cs.CurrentTurn]
+		if cs.isParticipantActive(actorID) {
 			break
 		}
 
 		// Safety check to prevent infinite loop if no active participants
-		if s.CountActiveParticipants() == 0 {
+		if cs.CountActiveParticipants() == 0 {
 			break
 		}
 	}
-
-	s.UpdatedAt = time.Now()
 }
 
-// resetExchangeState resets per-exchange state at the start of a new round
-func (s *Scene) resetExchangeState() {
-	for i := range s.ConflictState.Participants {
-		s.ConflictState.Participants[i].HasActed = false
-		s.ConflictState.Participants[i].FullDefense = false
+// resetExchangeState resets per-exchange state at the start of a new round.
+func (cs *ConflictState) resetExchangeState() {
+	for i := range cs.Participants {
+		cs.Participants[i].HasActed = false
+		cs.Participants[i].FullDefense = false
 	}
 }
 
-// isParticipantActive returns true if the participant is still active in the conflict
-func (s *Scene) isParticipantActive(characterID string) bool {
-	for _, p := range s.ConflictState.Participants {
+// isParticipantActive returns true if the participant is still active in the conflict.
+func (cs *ConflictState) isParticipantActive(characterID string) bool {
+	for _, p := range cs.Participants {
 		if p.CharacterID == characterID {
 			return p.Status == StatusActive
 		}
@@ -324,10 +317,10 @@ func (s *Scene) isParticipantActive(characterID string) bool {
 	return false
 }
 
-// CountActiveParticipants returns the number of active participants
-func (s *Scene) CountActiveParticipants() int {
+// CountActiveParticipants returns the number of active participants.
+func (cs *ConflictState) CountActiveParticipants() int {
 	count := 0
-	for _, p := range s.ConflictState.Participants {
+	for _, p := range cs.Participants {
 		if p.Status == StatusActive {
 			count++
 		}
@@ -335,46 +328,32 @@ func (s *Scene) CountActiveParticipants() int {
 	return count
 }
 
-// SetParticipantStatus updates a participant's status (conceded, taken out)
-func (s *Scene) SetParticipantStatus(characterID string, status ParticipantStatus) bool {
-	if !s.IsConflict || s.ConflictState == nil {
-		return false
-	}
-
-	for i := range s.ConflictState.Participants {
-		if s.ConflictState.Participants[i].CharacterID == characterID {
-			s.ConflictState.Participants[i].Status = status
-			s.UpdatedAt = time.Now()
+// SetParticipantStatus updates a participant's status (conceded, taken out).
+func (cs *ConflictState) SetParticipantStatus(characterID string, status ParticipantStatus) bool {
+	for i := range cs.Participants {
+		if cs.Participants[i].CharacterID == characterID {
+			cs.Participants[i].Status = status
 			return true
 		}
 	}
 	return false
 }
 
-// SetFullDefense sets a participant to full defense mode for this exchange
-func (s *Scene) SetFullDefense(characterID string) bool {
-	if !s.IsConflict || s.ConflictState == nil {
-		return false
-	}
-
-	for i := range s.ConflictState.Participants {
-		if s.ConflictState.Participants[i].CharacterID == characterID {
-			s.ConflictState.Participants[i].FullDefense = true
-			s.ConflictState.Participants[i].HasActed = true // Full defense uses your action
-			s.UpdatedAt = time.Now()
+// SetFullDefense sets a participant to full defense mode for this exchange.
+func (cs *ConflictState) SetFullDefense(characterID string) bool {
+	for i := range cs.Participants {
+		if cs.Participants[i].CharacterID == characterID {
+			cs.Participants[i].FullDefense = true
+			cs.Participants[i].HasActed = true // Full defense uses your action
 			return true
 		}
 	}
 	return false
 }
 
-// IsFullDefense returns true if the participant is in full defense mode
-func (s *Scene) IsFullDefense(characterID string) bool {
-	if !s.IsConflict || s.ConflictState == nil {
-		return false
-	}
-
-	for _, p := range s.ConflictState.Participants {
+// IsFullDefense returns true if the participant is in full defense mode.
+func (cs *ConflictState) IsFullDefense(characterID string) bool {
+	for _, p := range cs.Participants {
 		if p.CharacterID == characterID {
 			return p.FullDefense
 		}
@@ -382,15 +361,11 @@ func (s *Scene) IsFullDefense(characterID string) bool {
 	return false
 }
 
-// GetParticipant returns a pointer to a participant by character ID
-func (s *Scene) GetParticipant(characterID string) *ConflictParticipant {
-	if !s.IsConflict || s.ConflictState == nil {
-		return nil
-	}
-
-	for i := range s.ConflictState.Participants {
-		if s.ConflictState.Participants[i].CharacterID == characterID {
-			return &s.ConflictState.Participants[i]
+// GetParticipant returns a pointer to a participant by character ID.
+func (cs *ConflictState) GetParticipant(characterID string) *ConflictParticipant {
+	for i := range cs.Participants {
+		if cs.Participants[i].CharacterID == characterID {
+			return &cs.Participants[i]
 		}
 	}
 	return nil
