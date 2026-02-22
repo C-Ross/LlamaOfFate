@@ -464,11 +464,7 @@ func (cm *ConflictManager) promptPlayerForFates(ctx context.Context) {
 // and applies the results. Extracted from promptPlayerForFates to serve as the
 // mid-flow continuation.
 func (cm *ConflictManager) processFateNarration(ctx context.Context, input string, takenOutNPCs []prompt.FateNarrationNPC) []GameEvent {
-	// Determine conflict type for context
-	conflictType := "physical"
-	if cm.currentScene.ConflictState != nil && cm.currentScene.ConflictState.Type == scene.MentalConflict {
-		conflictType = "mental"
-	}
+	conflictType := cm.conflictTypeString()
 
 	// Send to LLM for structured parsing
 	data := prompt.FateNarrationData{
@@ -713,10 +709,7 @@ func (cm *ConflictManager) generateConsequenceAspect(ctx context.Context, conseq
 		return "", fmt.Errorf("LLM client required")
 	}
 
-	conflictType := "physical"
-	if cm.currentScene.ConflictState != nil && cm.currentScene.ConflictState.Type == scene.MentalConflict {
-		conflictType = "mental"
-	}
+	conflictType := cm.conflictTypeString()
 
 	data := prompt.ConsequenceAspectData{
 		CharacterName: cm.player.Name,
@@ -870,10 +863,7 @@ func (cm *ConflictManager) generateTakenOutNarrativeAndOutcome(ctx context.Conte
 		return "", TakenOutTransition, "", fmt.Errorf("LLM client required")
 	}
 
-	conflictType := "physical"
-	if cm.currentScene.ConflictState != nil && cm.currentScene.ConflictState.Type == scene.MentalConflict {
-		conflictType = "mental"
-	}
+	conflictType := cm.conflictTypeString()
 
 	data := prompt.TakenOutData{
 		CharacterName:       cm.player.Name,

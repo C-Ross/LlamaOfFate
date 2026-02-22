@@ -87,3 +87,12 @@ func (cm *ConflictManager) SceneExitState() (SceneEndReason, string) {
 func (cm *ConflictManager) GetTakenOutChars() []string {
 	return cm.takenOutChars
 }
+
+// conflictTypeString returns "physical" or "mental" based on the active conflict.
+// Defaults to "physical" when no conflict is active.
+func (cm *ConflictManager) conflictTypeString() string {
+	if cm.currentScene.ConflictState != nil && cm.currentScene.ConflictState.Type == scene.MentalConflict {
+		return "mental"
+	}
+	return "physical"
+}

@@ -414,19 +414,7 @@ func (sm *SceneManager) handleAction(ctx context.Context, input string) ([]GameE
 
 	// Parse the action using the action parser
 	if sm.actionParser != nil {
-		// Get other characters in the scene from the character registry
-		otherCharactersMap := sm.characters.GetCharactersByScene(sm.currentScene)
-		// Remove the player from other characters (they're already the main character)
-		delete(otherCharactersMap, sm.player.ID)
-
-		// Convert map to slice for ActionParseRequest, excluding taken-out characters
-		var otherCharacters []*character.Character
-		for _, char := range otherCharactersMap {
-			if sm.currentScene.IsCharacterTakenOut(char.ID) {
-				continue
-			}
-			otherCharacters = append(otherCharacters, char)
-		}
+		otherCharacters, _ := sm.sceneCharacters()
 
 		action, err := sm.actionParser.ParseAction(ctx, ActionParseRequest{
 			Character:       sm.player,
@@ -464,19 +452,7 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 	}
 
 	// Get other characters in the scene
-	otherCharactersMap := sm.characters.GetCharactersByScene(sm.currentScene)
-	delete(otherCharactersMap, sm.player.ID) // Remove the player
-
-	// Separate active characters from taken-out characters
-	var otherCharacters []*character.Character
-	var takenOutCharacters []*character.Character
-	for _, char := range otherCharactersMap {
-		if sm.currentScene.IsCharacterTakenOut(char.ID) {
-			takenOutCharacters = append(takenOutCharacters, char)
-		} else {
-			otherCharacters = append(otherCharacters, char)
-		}
-	}
+	otherCharacters, takenOutCharacters := sm.sceneCharacters()
 
 	var promptText string
 	var renderErr error
@@ -492,8 +468,11 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 
 		characterMap := make(map[string]*character.Character)
 		characterMap[sm.player.ID] = sm.player
-		for id, char := range otherCharactersMap {
-			characterMap[id] = char
+		for _, char := range otherCharacters {
+			characterMap[char.ID] = char
+		}
+		for _, char := range takenOutCharacters {
+			characterMap[char.ID] = char
 		}
 
 		// Determine current character name
@@ -557,17 +536,7 @@ func (sm *SceneManager) GenerateActionNarrative(ctx context.Context, parsedActio
 	}
 
 	// Get other characters in the scene
-	otherCharactersMap := sm.characters.GetCharactersByScene(sm.currentScene)
-	delete(otherCharactersMap, sm.player.ID) // Remove the player
-
-	// Exclude taken-out characters from narrative context
-	var otherCharacters []*character.Character
-	for _, char := range otherCharactersMap {
-		if sm.currentScene.IsCharacterTakenOut(char.ID) {
-			continue
-		}
-		otherCharacters = append(otherCharacters, char)
-	}
+	otherCharacters, _ := sm.sceneCharacters()
 
 	// Prepare template data and render
 	data := prompt.ActionNarrativeData{
@@ -599,6 +568,22 @@ func (sm *SceneManager) GenerateActionNarrative(ctx context.Context, parsedActio
 // GetCurrentScene returns the current scene
 func (sm *SceneManager) GetCurrentScene() *scene.Scene {
 	return sm.currentScene
+}
+
+// sceneCharacters returns non-player characters in the current scene, partitioned
+// into active and taken-out slices. Callers that only need active characters can
+// ignore the second return value.
+func (sm *SceneManager) sceneCharacters() (active, takenOut []*character.Character) {
+	others := sm.characters.GetCharactersByScene(sm.currentScene)
+	delete(others, sm.player.ID)
+	for _, c := range others {
+		if sm.currentScene.IsCharacterTakenOut(c.ID) {
+			takenOut = append(takenOut, c)
+		} else {
+			active = append(active, c)
+		}
+	}
+	return
 }
 
 // GetPlayer returns the current player character

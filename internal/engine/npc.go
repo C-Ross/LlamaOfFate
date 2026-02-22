@@ -23,11 +23,7 @@ func (cm *ConflictManager) getNPCActionDecision(ctx context.Context, npc *charac
 		return nil, fmt.Errorf("LLM client required for NPC decisions")
 	}
 
-	// Determine conflict type string
-	conflictType := "physical"
-	if cm.currentScene.ConflictState.Type == scene.MentalConflict {
-		conflictType = "mental"
-	}
+	conflictType := cm.conflictTypeString()
 
 	// Build target list (all active participants except this NPC)
 	var targets []prompt.NPCTargetInfo
@@ -486,11 +482,7 @@ func (cm *ConflictManager) generateNPCAttackNarrative(ctx context.Context, npc *
 		outcomeDesc = "misses completely"
 	}
 
-	// Determine conflict type string
-	conflictType := "physical"
-	if cm.currentScene.ConflictState != nil && cm.currentScene.ConflictState.Type == scene.MentalConflict {
-		conflictType = "mental"
-	}
+	conflictType := cm.conflictTypeString()
 
 	// Get round number
 	round := 1
