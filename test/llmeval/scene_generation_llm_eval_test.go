@@ -4,6 +4,7 @@ package llmeval_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -228,19 +229,16 @@ func evaluateSceneGeneration(ctx context.Context, client llm.LLMClient, tc Scene
 		result.NPCsHaveDisp = true
 	}
 
-	// Check if scene advances the scenario story
+	// Check if scene advances the scenario story using LLM judge
 	if tc.Scenario != nil {
-		descLower := strings.ToLower(generated.Description)
-		aspectsLower := strings.ToLower(strings.Join(generated.SituationAspects, " "))
-		allSceneText := descLower + " " + aspectsLower + " " + strings.ToLower(generated.SceneName)
-
-		// Check if elements of the scenario appear in the generated scene
-		scenarioTerms := extractScenarioTerms(tc.Scenario)
-		for _, term := range scenarioTerms {
-			if strings.Contains(allSceneText, strings.ToLower(term)) {
-				result.AdvancesStory = true
-				break
-			}
+		sceneText := generated.SceneName + "\n" + generated.Description + "\n" + strings.Join(generated.SituationAspects, "\n")
+		scenarioContext := fmt.Sprintf("Scenario: %s\nProblem: %s\nStory Questions: %s",
+			tc.Scenario.Title, tc.Scenario.Problem, strings.Join(tc.Scenario.StoryQuestions, "; "))
+		judge, err := LLMJudgeWithContext(ctx, client, sceneText,
+			"Does this scene content (name, description, and situation aspects) relate to or advance the scenario's story by incorporating elements from the scenario's problem or story questions?",
+			scenarioContext)
+		if err == nil {
+			result.AdvancesStory = judge.Pass
 		}
 	}
 
@@ -255,29 +253,6 @@ func evaluateSceneGeneration(ctx context.Context, client llm.LLMClient, tc Scene
 		result.NPCCount <= 2
 
 	return result
-}
-
-// extractScenarioTerms pulls key words from the scenario for matching
-func extractScenarioTerms(s *scene.Scenario) []string {
-	var terms []string
-	allText := s.Problem + " " + s.Setting + " " + strings.Join(s.StoryQuestions, " ")
-	for _, w := range strings.Fields(allText) {
-		w = strings.Trim(w, ",.!?'\"()[]")
-		if len(w) > 4 && !isSceneGenCommonWord(w) {
-			terms = append(terms, w)
-		}
-	}
-	return terms
-}
-
-func isSceneGenCommonWord(w string) bool {
-	common := map[string]bool{
-		"about": true, "after": true, "before": true, "being": true,
-		"could": true, "every": true, "their": true, "there": true,
-		"these": true, "those": true, "through": true, "where": true,
-		"which": true, "while": true, "would": true, "should": true,
-	}
-	return common[strings.ToLower(w)]
 }
 
 // TestSceneGeneration_LLMEvaluation verifies scene generation produces valid Fate Core scenes.
