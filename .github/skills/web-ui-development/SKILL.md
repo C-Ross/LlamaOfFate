@@ -36,14 +36,20 @@ web/
     main.tsx                  - React entry point
     App.tsx                   - Root layout (two-panel)
     index.css                 - Tailwind + theme variables
-    lib/utils.ts              - cn() helper (clsx + tailwind-merge)
+    lib/
+      utils.ts                - cn() helper (clsx + tailwind-merge)
+      types.ts                - WebSocket message types & game state types
+      dice.ts                 - Dice rendering helpers (roll animation, fate die values)
+    hooks/
+      useGameSocket.ts        - WebSocket connection & message handling
+      useGameState.ts         - Game state derivation from event stream
     components/
       SidebarCard.tsx          - Reusable sidebar card wrapper
+      game/                    - Game-specific components (events, UI elements)
       ui/                      - shadcn/ui components (DO NOT edit manually)
     test/
       setup.ts                 - Vitest setup (jest-dom matchers)
-      App.test.tsx             - App component tests
-      SidebarCard.test.tsx     - SidebarCard tests
+      *.test.tsx               - Component tests (one per component)
 ```
 
 ## Justfile Targets
@@ -119,12 +125,66 @@ Fonts are loaded via Google Fonts `@import` at the top of `index.css`.
 2. Register in `@theme inline` as `--color-my-color: var(--my-color)`
 3. Use as `text-my-color`, `bg-my-color`, etc.
 
+## Hooks
+
+### `useGameSocket` (`hooks/useGameSocket.ts`)
+
+WebSocket connection & message handling hook. Returns:
+- `messages: GameEvent[]` — all received game events
+- `sendMessage(msg: string)` — send player input
+- `connectionStatus: string` — "connected", "connecting", "disconnected"
+
+Used in `App.tsx` to maintain WebSocket lifecycle and message stream.
+
+### `useGameState` (`hooks/useGameState.ts`)
+
+Derives sidebar state from event stream using `useMemo`. Exports `GameState` shape:
+```tsx
+interface GameState {
+  player: PlayerSnapshot | null
+  situationAspects: SituationAspectSnapshot[]
+  npcs: NPCSnapshot[]
+  fatePoints: number
+  stressTracks: Record<string, StressTrackSnapshot>
+  consequences: ConsequenceSnapshotEntry[]
+  inConflict: boolean
+  sceneName: string
+}
+```
+
+**Key behavior:** Handles `InvokeResolved` events by decrementing free invoke counts on situation aspects when `IsFree` is true.
+
 ## Layout
 
 The app uses a two-panel flexbox layout:
 
 - **Left panel** (flex-1): Chat area with header, scrollable message area, and input form
 - **Right panel** (w-80, hidden below `lg`): Game sidebar with `SidebarCard` components
+
+## Game Components (`components/game/`)
+
+Event-specific components that render game events in the chat stream:
+- `ActionAttempt` — action roll results
+- `AspectBadge` — aspect display (color-coded by type)
+- `ChatInput` — player input form
+- `ChatMessage` — narrative text event
+- `ChatPanel` — left panel container (messages + input)
+- `ConflictBanner` — conflict status indicator
+- `ConflictEnd` — conflict resolution event
+- `DamageResolution` — stress/consequence tracking event
+- `DefenseRoll` — defense roll result
+- `FateDie` — single Fate die visual (using dice.ts)
+- `FatePointTracker` — fate point counter (sidebar)
+- `GameSidebar` — right panel container (character, aspects, NPCs)
+- `InvokePrompt` — aspect invocation prompt (blocking)
+- `MidFlowPrompt` — mid-flow input prompt (blocking)
+- `NPCAction` — NPC action event
+- `NpcPanel` — NPC list (sidebar)
+- `OutcomeBadge` — outcome type badge (success, fail, tie, style)
+- `RollResult` — dice roll visualization
+- `SetupScreen` — character selection screen
+- `StressTrack` — stress track visualization (sidebar)
+- `TurnAnnouncement` — turn order indicator
 
 ## Creating Components
 
