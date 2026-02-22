@@ -161,6 +161,20 @@ scene.AddSituationAspect(aspect)
 used := aspect.UseFreeInvoke()  // Returns true if free invoke was available
 ```
 
+### Boosts
+
+A **boost** is a special temporary situation aspect with one free invoke that **disappears after being invoked once**. Boosts are granted by action outcomes (ties on attacks/defends, style on overcome). See [SRD: Types of Aspects](https://fate-srd.com/fate-core/types-aspects).
+
+**Code:** `internal/core/scene/scene.go`
+
+```go
+boost := scene.NewBoost("boost-1", "Off Balance", "player-1")  // Auto-expires after invoke
+scene.AddSituationAspect(boost)
+expired := boost.IsExpiredBoost()  // True when IsBoost && FreeInvokes == 0
+```
+
+The `IsBoost` field marks an aspect as temporary. The engine automatically removes expired boosts from the scene after their free invoke is consumed.
+
 ## Skills
 
 Skills are stored as `map[string]dice.Ladder` on characters. The `internal/core/skills.go` file classifies skills for conflict resolution:

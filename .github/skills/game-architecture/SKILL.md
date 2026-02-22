@@ -193,6 +193,8 @@ Blocking terminal UI interface driven by `syncdriver.Run()`:
 
 Data types shared between engine and UI:
 - `GameEvent`, `InvokePromptEvent`, `InputRequestEvent` — event types
+- `AspectCreatedEvent` — includes `IsBoost` field to distinguish boosts from regular aspects
+- `BoostExpiredEvent` — emitted when a boost's free invoke is consumed and it auto-removes
 - `InvokeResponse`, `MidFlowResponse` — response types
 - `SceneInfoSetter` — optional: wired by `syncdriver.Run()` onStart callback for meta-command access
 
