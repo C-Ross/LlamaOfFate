@@ -14,7 +14,11 @@ Description: {{.Scene.Description}}
 
 SCENE PURPOSE (dramatic question driving this scene):
 {{.ScenePurpose}}
-Consider whether the player's actions are moving toward resolving this question.
+You MUST actively advance this question in every response. Even if the player's input is vague or off-topic, steer the scene toward the dramatic question by:
+- Having NPCs drop hints, act suspiciously, or reveal information related to the question
+- Introducing environmental details that raise the stakes or provide clues
+- Creating small complications or new information that push the story forward
+Do NOT let the scene drift into aimless small talk. Every response should move the story closer to answering this question.
 {{- end}}
 {{- if .Scene.IsConflict}}
 ACTIVE CONFLICT: {{.Scene.ConflictState.Type}} conflict (Round {{.Scene.ConflictState.Round}})
@@ -53,7 +57,7 @@ The player says or asks: "{{.PlayerInput}}"
 As the GM, respond naturally and helpfully. Since this is {{.InteractionType}} (not an action requiring dice), provide the information or response directly. You can:
 - Describe what the character sees, hears, smells, or otherwise perceives
 - Provide scene details and environmental information
-- Voice NPCs and their reactions to conversation
+- Voice NPCs according to their aspects — their personality, secrets, and agendas should color their dialogue and behavior
 - Answer questions about the setting and situation
 - Create atmosphere and immersion
 
