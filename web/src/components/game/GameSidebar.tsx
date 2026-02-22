@@ -1,4 +1,5 @@
 import { SidebarCard } from "@/components/SidebarCard"
+import { AboutCard } from "@/components/game/AboutCard"
 import { AspectBadge } from "@/components/game/AspectBadge"
 import { StressTrack } from "@/components/game/StressTrack"
 import { FatePointTracker } from "@/components/game/FatePointTracker"
@@ -71,6 +72,9 @@ export function GameSidebar({ state, className }: GameSidebarProps) {
       <SidebarCard title={inConflict ? "Combatants" : "NPCs"}>
         <NpcPanel npcs={npcs} />
       </SidebarCard>
+
+      {/* About / Credits */}
+      <AboutCard />
     </div>
   )
 }
