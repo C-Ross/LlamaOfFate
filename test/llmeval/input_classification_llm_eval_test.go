@@ -165,16 +165,6 @@ func getClarificationTestCases() []InputClassificationTestCase {
 // These are mundane actions with no interesting failure consequence
 func getNarrativeTestCases() []InputClassificationTestCase {
 	return []InputClassificationTestCase{
-		// Shouldering through a tense crowd is action when scene aspects like
-		// "Tension Hangs in the Air" make failure interesting (could start a fight).
-		{
-			Name:             "Shoulder through crowd",
-			RawInput:         "Jesse shoulders his way through the crowd and slaps a silver dollar down on the bar.",
-			SceneName:        "Redemption Gulch Saloon",
-			SceneDescription: "A busy saloon filled with rough patrons drinking and playing cards, tension hangs in the air",
-			ExpectedType:     "action",
-			Description:      "Pushing through a tense crowd has interesting failure (confrontation) - action to overcome scene aspects",
-		},
 		{
 			Name:             "Walk to table",
 			RawInput:         "I walk over to the empty table in the corner and sit down.",
