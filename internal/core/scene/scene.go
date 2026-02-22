@@ -37,6 +37,18 @@ type SituationAspect struct {
 	CreatedAt   time.Time `json:"created_at" yaml:"created_at,omitempty"`
 }
 
+// SceneType identifies which structured Fate Core resolution mechanic
+// (if any) is active in a scene. Fate Core defines three mutually exclusive
+// structured types: conflicts, challenges, and contests.
+type SceneType string
+
+const (
+	SceneTypeNone      SceneType = "none"
+	SceneTypeConflict  SceneType = "conflict"
+	SceneTypeChallenge SceneType = "challenge"
+	SceneTypeContest   SceneType = "contest"
+)
+
 // ConflictType distinguishes physical from mental conflicts
 // Physical conflicts use Notice for initiative and target physical stress
 // Mental conflicts use Empathy for initiative and target mental stress
@@ -198,6 +210,15 @@ func (s *Scene) GetSituationAspect(aspectID string) *SituationAspect {
 		}
 	}
 	return nil
+}
+
+// ActiveSceneType returns which structured Fate Core mechanic is currently
+// active in this scene. Only one structured type may be active at a time.
+func (s *Scene) ActiveSceneType() SceneType {
+	if s.IsConflict {
+		return SceneTypeConflict
+	}
+	return SceneTypeNone
 }
 
 // StartConflict begins a conflict in this scene

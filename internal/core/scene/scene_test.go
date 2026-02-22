@@ -448,6 +448,34 @@ func TestScene_MarkCharacterTakenOut(t *testing.T) {
 	assert.True(t, s.UpdatedAt.After(originalTime))
 }
 
+func TestScene_ActiveSceneType_None(t *testing.T) {
+	s := NewScene("test", "Test Scene", "Test")
+	assert.Equal(t, SceneTypeNone, s.ActiveSceneType())
+}
+
+func TestScene_ActiveSceneType_Conflict(t *testing.T) {
+	s := NewScene("test", "Test Scene", "Test")
+	participants := []ConflictParticipant{
+		{CharacterID: "player", Initiative: 3},
+		{CharacterID: "npc", Initiative: 1},
+	}
+	s.StartConflict(PhysicalConflict, participants)
+	assert.Equal(t, SceneTypeConflict, s.ActiveSceneType())
+}
+
+func TestScene_ActiveSceneType_AfterConflictEnds(t *testing.T) {
+	s := NewScene("test", "Test Scene", "Test")
+	participants := []ConflictParticipant{
+		{CharacterID: "player", Initiative: 3},
+		{CharacterID: "npc", Initiative: 1},
+	}
+	s.StartConflict(PhysicalConflict, participants)
+	require.Equal(t, SceneTypeConflict, s.ActiveSceneType())
+
+	s.EndConflict()
+	assert.Equal(t, SceneTypeNone, s.ActiveSceneType())
+}
+
 func TestScene_MarkCharacterTakenOut_NilMap(t *testing.T) {
 	// Create scene and manually nil out the map to test defensive handling
 	s := NewScene("test", "Test Scene", "Test")
