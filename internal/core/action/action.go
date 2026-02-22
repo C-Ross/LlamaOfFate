@@ -42,6 +42,12 @@ type Action struct {
 	RawInput    string     `json:"raw_input"`
 	Target      string     `json:"target,omitempty"` // The target of the action (character ID, object, or description)
 
+	// Active NPC opposition (Fate Core: active vs passive opposition).
+	// When set, an NPC rolls their skill as opposition instead of using a
+	// flat difficulty. Applies to Overcome and Create Advantage outside conflict.
+	OpposingNPCID string `json:"opposing_npc_id,omitempty"` // NPC providing active opposition
+	OpposingSkill string `json:"opposing_skill,omitempty"`  // Skill the NPC uses to oppose
+
 	// Action Modifiers
 	Difficulty dice.Ladder    `json:"difficulty"`
 	Aspects    []AspectInvoke `json:"aspects"`

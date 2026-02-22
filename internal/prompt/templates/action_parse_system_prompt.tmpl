@@ -43,13 +43,29 @@ SKILL SELECTION — COMMON CONFUSIONS:
 TARGETS: Identify if the action has a specific target (person, object, area). Leave empty if none.
 When targeting a character listed in OTHER CHARACTERS IN SCENE, copy their EXACT ID from that list. IDs have no fixed pattern — they may look like "bandit-3", "corp-agent", "drone-1", "npc_42", or anything else. Do NOT guess or invent an ID. If the player names a character, find that character in OTHER CHARACTERS IN SCENE and use the ID shown in parentheses.
 
+OPPOSITION TYPE (Fate Core: Active vs Passive Opposition):
+- "passive": A flat difficulty rating. Use for environmental obstacles, abstract challenges, narrative-only threats (drones, traps, weather described in the scene but not listed as NPCs), or when no specific NPC is the one being acted against.
+- "active": A specific NPC rolls their skill as opposition instead of a flat difficulty. Use ONLY when the player's action is directed against a specific NPC listed in OTHER CHARACTERS IN SCENE AND that NPC would directly and deliberately resist (e.g., sneaking past a guard NPC → guard opposes with Notice, lying to a merchant NPC → merchant opposes with Empathy).
+
+CRITICAL: The opposing NPC must be the character the player is acting against, not just any NPC present. If the player is avoiding a hazard mentioned in the scene description (drones, traps, patrols) but that hazard is NOT listed in OTHER CHARACTERS IN SCENE, use PASSIVE opposition with an appropriate difficulty.
+
+For active opposition:
+- Set "opposing_npc_id" to the NPC's exact ID from OTHER CHARACTERS IN SCENE
+- Set "opposing_skill" to the NPC's most relevant opposing skill
+- Set "difficulty" to 0 (it will be replaced by the NPC's roll)
+For passive opposition: leave "opposing_npc_id" and "opposing_skill" as empty strings.
+Attack and Defend ALWAYS use "passive" (active defense is handled separately by the system).
+
 Your response must be valid JSON with no additional text:
 {
   "action_type": "One of: Overcome, Create an Advantage, Attack, Defend",
   "skill": "One of the 18 skills above",
   "description": "What they're trying to do",
   "target": "Exact character ID copied from OTHER CHARACTERS IN SCENE, or object name, or empty string",
-  "difficulty": Integer from DIFFICULTY RANGE (use 0 for Attack or Defend),
-  "reasoning": "Brief explanation including difficulty justification",
+  "opposition_type": "passive or active",
+  "difficulty": "Integer from DIFFICULTY RANGE (use 0 for Attack, Defend, or active opposition)",
+  "opposing_npc_id": "Exact NPC ID from OTHER CHARACTERS IN SCENE, or empty string",
+  "opposing_skill": "NPC skill name, or empty string",
+  "reasoning": "Brief explanation including difficulty or opposition justification",
   "confidence": 1-10
 }

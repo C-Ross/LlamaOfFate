@@ -378,3 +378,185 @@ func TestActionParser_TemplateErrorRegression(t *testing.T) {
 	_, err := parser.ParseAction(context.Background(), req)
 	require.NoError(t, err, "Template should handle OtherCharacters slice correctly")
 }
+
+func TestActionParser_ParseAction_ActiveOpposition(t *testing.T) {
+	// Setup mock LLM response with active opposition
+	mockResponse := `{
+		"action_type": "Overcome",
+		"skill": "Stealth",
+		"description": "Sneak past the guard",
+		"target": "",
+		"opposition_type": "active",
+		"difficulty": 0,
+		"opposing_npc_id": "guard-1",
+		"opposing_skill": "Notice",
+		"reasoning": "The guard is actively watching for intruders, so they provide active opposition with Notice",
+		"confidence": 9
+	}`
+
+	mockClient := &MockLLMClient{response: mockResponse}
+	parser := NewActionParser(mockClient)
+
+	char := character.NewCharacter("test-char", "Sneaky Rogue")
+	char.SetSkill("Stealth", dice.Good)
+
+	guard := character.NewCharacter("guard-1", "Stern Guard")
+	guard.SetSkill("Notice", dice.Fair)
+
+	req := ActionParseRequest{
+		Character:       char,
+		RawInput:        "I sneak past the guard",
+		Context:         "A stern guard watches the corridor",
+		OtherCharacters: []*character.Character{guard},
+	}
+
+	parsedAction, err := parser.ParseAction(context.Background(), req)
+
+	require.NoError(t, err)
+	assert.Equal(t, action.Overcome, parsedAction.Type)
+	assert.Equal(t, "Stealth", parsedAction.Skill)
+	assert.Equal(t, "guard-1", parsedAction.OpposingNPCID)
+	assert.Equal(t, "Notice", parsedAction.OpposingSkill)
+}
+
+func TestActionParser_ParseAction_PassiveOpposition(t *testing.T) {
+	// Setup mock LLM response with passive opposition (no NPC opposing)
+	mockResponse := `{
+		"action_type": "Overcome",
+		"skill": "Athletics",
+		"description": "Climb the wall",
+		"target": "",
+		"opposition_type": "passive",
+		"difficulty": 3,
+		"opposing_npc_id": "",
+		"opposing_skill": "",
+		"reasoning": "Environmental obstacle with no NPC actively opposing",
+		"confidence": 9
+	}`
+
+	mockClient := &MockLLMClient{response: mockResponse}
+	parser := NewActionParser(mockClient)
+
+	char := character.NewCharacter("test-char", "Test Hero")
+	char.SetSkill("Athletics", dice.Good)
+
+	req := ActionParseRequest{
+		Character: char,
+		RawInput:  "I climb the wall",
+		Context:   "A 20-foot stone wall blocks the path",
+	}
+
+	parsedAction, err := parser.ParseAction(context.Background(), req)
+
+	require.NoError(t, err)
+	assert.Equal(t, action.Overcome, parsedAction.Type)
+	assert.Equal(t, "Athletics", parsedAction.Skill)
+	assert.Equal(t, "", parsedAction.OpposingNPCID)
+	assert.Equal(t, "", parsedAction.OpposingSkill)
+	assert.Equal(t, dice.Good, parsedAction.Difficulty)
+}
+
+func TestActionParser_ParseAction_ActiveOpposition_MissingNPCID(t *testing.T) {
+	// LLM says "active" but provides no NPC ID — should fall back to passive
+	mockResponse := `{
+		"action_type": "Overcome",
+		"skill": "Deceive",
+		"description": "Lie to get past",
+		"target": "",
+		"opposition_type": "active",
+		"difficulty": 3,
+		"opposing_npc_id": "",
+		"opposing_skill": "Empathy",
+		"reasoning": "Active but no NPC identified",
+		"confidence": 5
+	}`
+
+	mockClient := &MockLLMClient{response: mockResponse}
+	parser := NewActionParser(mockClient)
+
+	char := character.NewCharacter("test-char", "Test Hero")
+	char.SetSkill("Deceive", dice.Fair)
+
+	req := ActionParseRequest{
+		Character: char,
+		RawInput:  "I lie to someone",
+		Context:   "In a tavern",
+	}
+
+	parsedAction, err := parser.ParseAction(context.Background(), req)
+
+	require.NoError(t, err)
+	assert.Equal(t, "", parsedAction.OpposingNPCID, "Should not set opposing NPC ID when empty")
+	assert.Equal(t, "", parsedAction.OpposingSkill, "Should not set opposing skill when NPC ID is empty")
+	assert.Equal(t, dice.Good, parsedAction.Difficulty, "Should use passive difficulty")
+}
+
+func TestActionParser_ParseAction_OldFormatBackCompat(t *testing.T) {
+	// LLM response without the new fields — backward compatible
+	mockResponse := `{
+		"action_type": "Overcome",
+		"skill": "Athletics",
+		"description": "Jump the gap",
+		"target": "",
+		"difficulty": 2,
+		"reasoning": "Simple obstacle",
+		"confidence": 8
+	}`
+
+	mockClient := &MockLLMClient{response: mockResponse}
+	parser := NewActionParser(mockClient)
+
+	char := character.NewCharacter("test-char", "Test Hero")
+	char.SetSkill("Athletics", dice.Good)
+
+	req := ActionParseRequest{
+		Character: char,
+		RawInput:  "I jump the gap",
+		Context:   "A small gap in the path",
+	}
+
+	parsedAction, err := parser.ParseAction(context.Background(), req)
+
+	require.NoError(t, err)
+	assert.Equal(t, action.Overcome, parsedAction.Type)
+	assert.Equal(t, "", parsedAction.OpposingNPCID, "Should be empty when not provided")
+	assert.Equal(t, "", parsedAction.OpposingSkill, "Should be empty when not provided")
+	assert.Equal(t, dice.Fair, parsedAction.Difficulty, "Should use provided difficulty")
+}
+
+func TestBuildPrompts_IncludesNPCSkills(t *testing.T) {
+	parser := NewActionParser(&MockLLMClient{})
+
+	char := character.NewCharacter("test-char", "Test Hero")
+	char.SetSkill("Stealth", dice.Good)
+
+	guard := character.NewCharacter("guard-1", "Stern Guard")
+	guard.Aspects.HighConcept = "Vigilant Watchman"
+	guard.SetSkill("Notice", dice.Fair)
+	guard.SetSkill("Fight", dice.Good)
+
+	req := ActionParseRequest{
+		Character:       char,
+		RawInput:        "I sneak past the guard",
+		Context:         "A guard patrols the hallway",
+		OtherCharacters: []*character.Character{guard},
+	}
+
+	userPrompt, err := parser.buildUserPrompt(req)
+	require.NoError(t, err)
+	assert.Contains(t, userPrompt, "Notice")
+	assert.Contains(t, userPrompt, "Fight")
+	assert.Contains(t, userPrompt, "Stern Guard")
+}
+
+func TestBuildPrompts_IncludesOppositionInstructions(t *testing.T) {
+	parser := NewActionParser(&MockLLMClient{})
+
+	systemPrompt, err := parser.buildSystemPrompt()
+	require.NoError(t, err)
+	assert.Contains(t, systemPrompt, "opposition_type")
+	assert.Contains(t, systemPrompt, "opposing_npc_id")
+	assert.Contains(t, systemPrompt, "opposing_skill")
+	assert.Contains(t, systemPrompt, "active")
+	assert.Contains(t, systemPrompt, "passive")
+}

@@ -194,6 +194,35 @@ func (ar *ActionResolver) resolveAction(ctx context.Context, parsedAction *actio
 		parsedAction.Difficulty = defenseResult.FinalValue
 	}
 
+	// For non-attack actions with active NPC opposition (Fate Core: active vs passive),
+	// roll the NPC's skill as opposition instead of using a flat difficulty.
+	var oppositionResult *dice.CheckResult
+	var opposingChar *character.Character
+	if parsedAction.Type != action.Attack && parsedAction.OpposingNPCID != "" {
+		opposingChar = ar.characters.ResolveCharacter(parsedAction.OpposingNPCID)
+		if opposingChar != nil {
+			oppositionLevel := opposingChar.GetSkill(parsedAction.OpposingSkill)
+			oppositionResult = ar.roller.RollWithModifier(dice.Mediocre, int(oppositionLevel))
+			parsedAction.Difficulty = oppositionResult.FinalValue
+			events = append(events, DefenseRollEvent{
+				DefenderName: opposingChar.Name,
+				Skill:        parsedAction.OpposingSkill,
+				Result:       oppositionResult.FinalValue.String(),
+				DiceFaces:    diceFacesToInts(oppositionResult.Roll.Dice),
+			})
+			slog.Debug("Active NPC opposition roll",
+				"component", componentSceneManager,
+				"npc", opposingChar.Name,
+				"skill", parsedAction.OpposingSkill,
+				"skill_level", int(oppositionLevel),
+				"roll_result", oppositionResult.FinalValue.String())
+		} else {
+			slog.Warn("Active opposition NPC not found, falling back to passive difficulty",
+				"component", componentSceneManager,
+				"npc_id", parsedAction.OpposingNPCID)
+		}
+	}
+
 	// Display initial result
 	var resultString string
 	var defenderName string
@@ -201,6 +230,11 @@ func (ar *ActionResolver) resolveAction(ctx context.Context, parsedAction *actio
 		defenderName = targetChar.Name
 		resultString = fmt.Sprintf("%s (Total: %s vs %s's Defense %s)",
 			result.String(), result.FinalValue.String(), targetChar.Name, defenseResult.FinalValue.String())
+	} else if oppositionResult != nil && opposingChar != nil {
+		defenderName = opposingChar.Name
+		resultString = fmt.Sprintf("%s (Total: %s vs %s's %s %s)",
+			result.String(), result.FinalValue.String(),
+			opposingChar.Name, parsedAction.OpposingSkill, oppositionResult.FinalValue.String())
 	} else {
 		resultString = fmt.Sprintf("%s (Total: %s vs Difficulty %s)",
 			result.String(), result.FinalValue.String(), parsedAction.Difficulty.String())
@@ -223,7 +257,7 @@ func (ar *ActionResolver) resolveAction(ctx context.Context, parsedAction *actio
 
 	// Log the dice roll
 	if ar.sessionLogger != nil {
-		ar.sessionLogger.Log("dice_roll", map[string]any{
+		logData := map[string]any{
 			"skill":       parsedAction.Skill,
 			"skill_level": int(skillLevel),
 			"bonus":       parsedAction.CalculateBonus(),
@@ -232,7 +266,12 @@ func (ar *ActionResolver) resolveAction(ctx context.Context, parsedAction *actio
 			"difficulty":  int(parsedAction.Difficulty),
 			"outcome":     initialOutcome.Type.String(),
 			"shifts":      initialOutcome.Shifts,
-		})
+		}
+		if opposingChar != nil {
+			logData["opposing_npc"] = opposingChar.Name
+			logData["opposing_skill"] = parsedAction.OpposingSkill
+		}
+		ar.sessionLogger.Log("dice_roll", logData)
 	}
 
 	// Build the continuation that runs after invokes complete.

@@ -21,6 +21,7 @@ OTHER CHARACTERS IN SCENE:
   {{- if $char.Aspects.Trouble}}, Trouble: {{$char.Aspects.Trouble}}{{end}}
   {{- $charAspects := $char.Aspects.GetAll}}
   {{- if $charAspects}}, Aspects: {{range $i, $aspect := $charAspects}}{{if $i}}, {{end}}{{$aspect}}{{end}}{{end}}
+  {{- if $char.Skills}}, Skills: {{range $skill, $level := $char.Skills}}{{$skill}} {{$level.String}}, {{end}}{{end}}
 {{- end}}
 {{- end}}
 {{- end}}

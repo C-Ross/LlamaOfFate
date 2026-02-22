@@ -328,6 +328,173 @@ func TestActionResolver_AspectGeneratorWiring_NoLLM(t *testing.T) {
 	assert.Nil(t, sm.actions.aspectGenerator, "ActionResolver should have nil aspectGenerator without LLM")
 }
 
+func TestActionResolver_ResolveAction_ActiveOpposition_Overcome(t *testing.T) {
+	// When an Overcome action has OpposingNPCID set, the resolver should roll
+	// the NPC's skill and use it as the difficulty instead of the static value.
+	engine, err := New()
+	require.NoError(t, err)
+
+	// Wire a mock narrative provider that won't fail
+	mockLLM := &MockLLMClient{
+		response: "The guard nearly spots you as you slip past.",
+	}
+	sm := NewSceneManager(engine, mockLLM, engine.actionParser)
+	sm.actions.roller = dice.NewSeededRoller(42) // Predictable rolls
+
+	player := character.NewCharacter("player1", "Sneaky Rogue")
+	player.SetSkill("Stealth", dice.Good)
+	engine.AddCharacter(player)
+
+	guard := character.NewCharacter("guard-1", "Stern Guard")
+	guard.SetSkill("Notice", dice.Fair) // +2
+	engine.AddCharacter(guard)
+
+	testScene := scene.NewScene("scene1", "Corridor", "A guarded corridor")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(guard.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	// Create an Overcome action with active NPC opposition
+	overcomeAction := action.NewAction("test-action-1", "player1", action.Overcome, "Stealth", "Sneak past the guard")
+	overcomeAction.OpposingNPCID = "guard-1"
+	overcomeAction.OpposingSkill = "Notice"
+	overcomeAction.Difficulty = dice.Mediocre // Will be overridden by NPC roll
+
+	events, _ := sm.actions.resolveAction(context.Background(), overcomeAction)
+
+	// Should have a DefenseRollEvent for the NPC opposition
+	defEvents := SliceOfType[DefenseRollEvent](events)
+	require.Len(t, defEvents, 1, "Should have exactly one DefenseRollEvent for NPC opposition")
+	assert.Equal(t, "Stern Guard", defEvents[0].DefenderName)
+	assert.Equal(t, "Notice", defEvents[0].Skill)
+
+	// Should have an ActionResultEvent with the NPC's name as defender
+	actionResults := SliceOfType[ActionResultEvent](events)
+	require.Len(t, actionResults, 1)
+	assert.Equal(t, "Stern Guard", actionResults[0].DefenderName)
+
+	// The difficulty should have been replaced by the NPC's roll, not the original static value
+	assert.NotEqual(t, int(dice.Mediocre), actionResults[0].Difficulty,
+		"Difficulty should be overridden by NPC's active opposition roll")
+}
+
+func TestActionResolver_ResolveAction_ActiveOpposition_CreateAdvantage(t *testing.T) {
+	// Create Advantage with active opposition should also roll the NPC's skill.
+	engine, err := New()
+	require.NoError(t, err)
+
+	mockLLM := &MockLLMClient{
+		response: "You study the merchant's body language.",
+	}
+	sm := NewSceneManager(engine, mockLLM, engine.actionParser)
+	sm.actions.roller = dice.NewSeededRoller(99)
+
+	player := character.NewCharacter("player1", "Observant Detective")
+	player.SetSkill("Empathy", dice.Good)
+	engine.AddCharacter(player)
+
+	merchant := character.NewCharacter("merchant-1", "Cagey Merchant")
+	merchant.SetSkill("Deceive", dice.Good) // +3
+	engine.AddCharacter(merchant)
+
+	testScene := scene.NewScene("scene1", "Market", "A bustling marketplace")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(merchant.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	caAction := action.NewAction("test-action-2", "player1", action.CreateAdvantage, "Empathy", "Read the merchant's tells")
+	caAction.OpposingNPCID = "merchant-1"
+	caAction.OpposingSkill = "Deceive"
+
+	events, _ := sm.actions.resolveAction(context.Background(), caAction)
+
+	defEvents := SliceOfType[DefenseRollEvent](events)
+	require.Len(t, defEvents, 1)
+	assert.Equal(t, "Cagey Merchant", defEvents[0].DefenderName)
+	assert.Equal(t, "Deceive", defEvents[0].Skill)
+}
+
+func TestActionResolver_ResolveAction_ActiveOpposition_NPCNotFound(t *testing.T) {
+	// If the opposing NPC ID can't be resolved, fall back to passive difficulty.
+	engine, err := New()
+	require.NoError(t, err)
+
+	mockLLM := &MockLLMClient{
+		response: "You attempt the action.",
+	}
+	sm := NewSceneManager(engine, mockLLM, engine.actionParser)
+	sm.actions.roller = dice.NewSeededRoller(42)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	player.SetSkill("Stealth", dice.Good)
+	engine.AddCharacter(player)
+
+	testScene := scene.NewScene("scene1", "Room", "A room")
+	testScene.AddCharacter(player.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	overcomeAction := action.NewAction("test-action-3", "player1", action.Overcome, "Stealth", "Sneak past")
+	overcomeAction.OpposingNPCID = "nonexistent-npc"
+	overcomeAction.OpposingSkill = "Notice"
+	overcomeAction.Difficulty = dice.Good // Should remain as passive fallback
+
+	events, _ := sm.actions.resolveAction(context.Background(), overcomeAction)
+
+	// Should NOT have a DefenseRollEvent since NPC wasn't found
+	defEvents := SliceOfType[DefenseRollEvent](events)
+	assert.Empty(t, defEvents, "Should have no DefenseRollEvent when NPC not found")
+
+	// ActionResultEvent should use the original passive difficulty
+	actionResults := SliceOfType[ActionResultEvent](events)
+	require.Len(t, actionResults, 1)
+	assert.Equal(t, int(dice.Good), actionResults[0].Difficulty)
+	assert.Empty(t, actionResults[0].DefenderName)
+}
+
+func TestActionResolver_ResolveAction_PassiveOpposition_NoNPCRoll(t *testing.T) {
+	// Standard passive opposition should NOT trigger any NPC roll.
+	engine, err := New()
+	require.NoError(t, err)
+
+	mockLLM := &MockLLMClient{
+		response: "You climb the wall.",
+	}
+	sm := NewSceneManager(engine, mockLLM, engine.actionParser)
+	sm.actions.roller = dice.NewSeededRoller(42)
+
+	player := character.NewCharacter("player1", "Test Hero")
+	player.SetSkill("Athletics", dice.Good)
+	engine.AddCharacter(player)
+
+	// NPC present but not opposing
+	guard := character.NewCharacter("guard-1", "Guard")
+	guard.SetSkill("Notice", dice.Fair)
+	engine.AddCharacter(guard)
+
+	testScene := scene.NewScene("scene1", "Wall", "A wall to climb")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(guard.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	overcomeAction := action.NewAction("test-action-4", "player1", action.Overcome, "Athletics", "Climb the wall")
+	// No OpposingNPCID — passive opposition
+	overcomeAction.Difficulty = dice.Good
+
+	events, _ := sm.actions.resolveAction(context.Background(), overcomeAction)
+
+	defEvents := SliceOfType[DefenseRollEvent](events)
+	assert.Empty(t, defEvents, "Passive opposition should not produce DefenseRollEvent")
+
+	actionResults := SliceOfType[ActionResultEvent](events)
+	require.Len(t, actionResults, 1)
+	assert.Equal(t, int(dice.Good), actionResults[0].Difficulty)
+	assert.Empty(t, actionResults[0].DefenderName)
+}
+
 func TestActionResolver_GenerateAspectName_Fallback(t *testing.T) {
 	// Without an aspect generator, generateAspectName should return a fallback.
 	engine, err := New()
