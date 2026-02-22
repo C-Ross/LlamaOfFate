@@ -109,6 +109,10 @@ Every skill roll is one of four action types. See [SRD: Four Actions](https://fa
 act := action.NewAction("act-1", "player-1", action.Attack, "Fight", "Slash at the orc")
 act := action.NewActionWithTarget("act-2", "player-1", action.Overcome, "Athletics", "Dodge the trap", "trap-1")
 
+// Active NPC opposition (outside conflict) — NPC rolls their skill instead of flat difficulty
+act.OpposingNPCID = "guard-1"
+act.OpposingSkill = "Fight"
+
 // Add aspect invocations before rolling
 act.AddAspectInvoke(action.AspectInvoke{
     AspectText:    "Infamous Girl with Sword",
@@ -246,6 +250,8 @@ Conflicts are structured exchanges where characters try to harm each other. See 
 
 **Types:** Physical (fists, weapons) or Mental (intimidation, psychic). Code: `scene.PhysicalConflict`, `scene.MentalConflict`.
 
+**Scene Types:** Fate Core defines mutually exclusive structured mechanics (conflict, challenge, contest). Check active type with `scene.ActiveSceneType()` which returns `SceneTypeConflict`, `SceneTypeChallenge`, `SceneTypeContest`, or `SceneTypeNone`.
+
 ### Conflict flow
 
 1. **Set the scene** — situation aspects, zones, participants
@@ -257,10 +263,10 @@ Conflicts are structured exchanges where characters try to harm each other. See 
 
 ```go
 scene.StartConflictWithInitiator(scene.PhysicalConflict, participants, "npc-1")
-actor := scene.GetCurrentActor()  // Current turn's character ID
-scene.NextTurn()                  // Advance to next participant
-scene.CountActiveParticipants()   // Excludes taken-out/conceded
-scene.EndConflict()               // Clears conflict state
+actor := scene.ConflictState.GetCurrentActor()  // Current turn's character ID
+scene.ConflictState.NextTurn()                  // Advance to next participant
+scene.ConflictState.CountActiveParticipants()   // Excludes taken-out/conceded
+scene.EndConflict()                             // Clears conflict state
 ```
 
 ### Taken Out
@@ -269,7 +275,7 @@ If you can't absorb all shifts from a hit (no stress boxes or consequences left)
 
 ```go
 scene.MarkCharacterTakenOut("npc-1")
-scene.SetParticipantStatus("npc-1", scene.StatusTakenOut)
+scene.ConflictState.SetParticipantStatus("npc-1", scene.StatusTakenOut)
 ```
 
 ### Concession
@@ -278,7 +284,7 @@ A character can concede **before** a roll to preserve some narrative control. Th
 
 ```go
 fatePoints := ConcessionFatePoints(consequenceCount)  // 1 + consequenceCount
-scene.SetParticipantStatus("player-1", scene.StatusConceded)
+scene.ConflictState.SetParticipantStatus("player-1", scene.StatusConceded)
 ```
 
 ### Full Defense
@@ -286,8 +292,8 @@ scene.SetParticipantStatus("player-1", scene.StatusConceded)
 Forfeit your action to gain +2 to all defense rolls for the exchange.
 
 ```go
-scene.SetFullDefense("player-1")
-isDefending := scene.IsFullDefense("player-1")
+scene.ConflictState.SetFullDefense("player-1")
+isDefending := scene.ConflictState.IsFullDefense("player-1")
 ```
 
 ## Character Types

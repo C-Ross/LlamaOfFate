@@ -137,9 +137,10 @@ End: all opponents taken out | player concedes | [CONFLICT_END:] marker | player
 ### Action resolution (`resolveAction`)
 
 1. Attack without conflict → auto-initiate; type mismatch → escalate
-2. Roll 4dF + skill; for attacks: roll target defense (+2 if full defense)
-3. `handlePostRollInvokes()` → invoke prompt loop
-4. `applyActionEffects()`:
+2. Roll 4dF + skill; for attacks: roll target defense (+2 if full defense via `scene.ConflictState.IsFullDefense()`)
+3. For Overcome/CreateAdvantage with active NPC opposition: roll NPC's `OpposingSkill` as opposition
+4. `handlePostRollInvokes()` → invoke prompt loop
+5. `applyActionEffects()`:
    - **Attack success** → `applyDamageToTarget()` → stress → consequences → taken out
    - **Create Advantage** → `AspectGenerator` → situation aspect (tie=boost, success=1 free invoke, style=2)
    - **Overcome/Defend** → narrative only
