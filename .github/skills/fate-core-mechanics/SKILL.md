@@ -190,14 +190,21 @@ level := char.GetSkill("Fight")         // dice.Good; returns dice.Mediocre if u
 Stress represents ephemeral harm absorbed during conflict. Clears after the scene. See [SRD: Stress](https://fate-srd.com/fate-core/resolving-attacks#stress).
 
 **Rules:**
-- Two tracks: physical and mental (2 boxes each by default)
+- Two tracks: physical and mental
 - On a hit, check off a stress box **with value equal to or greater than** the shift value
 - Each box can only be checked once; only **one box per hit**
-- Physique adds physical boxes; Will adds mental boxes (Average/Fair → +1 box, Good+ → +2 boxes)
+- Track sizes scale with skills (per SRD):
+  - **Physique** scales physical stress: Mediocre/no skill → 2 boxes, Average/Fair → 3 boxes, Good+ → 4 boxes
+  - **Will** scales mental stress: same progression
+- Tracks automatically recalculate when Physique or Will changes
 
 **Code:** `internal/core/character/character.go` — `character.StressTrack`.
 
 ```go
+char.SetSkill("Physique", dice.Good)  // Physical stress → 4 boxes
+char.SetSkill("Will", dice.Fair)      // Mental stress → 3 boxes
+char.RecalculateStressTracks()        // Explicit recalc (auto-called by SetSkill)
+
 track := char.GetStressTrack(character.PhysicalStress)
 absorbed := char.TakeStress(character.PhysicalStress, 3)  // Try to check off box 3+
 char.ClearAllStress()  // After conflict ends
@@ -222,6 +229,7 @@ Consequences are lasting injuries/trauma that absorb hits but create negative as
 
 **Rules:**
 - One slot per severity level (mild, moderate, severe) — shared across physical and mental
+- **Extra mild slots** at Superb+ (per SRD): Superb Physique → +1 physical mild, Superb Will → +1 mental mild
 - Can combine stress + consequences to absorb a single hit
 - The attacker gets a **free invoke** on your consequence aspect
 - Recovery requires an overcome roll: Mild → Fair(+2), Moderate → Great(+4), Severe → Fantastic(+6)

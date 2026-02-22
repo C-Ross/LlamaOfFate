@@ -15,9 +15,10 @@ syncdriver.Run()     ← blocking terminal loop (wraps async engine API)
   └─ GameManager (GameSessionManager interface) ← async API: Start/HandleInput/Provide*Response
        └─ ScenarioManager ← multi-scene loop, scene generation, summaries, NPC registry, recovery
             └─ SceneManager ← single-scene loop, input classification, dialog/action, conflict turns
+                 ├─ ActionResolver  ← generic action resolution: dice, invokes, mid-flow, narrative
+                 ├─ ConflictManager ← conflict lifecycle, NPC turns, damage, taken-out, concession
                  ├─ ActionParser    ← LLM: free-text → structured action
-                 ├─ AspectGenerator ← LLM: Create Advantage → aspect name
-                 └─ invoke.go       ← post-roll aspect invocation loop
+                 └─ AspectGenerator ← LLM: Create Advantage → aspect name
 ```
 
 **syncdriver** wraps the async engine for blocking UIs. Engine itself is purely event-driven. Each layer creates/configures the layer below. **Do not skip layers.**
@@ -120,42 +121,70 @@ HandleInput(input)
 
 ### Action flow
 
-`handleAction()`: `ActionParser.ParseAction()` → `resolveAction()` (auto-initiates conflict for attacks) → `applyActionEffects()` → `generateActionNarrative()`.
+`handleAction()`: `ActionParser.ParseAction()` → `ActionResolver.resolveAction()` (auto-initiates conflict for attacks) → `applyActionEffects()` → `generateActionNarrative()`.
 
-## Conflict System (`conflict.go`)
+## ActionResolver (`action_resolver.go`)
 
-Methods on `SceneManager`. Triggered by `[CONFLICT_START:]` markers or player Attack actions.
+Generic action resolution pipeline used by both SceneManager (player actions) and ConflictManager (NPC defense invokes).
 
-### Lifecycle
+**Responsibilities:**
+- Dice rolling: `resolveAction()` → 4dF + skill vs difficulty/target defense
+- Invoke loops: `handlePostRollInvokes()` → `beginInvokeLoop()` → emits `InvokePromptEvent`
+- Mid-flow prompts: targeting, recovery choices, etc.
+- Narrative coordination: `GenerateActionNarrative()` via `NarrativeProvider` interface
+- Effect application: `applyActionEffects()` → create-advantage aspects, attack damage delegation
 
+**Key methods:**
+- `resolveAction(ctx, a)` — rolls dice, handles defense, invoke loop, applies effects
+- `finishResolveAction(ctx, a)` — generates narrative after effects applied
+- `rollTargetDefense(target, defSkill, bonus)` — defender's dice roll
+- `gatherInvokableAspects(...)` — character, situation (free invokes), consequence aspects
+- `beginInvokeLoop(...)` → emits `InvokePromptEvent`, sets `pendingInvoke`
+- `handleMidFlowRequest(...)` → emits `InputRequestEvent`, sets `pendingMidFlow`
+
+**NarrativeProvider interface:** SceneManager implements this to provide conversation context and LLM prompt rendering for action narrative generation.
+
+## ConflictManager (`conflict_manager.go`, `conflict.go`)
+
+Conflict-specific logic: lifecycle, NPC turns, damage resolution, taken-out/concession handling. Delegates generic action resolution to ActionResolver.
+
+**Lifecycle:**
 ```
 initiateConflict(type, initiator) → build participants, calculate initiative
   → player acts → advanceConflictTurns() → NPC turns via processNPCTurn() → back to player
 End: all opponents taken out | player concedes | [CONFLICT_END:] marker | player taken out
 ```
 
-### Action resolution (`resolveAction`)
+**Key methods:**
+- `initiateConflict(conflictType, initiator)` — builds participants, calculates initiative
+- `advanceConflictTurns()` → processes NPC turns sequentially
+- `processNPCTurn(npcID)` → LLM decision → `processNPC<Type>()`
+- `applyDamageToTarget(target, shifts, stressType)` → stress → consequences → taken-out
+- `handleConcession()` → awards fate points, generates narrative, ends conflict
+- `handleConflictEscalation(newType)` — changes conflict type, recalculates initiative
+
+### Action resolution (`ActionResolver.resolveAction`)
 
 1. Attack without conflict → auto-initiate; type mismatch → escalate
 2. Roll 4dF + skill; for attacks: roll target defense (+2 if full defense)
 3. `handlePostRollInvokes()` → invoke prompt loop
 4. `applyActionEffects()`:
-   - **Attack success** → `applyDamageToTarget()` → stress → consequences → taken out
+   - **Attack success** → `ConflictManager.applyDamageToTarget()` → stress → consequences → taken out
    - **Create Advantage** → `AspectGenerator` → situation aspect (tie=boost, success=1 free invoke, style=2)
    - **Overcome/Defend** → narrative only
 
 ### Invocation (`invoke.go`)
 
-All invoke logic in `invoke.go` (called from `conflict.go` and `npc.go`):
-1. `gatherInvokableAspects()` → character, situation (with free invokes), consequence aspects
-2. `beginInvokeLoop()` → emits `InvokePromptEvent`, sets `sm.pendingInvoke`
+All invoke logic in `invoke.go` (called from `action_resolver.go` and `npc.go`):
+1. `ActionResolver.gatherInvokableAspects()` → character, situation (with free invokes), consequence aspects
+2. `ActionResolver.beginInvokeLoop()` → emits `InvokePromptEvent`, sets `pendingInvoke`
 3. Blocking UIs: `syncdriver` calls `ui.PromptForInvoke()`, then `gm.ProvideInvokeResponse()`
 4. Apply +2 or reroll; spend fate point or free invoke; loop until declined
 5. NPC defense invokes: `resumeTurns` flag triggers `maybeResumeConflictTurns`
 
 ### Damage
 
-`applyDamageToTarget(target, shifts, stressType)`: try `TakeStress()` → `fillTargetStressOverflow()` (consequence slots) → `applyTargetTakenOut()`. Player taken-out uses LLM to classify outcome (continue/transition/game over).
+`ConflictManager.applyDamageToTarget(target, shifts, stressType)`: try `TakeStress()` → `fillTargetStressOverflow()` (consequence slots) → `applyTargetTakenOut()`. Player taken-out uses LLM to classify outcome (continue/transition/game over).
 
 ### Concession
 
@@ -163,7 +192,7 @@ All invoke logic in `invoke.go` (called from `conflict.go` and `npc.go`):
 
 ### Escalation
 
-`handleConflictEscalation(newType)` — changes conflict type, recalculates initiative.
+`ConflictManager.handleConflictEscalation(newType)` — changes conflict type, recalculates initiative.
 
 ## NPC Turns (`npc.go`)
 
@@ -203,8 +232,8 @@ Data types shared between engine and UI:
 | Meta-command | `internal/ui/terminal/terminal.go` `handleSpecialCommands()` |
 | Blocking loop behavior | `internal/syncdriver/syncdriver.go` `Run()`, `driveBlockingPrompts()` |
 | Input classification type | `scene_manager.go` constants + `HandleInput()` switch |
-| Action outcome effect | `conflict.go` `applyActionEffects()` |
-| Conflict mechanic | `conflict.go` (method on `*SceneManager`) |
+| Action resolution mechanics | `action_resolver.go` `resolveAction()`, `applyActionEffects()` |
+| Conflict lifecycle | `conflict_manager.go`, `conflict.go` (methods on `*ConflictManager`) |
 | LLM prompt/response | `internal/prompt/` (template + data struct + parser) |
 | NPC action type | `npc.go` (`processNPC<Type>()` + switch) |
 | Scene generation | `scenario_manager.go` `generateNextScene()` |
