@@ -489,3 +489,66 @@ func TestProcessNPCAttack_NonPlayerTarget_Tie_CreatesBoost(t *testing.T) {
 	assert.True(t, sm.currentScene.SituationAspects[0].IsBoost)
 	assert.Equal(t, npc.ID, sm.currentScene.SituationAspects[0].CreatedBy, "attacker NPC gets the boost")
 }
+
+// Fate Core SRD (Defend): When the defender succeeds with style (attacker fails
+// by ≥3 shifts), the defender gets a boost.
+func TestProcessNPCAttack_NonPlayerTarget_DefendWithStyle_GrantsTargetBoost(t *testing.T) {
+	eng, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(eng, eng.llmClient, eng.actionParser)
+
+	player := character.NewCharacter("player-1", "Hero")
+	npc := character.NewCharacter("npc-1", "Goblin Scout")
+	npc.SetSkill("Fight", 2)
+	target := character.NewCharacter("npc-target", "Orc Warrior")
+	target.SetSkill("Athletics", dice.Fair)
+
+	eng.AddCharacter(player)
+	eng.AddCharacter(npc)
+	eng.AddCharacter(target)
+
+	testScene := scene.NewScene("test-scene", "Forest Clearing", "A dim clearing.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(npc.ID)
+	testScene.AddCharacter(target.ID)
+	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
+	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
+
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, npc.ID)
+	require.NoError(t, err)
+
+	decision := &prompt.NPCActionDecision{
+		ActionType: "ATTACK",
+		Skill:      "Fight",
+		TargetID:   target.ID,
+	}
+
+	// NPC Fight +2 roll -4 → Terrible(-2). Target Athletics +2 roll 0 → Fair(+2).
+	// Outcome: -2 vs +2 = -4 shifts (≤ -3) → Failure, defender succeeded with style.
+	sm.actions.roller = dice.NewPlannedRoller([]int{-4, 0})
+
+	events, _ := sm.conflict.processNPCAttack(context.Background(), npc, decision)
+
+	var boostEvt AspectCreatedEvent
+	var found bool
+	for _, e := range events {
+		if b, ok := e.(AspectCreatedEvent); ok {
+			boostEvt = b
+			found = true
+			break
+		}
+	}
+
+	require.True(t, found, "expected AspectCreatedEvent when target defends with style")
+	assert.True(t, boostEvt.IsBoost)
+	assert.Equal(t, 1, boostEvt.FreeInvokes)
+
+	require.Len(t, sm.currentScene.SituationAspects, 1)
+	assert.True(t, sm.currentScene.SituationAspects[0].IsBoost)
+	assert.Equal(t, target.ID, sm.currentScene.SituationAspects[0].CreatedBy, "defending target gets the boost")
+}

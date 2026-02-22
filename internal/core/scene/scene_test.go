@@ -469,3 +469,22 @@ func TestScene_MarkCharacterTakenOut_NilMap(t *testing.T) {
 	s.MarkCharacterTakenOut("char-1")
 	assert.True(t, s.IsCharacterTakenOut("char-1"))
 }
+
+func TestIsExpiredBoost_TrueWhenBoostWithZeroInvokes(t *testing.T) {
+	boost := NewBoost("b-1", "Fleeting Opening", "char-1")
+	assert.False(t, boost.IsExpiredBoost(), "fresh boost still has 1 free invoke")
+
+	boost.UseFreeInvoke()
+	assert.True(t, boost.IsExpiredBoost(), "boost with 0 free invokes should be expired")
+}
+
+func TestIsExpiredBoost_FalseForNonBoostAspect(t *testing.T) {
+	sa := NewSituationAspect("sa-1", "On Fire", "char-1", 1)
+	sa.UseFreeInvoke()
+	assert.False(t, sa.IsExpiredBoost(), "regular aspect with 0 invokes is not an expired boost")
+}
+
+func TestIsExpiredBoost_FalseWhenInvokesRemain(t *testing.T) {
+	boost := NewBoost("b-2", "Momentary Edge", "char-1")
+	assert.False(t, boost.IsExpiredBoost(), "boost with remaining invokes is not expired")
+}

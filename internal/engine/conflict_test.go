@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
+	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -1326,6 +1328,60 @@ func TestSceneManager_ApplyActionEffects_Overcome_SWS_CreatesBoost(t *testing.T)
 	require.Len(t, sm.currentScene.SituationAspects, 1)
 	assert.True(t, sm.currentScene.SituationAspects[0].IsBoost)
 	assert.Equal(t, player.ID, sm.currentScene.SituationAspects[0].CreatedBy)
+}
+
+// errorAspectGenerator is a mock AspectGenerator that always returns an error,
+// exercising the fallback path inside generateBoostName.
+type errorAspectGenerator struct{}
+
+func (e *errorAspectGenerator) GenerateAspect(_ context.Context, _ prompt.AspectGenerationRequest) (*AspectGenerationResponse, error) {
+	return nil, errors.New("LLM unavailable")
+}
+
+// emptyAspectGenerator returns a response with an empty AspectText, exercising
+// the empty-string fallback branch.
+type emptyAspectGenerator struct{}
+
+func (e *emptyAspectGenerator) GenerateAspect(_ context.Context, _ prompt.AspectGenerationRequest) (*AspectGenerationResponse, error) {
+	return &AspectGenerationResponse{AspectText: ""}, nil
+}
+
+func TestGenerateBoostName_FallbackOnError(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm.actions.aspectGenerator = &errorAspectGenerator{}
+
+	player := character.NewCharacter("player-1", "Hero")
+	engine.AddCharacter(player)
+
+	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
+	testScene.AddCharacter(player.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	name := sm.actions.generateBoostName(context.Background(), player, "Fight", "strike hard", "Fleeting Opening")
+	assert.Equal(t, "Fleeting Opening", name, "should return fallback when LLM errors")
+}
+
+func TestGenerateBoostName_FallbackOnEmptyResponse(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm.actions.aspectGenerator = &emptyAspectGenerator{}
+
+	player := character.NewCharacter("player-1", "Hero")
+	engine.AddCharacter(player)
+
+	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
+	testScene.AddCharacter(player.ID)
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+
+	name := sm.actions.generateBoostName(context.Background(), player, "Athletics", "vault", "Strong Momentum")
+	assert.Equal(t, "Strong Momentum", name, "should return fallback when LLM returns empty aspect text")
 }
 
 func TestSceneManager_ResolveAction_TargetByName(t *testing.T) {
