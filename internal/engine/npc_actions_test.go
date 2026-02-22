@@ -151,8 +151,8 @@ func TestProcessNPCCreateAdvantage_SuccessWithStyle(t *testing.T) {
 	assert.Equal(t, 2, sm.currentScene.SituationAspects[0].FreeInvokes)
 }
 
-// Fate Core SRD: Tie on Create Advantage — you get a boost (temporary aspect)
-// but no full situation aspect.
+// Fate Core SRD: Tie on Create Advantage — you get a boost (temporary aspect with
+// one free invoke) instead of a full situation aspect.
 func TestProcessNPCCreateAdvantage_Tie(t *testing.T) {
 	sm, _, npc := setupNPCConflictSM(t)
 
@@ -166,16 +166,25 @@ func TestProcessNPCCreateAdvantage_Tie(t *testing.T) {
 
 	events := sm.conflict.processNPCCreateAdvantage(context.Background(), npc, decision)
 
-	require.Len(t, events, 2)
+	// Tie produces 3 events: NPCActionResultEvent + AspectCreatedEvent (boost) + NarrativeEvent.
+	require.Len(t, events, 3)
 	actionEvt := events[0].(NPCActionResultEvent)
 	assert.Equal(t, "Tie", actionEvt.Outcome)
-	assert.Empty(t, actionEvt.AspectCreated, "Tie should not create a situation aspect")
-	assert.Equal(t, 0, actionEvt.FreeInvokes)
+	assert.NotEmpty(t, actionEvt.AspectCreated, "Tie should create a boost")
+	assert.Equal(t, 1, actionEvt.FreeInvokes, "Boost grants 1 free invoke")
 
-	// No situation aspect added.
-	assert.Empty(t, sm.currentScene.SituationAspects)
+	// A boost (IsBoost=true) should be added to the scene.
+	require.Len(t, sm.currentScene.SituationAspects, 1)
+	boost := sm.currentScene.SituationAspects[0]
+	assert.True(t, boost.IsBoost, "aspect should be flagged as a boost")
+	assert.Equal(t, 1, boost.FreeInvokes)
 
-	narrEvt := events[1].(NarrativeEvent)
+	boostEvt, ok := events[1].(AspectCreatedEvent)
+	require.True(t, ok, "expected AspectCreatedEvent, got %T", events[1])
+	assert.True(t, boostEvt.IsBoost)
+	assert.Equal(t, 1, boostEvt.FreeInvokes)
+
+	narrEvt := events[2].(NarrativeEvent)
 	assert.Contains(t, narrEvt.Text, npc.Name)
 }
 
@@ -384,4 +393,162 @@ func TestProcessNPCTurn_FallbackToAttack(t *testing.T) {
 	assert.True(t, hasAnnounce, "expected TurnAnnouncementEvent")
 	// We don't assert the full attack chain here — that's covered by separate
 	// attack tests. Just verifying the dispatch falls through to attack.
+}
+
+// --- Boost creation paths (Fate Core SRD) ---
+
+// Fate Core SRD (Overcome, SWS): NPC overcome with SWS grants the NPC a boost.
+func TestProcessNPCOvercome_SuccessWithStyle_CreatesBoost(t *testing.T) {
+	sm, _, npc := setupNPCConflictSM(t)
+
+	// Dice total 3 → final Superb(+5), shifts=3 → SWS.
+	sm.actions.roller = dice.NewPlannedRoller([]int{3})
+
+	decision := &prompt.NPCActionDecision{
+		ActionType: "OVERCOME",
+		Skill:      "Athletics",
+	}
+
+	events := sm.conflict.processNPCOvercome(context.Background(), npc, decision)
+
+	// SWS produces 3 events: NPCActionResultEvent + NarrativeEvent + AspectCreatedEvent.
+	require.Len(t, events, 3)
+	actionEvt := events[0].(NPCActionResultEvent)
+	assert.Equal(t, "Success with Style", actionEvt.Outcome)
+
+	narrEvt := events[1].(NarrativeEvent)
+	assert.Contains(t, narrEvt.Text, npc.Name)
+
+	boostEvt, ok := events[2].(AspectCreatedEvent)
+	require.True(t, ok, "expected AspectCreatedEvent for NPC overcome SWS boost, got %T", events[2])
+	assert.True(t, boostEvt.IsBoost)
+	assert.Equal(t, 1, boostEvt.FreeInvokes)
+
+	require.Len(t, sm.currentScene.SituationAspects, 1)
+	assert.True(t, sm.currentScene.SituationAspects[0].IsBoost)
+	assert.Equal(t, npc.ID, sm.currentScene.SituationAspects[0].CreatedBy)
+}
+
+// Fate Core SRD (Attack, Tie): NPC attack on non-player target ties — attacker gets boost.
+func TestProcessNPCAttack_NonPlayerTarget_Tie_CreatesBoost(t *testing.T) {
+	eng, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(eng, eng.llmClient, eng.actionParser)
+
+	player := character.NewCharacter("player-1", "Hero")
+	npc := character.NewCharacter("npc-1", "Goblin Scout")
+	npc.SetSkill("Fight", 2)
+	target := character.NewCharacter("npc-target", "Orc Warrior")
+	target.SetSkill("Athletics", dice.Fair)
+
+	eng.AddCharacter(player)
+	eng.AddCharacter(npc)
+	eng.AddCharacter(target)
+
+	testScene := scene.NewScene("test-scene", "Forest Clearing", "A dim clearing.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(npc.ID)
+	testScene.AddCharacter(target.ID)
+	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
+	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
+
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, npc.ID)
+	require.NoError(t, err)
+
+	decision := &prompt.NPCActionDecision{
+		ActionType: "ATTACK",
+		Skill:      "Fight",
+		TargetID:   target.ID,
+	}
+
+	// NPC Fight +2 roll 0 → Fair(+2). Target Athletics +2 roll 0 → Fair(+2). Tie (shifts=0).
+	sm.actions.roller = dice.NewPlannedRoller([]int{0, 0})
+
+	events, _ := sm.conflict.processNPCAttack(context.Background(), npc, decision)
+
+	var boostEvt AspectCreatedEvent
+	var found bool
+	for _, e := range events {
+		if b, ok := e.(AspectCreatedEvent); ok {
+			boostEvt = b
+			found = true
+			break
+		}
+	}
+
+	require.True(t, found, "expected AspectCreatedEvent for NPC attack tie on non-player target")
+	assert.True(t, boostEvt.IsBoost)
+	assert.Equal(t, 1, boostEvt.FreeInvokes)
+
+	require.Len(t, sm.currentScene.SituationAspects, 1)
+	assert.True(t, sm.currentScene.SituationAspects[0].IsBoost)
+	assert.Equal(t, npc.ID, sm.currentScene.SituationAspects[0].CreatedBy, "attacker NPC gets the boost")
+}
+
+// Fate Core SRD (Defend): When the defender succeeds with style (attacker fails
+// by ≥3 shifts), the defender gets a boost.
+func TestProcessNPCAttack_NonPlayerTarget_DefendWithStyle_GrantsTargetBoost(t *testing.T) {
+	eng, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(eng, eng.llmClient, eng.actionParser)
+
+	player := character.NewCharacter("player-1", "Hero")
+	npc := character.NewCharacter("npc-1", "Goblin Scout")
+	npc.SetSkill("Fight", 2)
+	target := character.NewCharacter("npc-target", "Orc Warrior")
+	target.SetSkill("Athletics", dice.Fair)
+
+	eng.AddCharacter(player)
+	eng.AddCharacter(npc)
+	eng.AddCharacter(target)
+
+	testScene := scene.NewScene("test-scene", "Forest Clearing", "A dim clearing.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(npc.ID)
+	testScene.AddCharacter(target.ID)
+	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
+	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
+
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, npc.ID)
+	require.NoError(t, err)
+
+	decision := &prompt.NPCActionDecision{
+		ActionType: "ATTACK",
+		Skill:      "Fight",
+		TargetID:   target.ID,
+	}
+
+	// NPC Fight +2 roll -4 → Terrible(-2). Target Athletics +2 roll 0 → Fair(+2).
+	// Outcome: -2 vs +2 = -4 shifts (≤ -3) → Failure, defender succeeded with style.
+	sm.actions.roller = dice.NewPlannedRoller([]int{-4, 0})
+
+	events, _ := sm.conflict.processNPCAttack(context.Background(), npc, decision)
+
+	var boostEvt AspectCreatedEvent
+	var found bool
+	for _, e := range events {
+		if b, ok := e.(AspectCreatedEvent); ok {
+			boostEvt = b
+			found = true
+			break
+		}
+	}
+
+	require.True(t, found, "expected AspectCreatedEvent when target defends with style")
+	assert.True(t, boostEvt.IsBoost)
+	assert.Equal(t, 1, boostEvt.FreeInvokes)
+
+	require.Len(t, sm.currentScene.SituationAspects, 1)
+	assert.True(t, sm.currentScene.SituationAspects[0].IsBoost)
+	assert.Equal(t, target.ID, sm.currentScene.SituationAspects[0].CreatedBy, "defending target gets the boost")
 }

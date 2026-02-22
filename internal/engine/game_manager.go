@@ -379,6 +379,7 @@ func (g *GameManager) buildStateSnapshot() GameStateSnapshotEvent {
 			snap.SituationAspects = append(snap.SituationAspects, SituationAspectSnapshot{
 				Name:        sa.Aspect,
 				FreeInvokes: sa.FreeInvokes,
+				IsBoost:     sa.IsBoost,
 			})
 		}
 

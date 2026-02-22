@@ -8,6 +8,7 @@ import type {
   StressTrackSnapshot,
   ConsequenceSnapshotEntry,
   AspectCreatedEventData,
+  BoostExpiredEventData,
   PlayerStressEventData,
   PlayerConsequenceEventData,
   ConflictStartEventData,
@@ -106,8 +107,17 @@ export function deriveState(events: GameEvent[]): GameState {
           ...state,
           situationAspects: [
             ...state.situationAspects,
-            { name: d.AspectName, freeInvokes: d.FreeInvokes },
+            { name: d.AspectName, freeInvokes: d.FreeInvokes, isBoost: d.IsBoost ?? false },
           ],
+        }
+        break
+      }
+
+      case "boost_expired": {
+        const d = evt.data as BoostExpiredEventData
+        state = {
+          ...state,
+          situationAspects: state.situationAspects.filter((a) => a.name !== d.AspectName),
         }
         break
       }

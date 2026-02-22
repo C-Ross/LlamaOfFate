@@ -47,7 +47,7 @@ export function GameSidebar({ state, className }: GameSidebarProps) {
               <AspectBadge
                 key={`${a.name}-${i}`}
                 name={a.name}
-                kind="situation"
+                kind={a.isBoost ? "boost" : "situation"}
                 freeInvokes={a.freeInvokes}
               />
             ))}

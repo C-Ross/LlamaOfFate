@@ -36,6 +36,7 @@ type ConsequenceDetail = uicontract.ConsequenceDetail
 type DamageResolutionEvent = uicontract.DamageResolutionEvent
 type PlayerAttackResultEvent = uicontract.PlayerAttackResultEvent
 type AspectCreatedEvent = uicontract.AspectCreatedEvent
+type BoostExpiredEvent = uicontract.BoostExpiredEvent
 type NPCAttackEvent = uicontract.NPCAttackEvent
 type PlayerStressEvent = uicontract.PlayerStressEvent
 type PlayerDefendedEvent = uicontract.PlayerDefendedEvent

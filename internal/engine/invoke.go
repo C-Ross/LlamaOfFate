@@ -236,11 +236,21 @@ func (ar *ActionResolver) applyInvokeChoice(is *invokeState, selected *Invokable
 	var events []GameEvent
 
 	if useFree {
+		var expiredBoostName string
 		for i := range ar.currentScene.SituationAspects {
 			if ar.currentScene.SituationAspects[i].Aspect == selected.Name {
 				ar.currentScene.SituationAspects[i].UseFreeInvoke()
+				// Boosts are removed from the scene once their free invoke is consumed (Fate Core SRD).
+				if ar.currentScene.SituationAspects[i].IsExpiredBoost() {
+					expiredBoostName = ar.currentScene.SituationAspects[i].Aspect
+					boostID := ar.currentScene.SituationAspects[i].ID
+					ar.currentScene.RemoveSituationAspect(boostID)
+				}
 				break
 			}
+		}
+		if expiredBoostName != "" {
+			events = append(events, BoostExpiredEvent{AspectName: expiredBoostName})
 		}
 	} else {
 		if !ar.player.SpendFatePoint() {

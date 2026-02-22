@@ -406,6 +406,10 @@ func (ar *ActionResolver) applyActionEffects(ctx context.Context, parsedAction *
 				AspectName:  aspectName,
 				FreeInvokes: freeInvokes,
 			})
+		} else if parsedAction.Outcome.Type == dice.Tie {
+			// On a tie, player gets a boost instead of a full aspect (Fate Core SRD).
+			aspectName, _ := ar.generateAspectName(ctx, parsedAction)
+			events = append(events, ar.createBoost(aspectName, ar.player.ID))
 		}
 
 	case action.Attack:
@@ -439,15 +443,83 @@ func (ar *ActionResolver) applyActionEffects(ctx context.Context, parsedAction *
 			dmgEvent := ar.conflict.applyDamageToTarget(ctx, target, shifts, stressType)
 			events = append(events, dmgEvent)
 		} else if parsedAction.Outcome.Type == dice.Tie {
-			// On a tie, attacker gets a boost
+			// On a tie, attacker gets a boost (no damage dealt) — Fate Core SRD Attack.
 			events = append(events, PlayerAttackResultEvent{
 				TargetName: target.Name,
 				IsTie:      true,
 			})
+			boostName := ar.generateBoostName(ctx, ar.player, parsedAction.Skill, parsedAction.Description, "Fleeting Opening")
+			events = append(events, ar.createBoost(boostName, ar.player.ID))
+		} else if parsedAction.Outcome.Type == dice.Failure && parsedAction.Outcome.Shifts <= -3 {
+			// Target defended with style — defender gets a boost (Fate Core SRD Defend).
+			defDesc := fmt.Sprintf("defending against %s's attack", ar.player.Name)
+			defSkill := core.DefenseSkillForAttack(parsedAction.Skill)
+			boostName := ar.generateBoostName(ctx, target, defSkill, defDesc, "Deflected with Ease")
+			events = append(events, ar.createBoost(boostName, target.ID))
+		}
+
+	case action.Overcome:
+		if parsedAction.IsSuccessWithStyle() {
+			// Overcome SWS grants a boost in addition to achieving the goal (Fate Core SRD).
+			boostName := ar.generateBoostName(ctx, ar.player, parsedAction.Skill, parsedAction.Description, "Strong Momentum")
+			events = append(events, ar.createBoost(boostName, ar.player.ID))
 		}
 	}
 
 	return events
+}
+
+// createBoost creates a boost aspect on the scene and returns an AspectCreatedEvent.
+// A boost is a temporary situation aspect with 1 free invoke that is removed
+// after its free invoke is consumed (per Fate Core SRD: Types of Aspects — Boosts).
+func (ar *ActionResolver) createBoost(name, createdByID string) AspectCreatedEvent {
+	boost := scene.NewBoost(fmt.Sprintf("boost-%d", time.Now().UnixNano()), name, createdByID)
+	ar.currentScene.AddSituationAspect(boost)
+	return AspectCreatedEvent{AspectName: name, FreeInvokes: 1, IsBoost: true}
+}
+
+// generateBoostName generates a contextual name for a boost using the LLM aspect generator.
+// It constructs a synthetic CreateAdvantage action with a Tie outcome so the existing
+// aspect generation prompt can produce a thematic boost name.
+// Falls back to the provided fallback string if no generator is available or the call fails.
+func (ar *ActionResolver) generateBoostName(ctx context.Context, char *character.Character, skill, description, fallback string) string {
+	if ar.aspectGenerator == nil {
+		return fallback
+	}
+
+	existingAspects := make([]string, 0, len(ar.currentScene.SituationAspects))
+	for _, sa := range ar.currentScene.SituationAspects {
+		existingAspects = append(existingAspects, sa.Aspect)
+	}
+
+	// Synthetic CreateAdvantage action with a Tie outcome so the prompt knows this is a boost.
+	syntheticAction := action.NewAction(
+		fmt.Sprintf("boost-gen-%d", time.Now().UnixNano()),
+		char.ID, action.CreateAdvantage, skill, description,
+	)
+	syntheticAction.Outcome = &dice.Outcome{Type: dice.Tie, Shifts: 0}
+
+	req := prompt.AspectGenerationRequest{
+		Character:       char,
+		Action:          syntheticAction,
+		Outcome:         syntheticAction.Outcome,
+		Context:         ar.currentScene.Description,
+		TargetType:      "situation",
+		ExistingAspects: existingAspects,
+	}
+
+	genCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	resp, err := ar.aspectGenerator.GenerateAspect(genCtx, req)
+	if err != nil || resp == nil || resp.AspectText == "" {
+		slog.Warn("Failed to generate boost name via LLM, using fallback",
+			"component", componentSceneManager,
+			"error", err)
+		return fallback
+	}
+
+	return resp.AspectText
 }
 
 // generateAspectName uses the LLM to generate a creative aspect name for Create an Advantage.

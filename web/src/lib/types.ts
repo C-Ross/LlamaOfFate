@@ -217,6 +217,11 @@ export interface PlayerAttackResultEventData {
 export interface AspectCreatedEventData {
   AspectName: string
   FreeInvokes: number
+  IsBoost: boolean
+}
+
+export interface BoostExpiredEventData {
+  AspectName: string
 }
 
 export interface NPCAttackEventData {
@@ -343,6 +348,7 @@ export interface PlayerSnapshot {
 export interface SituationAspectSnapshot {
   name: string
   freeInvokes: number
+  isBoost?: boolean
 }
 
 export interface NPCSnapshot {
@@ -424,6 +430,7 @@ export type GameEventType =
   | "game_resumed"
   | "game_state_snapshot"
   | "error_notification"
+  | "boost_expired"
   | "session_init"
   | "result_meta"
   | "setup_request"
@@ -472,6 +479,7 @@ export const CHAT_DISPLAYABLE_EVENTS: Set<string> = new Set([
   "outcome_changed",
   "invoke",
   "aspect_created",
+  "boost_expired",
   "npc_action_result",
   "recovery",
   "stress_overflow",

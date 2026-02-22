@@ -69,7 +69,11 @@ func (ui *TerminalUI) Emit(event uicontract.GameEvent) {
 	case uicontract.PlayerAttackResultEvent:
 		ui.displayPlayerAttackResult(e)
 	case uicontract.AspectCreatedEvent:
-		ui.displaySystemMessage(fmt.Sprintf("Created situation aspect: '%s' with %d free invoke(s)", e.AspectName, e.FreeInvokes))
+		if e.IsBoost {
+			ui.displaySystemMessage(fmt.Sprintf("Gained a boost: '%s'! (1 free invoke, vanishes after use)", e.AspectName))
+		} else {
+			ui.displaySystemMessage(fmt.Sprintf("Created situation aspect: '%s' with %d free invoke(s)", e.AspectName, e.FreeInvokes))
+		}
 	case uicontract.NPCAttackEvent:
 		ui.displayNPCAttack(e)
 	case uicontract.PlayerStressEvent:
@@ -100,6 +104,8 @@ func (ui *TerminalUI) Emit(event uicontract.GameEvent) {
 		ui.displayMilestone(e)
 	case uicontract.GameResumedEvent:
 		ui.displayGameResumed(e)
+	case uicontract.BoostExpiredEvent:
+		ui.displaySystemMessage(fmt.Sprintf("Boost '%s' has been consumed and removed.", e.AspectName))
 	}
 }
 
@@ -427,7 +433,11 @@ func (ui *TerminalUI) displayScene() {
 			if aspect.FreeInvokes > 0 {
 				invokes = fmt.Sprintf(" (%d free invoke(s))", aspect.FreeInvokes)
 			}
-			fmt.Printf("  - %s%s\n", aspect.Aspect, invokes)
+			boostTag := ""
+			if aspect.IsBoost {
+				boostTag = " [BOOST]"
+			}
+			fmt.Printf("  - %s%s%s\n", aspect.Aspect, boostTag, invokes)
 		}
 	}
 }
@@ -476,7 +486,11 @@ func (ui *TerminalUI) displayAspects() {
 			if aspect.FreeInvokes > 0 {
 				invokes = fmt.Sprintf(" (%d free)", aspect.FreeInvokes)
 			}
-			fmt.Printf("  - %s%s\n", aspect.Aspect, invokes)
+			boostTag := ""
+			if aspect.IsBoost {
+				boostTag = " [BOOST]"
+			}
+			fmt.Printf("  - %s%s%s\n", aspect.Aspect, boostTag, invokes)
 		}
 	}
 }

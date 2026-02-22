@@ -563,9 +563,19 @@ func (cm *ConflictManager) applyAttackDamageToPlayer(ctx context.Context, outcom
 			events = append(events, overflowEvents...)
 		}
 	case dice.Tie:
+		// Attacker gets a boost on a tie (no damage to player).
 		events = append(events, PlayerDefendedEvent{IsTie: true})
+		boostName := cm.actions.generateBoostName(ctx, attacker, attackCtx.Skill, attackCtx.Description, "Fleeting Opening")
+		events = append(events, cm.actions.createBoost(boostName, attacker.ID))
 	default:
+		// Attack failed — check if player defended with style (3+ margin).
 		events = append(events, PlayerDefendedEvent{IsTie: false})
+		if outcome.Shifts <= -3 {
+			defDesc := fmt.Sprintf("defending against %s's attack", attacker.Name)
+			defSkill := core.DefenseSkillForAttack(attackCtx.Skill)
+			boostName := cm.actions.generateBoostName(ctx, cm.player, defSkill, defDesc, "Deflected with Ease")
+			events = append(events, cm.actions.createBoost(boostName, cm.player.ID))
+		}
 	}
 
 	return events

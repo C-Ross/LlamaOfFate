@@ -408,3 +408,108 @@ func TestHasPendingInvoke_True(t *testing.T) {
 func TestInvokeSkipConstant(t *testing.T) {
 	assert.Equal(t, -1, uicontract.InvokeSkip)
 }
+
+// --- Boost auto-removal ---
+
+// Fate Core SRD (Boosts): "A boost vanishes as soon as it's used for the first time."
+// After the boost's free invoke is consumed, it must be removed from the scene.
+func TestApplyInvokeChoice_Boost_RemovedAfterFreeInvokeUsed(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+
+	player := character.NewCharacter("player-1", "Hero")
+	player.FatePoints = 3
+	engine.AddCharacter(player)
+
+	testScene := scene.NewScene("scene-1", "Arena", "A battle arena.")
+	testScene.AddCharacter(player.ID)
+	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
+	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
+
+	// Add a boost (IsBoost=true, FreeInvokes=1) to the scene.
+	boost := scene.NewBoost("boost-1", "Fleeting Opening", player.ID)
+	sm.currentScene.AddSituationAspect(boost)
+	require.Len(t, sm.currentScene.SituationAspects, 1)
+
+	result := sm.actions.roller.RollWithModifier(dice.Mediocre, 0)
+	is := &invokeState{
+		result:       result,
+		difficulty:   dice.Fair,
+		parsedAction: action.NewAction("a1", player.ID, action.Attack, "Fight", "strike"),
+		usedAspects:  make(map[string]bool),
+	}
+	selected := &InvokableAspect{
+		Name:        "Fleeting Opening",
+		Source:      "situation",
+		SourceID:    "boost-1",
+		FreeInvokes: 1,
+	}
+
+	events := sm.actions.applyInvokeChoice(is, selected, true /* useFree */, false /* isReroll */)
+
+	// Boost should have been removed from the scene after its free invoke was used.
+	assert.Empty(t, sm.currentScene.SituationAspects, "boost should be removed after its free invoke is consumed")
+
+	// A BoostExpiredEvent should be emitted so the UI can update.
+	var foundExpiry bool
+	for _, e := range events {
+		if b, ok := e.(BoostExpiredEvent); ok {
+			assert.Equal(t, "Fleeting Opening", b.AspectName)
+			foundExpiry = true
+		}
+	}
+	assert.True(t, foundExpiry, "expected BoostExpiredEvent when boost is consumed")
+}
+
+// A regular situation aspect (non-boost) should NOT be removed after its last
+// free invoke is used — only boosts are auto-removed.
+func TestApplyInvokeChoice_RegularAspect_NotRemovedAfterFreeInvoke(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+
+	player := character.NewCharacter("player-1", "Hero")
+	player.FatePoints = 3
+	engine.AddCharacter(player)
+
+	testScene := scene.NewScene("scene-1", "Arena", "A battle arena.")
+	testScene.AddCharacter(player.ID)
+	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
+	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
+
+	// Regular aspect (IsBoost=false) with 1 free invoke.
+	regular := scene.NewSituationAspect("aspect-1", "On Fire", player.ID, 1)
+	sm.currentScene.AddSituationAspect(regular)
+	require.Len(t, sm.currentScene.SituationAspects, 1)
+
+	result := sm.actions.roller.RollWithModifier(dice.Mediocre, 0)
+	is := &invokeState{
+		result:       result,
+		difficulty:   dice.Fair,
+		parsedAction: action.NewAction("a1", player.ID, action.Attack, "Fight", "strike"),
+		usedAspects:  make(map[string]bool),
+	}
+	selected := &InvokableAspect{
+		Name:        "On Fire",
+		Source:      "situation",
+		SourceID:    "aspect-1",
+		FreeInvokes: 1,
+	}
+
+	sm.actions.applyInvokeChoice(is, selected, true /* useFree */, false /* isReroll */)
+
+	// Regular aspect should remain (only FreeInvokes decremented to 0).
+	require.Len(t, sm.currentScene.SituationAspects, 1, "regular aspect should not be auto-removed")
+	assert.Equal(t, 0, sm.currentScene.SituationAspects[0].FreeInvokes)
+}

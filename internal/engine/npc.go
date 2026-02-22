@@ -235,15 +235,24 @@ func (cm *ConflictManager) processNPCCreateAdvantage(ctx context.Context, npc *c
 		})
 		events = append(events, NarrativeEvent{Text: fmt.Sprintf("%s gains a tactical advantage!", npc.Name)})
 	case dice.Tie:
+		// On a tie, NPC gets a boost instead of a full aspect.
+		boostDesc := decision.Description
+		if boostDesc == "" {
+			boostDesc = fmt.Sprintf("%s creates a fleeting advantage", npc.Name)
+		}
+		boostName := cm.actions.generateBoostName(ctx, npc, skill, boostDesc, fmt.Sprintf("%s's Opportunity", npc.Name))
 		events = append(events, NPCActionResultEvent{
-			NPCName:    npc.Name,
-			ActionType: "create_advantage",
-			Skill:      skill,
-			RollResult: npcRoll.FinalValue.String(),
-			Difficulty: "Fair",
-			Outcome:    outcome.Type.String(),
+			NPCName:       npc.Name,
+			ActionType:    "create_advantage",
+			Skill:         skill,
+			RollResult:    npcRoll.FinalValue.String(),
+			Difficulty:    "Fair",
+			Outcome:       outcome.Type.String(),
+			AspectCreated: boostName,
+			FreeInvokes:   1,
 		})
-		events = append(events, NarrativeEvent{Text: fmt.Sprintf("%s's maneuver is partially successful.", npc.Name)})
+		events = append(events, cm.actions.createBoost(boostName, npc.ID))
+		events = append(events, NarrativeEvent{Text: fmt.Sprintf("%s's maneuver creates a fleeting opening.", npc.Name)})
 	default:
 		events = append(events, NPCActionResultEvent{
 			NPCName:    npc.Name,
@@ -285,7 +294,20 @@ func (cm *ConflictManager) processNPCOvercome(ctx context.Context, npc *characte
 	})
 
 	switch outcome.Type {
-	case dice.Success, dice.SuccessWithStyle:
+	case dice.SuccessWithStyle:
+		narrative := decision.Description
+		if narrative == "" {
+			narrative = fmt.Sprintf("%s successfully overcomes the challenge with style.", npc.Name)
+		}
+		events = append(events, NarrativeEvent{Text: narrative})
+		// Overcome SWS grants a boost in addition to achieving the goal.
+		overcomeSWS := decision.Description
+		if overcomeSWS == "" {
+			overcomeSWS = fmt.Sprintf("%s overcomes with style", npc.Name)
+		}
+		boostName := cm.actions.generateBoostName(ctx, npc, skill, overcomeSWS, "Strong Momentum")
+		events = append(events, cm.actions.createBoost(boostName, npc.ID))
+	case dice.Success:
 		narrative := decision.Description
 		if narrative == "" {
 			narrative = fmt.Sprintf("%s successfully overcomes the challenge.", npc.Name)
@@ -409,6 +431,17 @@ func (cm *ConflictManager) processNPCAttack(ctx context.Context, npc *character.
 
 	if outcome.Type == dice.Success || outcome.Type == dice.SuccessWithStyle {
 		events = append(events, NarrativeEvent{Text: fmt.Sprintf("%s takes %d shifts of stress!", target.Name, outcome.Shifts)})
+	} else if outcome.Type == dice.Tie {
+		// On a tie, attacker (NPC) gets a boost (no damage to target).
+		tieDesc := fmt.Sprintf("%s attacks %s but is evenly matched", npc.Name, target.Name)
+		boostName := cm.actions.generateBoostName(ctx, npc, attackSkill, tieDesc, "Fleeting Opening")
+		events = append(events, cm.actions.createBoost(boostName, npc.ID))
+	} else if outcome.Type == dice.Failure && outcome.Shifts <= -3 {
+		// Target defended with style — target gets a boost.
+		defDesc := fmt.Sprintf("defending against %s's attack", npc.Name)
+		defSkill := core.DefenseSkillForAttack(attackSkill)
+		boostName := cm.actions.generateBoostName(ctx, target, defSkill, defDesc, "Deflected with Ease")
+		events = append(events, cm.actions.createBoost(boostName, target.ID))
 	}
 
 	return events, false

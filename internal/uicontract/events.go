@@ -191,13 +191,23 @@ type PlayerAttackResultEvent struct {
 
 func (PlayerAttackResultEvent) gameEvent() {}
 
-// AspectCreatedEvent is emitted when Create an Advantage succeeds.
+// AspectCreatedEvent is emitted when Create an Advantage succeeds or a boost is granted.
 type AspectCreatedEvent struct {
 	AspectName  string // The new situation aspect
 	FreeInvokes int    // Number of free invokes granted
+	IsBoost     bool   // True if this is a boost (temporary, auto-removed after free invoke is used)
 }
 
 func (AspectCreatedEvent) gameEvent() {}
+
+// BoostExpiredEvent is emitted when a boost's single free invoke has been consumed
+// and the boost is automatically removed from the scene per Fate Core rules
+// ("A boost vanishes as soon as it's used for the first time.").
+type BoostExpiredEvent struct {
+	AspectName string // Name of the boost that was consumed and removed
+}
+
+func (BoostExpiredEvent) gameEvent() {}
 
 // NPCAttackEvent is emitted after an NPC's full attack sequence resolves
 // (attack roll, defense roll, initial outcome, optional narrative).
@@ -395,6 +405,7 @@ type ConsequenceSnapshotEntry struct {
 type SituationAspectSnapshot struct {
 	Name        string `json:"name"`
 	FreeInvokes int    `json:"freeInvokes"`
+	IsBoost     bool   `json:"isBoost,omitempty"`
 }
 
 // NPCSnapshot is a serialisable view of an NPC visible in the current scene.
