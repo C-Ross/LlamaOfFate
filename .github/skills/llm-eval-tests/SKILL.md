@@ -101,6 +101,30 @@ resp, err := client.ChatCompletion(ctx, llm.CompletionRequest{
 })
 ```
 
+### LLM-as-Judge Pattern
+For behavioral evaluations (e.g., "does this scene advance the story?"), use LLM-as-judge instead of brittle heuristics. Located in `test/llmeval/judge_helpers_test.go`:
+
+```go
+// Simple boolean question evaluation
+judge, err := LLMJudge(ctx, client, response, "Does this scene advance the story?")
+if err == nil {
+    result.AdvancesStory = judge.Pass  // true if LLM answered YES
+}
+
+// With additional context for reference material
+judge, err := LLMJudgeWithContext(ctx, client, response,
+    "Does this scene incorporate elements from the scenario?",
+    fmt.Sprintf("Scenario: %s\nProblem: %s", scenario.Title, scenario.Problem))
+```
+
+**When to use:**
+- Semantic/behavioral checks: "story-relevant?", "immersive?", "follows genre conventions?"
+- Use low temperature (0.1) for consistency
+- Frame questions so YES = pass
+
+**When NOT to use:**
+- Structural checks: JSON validity, field presence, word counts — use direct assertions
+
 ### Summary Statistics
 Always print summary at end:
 ```go
