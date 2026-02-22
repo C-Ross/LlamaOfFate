@@ -53,6 +53,8 @@ func TestClassifyInput_LLMError(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 
 	_, err = sm.classifyInput(context.Background(), "test input")
 
@@ -68,6 +70,8 @@ func TestClassifyInput_EmptyResponse(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 
 	_, err = sm.classifyInput(context.Background(), "test input")
 
@@ -83,6 +87,8 @@ func TestClassifyInput_UnexpectedClassification(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 
 	_, err = sm.classifyInput(context.Background(), "test input")
 
@@ -114,6 +120,8 @@ func TestClassifyInput_ValidTypes(t *testing.T) {
 			sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 			testScene := scene.NewScene("test", "Test", "Test scene")
 			sm.currentScene = testScene
+			sm.conflict.currentScene = testScene
+			sm.actions.currentScene = testScene
 
 			result, err := sm.classifyInput(context.Background(), "test input")
 
@@ -143,7 +151,11 @@ func TestGenerateSceneResponse_LLMError(t *testing.T) {
 	player := character.NewCharacter("p1", "Player")
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	engine.AddCharacter(player)
 
 	_, err = sm.generateSceneResponse(context.Background(), "hello", inputTypeDialog)
@@ -161,7 +173,11 @@ func TestGenerateSceneResponse_EmptyResponse(t *testing.T) {
 	player := character.NewCharacter("p1", "Player")
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	engine.AddCharacter(player)
 
 	_, err = sm.generateSceneResponse(context.Background(), "hello", inputTypeDialog)
@@ -178,7 +194,7 @@ func TestGenerateActionNarrative_LLMUnavailable(t *testing.T) {
 	testAction := action.NewAction("a1", "p1", action.Overcome, "Athletics", "Jump")
 	testAction.Outcome = &dice.Outcome{Type: dice.Success}
 
-	_, err := sm.generateActionNarrative(context.Background(), testAction)
+	_, err := sm.GenerateActionNarrative(context.Background(), testAction)
 
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, llm.ErrUnavailable))
@@ -193,13 +209,17 @@ func TestGenerateActionNarrative_LLMError(t *testing.T) {
 	player := character.NewCharacter("p1", "Player")
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	engine.AddCharacter(player)
 
 	testAction := action.NewAction("a1", "p1", action.Overcome, "Athletics", "Jump")
 	testAction.Outcome = &dice.Outcome{Type: dice.Success}
 
-	_, err = sm.generateActionNarrative(context.Background(), testAction)
+	_, err = sm.GenerateActionNarrative(context.Background(), testAction)
 
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, llm.ErrUnavailable))
@@ -245,7 +265,7 @@ func TestBuildMechanicalNarrative(t *testing.T) {
 			testAction := action.NewAction("a1", "p1", action.Overcome, "Athletics", tt.description)
 			testAction.Outcome = &dice.Outcome{Type: tt.outcomeType}
 
-			narrative := sm.buildMechanicalNarrative(testAction)
+			narrative := sm.BuildMechanicalNarrative(testAction)
 
 			assert.Contains(t, narrative, tt.description)
 			assert.Contains(t, narrative, tt.expectSubstr)
@@ -259,7 +279,7 @@ func TestBuildMechanicalNarrative_NilOutcome(t *testing.T) {
 	testAction := action.NewAction("a1", "p1", action.Overcome, "Athletics", "jump the gap")
 	testAction.Outcome = nil
 
-	narrative := sm.buildMechanicalNarrative(testAction)
+	narrative := sm.BuildMechanicalNarrative(testAction)
 
 	assert.Contains(t, narrative, "jump the gap")
 	assert.Contains(t, narrative, "attempt")
@@ -271,7 +291,7 @@ func TestBuildMechanicalNarrative_DefaultOutcome(t *testing.T) {
 	testAction := action.NewAction("a1", "p1", action.Overcome, "Athletics", "cross the bridge")
 	testAction.Outcome = &dice.Outcome{Type: dice.OutcomeType(99)}
 
-	narrative := sm.buildMechanicalNarrative(testAction)
+	narrative := sm.BuildMechanicalNarrative(testAction)
 
 	assert.Contains(t, narrative, "cross the bridge")
 	assert.Contains(t, narrative, "completes")
@@ -287,7 +307,11 @@ func TestProcessInput_ClassificationFallback(t *testing.T) {
 	player := character.NewCharacter("p1", "Player")
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	engine.AddCharacter(player)
 
 	// This should fail classification but still handle as dialog

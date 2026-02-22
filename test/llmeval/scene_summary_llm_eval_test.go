@@ -143,11 +143,19 @@ func evaluateSceneSummary(ctx context.Context, client llm.LLMClient, tc SceneSum
 
 	// Validate narrative_prose: should read like a recap, not bullet points
 	result.HasNarrativeProse = summary.NarrativeProse != "" && len(summary.NarrativeProse) > 30
-	// Prose should not start with bullet points or numbers
-	result.ProseIsNarrative = result.HasNarrativeProse &&
-		!strings.HasPrefix(strings.TrimSpace(summary.NarrativeProse), "-") &&
-		!strings.HasPrefix(strings.TrimSpace(summary.NarrativeProse), "•") &&
-		!strings.HasPrefix(strings.TrimSpace(summary.NarrativeProse), "1.")
+	// Use LLM judge to check if prose reads like narrative, not a list
+	if result.HasNarrativeProse {
+		judge, err := LLMJudge(ctx, client, summary.NarrativeProse,
+			"Does this text read like a narrative story recap paragraph (not a bullet point list or numbered list)?")
+		if err != nil {
+			// Fallback to prefix checks on error
+			result.ProseIsNarrative = !strings.HasPrefix(strings.TrimSpace(summary.NarrativeProse), "-") &&
+				!strings.HasPrefix(strings.TrimSpace(summary.NarrativeProse), "•") &&
+				!strings.HasPrefix(strings.TrimSpace(summary.NarrativeProse), "1.")
+		} else {
+			result.ProseIsNarrative = judge.Pass
+		}
+	}
 
 	// Validate key_events: 1-4 items
 	result.KeyEventCount = len(summary.KeyEvents)

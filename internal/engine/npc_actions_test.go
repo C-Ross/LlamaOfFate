@@ -39,9 +39,13 @@ func setupNPCConflictSM(t *testing.T) (*SceneManager, *character.Character, *cha
 	testScene.AddCharacter(player.ID)
 	testScene.AddCharacter(npc.ID)
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
 
-	err = sm.initiateConflict(scene.PhysicalConflict, npc.ID)
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, npc.ID)
 	require.NoError(t, err)
 
 	return sm, player, npc
@@ -58,7 +62,7 @@ func TestProcessNPCDefend_Default(t *testing.T) {
 		ActionType: "DEFEND",
 	}
 
-	events := sm.processNPCDefend(context.Background(), npc, decision)
+	events := sm.conflict.processNPCDefend(context.Background(), npc, decision)
 
 	require.Len(t, events, 2)
 
@@ -83,7 +87,7 @@ func TestProcessNPCDefend_CustomDescription(t *testing.T) {
 		Description: "The goblin ducks behind a rock.",
 	}
 
-	events := sm.processNPCDefend(context.Background(), npc, decision)
+	events := sm.conflict.processNPCDefend(context.Background(), npc, decision)
 
 	narrEvt := events[1].(NarrativeEvent)
 	assert.Equal(t, "The goblin ducks behind a rock.", narrEvt.Text)
@@ -98,7 +102,7 @@ func TestProcessNPCCreateAdvantage_Success(t *testing.T) {
 
 	// NPC Notice +2, rolled against Fair (+2).
 	// Dice total 1 → final Good(+3), shifts=1 → Success.
-	sm.roller = dice.NewPlannedRoller([]int{1})
+	sm.actions.roller = dice.NewPlannedRoller([]int{1})
 
 	decision := &prompt.NPCActionDecision{
 		ActionType:  "CREATE_ADVANTAGE",
@@ -106,7 +110,7 @@ func TestProcessNPCCreateAdvantage_Success(t *testing.T) {
 		Description: "Hidden Snare",
 	}
 
-	events := sm.processNPCCreateAdvantage(context.Background(), npc, decision)
+	events := sm.conflict.processNPCCreateAdvantage(context.Background(), npc, decision)
 
 	require.Len(t, events, 2)
 
@@ -129,7 +133,7 @@ func TestProcessNPCCreateAdvantage_SuccessWithStyle(t *testing.T) {
 	sm, _, npc := setupNPCConflictSM(t)
 
 	// Dice total 3 → final Superb(+5), shifts=3 → SWS.
-	sm.roller = dice.NewPlannedRoller([]int{3})
+	sm.actions.roller = dice.NewPlannedRoller([]int{3})
 
 	decision := &prompt.NPCActionDecision{
 		ActionType:  "CREATE_ADVANTAGE",
@@ -137,7 +141,7 @@ func TestProcessNPCCreateAdvantage_SuccessWithStyle(t *testing.T) {
 		Description: "Perfect Ambush Position",
 	}
 
-	events := sm.processNPCCreateAdvantage(context.Background(), npc, decision)
+	events := sm.conflict.processNPCCreateAdvantage(context.Background(), npc, decision)
 
 	actionEvt := events[0].(NPCActionResultEvent)
 	assert.Equal(t, "Success with Style", actionEvt.Outcome)
@@ -153,14 +157,14 @@ func TestProcessNPCCreateAdvantage_Tie(t *testing.T) {
 	sm, _, npc := setupNPCConflictSM(t)
 
 	// Dice total 0 → final Fair(+2), shifts=0 → Tie.
-	sm.roller = dice.NewPlannedRoller([]int{0})
+	sm.actions.roller = dice.NewPlannedRoller([]int{0})
 
 	decision := &prompt.NPCActionDecision{
 		ActionType: "CREATE_ADVANTAGE",
 		Skill:      "Notice",
 	}
 
-	events := sm.processNPCCreateAdvantage(context.Background(), npc, decision)
+	events := sm.conflict.processNPCCreateAdvantage(context.Background(), npc, decision)
 
 	// Tie produces 3 events: NPCActionResultEvent + AspectCreatedEvent (boost) + NarrativeEvent.
 	require.Len(t, events, 3)
@@ -190,14 +194,14 @@ func TestProcessNPCCreateAdvantage_Failure(t *testing.T) {
 	sm, _, npc := setupNPCConflictSM(t)
 
 	// Dice total -1 → final Average(+1), shifts=-1 → Failure.
-	sm.roller = dice.NewPlannedRoller([]int{-1})
+	sm.actions.roller = dice.NewPlannedRoller([]int{-1})
 
 	decision := &prompt.NPCActionDecision{
 		ActionType: "CREATE_ADVANTAGE",
 		Skill:      "Notice",
 	}
 
-	events := sm.processNPCCreateAdvantage(context.Background(), npc, decision)
+	events := sm.conflict.processNPCCreateAdvantage(context.Background(), npc, decision)
 
 	require.Len(t, events, 2)
 	actionEvt := events[0].(NPCActionResultEvent)
@@ -212,14 +216,14 @@ func TestProcessNPCCreateAdvantage_Failure(t *testing.T) {
 func TestProcessNPCCreateAdvantage_DefaultSkill(t *testing.T) {
 	sm, _, npc := setupNPCConflictSM(t)
 
-	sm.roller = dice.NewPlannedRoller([]int{1})
+	sm.actions.roller = dice.NewPlannedRoller([]int{1})
 
 	decision := &prompt.NPCActionDecision{
 		ActionType: "CREATE_ADVANTAGE",
 		Skill:      "", // empty → defaults to Notice
 	}
 
-	events := sm.processNPCCreateAdvantage(context.Background(), npc, decision)
+	events := sm.conflict.processNPCCreateAdvantage(context.Background(), npc, decision)
 	actionEvt := events[0].(NPCActionResultEvent)
 	assert.Equal(t, "Notice", actionEvt.Skill)
 }
@@ -231,7 +235,7 @@ func TestProcessNPCOvercome_Success(t *testing.T) {
 	sm, _, npc := setupNPCConflictSM(t)
 
 	// Dice total 1 → Success (shifts=1).
-	sm.roller = dice.NewPlannedRoller([]int{1})
+	sm.actions.roller = dice.NewPlannedRoller([]int{1})
 
 	decision := &prompt.NPCActionDecision{
 		ActionType:  "OVERCOME",
@@ -239,7 +243,7 @@ func TestProcessNPCOvercome_Success(t *testing.T) {
 		Description: "The goblin leaps over the barricade.",
 	}
 
-	events := sm.processNPCOvercome(context.Background(), npc, decision)
+	events := sm.conflict.processNPCOvercome(context.Background(), npc, decision)
 
 	require.Len(t, events, 2)
 	actionEvt := events[0].(NPCActionResultEvent)
@@ -258,14 +262,14 @@ func TestProcessNPCOvercome_Tie(t *testing.T) {
 	sm, _, npc := setupNPCConflictSM(t)
 
 	// Dice total 0 → Tie.
-	sm.roller = dice.NewPlannedRoller([]int{0})
+	sm.actions.roller = dice.NewPlannedRoller([]int{0})
 
 	decision := &prompt.NPCActionDecision{
 		ActionType: "OVERCOME",
 		Skill:      "Athletics",
 	}
 
-	events := sm.processNPCOvercome(context.Background(), npc, decision)
+	events := sm.conflict.processNPCOvercome(context.Background(), npc, decision)
 
 	actionEvt := events[0].(NPCActionResultEvent)
 	assert.Equal(t, "Tie", actionEvt.Outcome)
@@ -279,14 +283,14 @@ func TestProcessNPCOvercome_Failure(t *testing.T) {
 	sm, _, npc := setupNPCConflictSM(t)
 
 	// Dice total -1 → Failure.
-	sm.roller = dice.NewPlannedRoller([]int{-1})
+	sm.actions.roller = dice.NewPlannedRoller([]int{-1})
 
 	decision := &prompt.NPCActionDecision{
 		ActionType: "OVERCOME",
 		Skill:      "Athletics",
 	}
 
-	events := sm.processNPCOvercome(context.Background(), npc, decision)
+	events := sm.conflict.processNPCOvercome(context.Background(), npc, decision)
 
 	actionEvt := events[0].(NPCActionResultEvent)
 	assert.Equal(t, "Failure", actionEvt.Outcome)
@@ -299,14 +303,14 @@ func TestProcessNPCOvercome_Failure(t *testing.T) {
 func TestProcessNPCOvercome_DefaultSkill(t *testing.T) {
 	sm, _, npc := setupNPCConflictSM(t)
 
-	sm.roller = dice.NewPlannedRoller([]int{1})
+	sm.actions.roller = dice.NewPlannedRoller([]int{1})
 
 	decision := &prompt.NPCActionDecision{
 		ActionType: "OVERCOME",
 		Skill:      "",
 	}
 
-	events := sm.processNPCOvercome(context.Background(), npc, decision)
+	events := sm.conflict.processNPCOvercome(context.Background(), npc, decision)
 	actionEvt := events[0].(NPCActionResultEvent)
 	assert.Equal(t, "Athletics", actionEvt.Skill)
 }
@@ -336,12 +340,16 @@ func TestProcessNPCTurn_DispatchDefend(t *testing.T) {
 	testScene.AddCharacter(player.ID)
 	testScene.AddCharacter(npc.ID)
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
 
-	err = sm.initiateConflict(scene.PhysicalConflict, npc.ID)
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, npc.ID)
 	require.NoError(t, err)
 
-	events, awaiting := sm.processNPCTurn(context.Background(), npc.ID)
+	events, awaiting := sm.conflict.processNPCTurn(context.Background(), npc.ID)
 	assert.False(t, awaiting, "defend should not await invoke")
 
 	// Should contain TurnAnnouncementEvent + NPCActionResultEvent + NarrativeEvent.
@@ -368,9 +376,9 @@ func TestProcessNPCTurn_FallbackToAttack(t *testing.T) {
 	// PlannedRoller: first roll for NPC attack, second for player defense.
 	// NPC Fight +2: dice -4 → final = 0+(-4)+2 = -2 (Terrible).
 	// Player defense: dice +4 → high defense. Attack will fail.
-	sm.roller = dice.NewPlannedRoller([]int{-4, 4})
+	sm.actions.roller = dice.NewPlannedRoller([]int{-4, 4})
 
-	events, awaiting := sm.processNPCTurn(context.Background(), npc.ID)
+	events, awaiting := sm.conflict.processNPCTurn(context.Background(), npc.ID)
 
 	// Without invoke-eligible aspects, attack resolves immediately.
 	_ = awaiting
@@ -394,14 +402,14 @@ func TestProcessNPCOvercome_SuccessWithStyle_CreatesBoost(t *testing.T) {
 	sm, _, npc := setupNPCConflictSM(t)
 
 	// Dice total 3 → final Superb(+5), shifts=3 → SWS.
-	sm.roller = dice.NewPlannedRoller([]int{3})
+	sm.actions.roller = dice.NewPlannedRoller([]int{3})
 
 	decision := &prompt.NPCActionDecision{
 		ActionType: "OVERCOME",
 		Skill:      "Athletics",
 	}
 
-	events := sm.processNPCOvercome(context.Background(), npc, decision)
+	events := sm.conflict.processNPCOvercome(context.Background(), npc, decision)
 
 	// SWS produces 3 events: NPCActionResultEvent + NarrativeEvent + AspectCreatedEvent.
 	require.Len(t, events, 3)
@@ -443,9 +451,13 @@ func TestProcessNPCAttack_NonPlayerTarget_Tie_CreatesBoost(t *testing.T) {
 	testScene.AddCharacter(npc.ID)
 	testScene.AddCharacter(target.ID)
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
 
-	err = sm.initiateConflict(scene.PhysicalConflict, npc.ID)
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, npc.ID)
 	require.NoError(t, err)
 
 	decision := &prompt.NPCActionDecision{
@@ -455,9 +467,9 @@ func TestProcessNPCAttack_NonPlayerTarget_Tie_CreatesBoost(t *testing.T) {
 	}
 
 	// NPC Fight +2 roll 0 → Fair(+2). Target Athletics +2 roll 0 → Fair(+2). Tie (shifts=0).
-	sm.roller = dice.NewPlannedRoller([]int{0, 0})
+	sm.actions.roller = dice.NewPlannedRoller([]int{0, 0})
 
-	events, _ := sm.processNPCAttack(context.Background(), npc, decision)
+	events, _ := sm.conflict.processNPCAttack(context.Background(), npc, decision)
 
 	var boostEvt AspectCreatedEvent
 	var found bool

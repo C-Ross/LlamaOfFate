@@ -33,24 +33,22 @@ const (
 
 // SceneManager handles the main scene loop and player interactions
 type SceneManager struct {
-	llmClient             llm.LLMClient
-	characters            CharacterResolver
-	actionParser          ActionParser
-	currentScene          *scene.Scene
-	player                *character.Character
-	roller                dice.DiceRoller
-	conversationHistory   []prompt.ConversationEntry
-	shouldExit            bool                    // Set to true when the game should end
-	exitOnSceneTransition bool                    // Set to true to exit the loop on scene transition
-	lastTransition        *prompt.SceneTransition // Captured transition hint when scene ends
-	aspectGenerator       AspectGenerator
-	sessionLogger         *session.Logger
-	takenOutChars         []string       // Characters taken out during this scene
-	sceneEndReason        SceneEndReason // Why the scene ended
-	playerTakenOutHint    string         // Transition hint if player was taken out
-	scenePurpose          string         // Dramatic question driving the current scene
-	pendingInvoke         *invokeState   // Non-nil when awaiting an InvokeResponse
-	pendingMidFlow        *midFlowState  // Non-nil when awaiting a MidFlowResponse
+	llmClient           llm.LLMClient
+	characters          CharacterResolver
+	actionParser        ActionParser
+	currentScene        *scene.Scene
+	player              *character.Character
+	conversationHistory []prompt.ConversationEntry
+	lastTransition      *prompt.SceneTransition // Captured transition hint when scene ends
+	sessionLogger       *session.Logger
+	scenePurpose        string           // Dramatic question driving the current scene
+	actions             *ActionResolver  // Generic action resolution (dice, invokes, narrative)
+	conflict            *ConflictManager // Conflict lifecycle (turns, NPC, damage, taken-out)
+
+	// Scene-exit state for transitions (owned by SM, not CM).
+	// CM owns exit state for conflict outcomes (player taken out).
+	shouldExit     bool
+	sceneEndReason SceneEndReason
 }
 
 // SetScenePurpose sets the dramatic question driving the current scene,
@@ -62,34 +60,51 @@ func (sm *SceneManager) SetScenePurpose(purpose string) {
 // NewSceneManager creates a new scene manager with injected dependencies.
 // llmClient and actionParser may be nil when running without an LLM.
 func NewSceneManager(characters CharacterResolver, llmClient llm.LLMClient, actionParser ActionParser) *SceneManager {
+	roller := dice.NewRoller()
+	var ag AspectGenerator
+	if llmClient != nil {
+		ag = NewAspectGenerator(llmClient)
+	}
+
+	cm := newConflictManager(llmClient, characters)
+	ar := newActionResolver(roller, characters, ag)
+	// Wire cross-references: AR ↔ CM.
+	ar.conflict = cm
+	cm.actions = ar
+
 	sm := &SceneManager{
 		llmClient:           llmClient,
 		characters:          characters,
 		actionParser:        actionParser,
-		roller:              dice.NewRoller(),
 		conversationHistory: make([]prompt.ConversationEntry, 0),
+		actions:             ar,
+		conflict:            cm,
 	}
-	// Initialize aspect generator if LLM client is available
-	if llmClient != nil {
-		sm.aspectGenerator = NewAspectGenerator(llmClient)
-	}
+	// SceneManager implements NarrativeProvider — wire it so ActionResolver
+	// can generate narrative and record conversation history.
+	sm.actions.SetNarrativeProvider(sm)
 	return sm
 }
 
-// SetSessionLogger sets the session logger for recording game transcripts
+// SetSessionLogger sets the session logger for recording game transcripts.
+// It also propagates to the ConflictManager.
 func (sm *SceneManager) SetSessionLogger(logger *session.Logger) {
 	sm.sessionLogger = logger
+	sm.actions.setSessionLogger(logger)
+	sm.conflict.setSessionLogger(logger)
 }
 
 // SetExitOnSceneTransition configures whether the scene loop should exit on scene transition
 func (sm *SceneManager) SetExitOnSceneTransition(exit bool) {
-	sm.exitOnSceneTransition = exit
+	sm.conflict.exitOnSceneTransition = exit
 }
 
 // StartScene begins a new scene with the given pre-configured scene
 func (sm *SceneManager) StartScene(scene *scene.Scene, player *character.Character) error {
 	sm.currentScene = scene
 	sm.player = player
+	sm.actions.setSceneState(scene, player)
+	sm.conflict.setSceneState(scene, player)
 
 	// Clear conversation history from previous scene — recap should only
 	// appear when restoring from a save (via Restore()), not on normal transitions.
@@ -126,10 +141,10 @@ func (sm *SceneManager) StartScene(scene *scene.Scene, player *character.Charact
 // collect an InvokeResponse and call ProvideInvokeResponse before sending
 // another HandleInput.
 func (sm *SceneManager) HandleInput(ctx context.Context, input string) (*InputResult, error) {
-	if sm.pendingInvoke != nil {
+	if sm.actions.HasPendingInvoke() {
 		return nil, fmt.Errorf("HandleInput called while awaiting invoke response; call ProvideInvokeResponse instead")
 	}
-	if sm.pendingMidFlow != nil {
+	if sm.actions.HasPendingMidFlow() {
 		return nil, fmt.Errorf("HandleInput called while awaiting mid-flow response; call ProvideMidFlowResponse instead")
 	}
 
@@ -141,16 +156,13 @@ func (sm *SceneManager) HandleInput(ctx context.Context, input string) (*InputRe
 	}
 
 	// Check for concession command during conflict (before any roll per Fate Core rules).
-	if sm.currentScene.IsConflict && sm.isConcedeCommand(input) {
-		result.Events = sm.handleConcession(ctx)
-		if sm.pendingMidFlow != nil {
-			result.Events = append(result.Events, sm.pendingMidFlow.event)
+	if sm.currentScene.IsConflict && sm.conflict.isConcedeCommand(input) {
+		result.Events = sm.conflict.handleConcession(ctx)
+		if sm.actions.HasPendingMidFlow() {
+			result.Events = append(result.Events, sm.actions.PendingMidFlowEvent())
 			result.AwaitingMidFlow = true
 		}
-		if sm.shouldExit && !result.AwaitingMidFlow {
-			result.SceneEnded = true
-			result.EndResult = sm.buildSceneEndResult()
-		}
+		sm.applySceneEnd(result)
 		return result, nil
 	}
 
@@ -189,35 +201,38 @@ func (sm *SceneManager) HandleInput(ctx context.Context, input string) (*InputRe
 	}
 
 	// Check if a mid-flow prompt was emitted during processing.
-	if sm.pendingMidFlow != nil {
-		result.Events = append(result.Events, sm.pendingMidFlow.event)
+	if sm.actions.HasPendingMidFlow() {
+		result.Events = append(result.Events, sm.actions.PendingMidFlowEvent())
 		result.AwaitingMidFlow = true
 	}
 
-	if !result.AwaitingInvoke && !result.AwaitingMidFlow && sm.shouldExit {
-		result.SceneEnded = true
-		result.EndResult = sm.buildSceneEndResult()
-	}
+	sm.applySceneEnd(result)
 
 	return result, nil
 }
 
 // resetSceneState clears per-scene state before a new scene loop begins.
 func (sm *SceneManager) resetSceneState() {
-	sm.takenOutChars = nil
-	sm.sceneEndReason = ""
-	sm.playerTakenOutHint = ""
 	sm.lastTransition = nil
 	sm.shouldExit = false
-	sm.pendingInvoke = nil
-	sm.pendingMidFlow = nil
+	sm.sceneEndReason = ""
+	sm.actions.resetState()
+	sm.conflict.resetState()
 }
 
 // buildSceneEndResult constructs a SceneEndResult from the current state.
+// It merges SM-owned exit state (scene transitions) with CM-owned exit state
+// (player taken out).
 func (sm *SceneManager) buildSceneEndResult() *SceneEndResult {
+	// SM's scene-transition reason takes priority when set.
+	reason := sm.sceneEndReason
+	if reason == "" {
+		reason, _ = sm.conflict.SceneExitState()
+	}
+
 	result := &SceneEndResult{
-		Reason:        sm.sceneEndReason,
-		TakenOutChars: sm.takenOutChars,
+		Reason:        reason,
+		TakenOutChars: sm.conflict.GetTakenOutChars(),
 	}
 
 	if result.Reason == "" {
@@ -230,10 +245,22 @@ func (sm *SceneManager) buildSceneEndResult() *SceneEndResult {
 			result.TransitionHint = sm.lastTransition.Hint
 		}
 	case SceneEndPlayerTakenOut:
-		result.TransitionHint = sm.playerTakenOutHint
+		_, hint := sm.conflict.SceneExitState()
+		result.TransitionHint = hint
 	}
 
 	return result
+}
+
+// applySceneEnd checks whether a scene exit has been signalled — either by
+// the conflict subsystem (player taken out) or by SceneManager itself (scene
+// transition). If so, populates the result with SceneEnded / EndResult.
+func (sm *SceneManager) applySceneEnd(result *InputResult) {
+	exitRequested := sm.shouldExit || sm.conflict.SceneExitRequested()
+	if exitRequested && !result.AwaitingInvoke && !result.AwaitingMidFlow {
+		result.SceneEnded = true
+		result.EndResult = sm.buildSceneEndResult()
+	}
 }
 
 // classifyInput uses LLM to determine if input is dialog, clarification, or action
@@ -294,8 +321,8 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) []GameEv
 	}
 
 	// Check for markers in the response (conflict escalation, de-escalation, and scene transition)
-	conflictTrigger, cleanedResponse := sm.parseConflictMarker(response)
-	conflictResolution, cleanedResponse := sm.parseConflictEndMarker(cleanedResponse)
+	conflictTrigger, cleanedResponse := sm.conflict.parseConflictMarker(response)
+	conflictResolution, cleanedResponse := sm.conflict.parseConflictEndMarker(cleanedResponse)
 	sceneTransition, cleanedResponse := prompt.ParseSceneTransitionMarker(cleanedResponse)
 
 	events = append(events, DialogEvent{PlayerInput: input, GMResponse: cleanedResponse})
@@ -309,11 +336,11 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) []GameEv
 	}
 
 	// Record this exchange in conversation history
-	sm.addToConversationHistory(input, cleanedResponse, inputTypeDialog)
+	sm.RecordConversationEntry(input, cleanedResponse, inputTypeDialog)
 
 	// Handle conflict initiation if triggered by NPC
 	if conflictTrigger != nil && !sm.currentScene.IsConflict {
-		if err := sm.initiateConflict(conflictTrigger.Type, conflictTrigger.InitiatorID); err != nil {
+		if err := sm.conflict.initiateConflict(conflictTrigger.Type, conflictTrigger.InitiatorID); err != nil {
 			slog.Warn("Failed to initiate conflict from dialog",
 				"component", componentSceneManager,
 				"error", err)
@@ -325,9 +352,9 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) []GameEv
 			events = append(events, ConflictStartEvent{
 				ConflictType:  string(conflictTrigger.Type),
 				InitiatorName: initiatorName,
-				Participants:  sm.getParticipantInfo(),
+				Participants:  sm.conflict.getParticipantInfo(),
 			})
-			sm.addToConversationHistory("",
+			sm.RecordConversationEntry("",
 				fmt.Sprintf("[%s conflict initiated by %s]", conflictTrigger.Type, initiatorName),
 				inputTypeConflict)
 		}
@@ -335,10 +362,10 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) []GameEv
 
 	// Handle conflict de-escalation if detected
 	if conflictResolution != nil && sm.currentScene.IsConflict {
-		reasonMessage := sm.resolveConflictPeacefully(conflictResolution.Reason)
+		reasonMessage := sm.conflict.resolveConflictPeacefully(conflictResolution.Reason)
 		if reasonMessage != "" {
 			events = append(events, ConflictEndEvent{Reason: reasonMessage})
-			sm.addToConversationHistory("",
+			sm.RecordConversationEntry("",
 				fmt.Sprintf("[Conflict ended — %s]", reasonMessage),
 				inputTypeConflict)
 		}
@@ -368,7 +395,7 @@ func (sm *SceneManager) handleSceneTransition(transition *prompt.SceneTransition
 	// Capture the transition for the caller (ScenarioManager)
 	sm.lastTransition = transition
 
-	// Mark that we should exit the scene loop
+	// Mark that we should exit the scene loop (SM-owned state for transitions)
 	sm.sceneEndReason = SceneEndTransition
 	sm.shouldExit = true
 
@@ -387,19 +414,7 @@ func (sm *SceneManager) handleAction(ctx context.Context, input string) ([]GameE
 
 	// Parse the action using the action parser
 	if sm.actionParser != nil {
-		// Get other characters in the scene from the character registry
-		otherCharactersMap := sm.characters.GetCharactersByScene(sm.currentScene)
-		// Remove the player from other characters (they're already the main character)
-		delete(otherCharactersMap, sm.player.ID)
-
-		// Convert map to slice for ActionParseRequest, excluding taken-out characters
-		var otherCharacters []*character.Character
-		for _, char := range otherCharactersMap {
-			if sm.currentScene.IsCharacterTakenOut(char.ID) {
-				continue
-			}
-			otherCharacters = append(otherCharacters, char)
-		}
+		otherCharacters, _ := sm.sceneCharacters()
 
 		action, err := sm.actionParser.ParseAction(ctx, ActionParseRequest{
 			Character:       sm.player,
@@ -421,7 +436,7 @@ func (sm *SceneManager) handleAction(ctx context.Context, input string) ([]GameE
 			sm.sessionLogger.Log("action_parse", action)
 		}
 
-		return sm.resolveAction(ctx, action)
+		return sm.actions.resolveAction(ctx, action)
 	}
 
 	events = append(events, SystemMessageEvent{
@@ -437,19 +452,7 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 	}
 
 	// Get other characters in the scene
-	otherCharactersMap := sm.characters.GetCharactersByScene(sm.currentScene)
-	delete(otherCharactersMap, sm.player.ID) // Remove the player
-
-	// Separate active characters from taken-out characters
-	var otherCharacters []*character.Character
-	var takenOutCharacters []*character.Character
-	for _, char := range otherCharactersMap {
-		if sm.currentScene.IsCharacterTakenOut(char.ID) {
-			takenOutCharacters = append(takenOutCharacters, char)
-		} else {
-			otherCharacters = append(otherCharacters, char)
-		}
-	}
+	otherCharacters, takenOutCharacters := sm.sceneCharacters()
 
 	var promptText string
 	var renderErr error
@@ -465,8 +468,11 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 
 		characterMap := make(map[string]*character.Character)
 		characterMap[sm.player.ID] = sm.player
-		for id, char := range otherCharactersMap {
-			characterMap[id] = char
+		for _, char := range otherCharacters {
+			characterMap[char.ID] = char
+		}
+		for _, char := range takenOutCharacters {
+			characterMap[char.ID] = char
 		}
 
 		// Determine current character name
@@ -522,24 +528,15 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 	return content, nil
 }
 
-// generateActionNarrative generates narrative text for action results
-func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedAction *action.Action) (string, error) {
+// GenerateActionNarrative generates narrative text for action results.
+// Implements NarrativeProvider.
+func (sm *SceneManager) GenerateActionNarrative(ctx context.Context, parsedAction *action.Action) (string, error) {
 	if sm.llmClient == nil {
 		return "", fmt.Errorf("generateActionNarrative: %w", llm.ErrUnavailable)
 	}
 
 	// Get other characters in the scene
-	otherCharactersMap := sm.characters.GetCharactersByScene(sm.currentScene)
-	delete(otherCharactersMap, sm.player.ID) // Remove the player
-
-	// Exclude taken-out characters from narrative context
-	var otherCharacters []*character.Character
-	for _, char := range otherCharactersMap {
-		if sm.currentScene.IsCharacterTakenOut(char.ID) {
-			continue
-		}
-		otherCharacters = append(otherCharacters, char)
-	}
+	otherCharacters, _ := sm.sceneCharacters()
 
 	// Prepare template data and render
 	data := prompt.ActionNarrativeData{
@@ -563,7 +560,7 @@ func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedActio
 
 	// Add this to conversation history as well
 	actionDescription := fmt.Sprintf("Attempted: %s (Outcome: %s)", parsedAction.Description, parsedAction.Outcome.Type.String())
-	sm.addToConversationHistory(actionDescription, narrative, inputTypeAction)
+	sm.RecordConversationEntry(actionDescription, narrative, inputTypeAction)
 
 	return narrative, nil
 }
@@ -571,6 +568,22 @@ func (sm *SceneManager) generateActionNarrative(ctx context.Context, parsedActio
 // GetCurrentScene returns the current scene
 func (sm *SceneManager) GetCurrentScene() *scene.Scene {
 	return sm.currentScene
+}
+
+// sceneCharacters returns non-player characters in the current scene, partitioned
+// into active and taken-out slices. Callers that only need active characters can
+// ignore the second return value.
+func (sm *SceneManager) sceneCharacters() (active, takenOut []*character.Character) {
+	others := sm.characters.GetCharactersByScene(sm.currentScene)
+	delete(others, sm.player.ID)
+	for _, c := range others {
+		if sm.currentScene.IsCharacterTakenOut(c.ID) {
+			takenOut = append(takenOut, c)
+		} else {
+			active = append(active, c)
+		}
+	}
+	return
 }
 
 // GetPlayer returns the current player character
@@ -583,8 +596,38 @@ func (sm *SceneManager) GetConversationHistory() []prompt.ConversationEntry {
 	return sm.conversationHistory
 }
 
+// ProvideInvokeResponse delegates to ActionResolver and wraps the result
+// with scene-end detection. This is the public API called by ScenarioManager.
+func (sm *SceneManager) ProvideInvokeResponse(ctx context.Context, resp InvokeResponse) (*InputResult, error) {
+	result, err := sm.actions.ProvideInvokeResponse(ctx, resp)
+	if err != nil {
+		return nil, err
+	}
+	sm.applySceneEnd(result)
+	return result, nil
+}
+
+// ProvideMidFlowResponse delegates to ActionResolver and wraps the result
+// with scene-end detection. This is the public API called by ScenarioManager.
+func (sm *SceneManager) ProvideMidFlowResponse(ctx context.Context, resp MidFlowResponse) (*InputResult, error) {
+	result, err := sm.actions.ProvideMidFlowResponse(ctx, resp)
+	if err != nil {
+		return nil, err
+	}
+	sm.applySceneEnd(result)
+	return result, nil
+}
+
+// HasPendingInvoke delegates to ActionResolver.
+func (sm *SceneManager) HasPendingInvoke() bool {
+	return sm.actions.HasPendingInvoke()
+}
+
 // Ensure SceneManager implements the SceneInfo interface
 var _ SceneInfo = (*SceneManager)(nil)
+
+// Ensure SceneManager satisfies NarrativeProvider.
+var _ NarrativeProvider = (*SceneManager)(nil)
 
 // Snapshot returns a SceneState capturing the current scene-level state
 // for persistence. This includes the scene itself (with any active conflict),
@@ -609,6 +652,8 @@ func (sm *SceneManager) Restore(state SceneState, player *character.Character) {
 	sm.player = player
 	sm.conversationHistory = state.ConversationHistory
 	sm.scenePurpose = state.ScenePurpose
+	sm.conflict.setSceneState(state.CurrentScene, player)
+	sm.actions.setSceneState(state.CurrentScene, player)
 
 	// Ensure player is in the scene (defensive — should already be from saved state)
 	if sm.currentScene != nil {
@@ -619,8 +664,9 @@ func (sm *SceneManager) Restore(state SceneState, player *character.Character) {
 	}
 }
 
-// addToConversationHistory adds an exchange to the conversation history
-func (sm *SceneManager) addToConversationHistory(playerInput, gmResponse, interactionType string) {
+// RecordConversationEntry adds an exchange to the conversation history.
+// Implements NarrativeProvider.
+func (sm *SceneManager) RecordConversationEntry(playerInput, gmResponse, interactionType string) {
 	entry := prompt.ConversationEntry{
 		PlayerInput: playerInput,
 		GMResponse:  gmResponse,
@@ -659,8 +705,9 @@ func (sm *SceneManager) buildConversationContext() string {
 	return context.String()
 }
 
-// buildMechanicalNarrative creates a basic narrative from action data when LLM is unavailable
-func (sm *SceneManager) buildMechanicalNarrative(a *action.Action) string {
+// BuildMechanicalNarrative creates a basic narrative from action data when LLM is unavailable.
+// Implements NarrativeProvider.
+func (sm *SceneManager) BuildMechanicalNarrative(a *action.Action) string {
 	if a.Outcome == nil {
 		return fmt.Sprintf("Your attempt to %s...", a.Description)
 	}

@@ -105,6 +105,37 @@ func (m *ScenarioManager) triggerSave(trigger string) {
 	}
 }
 
+// emitSceneOpeningEvents returns the narrative events for a newly started scene:
+// the scene name/description, and optionally the dramatic purpose and opening hook.
+// It also logs purpose/hook to the session logger when present.
+func (m *ScenarioManager) emitSceneOpeningEvents() []GameEvent {
+	events := []GameEvent{
+		NarrativeEvent{
+			SceneName: m.currentScene.Name,
+			Text:      m.currentScene.Description,
+		},
+	}
+	if m.lastGeneratedPurpose != "" || m.lastGeneratedHook != "" {
+		events = append(events, NarrativeEvent{
+			Purpose: m.lastGeneratedPurpose,
+			Text:    m.lastGeneratedHook,
+		})
+		if m.sessionLogger != nil {
+			if m.lastGeneratedPurpose != "" {
+				m.sessionLogger.Log("scene_purpose", map[string]any{
+					"purpose": m.lastGeneratedPurpose,
+				})
+			}
+			if m.lastGeneratedHook != "" {
+				m.sessionLogger.Log("opening_hook", map[string]any{
+					"hook": m.lastGeneratedHook,
+				})
+			}
+		}
+	}
+	return events
+}
+
 // Snapshot returns the scenario-level and scene-level state for persistence.
 // It cascades to SceneManager.Snapshot() for the scene layer.
 func (m *ScenarioManager) Snapshot() (ScenarioState, SceneState) {
@@ -254,31 +285,7 @@ func (m *ScenarioManager) Start(ctx context.Context) ([]GameEvent, error) {
 		// Reset scene state for the first scene
 		sceneManager.resetSceneState()
 
-		// Emit scene name and description
-		events = append(events, NarrativeEvent{
-			SceneName: m.currentScene.Name,
-			Text:      m.currentScene.Description,
-		})
-
-		// Emit scene purpose and opening hook
-		if m.lastGeneratedPurpose != "" || m.lastGeneratedHook != "" {
-			events = append(events, NarrativeEvent{
-				Purpose: m.lastGeneratedPurpose,
-				Text:    m.lastGeneratedHook,
-			})
-			if m.sessionLogger != nil {
-				if m.lastGeneratedPurpose != "" {
-					m.sessionLogger.Log("scene_purpose", map[string]any{
-						"purpose": m.lastGeneratedPurpose,
-					})
-				}
-				if m.lastGeneratedHook != "" {
-					m.sessionLogger.Log("opening_hook", map[string]any{
-						"hook": m.lastGeneratedHook,
-					})
-				}
-			}
-		}
+		events = append(events, m.emitSceneOpeningEvents()...)
 
 		// Save state at scene start
 		m.triggerSave("scene_start")
@@ -498,29 +505,7 @@ func (m *ScenarioManager) handleSceneEnd(ctx context.Context, sceneManager *Scen
 
 	newSceneManager.resetSceneState()
 
-	// Emit new scene opening events
-	events = append(events, NarrativeEvent{
-		SceneName: m.currentScene.Name,
-		Text:      m.currentScene.Description,
-	})
-	if m.lastGeneratedPurpose != "" || m.lastGeneratedHook != "" {
-		events = append(events, NarrativeEvent{
-			Purpose: m.lastGeneratedPurpose,
-			Text:    m.lastGeneratedHook,
-		})
-		if m.sessionLogger != nil {
-			if m.lastGeneratedPurpose != "" {
-				m.sessionLogger.Log("scene_purpose", map[string]any{
-					"purpose": m.lastGeneratedPurpose,
-				})
-			}
-			if m.lastGeneratedHook != "" {
-				m.sessionLogger.Log("opening_hook", map[string]any{
-					"hook": m.lastGeneratedHook,
-				})
-			}
-		}
-	}
+	events = append(events, m.emitSceneOpeningEvents()...)
 
 	m.triggerSave("scene_start")
 

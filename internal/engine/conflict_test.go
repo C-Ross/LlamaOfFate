@@ -56,7 +56,7 @@ func TestSceneManager_ParseConflictMarker_Physical(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 
 	response := "The orc swings his axe at you! [CONFLICT:physical:orc-1] Roll for initiative!"
-	trigger, cleanedResponse := sm.parseConflictMarker(response)
+	trigger, cleanedResponse := sm.conflict.parseConflictMarker(response)
 
 	require.NotNil(t, trigger)
 	assert.Equal(t, scene.PhysicalConflict, trigger.Type)
@@ -71,7 +71,7 @@ func TestSceneManager_ParseConflictMarker_Mental(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 
 	response := "The sorcerer locks eyes with you, attempting to dominate your mind. [CONFLICT:mental:sorcerer-1]"
-	trigger, cleanedResponse := sm.parseConflictMarker(response)
+	trigger, cleanedResponse := sm.conflict.parseConflictMarker(response)
 
 	require.NotNil(t, trigger)
 	assert.Equal(t, scene.MentalConflict, trigger.Type)
@@ -86,7 +86,7 @@ func TestSceneManager_ParseConflictMarker_NoMarker(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 
 	response := "The merchant smiles and offers you a deal."
-	trigger, cleanedResponse := sm.parseConflictMarker(response)
+	trigger, cleanedResponse := sm.conflict.parseConflictMarker(response)
 
 	assert.Nil(t, trigger)
 	assert.Equal(t, "The merchant smiles and offers you a deal.", cleanedResponse)
@@ -103,7 +103,7 @@ func TestSceneManager_CalculateInitiative_Physical(t *testing.T) {
 	char.SetSkill("Athletics", 2)
 
 	// Should use Notice for physical conflicts
-	initiative := sm.calculateInitiative(char, scene.PhysicalConflict)
+	initiative := sm.conflict.calculateInitiative(char, scene.PhysicalConflict)
 	assert.Equal(t, 3, initiative)
 }
 
@@ -117,7 +117,7 @@ func TestSceneManager_CalculateInitiative_Physical_NoNotice(t *testing.T) {
 	char.SetSkill("Athletics", 2)
 
 	// Should fall back to Athletics when Notice is 0
-	initiative := sm.calculateInitiative(char, scene.PhysicalConflict)
+	initiative := sm.conflict.calculateInitiative(char, scene.PhysicalConflict)
 	assert.Equal(t, 2, initiative)
 }
 
@@ -132,7 +132,7 @@ func TestSceneManager_CalculateInitiative_Mental(t *testing.T) {
 	char.SetSkill("Rapport", 2)
 
 	// Should use Empathy for mental conflicts
-	initiative := sm.calculateInitiative(char, scene.MentalConflict)
+	initiative := sm.conflict.calculateInitiative(char, scene.MentalConflict)
 	assert.Equal(t, 4, initiative)
 }
 
@@ -146,7 +146,7 @@ func TestSceneManager_CalculateInitiative_Mental_NoEmpathy(t *testing.T) {
 	char.SetSkill("Rapport", 3)
 
 	// Should fall back to Rapport when Empathy is 0
-	initiative := sm.calculateInitiative(char, scene.MentalConflict)
+	initiative := sm.conflict.calculateInitiative(char, scene.MentalConflict)
 	assert.Equal(t, 3, initiative)
 }
 
@@ -174,7 +174,7 @@ func TestSceneManager_InitiateConflict(t *testing.T) {
 	require.NoError(t, err)
 
 	// Initiate conflict
-	err = sm.initiateConflict(scene.PhysicalConflict, enemy.ID)
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, enemy.ID)
 	require.NoError(t, err)
 
 	// Verify conflict state
@@ -205,11 +205,11 @@ func TestSceneManager_InitiateConflict_AlreadyInConflict(t *testing.T) {
 	require.NoError(t, err)
 
 	// Start first conflict
-	err = sm.initiateConflict(scene.PhysicalConflict, enemy.ID)
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, enemy.ID)
 	require.NoError(t, err)
 
 	// Try to start another conflict
-	err = sm.initiateConflict(scene.MentalConflict, player.ID)
+	err = sm.conflict.initiateConflict(scene.MentalConflict, player.ID)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "already in a conflict")
 }
@@ -231,7 +231,7 @@ func TestSceneManager_InitiateConflict_NotEnoughParticipants(t *testing.T) {
 	require.NoError(t, err)
 
 	// Try to initiate conflict with only one participant
-	err = sm.initiateConflict(scene.PhysicalConflict, player.ID)
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, player.ID)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "at least 2 participants")
 }
@@ -256,7 +256,7 @@ func TestSceneManager_InitiateConflict_UnknownInitiator(t *testing.T) {
 	require.NoError(t, err)
 
 	// Try to initiate conflict with an ID that doesn't match any character (LLM hallucination)
-	err = sm.initiateConflict(scene.PhysicalConflict, "none")
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, "none")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not a known character")
 
@@ -288,7 +288,7 @@ func TestSceneManager_HandleConflictEscalation(t *testing.T) {
 	require.NoError(t, err)
 
 	// Start a mental conflict
-	err = sm.initiateConflict(scene.MentalConflict, enemy.ID)
+	err = sm.conflict.initiateConflict(scene.MentalConflict, enemy.ID)
 	require.NoError(t, err)
 
 	// Verify initial mental initiative (player with Empathy 4 should be first)
@@ -299,7 +299,7 @@ func TestSceneManager_HandleConflictEscalation(t *testing.T) {
 	assert.Equal(t, 4, firstParticipant.Initiative)
 
 	// Escalate to physical
-	sm.handleConflictEscalation(scene.PhysicalConflict)
+	sm.conflict.handleConflictEscalation(scene.PhysicalConflict)
 
 	// Verify escalation
 	assert.Equal(t, scene.PhysicalConflict, sm.currentScene.ConflictState.Type)
@@ -319,7 +319,7 @@ func TestSceneManager_ParseConflictEndMarker_Surrender(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 
 	response := "The goblin drops his spear and raises his hands. \"I yield!\" [CONFLICT:end:surrender]"
-	resolution, cleanedResponse := sm.parseConflictEndMarker(response)
+	resolution, cleanedResponse := sm.conflict.parseConflictEndMarker(response)
 
 	require.NotNil(t, resolution)
 	assert.Equal(t, "surrender", resolution.Reason)
@@ -333,7 +333,7 @@ func TestSceneManager_ParseConflictEndMarker_Agreement(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 
 	response := "The merchant nods slowly. \"Very well, we have a deal.\" [CONFLICT:end:agreement]"
-	resolution, cleanedResponse := sm.parseConflictEndMarker(response)
+	resolution, cleanedResponse := sm.conflict.parseConflictEndMarker(response)
 
 	require.NotNil(t, resolution)
 	assert.Equal(t, "agreement", resolution.Reason)
@@ -347,7 +347,7 @@ func TestSceneManager_ParseConflictEndMarker_Retreat(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 
 	response := "The orc looks at his fallen comrades and flees into the forest. [CONFLICT:end:retreat]"
-	resolution, cleanedResponse := sm.parseConflictEndMarker(response)
+	resolution, cleanedResponse := sm.conflict.parseConflictEndMarker(response)
 
 	require.NotNil(t, resolution)
 	assert.Equal(t, "retreat", resolution.Reason)
@@ -361,7 +361,7 @@ func TestSceneManager_ParseConflictEndMarker_NoMarker(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 
 	response := "The guard eyes you suspiciously but does not attack."
-	resolution, cleanedResponse := sm.parseConflictEndMarker(response)
+	resolution, cleanedResponse := sm.conflict.parseConflictEndMarker(response)
 
 	assert.Nil(t, resolution)
 	assert.Equal(t, "The guard eyes you suspiciously but does not attack.", cleanedResponse)
@@ -387,15 +387,19 @@ func TestSceneManager_ResolveConflictPeacefully(t *testing.T) {
 	testScene.AddCharacter(player.ID)
 	testScene.AddCharacter(enemy.ID)
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
 
 	// Start a conflict
-	err = sm.initiateConflict(scene.PhysicalConflict, enemy.ID)
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, enemy.ID)
 	require.NoError(t, err)
 	assert.True(t, sm.currentScene.IsConflict)
 
 	// Resolve peacefully
-	sm.resolveConflictPeacefully("surrender")
+	sm.conflict.resolveConflictPeacefully("surrender")
 
 	// Verify conflict ended
 	assert.False(t, sm.currentScene.IsConflict)
@@ -429,14 +433,18 @@ func TestSceneManager_ResolveConflictPeacefully_ClearsStress(t *testing.T) {
 	testScene.AddCharacter(player.ID)
 	testScene.AddCharacter(enemy.ID)
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
 
 	// Start a conflict
-	err = sm.initiateConflict(scene.PhysicalConflict, enemy.ID)
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, enemy.ID)
 	require.NoError(t, err)
 
 	// Resolve peacefully (should clear all stress)
-	sm.resolveConflictPeacefully("surrender")
+	sm.conflict.resolveConflictPeacefully("surrender")
 
 	// Verify stress was cleared for all participants
 	assert.Equal(t, 2, player.GetStressTrack(character.PhysicalStress).AvailableBoxes())
@@ -453,9 +461,11 @@ func TestSceneManager_ResolveConflictPeacefully_NotInConflict(t *testing.T) {
 	// Setup scene (no conflict)
 	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 
 	// Attempting to resolve should not panic
-	sm.resolveConflictPeacefully("surrender")
+	sm.conflict.resolveConflictPeacefully("surrender")
 
 	// Still not in conflict
 	assert.False(t, sm.currentScene.IsConflict)
@@ -490,12 +500,16 @@ func TestSceneManager_ResolveConflictPeacefully_AllReasons(t *testing.T) {
 			testScene.AddCharacter(player.ID)
 			testScene.AddCharacter(enemy.ID)
 			sm.currentScene = testScene
+			sm.conflict.currentScene = testScene
+			sm.actions.currentScene = testScene
 			sm.player = player
+			sm.conflict.player = player
+			sm.actions.player = player
 
-			err = sm.initiateConflict(scene.PhysicalConflict, enemy.ID)
+			err = sm.conflict.initiateConflict(scene.PhysicalConflict, enemy.ID)
 			require.NoError(t, err)
 
-			msg := sm.resolveConflictPeacefully(tt.reason)
+			msg := sm.conflict.resolveConflictPeacefully(tt.reason)
 			assert.Equal(t, tt.expected, msg)
 			assert.False(t, sm.currentScene.IsConflict)
 		})
@@ -509,8 +523,10 @@ func TestSceneManager_HandleConflictEscalation_NotInConflict(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
 	testScene := scene.NewScene("s1", "Room", "A room")
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 
-	events := sm.handleConflictEscalation(scene.PhysicalConflict)
+	events := sm.conflict.handleConflictEscalation(scene.PhysicalConflict)
 	assert.Nil(t, events)
 }
 
@@ -530,12 +546,16 @@ func TestSceneManager_HandleConflictEscalation_SameType(t *testing.T) {
 	testScene.AddCharacter(player.ID)
 	testScene.AddCharacter(enemy.ID)
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
 
-	err = sm.initiateConflict(scene.PhysicalConflict, enemy.ID)
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, enemy.ID)
 	require.NoError(t, err)
 
-	events := sm.handleConflictEscalation(scene.PhysicalConflict)
+	events := sm.conflict.handleConflictEscalation(scene.PhysicalConflict)
 	assert.Nil(t, events, "escalation to same type should be a no-op")
 }
 
@@ -552,6 +572,8 @@ func TestSceneManager_GatherInvokableAspects_ConsequencesAndSituation(t *testing
 		Aspect: "Bruised Ribs",
 	})
 	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
 
 	testScene := scene.NewScene("s1", "Room", "A room")
 	testScene.SituationAspects = append(testScene.SituationAspects, scene.SituationAspect{
@@ -560,8 +582,10 @@ func TestSceneManager_GatherInvokableAspects_ConsequencesAndSituation(t *testing
 		FreeInvokes: 1,
 	})
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 
-	aspects := sm.gatherInvokableAspects(map[string]bool{})
+	aspects := sm.actions.gatherInvokableAspects(map[string]bool{})
 	var names []string
 	for _, a := range aspects {
 		names = append(names, a.Name)
@@ -587,20 +611,20 @@ func TestSceneManager_RollTargetDefense(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
-	sm.roller = dice.NewSeededRoller(12345) // Predictable rolls
+	sm.actions.roller = dice.NewSeededRoller(12345) // Predictable rolls
 
 	target := character.NewCharacter("target-1", "Goblin")
 	target.SetSkill("Athletics", 2)
 	target.SetSkill("Will", 1)
 
 	// Test physical attack defense (uses Athletics)
-	defenseResult, defEvent := sm.rollTargetDefense(target, "Fight")
+	defenseResult, defEvent := sm.actions.rollTargetDefense(target, "Fight")
 	assert.NotNil(t, defenseResult)
 	assert.NotEmpty(t, defEvent.DefenderName)
 	// With seeded roller and Athletics +2, we get a predictable result
 
 	// Test mental attack defense (uses Will)
-	defenseResult, defEvent = sm.rollTargetDefense(target, "Provoke")
+	defenseResult, defEvent = sm.actions.rollTargetDefense(target, "Provoke")
 	assert.NotNil(t, defenseResult)
 	assert.NotEmpty(t, defEvent.DefenderName)
 }
@@ -614,7 +638,7 @@ func TestSceneManager_ApplyDamageToTarget_StressAbsorbed(t *testing.T) {
 	target := character.NewCharacter("target-1", "Goblin")
 	// Default stress track should be able to absorb small hits
 
-	dmgEvent := sm.applyDamageToTarget(context.Background(), target, 1, character.PhysicalStress)
+	dmgEvent := sm.conflict.applyDamageToTarget(context.Background(), target, 1, character.PhysicalStress)
 
 	// Check that stress was absorbed
 	assert.NotNil(t, dmgEvent.Absorbed, "Expected stress absorption")
@@ -715,15 +739,19 @@ func TestSceneManager_HandleTargetTakenOut(t *testing.T) {
 	testScene.AddCharacter(target.ID)
 	testScene.AddCharacter(otherEnemy.ID)
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
 
 	// Start a conflict
-	err = sm.initiateConflict(scene.PhysicalConflict, target.ID)
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, target.ID)
 	require.NoError(t, err)
 
 	// Take out the target
 	dmgEvent := &DamageResolutionEvent{TargetName: target.Name}
-	sm.applyTargetTakenOut(context.Background(), target, dmgEvent)
+	sm.conflict.applyTargetTakenOut(context.Background(), target, dmgEvent)
 	assert.True(t, dmgEvent.TakenOut)
 
 	// Check that target is marked as taken out (conflict still active because of otherEnemy)
@@ -752,15 +780,19 @@ func TestSceneManager_HandleTargetTakenOut_ConflictEnds(t *testing.T) {
 	testScene.AddCharacter(player.ID)
 	testScene.AddCharacter(target.ID)
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
 
 	// Start a conflict
-	err = sm.initiateConflict(scene.PhysicalConflict, target.ID)
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, target.ID)
 	require.NoError(t, err)
 
 	// Take out the only target
 	dmgEvent := &DamageResolutionEvent{TargetName: target.Name}
-	sm.applyTargetTakenOut(context.Background(), target, dmgEvent)
+	sm.conflict.applyTargetTakenOut(context.Background(), target, dmgEvent)
 
 	// Conflict should end since no active opponents remain
 	assert.False(t, sm.currentScene.IsConflict)
@@ -785,15 +817,19 @@ func TestSceneManager_HandleTargetTakenOut_MarksSceneLevelTakenOut(t *testing.T)
 	testScene.AddCharacter(player.ID)
 	testScene.AddCharacter(target.ID)
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
 
 	// Start a conflict
-	err = sm.initiateConflict(scene.PhysicalConflict, target.ID)
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, target.ID)
 	require.NoError(t, err)
 
 	// Take out the target
 	dmgEvent := &DamageResolutionEvent{TargetName: target.Name}
-	sm.applyTargetTakenOut(context.Background(), target, dmgEvent)
+	sm.conflict.applyTargetTakenOut(context.Background(), target, dmgEvent)
 
 	// Conflict ends, but character should still be marked as taken out at scene level
 	assert.False(t, sm.currentScene.IsConflict)
@@ -819,14 +855,18 @@ func TestSceneManager_InitiateConflict_ExcludesTakenOutCharacters(t *testing.T) 
 	testScene.AddCharacter(enemy1.ID)
 	testScene.AddCharacter(enemy2.ID)
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
 
 	// Start first conflict and take out enemy1
-	err = sm.initiateConflict(scene.PhysicalConflict, enemy1.ID)
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, enemy1.ID)
 	require.NoError(t, err)
 
 	dmgEvent := &DamageResolutionEvent{TargetName: enemy1.Name}
-	sm.applyTargetTakenOut(context.Background(), enemy1, dmgEvent)
+	sm.conflict.applyTargetTakenOut(context.Background(), enemy1, dmgEvent)
 	// Conflict still ongoing because enemy2 is active
 	assert.True(t, sm.currentScene.IsConflict)
 
@@ -835,7 +875,7 @@ func TestSceneManager_InitiateConflict_ExcludesTakenOutCharacters(t *testing.T) 
 	assert.False(t, sm.currentScene.IsConflict)
 
 	// Try to initiate a new conflict with enemy2
-	err = sm.initiateConflict(scene.PhysicalConflict, enemy2.ID)
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, enemy2.ID)
 	require.NoError(t, err)
 
 	// enemy1 should NOT be in the new conflict since they were taken out
@@ -863,21 +903,25 @@ func TestSceneManager_InitiateConflict_TakenOutInitiatorFails(t *testing.T) {
 	testScene.AddCharacter(player.ID)
 	testScene.AddCharacter(enemy.ID)
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
 
 	// Start first conflict and take out enemy
-	err = sm.initiateConflict(scene.PhysicalConflict, enemy.ID)
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, enemy.ID)
 	require.NoError(t, err)
 
 	dmgEvent := &DamageResolutionEvent{TargetName: enemy.Name}
-	sm.applyTargetTakenOut(context.Background(), enemy, dmgEvent)
+	sm.conflict.applyTargetTakenOut(context.Background(), enemy, dmgEvent)
 	assert.False(t, sm.currentScene.IsConflict) // Conflict ended
 
 	// Enemy is marked as taken out at scene level
 	assert.True(t, sm.currentScene.IsCharacterTakenOut(enemy.ID))
 
 	// Try to have the taken-out enemy initiate a new conflict - should fail
-	err = sm.initiateConflict(scene.PhysicalConflict, enemy.ID)
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, enemy.ID)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "taken out")
 }
@@ -919,7 +963,7 @@ func TestSceneManager_ApplyActionEffects_Attack(t *testing.T) {
 		Shifts: 3,
 	}
 
-	events := sm.applyActionEffects(context.Background(), testAction, target)
+	events := sm.actions.applyActionEffects(context.Background(), testAction, target)
 
 	// Check that events contain attack result with shifts
 	ar := RequireFirstFrom[PlayerAttackResultEvent](t, events)
@@ -954,7 +998,7 @@ func TestSceneManager_IsConcedeCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := sm.isConcedeCommand(tt.input)
+			result := sm.conflict.isConcedeCommand(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -980,13 +1024,13 @@ func TestSceneManager_HandleConcession(t *testing.T) {
 	require.NoError(t, err)
 
 	// Start a conflict
-	err = sm.initiateConflict(scene.PhysicalConflict, enemy.ID)
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, enemy.ID)
 	require.NoError(t, err)
 	require.True(t, sm.currentScene.IsConflict)
 
 	// Handle concession
 	ctx := context.Background()
-	events := sm.handleConcession(ctx)
+	events := sm.conflict.handleConcession(ctx)
 
 	// Check fate point was awarded (1 base + 1 for conceding = 2)
 	assert.Equal(t, 2, player.FatePoints, "Expected fate point for conceding")
@@ -1030,12 +1074,12 @@ func TestSceneManager_HandleConcession_WithConsequences(t *testing.T) {
 	require.NoError(t, err)
 
 	// Start a conflict
-	err = sm.initiateConflict(scene.PhysicalConflict, enemy.ID)
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, enemy.ID)
 	require.NoError(t, err)
 
 	// Handle concession
 	ctx := context.Background()
-	events := sm.handleConcession(ctx)
+	events := sm.conflict.handleConcession(ctx)
 
 	// Check fate points: 1 base + 1 for conceding + 2 for consequences = 4
 	assert.Equal(t, 4, player.FatePoints, "Expected fate points for conceding with consequences")
@@ -1082,7 +1126,7 @@ func TestSceneManager_ApplyActionEffects_Attack_NilTarget_ShowsError(t *testing.
 	}
 
 	// Call with nil target (simulating failed resolution)
-	events := sm.applyActionEffects(context.Background(), testAction, nil)
+	events := sm.actions.applyActionEffects(context.Background(), testAction, nil)
 
 	// Should return a PlayerAttackResultEvent with TargetMissing
 	ar := RequireFirstFrom[PlayerAttackResultEvent](t, events)
@@ -1125,7 +1169,7 @@ func TestSceneManager_ApplyActionEffects_Attack_DealsDamage(t *testing.T) {
 		Shifts: 1,
 	}
 
-	events := sm.applyActionEffects(context.Background(), testAction, target)
+	events := sm.actions.applyActionEffects(context.Background(), testAction, target)
 
 	// Verify stress was actually applied
 	afterAvailable := target.GetStressTrack(character.PhysicalStress).AvailableBoxes()
@@ -1173,7 +1217,7 @@ func TestSceneManager_ApplyActionEffects_Attack_Tie_GrantsBoost(t *testing.T) {
 		Shifts: 0,
 	}
 
-	events := sm.applyActionEffects(context.Background(), testAction, target)
+	events := sm.actions.applyActionEffects(context.Background(), testAction, target)
 
 	// Attack result reports a tie.
 	ar := RequireFirstFrom[PlayerAttackResultEvent](t, events)
@@ -1214,7 +1258,7 @@ func TestSceneManager_ApplyActionEffects_Attack_Failure_DefendWithStyle_GrantsTa
 	// Shifts = -3 → attacker lost by 3, defender succeeded with style.
 	testAction.Outcome = &dice.Outcome{Type: dice.Failure, Shifts: -3}
 
-	events := sm.applyActionEffects(context.Background(), testAction, target)
+	events := sm.actions.applyActionEffects(context.Background(), testAction, target)
 
 	boostEvt := RequireFirstFrom[AspectCreatedEvent](t, events)
 	assert.True(t, boostEvt.IsBoost, "defending with style should create a boost for the defender")
@@ -1243,7 +1287,7 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage_Tie_CreatesBoost(t *tes
 	testAction := action.NewAction("action-1", player.ID, action.CreateAdvantage, "Notice", "Look for an opening")
 	testAction.Outcome = &dice.Outcome{Type: dice.Tie, Shifts: 0}
 
-	events := sm.applyActionEffects(context.Background(), testAction, nil)
+	events := sm.actions.applyActionEffects(context.Background(), testAction, nil)
 
 	boostEvt := RequireFirstFrom[AspectCreatedEvent](t, events)
 	assert.True(t, boostEvt.IsBoost, "CaA tie should create a boost, not a full aspect")
@@ -1273,7 +1317,7 @@ func TestSceneManager_ApplyActionEffects_Overcome_SWS_CreatesBoost(t *testing.T)
 	testAction := action.NewAction("action-1", player.ID, action.Overcome, "Athletics", "Vault the obstacle")
 	testAction.Outcome = &dice.Outcome{Type: dice.SuccessWithStyle, Shifts: 3}
 
-	events := sm.applyActionEffects(context.Background(), testAction, nil)
+	events := sm.actions.applyActionEffects(context.Background(), testAction, nil)
 
 	boostEvt := RequireFirstFrom[AspectCreatedEvent](t, events)
 	assert.True(t, boostEvt.IsBoost, "Overcome SWS should create a boost for the player")
@@ -1291,7 +1335,7 @@ func TestSceneManager_ResolveAction_TargetByName(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := engine.GetSceneManager()
-	sm.roller = dice.NewSeededRoller(42)
+	sm.actions.roller = dice.NewSeededRoller(42)
 
 	// Create player and NPC with different ID and name
 	player := character.NewCharacter("player-1", "Hero")
@@ -1320,7 +1364,7 @@ func TestSceneManager_ResolveAction_TargetByName(t *testing.T) {
 	testAction.Difficulty = dice.Fair
 
 	ctx := context.Background()
-	events, _ := sm.resolveAction(ctx, testAction)
+	events, _ := sm.actions.resolveAction(ctx, testAction)
 
 	// The attack should have resolved against Bart — check defense was rolled
 	// and damage was applied (if target wasn't found, no damage messages would appear)
@@ -1357,7 +1401,7 @@ func TestSceneManager_ResolveAction_UnknownTarget_AbortsWithoutConsumingTurn(t *
 	require.NoError(t, err)
 
 	sm := engine.GetSceneManager()
-	sm.roller = dice.NewSeededRoller(42)
+	sm.actions.roller = dice.NewSeededRoller(42)
 
 	player := character.NewCharacter("player-1", "Hero")
 	player.SetSkill("Fight", dice.Good)
@@ -1386,7 +1430,7 @@ func TestSceneManager_ResolveAction_UnknownTarget_AbortsWithoutConsumingTurn(t *
 	testAction.Difficulty = dice.Fair
 
 	ctx := context.Background()
-	events, awaiting := sm.resolveAction(ctx, testAction)
+	events, awaiting := sm.actions.resolveAction(ctx, testAction)
 	assert.False(t, awaiting, "unknown target should not await invoke")
 
 	// Should see the "try again" message in events
@@ -1438,8 +1482,12 @@ func TestSceneManager_HandleAction_ExcludesTakenOutFromTargets(t *testing.T) {
 	testScene.AddCharacter(takenOutNPC.ID)
 
 	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
 	sm.player = player
-	sm.roller = dice.NewSeededRoller(12345)
+	sm.conflict.player = player
+	sm.actions.player = player
+	sm.actions.roller = dice.NewSeededRoller(12345)
 
 	// Mark the goblin as taken out
 	testScene.MarkCharacterTakenOut(takenOutNPC.ID)

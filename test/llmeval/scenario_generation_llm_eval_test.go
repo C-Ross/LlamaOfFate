@@ -134,12 +134,18 @@ func evaluateScenarioGeneration(ctx context.Context, client llm.LLMClient, tc Sc
 	result.HasStoryQs = len(scenario.StoryQuestions) >= 2
 	result.StoryQsCount = len(scenario.StoryQuestions)
 
-	// Check story questions use "Can" or "Will" format per Fate Core
+	// Check story questions use "Can" or "Will" format per Fate Core using LLM judge
 	if len(scenario.StoryQuestions) > 0 {
 		canWillCount := 0
 		for _, q := range scenario.StoryQuestions {
-			q = strings.TrimSpace(q)
-			if strings.HasPrefix(q, "Can ") || strings.HasPrefix(q, "Will ") {
+			judge, err := LLMJudge(ctx, client, q, "Is this question phrased as a yes/no story question starting with 'Can' or 'Will' as used in Fate Core RPG scenarios?")
+			if err != nil {
+				// Fallback to prefix check on error
+				q = strings.TrimSpace(q)
+				if strings.HasPrefix(q, "Can ") || strings.HasPrefix(q, "Will ") {
+					canWillCount++
+				}
+			} else if judge.Pass {
 				canWillCount++
 			}
 		}

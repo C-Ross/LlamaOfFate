@@ -514,3 +514,229 @@ func TestCharacter_IsPermanentlyRemoved(t *testing.T) {
 	}
 	assert.True(t, char.IsPermanentlyRemoved(), "Permanent fate should be permanently removed")
 }
+
+// TestRecalculateStressTracks covers all Fate Core SRD tiers for Physique and Will,
+// extra mild consequence slots at Superb+, NPC type behaviour, and InitDefaults
+// hydration as sub-tests within a single table-driven function.
+func TestRecalculateStressTracks(t *testing.T) {
+	ladder := func(l dice.Ladder) *dice.Ladder { return &l }
+	mildIDs := [4]string{"m0", "m1", "m2", "m3"}
+
+	tests := []struct {
+		name            string
+		setup           func() *Character // nil → NewCharacter("test", "Test")
+		physique        *dice.Ladder      // nil → not set
+		will            *dice.Ladder      // nil → not set
+		wantPhysBoxes   int
+		wantMentalBoxes int
+		wantMaxMild     int // total mild consequence slots available (0 = skip check)
+	}{
+		// No-skill default
+		{
+			name:            "no skills → 2 boxes each, 1 mild slot",
+			wantPhysBoxes:   2,
+			wantMentalBoxes: 2,
+			wantMaxMild:     1,
+		},
+		// Average tier (3 boxes)
+		{
+			name:            "Physique Average → 3 physical boxes",
+			physique:        ladder(dice.Average),
+			wantPhysBoxes:   3,
+			wantMentalBoxes: 2,
+			wantMaxMild:     1,
+		},
+		{
+			name:            "Will Average → 3 mental boxes",
+			will:            ladder(dice.Average),
+			wantPhysBoxes:   2,
+			wantMentalBoxes: 3,
+			wantMaxMild:     1,
+		},
+		{
+			name:            "Physique Fair → 3 physical boxes",
+			physique:        ladder(dice.Fair),
+			wantPhysBoxes:   3,
+			wantMentalBoxes: 2,
+			wantMaxMild:     1,
+		},
+		{
+			name:            "Will Fair → 3 mental boxes",
+			will:            ladder(dice.Fair),
+			wantPhysBoxes:   2,
+			wantMentalBoxes: 3,
+			wantMaxMild:     1,
+		},
+		// Good tier (4 boxes)
+		{
+			name:            "Physique Good → 4 physical boxes",
+			physique:        ladder(dice.Good),
+			wantPhysBoxes:   4,
+			wantMentalBoxes: 2,
+			wantMaxMild:     1,
+		},
+		{
+			name:            "Will Good → 4 mental boxes",
+			will:            ladder(dice.Good),
+			wantPhysBoxes:   2,
+			wantMentalBoxes: 4,
+			wantMaxMild:     1,
+		},
+		{
+			name:            "Physique Great → 4 physical boxes",
+			physique:        ladder(dice.Great),
+			wantPhysBoxes:   4,
+			wantMentalBoxes: 2,
+			wantMaxMild:     1,
+		},
+		{
+			name:            "Will Great → 4 mental boxes",
+			will:            ladder(dice.Great),
+			wantPhysBoxes:   2,
+			wantMentalBoxes: 4,
+			wantMaxMild:     1,
+		},
+		// Superb tier (4 boxes + extra mild slot)
+		{
+			name:            "Physique Superb → 4 physical boxes and 1 extra mild slot",
+			physique:        ladder(dice.Superb),
+			wantPhysBoxes:   4,
+			wantMentalBoxes: 2,
+			wantMaxMild:     2,
+		},
+		{
+			name:            "Will Superb → 4 mental boxes and 1 extra mild slot",
+			will:            ladder(dice.Superb),
+			wantPhysBoxes:   2,
+			wantMentalBoxes: 4,
+			wantMaxMild:     2,
+		},
+		{
+			name:            "both Physique and Will Superb → 4 boxes each and 2 extra mild slots",
+			physique:        ladder(dice.Superb),
+			will:            ladder(dice.Superb),
+			wantPhysBoxes:   4,
+			wantMentalBoxes: 4,
+			wantMaxMild:     3,
+		},
+		// NPC types
+		{
+			name:            "Main NPC with Physique Good and Will Fair",
+			setup:           func() *Character { return NewMainNPC("boss-1", "Boss") },
+			physique:        ladder(dice.Good),
+			will:            ladder(dice.Fair),
+			wantPhysBoxes:   4,
+			wantMentalBoxes: 3,
+			wantMaxMild:     1,
+		},
+		{
+			name:            "Supporting NPC default → 2 boxes each",
+			setup:           func() *Character { return NewSupportingNPC("npc", "NPC", "Concept") },
+			wantPhysBoxes:   2,
+			wantMentalBoxes: 2,
+			wantMaxMild:     1,
+		},
+		{
+			name:            "Supporting NPC with Physique Good → 4 physical boxes",
+			setup:           func() *Character { return NewSupportingNPC("npc", "NPC", "Concept") },
+			physique:        ladder(dice.Good),
+			wantPhysBoxes:   4,
+			wantMentalBoxes: 2,
+			wantMaxMild:     1,
+		},
+		// InitDefaults hydration from saved skills
+		{
+			name: "InitDefaults hydrates tracks from existing skills",
+			setup: func() *Character {
+				char := &Character{
+					ID:     "saved",
+					Name:   "Loaded Hero",
+					Skills: map[string]dice.Ladder{"Physique": dice.Great, "Will": dice.Average},
+					Aspects: Aspects{
+						OtherAspects: make([]string, 0),
+					},
+					Consequences: make([]Consequence, 0),
+				}
+				char.InitDefaults()
+				return char
+			},
+			wantPhysBoxes:   4,
+			wantMentalBoxes: 3,
+			wantMaxMild:     1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var char *Character
+			if tt.setup != nil {
+				char = tt.setup()
+			} else {
+				char = NewCharacter("test", "Test")
+			}
+			if tt.physique != nil {
+				char.SetSkill("Physique", *tt.physique)
+			}
+			if tt.will != nil {
+				char.SetSkill("Will", *tt.will)
+			}
+
+			physTrack := char.GetStressTrack(PhysicalStress)
+			mentalTrack := char.GetStressTrack(MentalStress)
+			require.NotNil(t, physTrack)
+			require.NotNil(t, mentalTrack)
+			assert.Equal(t, tt.wantPhysBoxes, physTrack.MaxBoxes)
+			assert.Equal(t, tt.wantMentalBoxes, mentalTrack.MaxBoxes)
+
+			if tt.wantMaxMild > 0 && char.CharacterType.HasConsequences() {
+				for i := 0; i < tt.wantMaxMild; i++ {
+					assert.True(t, char.CanTakeConsequence(MildConsequence),
+						"mild slot %d of %d should be available", i+1, tt.wantMaxMild)
+					char.AddConsequence(Consequence{ID: mildIDs[i], Type: MildConsequence})
+				}
+				assert.False(t, char.CanTakeConsequence(MildConsequence),
+					"should have no more mild slots after %d taken", tt.wantMaxMild)
+			}
+		})
+	}
+}
+
+// TestRecalculateStressTracks_SkillChangeMidGame verifies that changing Physique or Will
+// mid-game resizes the track while preserving already-checked boxes.
+func TestRecalculateStressTracks_SkillChangeMidGame(t *testing.T) {
+	char := NewCharacter("test", "Test") // 2 boxes initially
+
+	// Mark box 1 and 2
+	assert.True(t, char.TakeStress(PhysicalStress, 1))
+	assert.True(t, char.TakeStress(PhysicalStress, 2))
+
+	// Upgrade Physique to Good → expands to 4 boxes
+	char.SetSkill("Physique", dice.Good)
+	physTrack := char.GetStressTrack(PhysicalStress)
+	assert.Equal(t, 4, physTrack.MaxBoxes, "Should expand to 4 boxes")
+	assert.True(t, physTrack.Boxes[0], "Box 1 should remain checked after resize")
+	assert.True(t, physTrack.Boxes[1], "Box 2 should remain checked after resize")
+	assert.False(t, physTrack.Boxes[2], "Box 3 should start empty")
+	assert.False(t, physTrack.Boxes[3], "Box 4 should start empty")
+}
+
+// TestStressBoxesForSkill covers all tiers in the Fate Core table.
+func TestStressBoxesForSkill(t *testing.T) {
+	tests := []struct {
+		level    dice.Ladder
+		expected int
+	}{
+		{dice.Mediocre, 2},
+		{dice.Average, 3},
+		{dice.Fair, 3},
+		{dice.Good, 4},
+		{dice.Great, 4},
+		{dice.Superb, 4},
+		{dice.Fantastic, 4},
+	}
+
+	for _, tt := range tests {
+		assert.Equal(t, tt.expected, stressBoxesForSkill(tt.level),
+			"stressBoxesForSkill(%s)", tt.level)
+	}
+}

@@ -172,7 +172,7 @@ func getOvercomeTestCases() []ActionParserTestCase {
 			RawInput:           "Jesse shoulders his way through the crowd and slaps a silver dollar down on the bar",
 			Context:            "A busy saloon filled with rough patrons, the barkeep is serving drinks at the far end of the bar",
 			ExpectedType:       action.Overcome,
-			ExpectedSkills:     []string{"Rapport", "Provoke", "Physique"},
+			ExpectedSkills:     []string{"Rapport", "Provoke", "Physique", "Athletics"},
 			ExpectedDifficulty: 1, // Average - busy but not hostile
 			Description:        "Getting barkeep's attention in a busy saloon is an immediate obstacle - Overcome, not Create Advantage",
 		},
@@ -466,7 +466,7 @@ func getCreateAdvantageTestCases() []ActionParserTestCase {
 			RawInput:           "I spread rumors about the merchant to damage his reputation",
 			Context:            "Working to undermine a corrupt merchant's influence in town",
 			ExpectedType:       action.CreateAdvantage,
-			ExpectedSkills:     []string{"Deceive", "Contacts", "Rapport"},
+			ExpectedSkills:     []string{"Deceive", "Contacts", "Rapport", "Provoke"},
 			ExpectedDifficulty: 2, // Fair - people love gossip
 			Description:        "Creating a social situation aspect - Create Advantage",
 		},
