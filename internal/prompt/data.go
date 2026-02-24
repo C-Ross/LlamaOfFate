@@ -1,6 +1,8 @@
 package prompt
 
 import (
+	"fmt"
+
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
@@ -10,6 +12,61 @@ import (
 
 // Template data types for LLM prompt generation.
 // These structs are passed to Go templates to render prompts.
+
+// DifficultyGuidance holds pre-computed difficulty thresholds derived from
+// a character's peak skill. Both the action parser and challenge generator
+// embed this so the LLM picks sensible difficulties.
+type DifficultyGuidance struct {
+	DifficultyMin     int    // Recommended minimum difficulty
+	DifficultyMax     int    // Recommended maximum difficulty
+	DifficultyDefault int    // Suggested default difficulty
+	DifficultyGuide   string // Human-readable difficulty guidance
+}
+
+// ComputeDifficultyGuidance derives difficulty thresholds from a character's
+// skill map. The range follows Fate Core heuristics: 2 below peak = easy,
+// at peak = moderate, 2 above peak = hard.
+func ComputeDifficultyGuidance(skills map[string]dice.Ladder) DifficultyGuidance {
+	highestSkill := dice.Mediocre
+	for _, level := range skills {
+		if level > highestSkill {
+			highestSkill = level
+		}
+	}
+
+	minDiff := int(dice.Average)     // Floor at Average (+1) for meaningful rolls
+	defaultDiff := int(dice.Fair)    // Fair (+2) is the standard default
+	maxDiff := int(highestSkill) + 2 // Up to 2 above their best skill
+	if maxDiff < int(dice.Good) {
+		maxDiff = int(dice.Good) // At least Good (+3) as upper bound
+	}
+	if maxDiff > int(dice.Fantastic) {
+		maxDiff = int(dice.Fantastic) // Cap at Fantastic (+6) for normal play
+	}
+
+	guide := fmt.Sprintf("%d=easy, %d=moderate, %d=hard", minDiff, defaultDiff, maxDiff)
+
+	return DifficultyGuidance{
+		DifficultyMin:     minDiff,
+		DifficultyMax:     maxDiff,
+		DifficultyDefault: defaultDiff,
+		DifficultyGuide:   guide,
+	}
+}
+
+// ChallengeBuildData holds context for the challenge build prompt, which
+// generates structured task lists from a challenge description. This is
+// the second LLM call in the two-step challenge flow: (1) the scene
+// response LLM emits [CHALLENGE:description], (2) this prompt turns that
+// description into concrete tasks with skills and difficulties.
+type ChallengeBuildData struct {
+	Description        string                  // Challenge description from the marker
+	SceneName          string                  // Current scene name for context
+	SceneDescription   string                  // Current scene description
+	PlayerSkills       []string                // Player's skill names (so tasks use real skills)
+	SituationAspects   []scene.SituationAspect // Active scene aspects for narrative context
+	DifficultyGuidance                         // Embedded difficulty thresholds
+}
 
 // InputClassificationData holds the data for input classification template
 type InputClassificationData struct {
@@ -238,15 +295,12 @@ type ConversationEntry = uicontract.ConversationEntry
 
 // ActionParseTemplateData holds the data for action parse template
 type ActionParseTemplateData struct {
-	Character         *character.Character
-	RawInput          string
-	Context           string
-	Scene             interface{}
-	OtherCharacters   []*character.Character
-	DifficultyMin     int    // Recommended minimum difficulty
-	DifficultyMax     int    // Recommended maximum difficulty
-	DifficultyDefault int    // Suggested default difficulty
-	DifficultyGuide   string // Human-readable difficulty guidance
+	Character          *character.Character
+	RawInput           string
+	Context            string
+	Scene              interface{}
+	OtherCharacters    []*character.Character
+	DifficultyGuidance // Embedded difficulty thresholds
 }
 
 // FateNarrationData holds the data for the fate narration template.

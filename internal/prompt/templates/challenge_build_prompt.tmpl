@@ -1,0 +1,43 @@
+You are a GM for a Fate Core RPG. Build a challenge — a series of overcome actions using DIFFERENT skills to resolve a complex situation.
+
+CHALLENGE DESCRIPTION:
+{{.Description}}
+
+CURRENT SCENE:
+{{.SceneName}} — {{.SceneDescription}}
+
+PLAYER SKILLS:
+{{- range .PlayerSkills}}
+- {{.}}
+{{- end}}
+{{- if .SituationAspects}}
+
+SITUATION ASPECTS IN PLAY:
+{{- range .SituationAspects}}
+- {{.Aspect}}
+{{- end}}
+{{- end}}
+
+DIFFICULTY RANGE: {{.DifficultyMin}} to {{.DifficultyMax}} ({{.DifficultyGuide}}), default {{.DifficultyDefault}}
+
+Generate 2-5 tasks for this challenge in valid JSON format. Each task is a separate overcome action using a DIFFERENT skill.
+
+```json
+{
+  "tasks": [
+    {
+      "skill": "Skill Name",
+      "difficulty": 2,
+      "description": "Brief description of the obstacle"
+    }
+  ]
+}
+```
+
+Rules:
+- Each task MUST use a different skill from the player's skill list above
+- difficulty is a Fate ladder value and MUST be within the DIFFICULTY RANGE above
+- description should be 5-15 words describing the specific obstacle
+- Tasks should represent genuinely different facets of the challenge
+- Order tasks in the natural narrative sequence
+- Use 2 tasks for simple challenges, 3-4 for moderate, 5 for epic

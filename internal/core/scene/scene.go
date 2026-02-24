@@ -1,6 +1,7 @@
 package scene
 
 import (
+	"fmt"
 	"sort"
 	"time"
 )
@@ -19,6 +20,8 @@ type Scene struct {
 	// Scene State
 	IsConflict         bool            `json:"is_conflict" yaml:"is_conflict,omitempty"`
 	ConflictState      *ConflictState  `json:"conflict_state,omitempty" yaml:"conflict_state,omitempty"`
+	IsChallenge        bool            `json:"is_challenge" yaml:"is_challenge,omitempty"`
+	ChallengeState     *ChallengeState `json:"challenge_state,omitempty" yaml:"challenge_state,omitempty"`
 	TakenOutCharacters map[string]bool `json:"taken_out_characters,omitempty" yaml:"taken_out_characters,omitempty"` // Characters taken out this scene
 
 	// Metadata
@@ -218,6 +221,9 @@ func (s *Scene) ActiveSceneType() SceneType {
 	if s.IsConflict {
 		return SceneTypeConflict
 	}
+	if s.IsChallenge {
+		return SceneTypeChallenge
+	}
 	return SceneTypeNone
 }
 
@@ -275,6 +281,43 @@ func (s *Scene) EscalateConflict(newType ConflictType) bool {
 func (s *Scene) EndConflict() {
 	s.IsConflict = false
 	s.ConflictState = nil
+	s.UpdatedAt = time.Now()
+}
+
+// StartChallenge begins a challenge in this scene. Returns an error if
+// another structured type (conflict, challenge, contest) is already active.
+func (s *Scene) StartChallenge(description string, tasks []ChallengeTask) error {
+	if active := s.ActiveSceneType(); active != SceneTypeNone {
+		return fmt.Errorf("cannot start challenge: scene already has active %s", active)
+	}
+
+	// Assign IDs and set initial status for each task
+	for i := range tasks {
+		if tasks[i].ID == "" {
+			tasks[i].ID = fmt.Sprintf("task-%d", i+1)
+		}
+		if tasks[i].Status == "" {
+			tasks[i].Status = TaskPending
+		}
+	}
+
+	s.IsChallenge = true
+	s.ChallengeState = &ChallengeState{
+		Description: description,
+		Tasks:       tasks,
+		Resolved:    false,
+	}
+	s.UpdatedAt = time.Now()
+	return nil
+}
+
+// EndChallenge ends the challenge in this scene.
+func (s *Scene) EndChallenge() {
+	if s.ChallengeState != nil {
+		s.ChallengeState.Resolved = true
+	}
+	s.IsChallenge = false
+	s.ChallengeState = nil
 	s.UpdatedAt = time.Now()
 }
 

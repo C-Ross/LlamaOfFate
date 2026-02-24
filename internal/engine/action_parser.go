@@ -155,39 +155,15 @@ func (ap *LLMActionParser) buildSystemPrompt() (string, error) {
 
 // buildUserPrompt creates the user prompt using templates with pre-computed difficulty guidance
 func (ap *LLMActionParser) buildUserPrompt(req ActionParseRequest) (string, error) {
-	// Compute difficulty range based on character's highest skill
-	highestSkill := dice.Mediocre
-	for _, level := range req.Character.Skills {
-		if level > highestSkill {
-			highestSkill = level
-		}
-	}
-
-	// Fate guidance: 2 below skill = easy, at skill = moderate, 2 above = hard
-	// Typical range: Fair (+2) for routine to skill+2 for challenging
-	minDiff := int(dice.Average)     // Floor at Average (+1) for meaningful rolls
-	defaultDiff := int(dice.Fair)    // Fair (+2) is the standard default
-	maxDiff := int(highestSkill) + 2 // Up to 2 above their best skill
-	if maxDiff < int(dice.Good) {
-		maxDiff = int(dice.Good) // At least Good (+3) as upper bound
-	}
-	if maxDiff > int(dice.Fantastic) {
-		maxDiff = int(dice.Fantastic) // Cap at Fantastic (+6) for normal play
-	}
-
-	// Build human-readable guide
-	guide := fmt.Sprintf("%d=easy, %d=moderate, %d=hard", minDiff, defaultDiff, maxDiff)
+	guidance := prompt.ComputeDifficultyGuidance(req.Character.Skills)
 
 	templateData := prompt.ActionParseTemplateData{
-		Character:         req.Character,
-		RawInput:          req.RawInput,
-		Context:           req.Context,
-		Scene:             req.Scene,
-		OtherCharacters:   req.OtherCharacters,
-		DifficultyMin:     minDiff,
-		DifficultyMax:     maxDiff,
-		DifficultyDefault: defaultDiff,
-		DifficultyGuide:   guide,
+		Character:          req.Character,
+		RawInput:           req.RawInput,
+		Context:            req.Context,
+		Scene:              req.Scene,
+		OtherCharacters:    req.OtherCharacters,
+		DifficultyGuidance: guidance,
 	}
 
 	return prompt.RenderActionParse(templateData)

@@ -227,3 +227,37 @@ func TestFateNarrationTemplate(t *testing.T) {
 	assert.Contains(t, rendered, "knock them both out")
 	assert.Contains(t, rendered, "physical")
 }
+
+func TestChallengeBuildTemplate(t *testing.T) {
+	data := ChallengeBuildData{
+		Description:      "Break into the baron's vault",
+		SceneName:        "The Baron's Keep",
+		SceneDescription: "A fortified keep with guards and traps",
+		PlayerSkills:     []string{"Athletics", "Stealth", "Burglary"},
+		SituationAspects: []scene.SituationAspect{
+			{ID: "asp-1", Aspect: "Patrolling Guards"},
+			{ID: "asp-2", Aspect: "Moonless Night"},
+		},
+		DifficultyGuidance: DifficultyGuidance{
+			DifficultyMin:     1,
+			DifficultyMax:     5,
+			DifficultyDefault: 2,
+			DifficultyGuide:   "1=easy, 2=moderate, 5=hard",
+		},
+	}
+
+	rendered, err := RenderChallengeBuild(data)
+	require.NoError(t, err)
+
+	assert.Contains(t, rendered, "Break into the baron's vault")
+	assert.Contains(t, rendered, "The Baron's Keep")
+	assert.Contains(t, rendered, "fortified keep")
+	assert.Contains(t, rendered, "Athletics")
+	assert.Contains(t, rendered, "Stealth")
+	assert.Contains(t, rendered, "Burglary")
+	assert.Contains(t, rendered, "1=easy, 2=moderate, 5=hard")
+	assert.Contains(t, rendered, "DIFFICULTY RANGE")
+	assert.Contains(t, rendered, "Patrolling Guards")
+	assert.Contains(t, rendered, "Moonless Night")
+	assert.Contains(t, rendered, "SITUATION ASPECTS")
+}
