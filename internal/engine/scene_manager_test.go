@@ -1058,3 +1058,173 @@ func TestHandleInput_ClassificationFallbackToDialog(t *testing.T) {
 	_, ok := result.Events[0].(DialogEvent)
 	assert.True(t, ok, "fallback should produce DialogEvent, got %T", result.Events[0])
 }
+
+// --- Challenge integration tests ---
+
+func TestHandleInput_DialogWithChallengeMarker_InitiatesChallenge(t *testing.T) {
+	// Sequence:
+	//  1. classification → "dialog"
+	//  2. scene response → narrative with [CHALLENGE:...] marker
+	//  3. challenge generator (BuildChallenge) → JSON tasks
+	client := &sequentialMockLLMClient{
+		responses: []string{
+			"dialog",
+			"The vault door looms before you. [CHALLENGE:Break into the vault]",
+			`{"tasks": [
+				{"skill": "Athletics", "difficulty": 3, "description": "Scale the wall"},
+				{"skill": "Stealth",   "difficulty": 2, "description": "Sneak past guards"},
+				{"skill": "Burglary",  "difficulty": 4, "description": "Pick the lock"}
+			]}`,
+		},
+	}
+
+	engine, err := NewWithLLM(client)
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	testScene := scene.NewScene("vault", "Vault", "A massive vault")
+	player := character.NewCharacter("player-1", "Hero")
+	player.SetSkill("Athletics", dice.Good)
+	player.SetSkill("Stealth", dice.Fair)
+	player.SetSkill("Burglary", dice.Great)
+	engine.AddCharacter(player)
+	testScene.AddCharacter(player.ID)
+
+	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
+	sm.challenge.setSceneState(testScene, player)
+	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
+
+	result, err := sm.HandleInput(context.Background(), "I examine the vault")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// Should have DialogEvent + ChallengeStartEvent
+	AssertHasEventIn[DialogEvent](t, result.Events)
+	startEvent := RequireFirstFrom[ChallengeStartEvent](t, result.Events)
+
+	assert.Equal(t, "Break into the vault", startEvent.Description)
+	assert.Len(t, startEvent.Tasks, 3)
+
+	// Scene should now be in challenge mode
+	assert.True(t, testScene.IsChallenge)
+	require.NotNil(t, testScene.ChallengeState)
+	assert.Len(t, testScene.ChallengeState.Tasks, 3)
+}
+
+func TestHandleInput_ActionDuringChallenge_ResolvesTask(t *testing.T) {
+	// Scene already has an active challenge. Player takes an action whose
+	// skill matches a pending task → should produce ChallengeTaskResultEvent.
+	//
+	// Sequence:
+	//  1. classification → "action"
+	//  2. action parse   → overcome with Athletics
+	//  3. narrative       → flavor text
+	client := &sequentialMockLLMClient{
+		responses: []string{
+			"action",
+			`{"action_type":"Overcome","skill":"Athletics","description":"climb the wall","difficulty":3}`,
+			"You scale the wall with ease!",
+		},
+	}
+
+	engine, err := NewWithLLM(client)
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm.actions.roller = dice.NewSeededRoller(42)
+
+	testScene := scene.NewScene("vault", "Vault", "A massive vault")
+	player := character.NewCharacter("player-1", "Hero")
+	player.SetSkill("Athletics", dice.Good) // +3
+	engine.AddCharacter(player)
+	testScene.AddCharacter(player.ID)
+
+	// Manually start a challenge on the scene
+	tasks := []scene.ChallengeTask{
+		{ID: "task-1", Skill: "Athletics", Difficulty: 3, Status: scene.TaskPending, Description: "Scale the wall"},
+		{ID: "task-2", Skill: "Stealth", Difficulty: 2, Status: scene.TaskPending, Description: "Sneak past guards"},
+	}
+	err = testScene.StartChallenge("Break into the vault", tasks)
+	require.NoError(t, err)
+
+	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
+	sm.challenge.setSceneState(testScene, player)
+	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
+
+	result, err := sm.HandleInput(context.Background(), "I climb the wall")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// Should have an ActionResultEvent, NarrativeEvent, and a ChallengeTaskResultEvent
+	AssertHasEventIn[ActionResultEvent](t, result.Events)
+	taskResult := RequireFirstFrom[ChallengeTaskResultEvent](t, result.Events)
+	assert.Equal(t, "task-1", taskResult.TaskID)
+	assert.Equal(t, "Athletics", taskResult.Skill)
+
+	// task-2 is still pending so challenge should not be complete
+	assert.True(t, testScene.IsChallenge)
+	AssertNoEventIn[ChallengeCompleteEvent](t, result.Events)
+}
+
+func TestHandleInput_ActionDuringChallenge_CompletesChallenge(t *testing.T) {
+	// Only one task left pending. Resolving it should produce both
+	// ChallengeTaskResultEvent and ChallengeCompleteEvent.
+	client := &sequentialMockLLMClient{
+		responses: []string{
+			"action",
+			`{"action_type":"Overcome","skill":"Stealth","description":"sneak past the guards","difficulty":2}`,
+			"You slip past unnoticed!",
+		},
+	}
+
+	engine, err := NewWithLLM(client)
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm.actions.roller = dice.NewSeededRoller(42)
+
+	testScene := scene.NewScene("vault", "Vault", "A massive vault")
+	player := character.NewCharacter("player-1", "Hero")
+	player.SetSkill("Stealth", dice.Fair) // +2
+	engine.AddCharacter(player)
+	testScene.AddCharacter(player.ID)
+
+	// Challenge with one already-resolved task and one pending
+	tasks := []scene.ChallengeTask{
+		{ID: "task-1", Skill: "Athletics", Difficulty: 3, Status: scene.TaskSucceeded, ActorID: "player-1"},
+		{ID: "task-2", Skill: "Stealth", Difficulty: 2, Status: scene.TaskPending, Description: "Sneak past guards"},
+	}
+	err = testScene.StartChallenge("Break into the vault", tasks)
+	require.NoError(t, err)
+
+	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
+	sm.challenge.setSceneState(testScene, player)
+	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
+
+	result, err := sm.HandleInput(context.Background(), "I sneak past the guards")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// Should have task result and challenge complete events
+	AssertHasEventIn[ChallengeTaskResultEvent](t, result.Events)
+	completeEvent := RequireFirstFrom[ChallengeCompleteEvent](t, result.Events)
+
+	// task-1 succeeded, task-2 result depends on dice — but challenge should be done
+	assert.GreaterOrEqual(t, completeEvent.Successes+completeEvent.Failures+completeEvent.Ties, 2)
+	assert.NotEmpty(t, completeEvent.Overall)
+
+	// Scene should no longer be in challenge
+	assert.False(t, testScene.IsChallenge)
+}

@@ -655,3 +655,122 @@ func TestIntegration_Resume_MidConflict(t *testing.T) {
 	assert.Equal(t, "Survive the ambush", lastSave.Scene.ScenePurpose)
 	assert.Len(t, lastSave.Scene.ConversationHistory, 1)
 }
+
+// TestIntegration_Resume_MidChallenge verifies that resuming into a scene with
+// an active challenge preserves the challenge state through save/load.
+func TestIntegration_Resume_MidChallenge(t *testing.T) {
+	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	require.NoError(t, err)
+
+	player := character.NewCharacter("player1", "Jesse")
+	player.Aspects.HighConcept = "Gunslinger"
+
+	// Create a scene with an active challenge (mid-progress)
+	testScene := scene.NewScene("scene1", "Vault", "The massive vault")
+	testScene.IsChallenge = true
+	testScene.ChallengeState = &scene.ChallengeState{
+		Description: "Break into the vault",
+		Tasks: []scene.ChallengeTask{
+			{ID: "task-1", Skill: "Athletics", Difficulty: 3, Status: scene.TaskSucceeded, Description: "Scale the wall", ActorID: "player1"},
+			{ID: "task-2", Skill: "Stealth", Difficulty: 2, Status: scene.TaskPending, Description: "Sneak past guards"},
+			{ID: "task-3", Skill: "Burglary", Difficulty: 4, Status: scene.TaskPending, Description: "Pick the lock"},
+		},
+	}
+
+	savedState := &GameState{
+		Scenario: ScenarioState{
+			Player:   player,
+			Scenario: &scene.Scenario{Title: "The Heist", Problem: "Steal the jewel", Genre: "Thriller"},
+		},
+		Scene: SceneState{
+			CurrentScene: testScene,
+			ConversationHistory: []prompt.ConversationEntry{
+				{PlayerInput: "I examine the vault", GMResponse: "The vault door looms.", Type: "dialog"},
+				{PlayerInput: "", GMResponse: "[Challenge started: Break into the vault]", Type: "dialog"},
+			},
+			ScenePurpose: "Obtain the diamond",
+		},
+	}
+
+	recorder := &recordingSaver{loadResult: savedState}
+
+	gm := NewGameManager(engine)
+	gm.SetPlayer(player)
+	gm.SetSaver(recorder)
+
+	events, err := gm.Start(context.Background())
+	require.NoError(t, err)
+	_ = events
+
+	// Save should preserve challenge state
+	err = gm.Save()
+	require.NoError(t, err)
+	require.NotEmpty(t, recorder.savedStates)
+	lastSave := recorder.savedStates[len(recorder.savedStates)-1]
+
+	assert.True(t, lastSave.Scene.CurrentScene.IsChallenge, "challenge should still be active")
+	require.NotNil(t, lastSave.Scene.CurrentScene.ChallengeState)
+	assert.Equal(t, "Break into the vault", lastSave.Scene.CurrentScene.ChallengeState.Description)
+	assert.Len(t, lastSave.Scene.CurrentScene.ChallengeState.Tasks, 3)
+
+	// Verify individual task states were preserved
+	tasks := lastSave.Scene.CurrentScene.ChallengeState.Tasks
+	assert.Equal(t, scene.TaskSucceeded, tasks[0].Status)
+	assert.Equal(t, "player1", tasks[0].ActorID)
+	assert.Equal(t, scene.TaskPending, tasks[1].Status)
+	assert.Equal(t, scene.TaskPending, tasks[2].Status)
+
+	assert.Equal(t, "Obtain the diamond", lastSave.Scene.ScenePurpose)
+	assert.Len(t, lastSave.Scene.ConversationHistory, 2)
+}
+
+// TestIntegration_ChallengeState_SnapshotRoundTrip verifies that a challenge
+// state survives Snapshot → Restore on SceneManager.
+func TestIntegration_ChallengeState_SnapshotRoundTrip(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	// Build first scene manager with active challenge
+	sm1 := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	player := character.NewCharacter("player1", "Jesse")
+	testScene := scene.NewScene("vault", "Vault", "A massive vault")
+	require.NoError(t, sm1.StartScene(testScene, player))
+	sm1.SetScenePurpose("Obtain the diamond")
+
+	// Start a challenge on the scene
+	err = testScene.StartChallenge("Crack the safe", []scene.ChallengeTask{
+		{ID: "t1", Skill: "Burglary", Difficulty: 4, Status: scene.TaskPending, Description: "Pick the lock"},
+		{ID: "t2", Skill: "Notice", Difficulty: 2, Status: scene.TaskSucceeded, ActorID: "player1", Description: "Spot the mechanism"},
+	})
+	require.NoError(t, err)
+
+	sm1.conversationHistory = []prompt.ConversationEntry{
+		{PlayerInput: "I pick the lock", GMResponse: "You examine the mechanism", Type: "dialog"},
+	}
+
+	// Take snapshot
+	snapshot := sm1.Snapshot()
+
+	// Restore into a fresh scene manager
+	sm2 := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm2.Restore(snapshot, player)
+
+	// Verify challenge state survived the round-trip
+	require.NotNil(t, sm2.currentScene)
+	assert.Equal(t, "Vault", sm2.currentScene.Name)
+	assert.True(t, sm2.currentScene.IsChallenge)
+	require.NotNil(t, sm2.currentScene.ChallengeState)
+
+	cs := sm2.currentScene.ChallengeState
+	assert.Equal(t, "Crack the safe", cs.Description)
+	assert.Len(t, cs.Tasks, 2)
+	assert.Equal(t, scene.TaskPending, cs.Tasks[0].Status)
+	assert.Equal(t, scene.TaskSucceeded, cs.Tasks[1].Status)
+
+	assert.Equal(t, "Obtain the diamond", sm2.scenePurpose)
+	assert.Len(t, sm2.conversationHistory, 1)
+
+	// Verify the challenge manager has the wired scene
+	assert.Equal(t, testScene, sm2.challenge.currentScene)
+	assert.Equal(t, player, sm2.challenge.player)
+}
