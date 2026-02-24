@@ -57,7 +57,17 @@ prompt.RenderSceneSummary(data SceneSummaryData) (string, error)
 prompt.RenderScenarioGeneration(data ScenarioGenerationData) (string, error)
 prompt.RenderScenarioResolution(data ScenarioResolutionData) (string, error)
 prompt.RenderRecoveryNarrative(data RecoveryNarrativeData) (string, error)
+prompt.RenderChallengeBuild(data ChallengeBuildData) (string, error)
 ```
+
+## Existing Markers
+
+In `internal/prompt/markers.go`:
+
+- `ParseSceneTransitionMarker()` — `[SCENE_TRANSITION:hint]` for scene exits
+- `ParseConflictMarker()` — `[CONFLICT:physical|mental:character_id]` for conflict initiation
+- `ParseConflictEndMarker()` — `[CONFLICT:end:reason]` for conflict de-escalation
+- `ParseChallengeMarker()` — `[CHALLENGE:description]` for challenge initiation
 
 ## Adding New Markers
 

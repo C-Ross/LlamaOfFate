@@ -14,10 +14,12 @@ Orchestration layers in `internal/engine/` between `internal/core/` rules and `i
 syncdriver.Run()     ← blocking terminal loop (wraps async engine API)
   └─ GameManager (GameSessionManager interface) ← async API: Start/HandleInput/Provide*Response
        └─ ScenarioManager ← multi-scene loop, scene generation, summaries, NPC registry, recovery
-            └─ SceneManager ← single-scene loop, input classification, dialog/action, conflict turns
-                 ├─ ActionParser    ← LLM: free-text → structured action
-                 ├─ AspectGenerator ← LLM: Create Advantage → aspect name
-                 └─ invoke.go       ← post-roll aspect invocation loop
+            └─ SceneManager ← single-scene loop, input classification, dialog/action, conflict/challenge turns
+                 ├─ ActionResolver    ← dice, invokes, narrative, damage
+                 ├─ ConflictManager   ← conflict lifecycle (turns, NPC, damage)
+                 ├─ ChallengeManager  ← challenge lifecycle (initiation, task resolution)
+                 ├─ ActionParser      ← LLM: free-text → structured action
+                 └─ AspectGenerator   ← LLM: Create Advantage → aspect name
 ```
 
 **syncdriver** wraps the async engine for blocking UIs. Engine itself is purely event-driven. Each layer creates/configures the layer below. **Do not skip layers.**
@@ -165,6 +167,22 @@ All invoke logic in `invoke.go` (called from `conflict.go` and `npc.go`):
 
 `handleConflictEscalation(newType)` — changes conflict type, recalculates initiative.
 
+## ChallengeManager (`challenge_manager.go`, `challenge.go`)
+
+Challenge lifecycle:
+
+1. **Initiation** — `parseChallengeTrigger()` detects `[CHALLENGE:desc]` marker → `initiateChallenge()` calls LLM to generate task list
+2. **Task Resolution** — `resolveTask()` called by `ActionResolver.finishResolveAction()` after overcome roll
+3. **Completion** — `completeChallenge()` when all tasks resolved, emits `ChallengeCompleteEvent` with tally
+
+**Generator:** `ChallengeGenerator` (LLM-backed) creates `ChallengeState` from scene context.
+
+```go
+cm.initiateChallenge(ctx, description)  // Returns ChallengeStartEvent
+cm.resolveTask(ctx, taskID, status)     // Returns ChallengeTaskResultEvent
+cm.completeChallenge(ctx)               // Returns ChallengeCompleteEvent
+```
+
 ## NPC Turns (`npc.go`)
 
 ```
@@ -204,7 +222,8 @@ Data types shared between engine and UI:
 | Blocking loop behavior | `internal/syncdriver/syncdriver.go` `Run()`, `driveBlockingPrompts()` |
 | Input classification type | `scene_manager.go` constants + `HandleInput()` switch |
 | Action outcome effect | `conflict.go` `applyActionEffects()` |
-| Conflict mechanic | `conflict.go` (method on `*SceneManager`) |
+| Conflict mechanic | `conflict.go` `ConflictManager` methods |
+| Challenge mechanic | `challenge.go`, `challenge_manager.go` `ChallengeManager` methods |
 | LLM prompt/response | `internal/prompt/` (template + data struct + parser) |
 | NPC action type | `npc.go` (`processNPC<Type>()` + switch) |
 | Scene generation | `scenario_manager.go` `generateNextScene()` |

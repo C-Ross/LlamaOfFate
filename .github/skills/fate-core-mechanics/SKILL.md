@@ -240,6 +240,16 @@ recovered := char.CheckConsequenceRecovery(currentScene, currentScenario)
 slots := char.AvailableConsequenceSlots()  // Returns []ConsequenceSlot
 ```
 
+## Scene Types
+
+Fate Core defines three mutually exclusive structured resolution mechanics: conflicts, challenges, and contests. See [SRD: Scenes](https://fate-srd.com/fate-core/scenes-sessions-scenarios).
+
+**Code:** `internal/core/scene/scene.go` — `scene.SceneType` enum, `scene.ActiveSceneType()` method.
+
+```go
+sceneType := scene.ActiveSceneType()  // SceneTypeNone, SceneTypeConflict, SceneTypeChallenge, SceneTypeContest
+```
+
 ## Conflicts
 
 Conflicts are structured exchanges where characters try to harm each other. See [SRD: Conflicts](https://fate-srd.com/fate-core/conflicts).
@@ -289,6 +299,33 @@ Forfeit your action to gain +2 to all defense rolls for the exchange.
 scene.SetFullDefense("player-1")
 isDefending := scene.IsFullDefense("player-1")
 ```
+
+## Challenges
+
+Challenges are multi-task situations requiring different skills to overcome a complex obstacle. See [SRD: Challenges](https://fate-srd.com/fate-core/challenges).
+
+**Code:** `internal/core/scene/challenge.go` — `scene.ChallengeState`, `scene.ChallengeTask`.
+
+```go
+// Challenge state
+scene.IsChallenge = true
+scene.ChallengeState = &scene.ChallengeState{
+    Description: "Escape the collapsing temple",
+    Tasks: []scene.ChallengeTask{
+        {ID: "t1", Description: "Dodge falling debris", Skill: "Athletics", Difficulty: 2, Status: scene.TaskPending},
+        {ID: "t2", Description: "Read ancient glyphs", Skill: "Lore", Difficulty: 3, Status: scene.TaskPending},
+    },
+}
+
+// Task resolution
+pending := scene.ChallengeState.PendingTasks()
+scene.ChallengeState.ResolveTask("t1", scene.TaskSucceeded, "player-1")
+successes, failures, ties := scene.ChallengeState.Tally()
+outcome := scene.ChallengeState.OverallOutcome()  // ChallengeSuccess, ChallengePartial, ChallengeFailure
+isComplete := scene.ChallengeState.IsComplete()   // All tasks resolved
+```
+
+**Task statuses:** `TaskPending`, `TaskSucceeded`, `TaskSucceededWithStyle`, `TaskFailed`, `TaskTied`.
 
 ## Character Types
 
@@ -372,6 +409,7 @@ if !defender.TakeStress(character.PhysicalStress, outcome.Shifts) {
 | Stress & Consequences | https://fate-srd.com/fate-core/stress-consequences |
 | Resolving Attacks | https://fate-srd.com/fate-core/resolving-attacks |
 | Conflicts | https://fate-srd.com/fate-core/conflicts |
+| Challenges | https://fate-srd.com/fate-core/challenges |
 | Getting Taken Out | https://fate-srd.com/fate-core/getting-taken-out |
 | Skills List | https://fate-srd.com/fate-core/default-skill-list |
 | Types of Aspects | https://fate-srd.com/fate-core/types-aspects |
