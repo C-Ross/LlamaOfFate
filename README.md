@@ -43,6 +43,8 @@ Fate™ is a trademark of Evil Hat Productions, LLC.
 ### Scene Management
 - **Dynamic Scenes**: Create and modify scenes with situation aspects
 - **Conflict System**: Handle conflicts with initiative, zones, and positioning
+- **Challenge System**: Multi-task challenges with independent skill checks and outcome tallying
+- **Active NPC Opposition**: NPCs actively resist player actions using their skills, even outside conflicts
 - **Narrative Continuity**: Maintain story context across scenes and sessions
 
 ## Configuration
@@ -195,7 +197,8 @@ LlamaOfFate/
 │   └── scene-generator/        # Scene generation example
 ├── configs/                    # Configuration files (azure-llm.yaml)
 ├── docs/                       # Documentation
-│   └── architecture.md         # Architecture documentation
+│   ├── architecture.md         # Architecture documentation
+│   └── challenges-and-contests-design.md  # Challenge/contest mechanic design
 ├── test/                       # Tests
 │   ├── integration/            # Integration tests
 │   └── llmeval/                # LLM evaluation tests
@@ -206,7 +209,7 @@ LlamaOfFate/
 
 - **`cmd/cli/`**: Entry point for the command-line application
 - **`cmd/server/`**: Entry point for the WebSocket server
-- **`internal/core/`**: Core Fate mechanics implementation (character, dice, scene, action, skills)
+- **`internal/core/`**: Core Fate mechanics implementation (character, dice, scene, action, skills, challenges)
 - **`internal/engine/`**: Purely async/event-driven game engine (GameSessionManager interface: Start/HandleInput/ProvideInvokeResponse/ProvideMidFlowResponse/Save); emits GameEvents for UI rendering
 - **`internal/syncdriver/`**: Synchronous blocking game loop that wraps the engine's async API for terminal-style UIs (Run function drives: ReadInput → HandleInput → Emit events → drive prompts → repeat)
 - **`internal/llm/`**: LLM integration with Azure OpenAI backend, including retry logic and response handling
@@ -232,6 +235,8 @@ LlamaOfFate/
 - ✅ LLM integration with Azure OpenAI
 - ✅ Action parsing from natural language input
 - ✅ Conflict resolution system with stress and consequences
+- ✅ Challenge system with multi-task resolution and outcome tallying
+- ✅ Active NPC opposition (NPCs use skills to resist player actions)
 - ✅ CLI interface for game interaction
 - ✅ Session logging for game transcripts
 - ✅ Game state persistence (save/load functionality via YAML)
@@ -241,6 +246,7 @@ LlamaOfFate/
 - ✅ WebSocket server backend
 
 ### Planned Features
+- 📋 Contest system (competitive exchanges racing to victory)
 - 📋 Additional LLM backends (Ollama, OpenAI direct)
 - 📋 WebSocket integration connecting web UI to game engine
 - 📋 Public API packages for external integrations
