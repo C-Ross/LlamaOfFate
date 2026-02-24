@@ -18,6 +18,7 @@ export default defineConfig({
         ...(process.env.VITE_ENABLE_DEMOS === "true" && {
           demo: path.resolve(__dirname, "demo.html"),
           "dice-demo": path.resolve(__dirname, "dice-demo.html"),
+          "challenge-demo": path.resolve(__dirname, "challenge-demo.html"),
         }),
       },
     },
