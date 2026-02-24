@@ -240,6 +240,39 @@ recovered := char.CheckConsequenceRecovery(currentScene, currentScenario)
 slots := char.AvailableConsequenceSlots()  // Returns []ConsequenceSlot
 ```
 
+## Challenges
+
+Challenges are multi-task, multi-skill obstacles that require several overcome actions to resolve. See [SRD: Challenges](https://fate-srd.com/fate-core/challenges).
+
+**When to use:** Escape collapsing building, infiltrate a compound, navigate a deadly storm — complex situations requiring multiple skills and rolls.
+
+**Code:** `internal/core/scene/challenge.go` — `scene.ChallengeState`, `scene.ChallengeTask`.
+
+```go
+// ChallengeState created via [CHALLENGE:description] marker + LLM generation
+scene.IsChallenge = true
+scene.ChallengeState = &scene.ChallengeState{
+    Description: "Escape the burning building",
+    Tasks: []scene.ChallengeTask{
+        {ID: "t1", Description: "Force open jammed door", Skill: "Physique", Difficulty: 2, Status: scene.TaskPending},
+        {ID: "t2", Description: "Navigate smoke-filled hallway", Skill: "Notice", Difficulty: 3, Status: scene.TaskPending},
+    },
+}
+
+// Task resolution
+pending := scene.ChallengeState.PendingTasks()
+task := scene.ChallengeState.Tasks[0]
+task.Status = scene.TaskSucceeded  // Or TaskFailed, TaskTied, TaskSucceededWithStyle
+
+// Completion check
+if scene.ChallengeState.IsComplete() {
+    successes, failures, ties := scene.ChallengeState.Tally()
+    outcome := scene.ChallengeState.OverallOutcome()  // ChallengeSuccess, ChallengePartial, or ChallengeFailure
+}
+```
+
+**Outcome categories:** `ChallengeSuccess` (majority succeeded), `ChallengeFailure` (majority failed), `ChallengePartial` (mixed).
+
 ## Conflicts
 
 Conflicts are structured exchanges where characters try to harm each other. See [SRD: Conflicts](https://fate-srd.com/fate-core/conflicts).
@@ -372,6 +405,7 @@ if !defender.TakeStress(character.PhysicalStress, outcome.Shifts) {
 | Stress & Consequences | https://fate-srd.com/fate-core/stress-consequences |
 | Resolving Attacks | https://fate-srd.com/fate-core/resolving-attacks |
 | Conflicts | https://fate-srd.com/fate-core/conflicts |
+| Challenges | https://fate-srd.com/fate-core/challenges |
 | Getting Taken Out | https://fate-srd.com/fate-core/getting-taken-out |
 | Skills List | https://fate-srd.com/fate-core/default-skill-list |
 | Types of Aspects | https://fate-srd.com/fate-core/types-aspects |

@@ -39,6 +39,7 @@ web/
     lib/utils.ts              - cn() helper (clsx + tailwind-merge)
     components/
       SidebarCard.tsx          - Reusable sidebar card wrapper
+      game/                    - Game-specific components (ConflictBanner, ChallengeBanner, ChatMessage, etc.)
       ui/                      - shadcn/ui components (DO NOT edit manually)
     test/
       setup.ts                 - Vitest setup (jest-dom matchers)
@@ -158,6 +159,56 @@ Key conventions:
 - Use `font-heading` for headings/labels, `font-body` for content text
 - Use semantic color classes (`text-primary`, `bg-card`, `text-muted-foreground`)
 - Extract repeated card/panel patterns into reusable components (see `SidebarCard`)
+
+## Game Events & State
+
+### Event Types (`lib/types.ts`)
+
+The WebSocket backend emits typed game events that the frontend renders. Key event types:
+
+**Challenge events:**
+- `ChallengeStartEvent` — announce new challenge with description and task list
+- `ChallengeTaskResultEvent` — single task outcome (skill, difficulty, outcome, boosts)
+- `ChallengeCompleteEvent` — overall challenge result (success/partial/failure, tally)
+
+**Conflict events:**
+- `ConflictStartEvent`, `TurnAnnouncementEvent`, `ConflictEndEvent`, etc.
+
+**Core events:**
+- `DialogEvent`, `ActionAttemptEvent`, `RollResultEvent`, `OutcomeEvent`, etc.
+
+### Game State Hook (`hooks/useGameState.ts`)
+
+`useGameState()` derives UI state from event stream:
+- `isInConflict` / `isInChallenge` / `activeSceneType` — scene type flags
+- `challengeState` — current challenge with task statuses and tally
+- `conflictState`, `currentTurnCharacter`, etc.
+
+Challenge state tracking:
+```typescript
+export interface ChallengeState {
+  description: string
+  tasks: Array<{
+    id: string
+    description: string
+    skill: string
+    difficulty: number
+    status: "pending" | "succeeded" | "succeeded_with_style" | "failed" | "tied"
+  }>
+  successes: number
+  failures: number
+  ties: number
+}
+```
+
+### Rendering Game Events (`components/game/ChatMessage.tsx`)
+
+`ChatMessage` dispatches on event type to render specialized components:
+- `ChallengeStartEvent` → prose announcement + task list
+- `ChallengeTaskResultEvent` → task description + skill/difficulty + outcome
+- `ChallengeCompleteEvent` → tally summary + overall result
+
+`ChallengeBanner.tsx` shows live challenge progress in the sidebar.
 
 ### shadcn Components (ui/)
 

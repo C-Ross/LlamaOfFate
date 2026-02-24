@@ -14,10 +14,11 @@ Orchestration layers in `internal/engine/` between `internal/core/` rules and `i
 syncdriver.Run()     ← blocking terminal loop (wraps async engine API)
   └─ GameManager (GameSessionManager interface) ← async API: Start/HandleInput/Provide*Response
        └─ ScenarioManager ← multi-scene loop, scene generation, summaries, NPC registry, recovery
-            └─ SceneManager ← single-scene loop, input classification, dialog/action, conflict turns
-                 ├─ ActionParser    ← LLM: free-text → structured action
-                 ├─ AspectGenerator ← LLM: Create Advantage → aspect name
-                 └─ invoke.go       ← post-roll aspect invocation loop
+            └─ SceneManager ← single-scene loop, input classification, dialog/action, conflict/challenge turns
+                 ├─ ActionParser       ← LLM: free-text → structured action
+                 ├─ AspectGenerator    ← LLM: Create Advantage → aspect name
+                 ├─ ChallengeManager   ← challenge lifecycle: initiate, resolve tasks, complete
+                 └─ invoke.go          ← post-roll aspect invocation loop
 ```
 
 **syncdriver** wraps the async engine for blocking UIs. Engine itself is purely event-driven. Each layer creates/configures the layer below. **Do not skip layers.**
@@ -108,7 +109,7 @@ HandleInput(input)
   → isConcedeCommand? (conflict only) → handleConcession()
   → classifyInput() via LLM → "dialog"|"clarification"|"narrative"|"action"
       dialog/clarification/narrative → handleDialog() → generateSceneResponse()
-                                        → parse markers ([CONFLICT_START:], [CONFLICT_END:], [SCENE_TRANSITION:])
+                                        → parse markers ([CONFLICT_START:], [CHALLENGE:], [CONFLICT_END:], [SCENE_TRANSITION:])
       action → handleAction() → ActionParser.ParseAction()
                 → resolveAction() → roll dice → applyActionEffects()
                 → generateActionNarrative()
@@ -164,6 +165,39 @@ All invoke logic in `invoke.go` (called from `conflict.go` and `npc.go`):
 ### Escalation
 
 `handleConflictEscalation(newType)` — changes conflict type, recalculates initiative.
+
+## Challenge System (`challenge.go`, `challenge_manager.go`)
+
+Challenges are multi-task overcome sequences triggered by `[CHALLENGE:description]` markers. Created by `ChallengeManager` sharing ActionResolver for dice/invoke mechanics.
+
+### Lifecycle
+
+```
+[CHALLENGE:desc] marker → initiate()
+  → ChallengeGenerator.Generate() (LLM → tasks + skills + difficulties)
+  → emit ChallengeStartEvent
+Player action → scene_manager.resolveAction()
+  → challenge active? → finishResolveAction() → ChallengeManager.resolveTask()
+    → emit ChallengeTaskResultEvent
+    → check IsComplete() → yes? → completeChallenge()
+      → emit ChallengeCompleteEvent
+      → end challenge
+```
+
+**Key methods in `challenge_manager.go`:**
+- `initiate(ctx, description)` — LLM generates tasks, emits start event
+- `resolveTask(ctx, outcome, task, actorID)` — updates task status, checks completion
+- `completeChallenge(ctx)` — tallies results, emits complete event with outcome
+
+**Key methods in `scene_manager.go`:**
+- `finishResolveAction()` — hooks into action resolution to dispatch challenge task resolution
+- `handleChallengeMarker()` — parses `[CHALLENGE:]` marker, calls `cm.initiate()`
+
+**ActiveSceneType dispatch:** `scene_manager.go` and `action_resolver.go` use `scene.ActiveSceneType()` to route logic between normal/conflict/challenge scenes.
+
+### ChallengeGenerator
+
+`ChallengeGenerator` interface (`challenge_generator.go`) with LLM implementation. Prompts LLM with scenario context to generate 2-4 tasks with skills and ladder difficulties, deserializes directly into `scene.ChallengeState`.
 
 ## NPC Turns (`npc.go`)
 
