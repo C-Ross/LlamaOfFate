@@ -43,6 +43,7 @@ Fate™ is a trademark of Evil Hat Productions, LLC.
 ### Scene Management
 - **Dynamic Scenes**: Create and modify scenes with situation aspects
 - **Conflict System**: Handle conflicts with initiative, zones, and positioning
+- **Challenge System**: Multi-task resolution for complex situations requiring different skills
 - **Narrative Continuity**: Maintain story context across scenes and sessions
 
 ## Configuration
@@ -195,7 +196,8 @@ LlamaOfFate/
 │   └── scene-generator/        # Scene generation example
 ├── configs/                    # Configuration files (azure-llm.yaml)
 ├── docs/                       # Documentation
-│   └── architecture.md         # Architecture documentation
+│   ├── architecture.md         # Architecture documentation
+│   └── challenges-and-contests-design.md  # Challenges & contests design
 ├── test/                       # Tests
 │   ├── integration/            # Integration tests
 │   └── llmeval/                # LLM evaluation tests
@@ -232,6 +234,7 @@ LlamaOfFate/
 - ✅ LLM integration with Azure OpenAI
 - ✅ Action parsing from natural language input
 - ✅ Conflict resolution system with stress and consequences
+- ✅ Challenge system for multi-task complex situations
 - ✅ CLI interface for game interaction
 - ✅ Session logging for game transcripts
 - ✅ Game state persistence (save/load functionality via YAML)
@@ -241,6 +244,7 @@ LlamaOfFate/
 - ✅ WebSocket server backend
 
 ### Planned Features
+- 📋 Contest system for opposed races toward goals
 - 📋 Additional LLM backends (Ollama, OpenAI direct)
 - 📋 WebSocket integration connecting web UI to game engine
 - 📋 Public API packages for external integrations
