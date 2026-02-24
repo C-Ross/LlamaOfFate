@@ -441,4 +441,89 @@ describe("deriveState", () => {
     expect(state.inConflict).toBe(false)
     expect(state.situationAspects).toEqual([])
   })
+
+  it("tracks challenge_start event", () => {
+    const events = [
+      makeEvent("game_state_snapshot", {
+        player: { name: "Zara", highConcept: "", trouble: "", aspects: [], fatePoints: 3, refresh: 3, stressTracks: {}, consequences: [] },
+        sceneName: "Test",
+        situationAspects: [],
+        npcs: [],
+        inConflict: false,
+      }),
+      makeEvent("challenge_start", {
+        Description: "Escape the mine",
+        Tasks: [
+          { ID: "task-1", Description: "Run fast", Skill: "Athletics", Difficulty: "Good (+3)", Status: "pending" },
+          { ID: "task-2", Description: "Find exit", Skill: "Notice", Difficulty: "Fair (+2)", Status: "pending" },
+        ],
+      }),
+    ]
+
+    const state = deriveState(events)
+    expect(state.inChallenge).toBe(true)
+    expect(state.challengeTasks).toHaveLength(2)
+    expect(state.challengeTasks[0].Skill).toBe("Athletics")
+    expect(state.challengeTasks[1].Status).toBe("pending")
+  })
+
+  it("updates task status on challenge_task_result", () => {
+    const events = [
+      makeEvent("challenge_start", {
+        Description: "Test",
+        Tasks: [
+          { ID: "task-1", Description: "Run", Skill: "Athletics", Difficulty: "Good (+3)", Status: "pending" },
+          { ID: "task-2", Description: "Hide", Skill: "Stealth", Difficulty: "Fair (+2)", Status: "pending" },
+        ],
+      }),
+      makeEvent("challenge_task_result", {
+        TaskID: "task-1",
+        Description: "Run",
+        Skill: "Athletics",
+        Outcome: "succeeded",
+        Shifts: 2,
+      }),
+    ]
+
+    const state = deriveState(events)
+    expect(state.challengeTasks[0].Status).toBe("succeeded")
+    expect(state.challengeTasks[1].Status).toBe("pending")
+  })
+
+  it("clears challenge state on challenge_complete", () => {
+    const events = [
+      makeEvent("challenge_start", {
+        Description: "Test",
+        Tasks: [
+          { ID: "task-1", Description: "Run", Skill: "Athletics", Difficulty: "Good (+3)", Status: "pending" },
+        ],
+      }),
+      makeEvent("challenge_complete", {
+        Successes: 1,
+        Failures: 0,
+        Ties: 0,
+        Overall: "success",
+      }),
+    ]
+
+    const state = deriveState(events)
+    expect(state.inChallenge).toBe(false)
+    expect(state.challengeTasks).toEqual([])
+  })
+
+  it("resets challenge state on scene transition narrative", () => {
+    const events = [
+      makeEvent("challenge_start", {
+        Description: "Test",
+        Tasks: [
+          { ID: "task-1", Description: "Run", Skill: "Athletics", Difficulty: "Good (+3)", Status: "pending" },
+        ],
+      }),
+      makeEvent("narrative", { SceneName: "New Scene", Text: "You arrive." }),
+    ]
+
+    const state = deriveState(events)
+    expect(state.inChallenge).toBe(false)
+    expect(state.challengeTasks).toEqual([])
+  })
 })

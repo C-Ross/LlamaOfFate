@@ -41,9 +41,10 @@ type SceneManager struct {
 	conversationHistory []prompt.ConversationEntry
 	lastTransition      *prompt.SceneTransition // Captured transition hint when scene ends
 	sessionLogger       *session.Logger
-	scenePurpose        string           // Dramatic question driving the current scene
-	actions             *ActionResolver  // Generic action resolution (dice, invokes, narrative)
-	conflict            *ConflictManager // Conflict lifecycle (turns, NPC, damage, taken-out)
+	scenePurpose        string            // Dramatic question driving the current scene
+	actions             *ActionResolver   // Generic action resolution (dice, invokes, narrative)
+	conflict            *ConflictManager  // Conflict lifecycle (turns, NPC, damage, taken-out)
+	challenge           *ChallengeManager // Challenge lifecycle (initiation, task resolution)
 
 	// Scene-exit state for transitions (owned by SM, not CM).
 	// CM owns exit state for conflict outcomes (player taken out).
@@ -67,10 +68,13 @@ func NewSceneManager(characters CharacterResolver, llmClient llm.LLMClient, acti
 	}
 
 	cm := newConflictManager(llmClient, characters)
+	chm := newChallengeManager(llmClient, characters)
 	ar := newActionResolver(roller, characters, ag)
 	// Wire cross-references: AR ↔ CM.
 	ar.conflict = cm
+	ar.challenge = chm
 	cm.actions = ar
+	chm.actions = ar
 
 	sm := &SceneManager{
 		llmClient:           llmClient,
@@ -79,6 +83,7 @@ func NewSceneManager(characters CharacterResolver, llmClient llm.LLMClient, acti
 		conversationHistory: make([]prompt.ConversationEntry, 0),
 		actions:             ar,
 		conflict:            cm,
+		challenge:           chm,
 	}
 	// SceneManager implements NarrativeProvider — wire it so ActionResolver
 	// can generate narrative and record conversation history.
@@ -92,6 +97,7 @@ func (sm *SceneManager) SetSessionLogger(logger *session.Logger) {
 	sm.sessionLogger = logger
 	sm.actions.setSessionLogger(logger)
 	sm.conflict.setSessionLogger(logger)
+	sm.challenge.setSessionLogger(logger)
 }
 
 // SetExitOnSceneTransition configures whether the scene loop should exit on scene transition
@@ -105,6 +111,7 @@ func (sm *SceneManager) StartScene(scene *scene.Scene, player *character.Charact
 	sm.player = player
 	sm.actions.setSceneState(scene, player)
 	sm.conflict.setSceneState(scene, player)
+	sm.challenge.setSceneState(scene, player)
 
 	// Clear conversation history from previous scene — recap should only
 	// appear when restoring from a save (via Restore()), not on normal transitions.
@@ -218,6 +225,7 @@ func (sm *SceneManager) resetSceneState() {
 	sm.sceneEndReason = ""
 	sm.actions.resetState()
 	sm.conflict.resetState()
+	sm.challenge.resetState()
 }
 
 // buildSceneEndResult constructs a SceneEndResult from the current state.
@@ -320,9 +328,10 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) []GameEv
 		return append(events, DialogEvent{PlayerInput: input, GMResponse: msgLLMUnavailable})
 	}
 
-	// Check for markers in the response (conflict escalation, de-escalation, and scene transition)
+	// Check for markers in the response (conflict, challenge, and scene transition)
 	conflictTrigger, cleanedResponse := sm.conflict.parseConflictMarker(response)
 	conflictResolution, cleanedResponse := sm.conflict.parseConflictEndMarker(cleanedResponse)
+	challengeTrigger, cleanedResponse := prompt.ParseChallengeMarker(cleanedResponse)
 	sceneTransition, cleanedResponse := prompt.ParseSceneTransitionMarker(cleanedResponse)
 
 	events = append(events, DialogEvent{PlayerInput: input, GMResponse: cleanedResponse})
@@ -368,6 +377,21 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) []GameEv
 			sm.RecordConversationEntry("",
 				fmt.Sprintf("[Conflict ended — %s]", reasonMessage),
 				inputTypeConflict)
+		}
+	}
+
+	// Handle challenge initiation if triggered
+	if challengeTrigger != nil && sm.currentScene.ActiveSceneType() == scene.SceneTypeNone {
+		challengeEvents, err := sm.challenge.initiateChallenge(ctx, challengeTrigger.Description)
+		if err != nil {
+			slog.Warn("Failed to initiate challenge from dialog",
+				"component", componentSceneManager,
+				"error", err)
+		} else {
+			events = append(events, challengeEvents...)
+			sm.RecordConversationEntry("",
+				fmt.Sprintf("[Challenge started: %s]", challengeTrigger.Description),
+				inputTypeDialog)
 		}
 	}
 
@@ -665,6 +689,7 @@ func (sm *SceneManager) Restore(state SceneState, player *character.Character) {
 	sm.conversationHistory = state.ConversationHistory
 	sm.scenePurpose = state.ScenePurpose
 	sm.conflict.setSceneState(state.CurrentScene, player)
+	sm.challenge.setSceneState(state.CurrentScene, player)
 	sm.actions.setSceneState(state.CurrentScene, player)
 
 	// Ensure player is in the scene (defensive — should already be from saved state)

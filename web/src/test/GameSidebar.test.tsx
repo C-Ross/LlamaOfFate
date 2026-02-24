@@ -11,6 +11,8 @@ const emptyState: GameState = {
   stressTracks: {},
   consequences: [],
   inConflict: false,
+  inChallenge: false,
+  challengeTasks: [],
   sceneName: "",
 }
 

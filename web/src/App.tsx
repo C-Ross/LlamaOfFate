@@ -4,6 +4,7 @@ import { GameSidebar } from "@/components/game/GameSidebar"
 import { ChatPanel } from "@/components/game/ChatPanel"
 import { ChatInput } from "@/components/game/ChatInput"
 import { ConflictBanner } from "@/components/game/ConflictBanner"
+import { ChallengeBanner } from "@/components/game/ChallengeBanner"
 import { InvokePrompt } from "@/components/game/InvokePrompt"
 import { MidFlowPrompt } from "@/components/game/MidFlowPrompt"
 import { SetupScreen } from "@/components/game/SetupScreen"
@@ -172,6 +173,9 @@ function App() {
 
         {/* Conflict banner */}
         <ConflictBanner active={gameState.inConflict} />
+
+        {/* Challenge banner */}
+        <ChallengeBanner active={gameState.inChallenge} tasks={gameState.challengeTasks} />
 
         {/* Message area — relative container for overlaid prompts */}
         <div className="relative flex-1 min-h-0">

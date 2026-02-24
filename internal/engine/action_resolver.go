@@ -56,6 +56,9 @@ type ActionResolver struct {
 	// escalate, damage, advance turns). May be nil in tests.
 	conflict *ConflictManager
 
+	// ChallengeManager — used for challenge task resolution. May be nil in tests.
+	challenge *ChallengeManager
+
 	// Per-scene state — wired by SceneManager.StartScene.
 	player       *character.Character
 	currentScene *scene.Scene
@@ -340,6 +343,15 @@ func (ar *ActionResolver) finishResolveAction(
 	if ar.currentScene.ActiveSceneType() == scene.SceneTypeConflict {
 		turnEvents, _ := ar.conflict.advanceConflictTurns(ctx)
 		events = append(events, turnEvents...)
+	}
+
+	// If we're in a challenge, resolve the matching task
+	if ar.currentScene.ActiveSceneType() == scene.SceneTypeChallenge && ar.challenge != nil {
+		task := ar.challenge.findTaskForSkill(parsedAction.Skill)
+		if task != nil {
+			challengeEvents := ar.challenge.resolveTask(task.ID, outcome.Type, outcome.Shifts)
+			events = append(events, challengeEvents...)
+		}
 	}
 
 	return events

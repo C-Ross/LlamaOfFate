@@ -250,6 +250,9 @@ func TestMarshalEvent_AllEventTypes(t *testing.T) {
 		uicontract.StressOverflowEvent{},
 		uicontract.MilestoneEvent{},
 		uicontract.GameResumedEvent{},
+		uicontract.ChallengeStartEvent{},
+		uicontract.ChallengeTaskResultEvent{},
+		uicontract.ChallengeCompleteEvent{},
 	}
 
 	seen := make(map[string]bool)
@@ -263,7 +266,7 @@ func TestMarshalEvent_AllEventTypes(t *testing.T) {
 		require.NoError(t, err, "failed to marshal %T", event)
 		assert.NotEmpty(t, data)
 	}
-	assert.Len(t, seen, 30, "expected 30 unique event wire names")
+	assert.Len(t, seen, 33, "expected 33 unique event wire names")
 }
 
 func TestMarshalResultMeta(t *testing.T) {

@@ -23,6 +23,16 @@ Do NOT let the scene drift into aimless small talk. Every response should move t
 {{- if .Scene.IsConflict}}
 ACTIVE CONFLICT: {{.Scene.ConflictState.Type}} conflict (Round {{.Scene.ConflictState.Round}})
 {{- end}}
+{{- if .Scene.IsChallenge}}
+ACTIVE CHALLENGE: {{.Scene.ChallengeState.Description}}
+Remaining tasks:
+{{- range .Scene.ChallengeState.Tasks}}
+{{- if eq (printf "%s" .Status) "pending"}}
+- {{.Skill}} ({{.Description}})
+{{- end}}
+{{- end}}
+The player must use an appropriate skill to overcome each remaining task. Guide them toward attempting these tasks through your narration.
+{{- end}}
 
 CHARACTER:
 {{.CharacterContext}}
@@ -85,6 +95,17 @@ If an NPC initiates violence or hostile action, add on its own line at the end:
 [CONFLICT:mental:character_id] - for social/mental attacks
 Use the character's ID (in parentheses above). Only add this for the FIRST hostile NPC action.
 {{- end}}
+
+CHALLENGE MARKERS:
+{{- if not .Scene.IsConflict}}{{if not .Scene.IsChallenge}}
+If the player's situation involves a complex, multi-part problem requiring several DIFFERENT skills to resolve — such as escaping a disaster, preparing for a heist, navigating a hazardous journey, or conducting a complex investigation — add on its own line at the end:
+[CHALLENGE:brief description of the overall challenge]
+Examples:
+- Player tries to escape a collapsing mine → [CHALLENGE:Escape the collapsing mine before it buries you alive]
+- Player plans to infiltrate a guarded compound → [CHALLENGE:Infiltrate the compound undetected and reach the vault]
+- Player must navigate a treacherous mountain pass → [CHALLENGE:Cross the deadly mountain pass in a raging storm]
+Only use this when MULTIPLE distinct skills are needed to resolve a complex situation. Do NOT use this for simple overcome actions that need just one roll.
+{{- end}}{{end}}
 
 CRITICAL: Do NOT explain your reasoning about markers to the player. Never say things like "adding a scene transition because..." or explain why you did/didn't add a marker. Just write the narrative response and optionally add the marker at the end.
 

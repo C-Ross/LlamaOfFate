@@ -18,6 +18,9 @@ import type {
   NarrativeEventData,
   RecoveryEventData,
   DamageResolutionEventData,
+  ChallengeStartEventData,
+  ChallengeTaskResultEventData,
+  ChallengeTaskInfo,
 } from "@/lib/types"
 
 // ---------------------------------------------------------------------------
@@ -32,6 +35,8 @@ export interface GameState {
   stressTracks: Record<string, StressTrackSnapshot>
   consequences: ConsequenceSnapshotEntry[]
   inConflict: boolean
+  inChallenge: boolean
+  challengeTasks: ChallengeTaskInfo[]
   sceneName: string
 }
 
@@ -43,6 +48,8 @@ const emptyState: GameState = {
   stressTracks: {},
   consequences: [],
   inConflict: false,
+  inChallenge: false,
+  challengeTasks: [],
   sceneName: "",
 }
 
@@ -80,6 +87,8 @@ export function deriveState(events: GameEvent[]): GameState {
           stressTracks: d.player?.stressTracks ?? {},
           consequences: d.player?.consequences ?? [],
           inConflict: d.inConflict,
+          inChallenge: d.inChallenge ?? false,
+          challengeTasks: d.challengeTasks ?? [],
           sceneName: d.sceneName,
         }
         break
@@ -96,6 +105,8 @@ export function deriveState(events: GameEvent[]): GameState {
             sceneName: d.SceneName,
             situationAspects: [],
             inConflict: false,
+            inChallenge: false,
+            challengeTasks: [],
           }
         }
         break
@@ -175,6 +186,32 @@ export function deriveState(events: GameEvent[]): GameState {
 
       case "conflict_end": {
         state = { ...state, inConflict: false }
+        break
+      }
+
+      case "challenge_start": {
+        const d = evt.data as ChallengeStartEventData
+        state = {
+          ...state,
+          inChallenge: true,
+          challengeTasks: d.Tasks ?? [],
+        }
+        break
+      }
+
+      case "challenge_task_result": {
+        const d = evt.data as ChallengeTaskResultEventData
+        state = {
+          ...state,
+          challengeTasks: state.challengeTasks.map((t) =>
+            t.ID === d.TaskID ? { ...t, Status: d.Outcome } : t,
+          ),
+        }
+        break
+      }
+
+      case "challenge_complete": {
+        state = { ...state, inChallenge: false, challengeTasks: [] }
         break
       }
 

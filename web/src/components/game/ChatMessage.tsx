@@ -40,6 +40,9 @@ import type {
   MilestoneEventData,
   GameResumedEventData,
   ConflictEscalationEventData,
+  ChallengeStartEventData,
+  ChallengeTaskResultEventData,
+  ChallengeCompleteEventData,
 } from "@/lib/types"
 
 interface ChatMessageProps {
@@ -119,6 +122,12 @@ function renderEvent(event: GameEvent) {
       return <MilestoneMessage data={event.data as MilestoneEventData} />
     case "game_resumed":
       return <GameResumedMessage data={event.data as GameResumedEventData} />
+    case "challenge_start":
+      return <ChallengeStartMessage data={event.data as ChallengeStartEventData} />
+    case "challenge_task_result":
+      return <ChallengeTaskResultMessage data={event.data as ChallengeTaskResultEventData} />
+    case "challenge_complete":
+      return <ChallengeCompleteMessage data={event.data as ChallengeCompleteEventData} />
     default:
       return null
   }
@@ -524,6 +533,79 @@ function GameResumedMessage({ data }: { data: GameResumedEventData }) {
   return (
     <div className="px-4 py-2 text-xs text-muted-foreground italic font-body">
       Resumed: {data.ScenarioTitle} — {data.SceneName}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Challenge events
+// ---------------------------------------------------------------------------
+
+function ChallengeStartMessage({ data }: { data: ChallengeStartEventData }) {
+  return (
+    <div className="my-3 rounded-lg border border-primary/50 bg-primary/5 px-4 py-3 space-y-2">
+      <div className="font-heading text-sm font-bold uppercase tracking-wide text-primary">
+        Challenge!
+      </div>
+      <div className="text-sm font-body text-foreground">{data.Description}</div>
+      <div className="space-y-1">
+        {data.Tasks?.map((task) => (
+          <div
+            key={task.ID}
+            className="flex items-center gap-2 rounded bg-secondary/50 px-3 py-1 text-sm font-body"
+          >
+            <span className="font-bold text-primary">{task.Skill}</span>
+            <span className="text-muted-foreground">—</span>
+            <span>{task.Description}</span>
+            <span className="ml-auto text-xs text-muted-foreground">{task.Difficulty}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ChallengeTaskResultMessage({ data }: { data: ChallengeTaskResultEventData }) {
+  const isSuccess = data.Outcome === "succeeded" || data.Outcome === "succeeded_with_style"
+  const isTie = data.Outcome === "tied"
+  return (
+    <div
+      className={cn(
+        "rounded-lg border px-4 py-2 text-sm font-body",
+        isSuccess && "border-green-500/30 bg-green-500/5",
+        isTie && "border-yellow-500/30 bg-yellow-500/5",
+        !isSuccess && !isTie && "border-destructive/30 bg-destructive/5",
+      )}
+    >
+      <span className="font-heading text-xs uppercase tracking-wide">
+        {isSuccess ? "✓" : isTie ? "~" : "✗"}{" "}
+      </span>
+      <span className="font-bold">{data.Skill}</span>: {data.Description} — {data.Outcome}
+      {data.Shifts !== 0 && (
+        <span className="text-xs text-muted-foreground ml-1">({data.Shifts > 0 ? "+" : ""}{data.Shifts} shifts)</span>
+      )}
+    </div>
+  )
+}
+
+function ChallengeCompleteMessage({ data }: { data: ChallengeCompleteEventData }) {
+  const isSuccess = data.Overall === "success"
+  const isFailure = data.Overall === "failure"
+  return (
+    <div
+      className={cn(
+        "my-3 rounded-lg border px-4 py-3 space-y-1",
+        isSuccess && "border-green-500/50 bg-green-500/5",
+        isFailure && "border-destructive/50 bg-destructive/5",
+        !isSuccess && !isFailure && "border-yellow-500/50 bg-yellow-500/5",
+      )}
+    >
+      <div className="font-heading text-sm font-bold uppercase tracking-wide">
+        Challenge Complete — {data.Overall}
+      </div>
+      <div className="text-xs font-body text-muted-foreground">
+        {data.Successes} successes, {data.Failures} failures, {data.Ties} ties
+      </div>
     </div>
   )
 }

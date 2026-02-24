@@ -148,6 +148,12 @@ func eventTypeName(event uicontract.GameEvent) string {
 		return "error_notification"
 	case uicontract.BoostExpiredEvent:
 		return "boost_expired"
+	case uicontract.ChallengeStartEvent:
+		return "challenge_start"
+	case uicontract.ChallengeTaskResultEvent:
+		return "challenge_task_result"
+	case uicontract.ChallengeCompleteEvent:
+		return "challenge_complete"
 	default:
 		return "unknown"
 	}

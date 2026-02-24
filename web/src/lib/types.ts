@@ -364,6 +364,40 @@ export interface GameStateSnapshotEventData {
   situationAspects: SituationAspectSnapshot[]
   npcs: NPCSnapshot[]
   inConflict: boolean
+  inChallenge?: boolean
+  challengeTasks?: ChallengeTaskInfo[]
+}
+
+// ---------------------------------------------------------------------------
+// Challenge event data types
+// ---------------------------------------------------------------------------
+
+export interface ChallengeTaskInfo {
+  ID: string
+  Description: string
+  Skill: string
+  Difficulty: string
+  Status: string
+}
+
+export interface ChallengeStartEventData {
+  Description: string
+  Tasks: ChallengeTaskInfo[]
+}
+
+export interface ChallengeTaskResultEventData {
+  TaskID: string
+  Description: string
+  Skill: string
+  Outcome: string
+  Shifts: number
+}
+
+export interface ChallengeCompleteEventData {
+  Successes: number
+  Failures: number
+  Ties: number
+  Overall: string
 }
 
 // ---------------------------------------------------------------------------
@@ -431,6 +465,9 @@ export type GameEventType =
   | "game_state_snapshot"
   | "error_notification"
   | "boost_expired"
+  | "challenge_start"
+  | "challenge_task_result"
+  | "challenge_complete"
   | "session_init"
   | "result_meta"
   | "setup_request"
@@ -486,4 +523,7 @@ export const CHAT_DISPLAYABLE_EVENTS: Set<string> = new Set([
   "milestone",
   "game_resumed",
   "conflict_escalation",
+  "challenge_start",
+  "challenge_task_result",
+  "challenge_complete",
 ])

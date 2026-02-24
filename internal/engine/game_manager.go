@@ -374,6 +374,11 @@ func (g *GameManager) buildStateSnapshot() GameStateSnapshotEvent {
 	if currentScene != nil {
 		snap.SceneName = currentScene.Name
 		snap.InConflict = currentScene.IsConflict
+		snap.InChallenge = currentScene.IsChallenge
+
+		if currentScene.IsChallenge && currentScene.ChallengeState != nil {
+			snap.ChallengeTasks = buildChallengeTaskInfos(currentScene.ChallengeState)
+		}
 
 		for _, sa := range currentScene.SituationAspects {
 			snap.SituationAspects = append(snap.SituationAspects, SituationAspectSnapshot{

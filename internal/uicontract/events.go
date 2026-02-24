@@ -372,6 +372,8 @@ type GameStateSnapshotEvent struct {
 	SituationAspects []SituationAspectSnapshot `json:"situationAspects"`
 	NPCs             []NPCSnapshot             `json:"npcs"`
 	InConflict       bool                      `json:"inConflict"`
+	InChallenge      bool                      `json:"inChallenge"`
+	ChallengeTasks   []ChallengeTaskInfo       `json:"challengeTasks,omitempty"`
 }
 
 func (GameStateSnapshotEvent) gameEvent() {}
@@ -415,3 +417,46 @@ type NPCSnapshot struct {
 	Aspects     []string `json:"aspects"`
 	IsTakenOut  bool     `json:"isTakenOut"`
 }
+
+// ---------------------------------------------------------------------------
+// Challenge events
+// ---------------------------------------------------------------------------
+
+// ChallengeStartEvent announces a new challenge.
+type ChallengeStartEvent struct {
+	Description string
+	Tasks       []ChallengeTaskInfo
+}
+
+func (ChallengeStartEvent) gameEvent() {}
+
+// ChallengeTaskInfo describes one task in a challenge (for UI display).
+type ChallengeTaskInfo struct {
+	ID          string
+	Description string
+	Skill       string
+	Difficulty  string // Ladder name, e.g. "Good (+3)"
+	Status      string // "pending", "succeeded", "failed", "tied", "succeeded_with_style"
+}
+
+// ChallengeTaskResultEvent announces the outcome of a single task.
+type ChallengeTaskResultEvent struct {
+	TaskID      string
+	Description string
+	Skill       string
+	Outcome     string // "success", "failure", "tie", "success_with_style"
+	Shifts      int
+}
+
+func (ChallengeTaskResultEvent) gameEvent() {}
+
+// ChallengeCompleteEvent announces the overall challenge resolution.
+type ChallengeCompleteEvent struct {
+	Successes int
+	Failures  int
+	Ties      int
+	Overall   string // "success", "partial", "failure"
+	Narrative string // LLM-generated summary
+}
+
+func (ChallengeCompleteEvent) gameEvent() {}

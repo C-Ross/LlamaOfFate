@@ -106,6 +106,14 @@ func (ui *TerminalUI) Emit(event uicontract.GameEvent) {
 		ui.displayGameResumed(e)
 	case uicontract.BoostExpiredEvent:
 		ui.displaySystemMessage(fmt.Sprintf("Boost '%s' has been consumed and removed.", e.AspectName))
+
+	// Challenge events
+	case uicontract.ChallengeStartEvent:
+		ui.displayChallengeStart(e)
+	case uicontract.ChallengeTaskResultEvent:
+		ui.displayChallengeTaskResult(e)
+	case uicontract.ChallengeCompleteEvent:
+		ui.displayChallengeComplete(e)
 	}
 }
 
@@ -561,6 +569,44 @@ func (ui *TerminalUI) displayConflictEnd(reason string) {
 	fmt.Printf("║         CONFLICT ENDS                    ║\n")
 	fmt.Println("╚══════════════════════════════════════════╝")
 	fmt.Printf("\n%s\n", reason)
+}
+
+// displayChallengeStart displays the start of a challenge with task list
+func (ui *TerminalUI) displayChallengeStart(e uicontract.ChallengeStartEvent) {
+	fmt.Println("\n╔══════════════════════════════════════════╗")
+	fmt.Printf("║         CHALLENGE BEGINS!                ║\n")
+	fmt.Println("╚══════════════════════════════════════════╝")
+	fmt.Printf("\n%s\n", e.Description)
+	fmt.Println("\n--- Tasks ---")
+	for i, t := range e.Tasks {
+		fmt.Printf("  %d. [%s] %s (Difficulty: %s)\n", i+1, t.Skill, t.Description, t.Difficulty)
+	}
+	fmt.Println("-------------")
+}
+
+// displayChallengeTaskResult displays the outcome of a single challenge task
+func (ui *TerminalUI) displayChallengeTaskResult(e uicontract.ChallengeTaskResultEvent) {
+	symbol := "✗"
+	switch e.Outcome {
+	case "succeeded", "succeeded_with_style":
+		symbol = "✓"
+	case "tied":
+		symbol = "~"
+	}
+	fmt.Printf("\n[%s] %s (%s): %s", symbol, e.Description, e.Skill, e.Outcome)
+	if e.Shifts != 0 {
+		fmt.Printf(" (%+d shifts)", e.Shifts)
+	}
+	fmt.Println()
+}
+
+// displayChallengeComplete displays the final outcome of a challenge
+func (ui *TerminalUI) displayChallengeComplete(e uicontract.ChallengeCompleteEvent) {
+	fmt.Println("\n╔══════════════════════════════════════════╗")
+	fmt.Printf("║         CHALLENGE COMPLETE               ║\n")
+	fmt.Println("╚══════════════════════════════════════════╝")
+	fmt.Printf("\nResults: %d successes, %d failures, %d ties\n", e.Successes, e.Failures, e.Ties)
+	fmt.Printf("Overall: %s\n", e.Overall)
 }
 
 // displayGameOver displays the game over screen

@@ -57,3 +57,9 @@ type StressTrackSnapshot = uicontract.StressTrackSnapshot
 type ConsequenceSnapshotEntry = uicontract.ConsequenceSnapshotEntry
 type SituationAspectSnapshot = uicontract.SituationAspectSnapshot
 type NPCSnapshot = uicontract.NPCSnapshot
+
+// Challenge event aliases
+type ChallengeStartEvent = uicontract.ChallengeStartEvent
+type ChallengeTaskInfo = uicontract.ChallengeTaskInfo
+type ChallengeTaskResultEvent = uicontract.ChallengeTaskResultEvent
+type ChallengeCompleteEvent = uicontract.ChallengeCompleteEvent
