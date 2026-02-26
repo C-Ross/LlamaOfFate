@@ -22,7 +22,7 @@ validate: go-validate web-validate
 # ─── Go targets ─────────────────────────────────────────────────────
 
 # Run all Go validation checks
-go-validate: go-vet go-fmtcheck go-lint go-test go-build-llmeval build-server
+go-validate: go-vet go-fmtcheck go-lint go-test go-build-llmeval build-server build-mcpserver
     @echo "Go validations passed!"
 
 # Build the CLI application
@@ -38,6 +38,13 @@ build-server:
     @mkdir -p bin
     {{gocmd}} build -o ./bin/server ./cmd/server
     @echo "Build complete: ./bin/server"
+
+# Build the MCP server
+build-mcpserver:
+    @echo "Building MCP server..."
+    @mkdir -p bin
+    {{gocmd}} build -o ./bin/mcpserver ./cmd/mcpserver
+    @echo "Build complete: ./bin/mcpserver"
 
 # Build and run the web server
 serve: build-server

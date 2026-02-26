@@ -7,6 +7,14 @@
      "playwright": {
       "command": "npx",
       "args": ["@playwright/mcp@latest"]
+    },
+     "llamaoffate": {
+      "command": "./bin/mcpserver",
+      "args": [],
+      "env": {
+        "LLM_CONFIG": "configs/azure-llm.yaml",
+        "CONFIG_ROOT": "configs"
+      }
     }
   }
 }

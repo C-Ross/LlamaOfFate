@@ -165,7 +165,7 @@ func (g *GameManager) Start(ctx context.Context) ([]GameEvent, error) {
 	}
 
 	// Append a full-state snapshot so web UIs can initialise sidebar state.
-	events = append(events, g.buildStateSnapshot())
+	events = append(events, g.BuildStateSnapshot())
 
 	return events, nil
 }
@@ -209,7 +209,7 @@ func (g *GameManager) startFromSave(ctx context.Context, state *GameState) ([]Ga
 	events = append(events, scenarioEvents...)
 
 	// Append a full-state snapshot so web UIs can initialise sidebar state.
-	events = append(events, g.buildStateSnapshot())
+	events = append(events, g.BuildStateSnapshot())
 
 	return events, nil
 }
@@ -276,7 +276,7 @@ func (g *GameManager) appendPostInputSnapshot(result *InputResult) {
 
 	// Scene transition (new scene started) → append fresh snapshot
 	if result.SceneEnded && !result.GameOver {
-		result.Events = append(result.Events, g.buildStateSnapshot())
+		result.Events = append(result.Events, g.BuildStateSnapshot())
 	}
 }
 
@@ -331,9 +331,9 @@ func (g *GameManager) handleMilestone() []GameEvent {
 	return events
 }
 
-// buildStateSnapshot creates a GameStateSnapshotEvent from the current engine
+// BuildStateSnapshot creates a GameStateSnapshotEvent from the current engine
 // state.  It is safe to call after ScenarioManager.Start has returned.
-func (g *GameManager) buildStateSnapshot() GameStateSnapshotEvent {
+func (g *GameManager) BuildStateSnapshot() GameStateSnapshotEvent {
 	snap := GameStateSnapshotEvent{}
 
 	// Player
