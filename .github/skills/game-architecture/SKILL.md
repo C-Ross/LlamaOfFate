@@ -179,6 +179,17 @@ Fallback: Attack with DefaultAttackSkillForConflict targeting player.
 
 `ActionParseRequest` → LLM (temp=0.3) → `ActionParseResponse` → `action.NewAction()`. Uses `parseActionType()` to handle LLM mistakes (e.g., skill name instead of action type).
 
+## Entrypoints
+
+**`cmd/cli`** — Terminal UI via `syncdriver.Run()` wrapping `GameManager`. Supports meta-commands (`help`, `scene`, `character`, `aspects`, `status`).
+
+**`cmd/server`** — WebSocket server for web UI. Converts GameEvents to JSON messages.
+
+**`cmd/mcpserver`** — MCP (Model Context Protocol) stdio server exposing game state inspection and control as tools:
+- `internal/mcpserver/server.go` — GameServer wrapping GameManager
+- `BuildGameStateSnapshot()` / `BuildSceneSnapshot()` — JSON state exports
+- Tools: `start_game`, `handle_input`, `list_presets`, `get_scene_state`
+
 ## UI Interfaces
 
 ### `syncdriver.BlockingUI` (`syncdriver/syncdriver.go`)
