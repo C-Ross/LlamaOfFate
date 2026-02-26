@@ -167,6 +167,7 @@ All marker regexes and parsers are in `internal/prompt/markers.go`:
 - `sceneTransitionMarkerRegex` / `ParseSceneTransitionMarker()` — scene exits
 - `conflictMarkerRegex` / `ParseConflictMarker()` — conflict escalation
 - `conflictEndMarkerRegex` / `ParseConflictEndMarker()` — conflict de-escalation
+- `challengeMarkerRegex` / `ParseChallengeMarker()` — challenge initiation
 
 The engine layer in `internal/engine/conflict.go` has thin `SceneManager` method wrappers that delegate to these.
 

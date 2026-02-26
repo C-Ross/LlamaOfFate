@@ -14,10 +14,13 @@ Orchestration layers in `internal/engine/` between `internal/core/` rules and `i
 syncdriver.Run()     ← blocking terminal loop (wraps async engine API)
   └─ GameManager (GameSessionManager interface) ← async API: Start/HandleInput/Provide*Response
        └─ ScenarioManager ← multi-scene loop, scene generation, summaries, NPC registry, recovery
-            └─ SceneManager ← single-scene loop, input classification, dialog/action, conflict turns
-                 ├─ ActionParser    ← LLM: free-text → structured action
-                 ├─ AspectGenerator ← LLM: Create Advantage → aspect name
-                 └─ invoke.go       ← post-roll aspect invocation loop
+            └─ SceneManager ← single-scene loop, input classification, dialog/action, conflict/challenge turns
+                 ├─ ActionResolver      ← dice rolling, invoke loops, action effects
+                 ├─ ConflictManager     ← conflict lifecycle, NPC turns, damage
+                 ├─ ChallengeManager    ← challenge lifecycle, task resolution
+                 ├─ ActionParser        ← LLM: free-text → structured action
+                 ├─ AspectGenerator     ← LLM: Create Advantage → aspect name
+                 └─ ChallengeGenerator  ← LLM: challenge description → tasks
 ```
 
 **syncdriver** wraps the async engine for blocking UIs. Engine itself is purely event-driven. Each layer creates/configures the layer below. **Do not skip layers.**
@@ -108,7 +111,7 @@ HandleInput(input)
   → isConcedeCommand? (conflict only) → handleConcession()
   → classifyInput() via LLM → "dialog"|"clarification"|"narrative"|"action"
       dialog/clarification/narrative → handleDialog() → generateSceneResponse()
-                                        → parse markers ([CONFLICT_START:], [CONFLICT_END:], [SCENE_TRANSITION:])
+                                        → parse markers ([CONFLICT_START:], [CONFLICT_END:], [CHALLENGE:], [SCENE_TRANSITION:])
       action → handleAction() → ActionParser.ParseAction()
                 → resolveAction() → roll dice → applyActionEffects()
                 → generateActionNarrative()
@@ -165,6 +168,35 @@ All invoke logic in `invoke.go` (called from `conflict.go` and `npc.go`):
 
 `handleConflictEscalation(newType)` — changes conflict type, recalculates initiative.
 
+## Challenge System (`challenge_manager.go`, `challenge.go`)
+
+Challenges are multi-task obstacles requiring varied skills. Triggered by `[CHALLENGE:description]` markers in scene responses.
+
+### Lifecycle
+
+```
+[CHALLENGE:description] detected
+  → ChallengeGenerator.GenerateTasks() via LLM → ChallengeState with tasks
+  → player acts on pending tasks → resolveAction() hooks task resolution
+  → ChallengeManager.CompleteChallenge() when all tasks resolved
+  → emit ChallengeComplete event with overall outcome
+```
+
+### Integration
+
+- **Mutual exclusion**: Only one active scene type (conflict/challenge/contest) at a time
+- **Task resolution**: `ActionResolver.finishResolveAction()` automatically resolves matching challenge tasks
+- **UI events**: `ChallengeStartEvent`, `ChallengeTaskResultEvent`, `ChallengeCompleteEvent`
+- **Template context**: Active challenge state passed to scene response prompts
+
+### Manager methods
+
+```go
+ChallengeManager.InitiateChallenge(description)  // Generate tasks via LLM
+ChallengeManager.ResolveTask(taskID, outcome)    // Mark task resolved
+ChallengeManager.CompleteChallenge()             // Tally and emit completion
+```
+
 ## NPC Turns (`npc.go`)
 
 ```
@@ -203,8 +235,9 @@ Data types shared between engine and UI:
 | Meta-command | `internal/ui/terminal/terminal.go` `handleSpecialCommands()` |
 | Blocking loop behavior | `internal/syncdriver/syncdriver.go` `Run()`, `driveBlockingPrompts()` |
 | Input classification type | `scene_manager.go` constants + `HandleInput()` switch |
-| Action outcome effect | `conflict.go` `applyActionEffects()` |
-| Conflict mechanic | `conflict.go` (method on `*SceneManager`) |
+| Action outcome effect | `action_resolver.go` `finishResolveAction()` |
+| Conflict mechanic | `conflict_manager.go` or `conflict.go` |
+| Challenge mechanic | `challenge_manager.go` or `challenge.go` |
 | LLM prompt/response | `internal/prompt/` (template + data struct + parser) |
 | NPC action type | `npc.go` (`processNPC<Type>()` + switch) |
 | Scene generation | `scenario_manager.go` `generateNextScene()` |

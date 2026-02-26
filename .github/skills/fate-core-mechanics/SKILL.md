@@ -360,6 +360,56 @@ if !defender.TakeStress(character.PhysicalStress, outcome.Shifts) {
 }
 ```
 
+## Challenges
+
+Challenges are complex situations requiring multiple overcome actions using different skills. See [SRD: Challenges](https://fate-srd.com/fate-core/challenges).
+
+**When to use:** Multi-part problems (chase, heist, ritual) that need more structure than a single roll but aren't direct confrontations.
+
+**Code:** `internal/core/scene/challenge.go` — `scene.ChallengeState`, `scene.ChallengeTask`.
+
+```go
+// Task definition
+task := scene.ChallengeTask{
+    ID:          "task-1",
+    Description: "Scale the outer wall",
+    Skill:       "Athletics",
+    Difficulty:  dice.Great,      // +4 ladder
+    Status:      scene.TaskPending,
+}
+
+// Challenge state
+challenge := &scene.ChallengeState{
+    Description: "Infiltrate the fortress",
+    Tasks:       []scene.ChallengeTask{task1, task2, task3},
+    Resolved:    false,
+}
+
+// Check progress
+pending := challenge.PendingTasks()              // Unresolved tasks
+successes, failures, ties := challenge.Tally()   // Current score
+complete := challenge.IsComplete()                // All tasks resolved?
+result := challenge.OverallOutcome()             // ChallengeSuccess/Partial/Failure
+
+// Resolve a task (outcome from dice roll)
+challenge.ResolveTask("task-1", "player-1", dice.Success)  // TaskSucceeded
+challenge.ResolveTask("task-2", "npc-1", dice.SuccessWithStyle)  // TaskSucceededWithStyle
+```
+
+**Task status constants:**
+- `scene.TaskPending` — not yet attempted
+- `scene.TaskSucceeded` — overcome roll succeeded (1-2 shifts)
+- `scene.TaskSucceededWithStyle` — overcome roll succeeded with style (3+ shifts)
+- `scene.TaskFailed` — overcome roll failed
+- `scene.TaskTied` — overcome roll tied (0 shifts)
+
+**Overall outcomes** (determined by `OverallOutcome()`):
+- `scene.ChallengeSuccess` — majority of tasks succeeded
+- `scene.ChallengePartial` — mixed results (roughly balanced)
+- `scene.ChallengeFailure` — majority of tasks failed
+
+**Engine integration:** `internal/engine/challenge_manager.go` handles initiation and tracks lifecycle. `internal/engine/challenge_generator.go` uses LLM to generate tasks from a description. Challenges are mutually exclusive with conflicts/contests — only one active scene type at a time.
+
 ## SRD Quick Reference
 
 | Topic | SRD Link |
@@ -372,6 +422,7 @@ if !defender.TakeStress(character.PhysicalStress, outcome.Shifts) {
 | Stress & Consequences | https://fate-srd.com/fate-core/stress-consequences |
 | Resolving Attacks | https://fate-srd.com/fate-core/resolving-attacks |
 | Conflicts | https://fate-srd.com/fate-core/conflicts |
+| Challenges | https://fate-srd.com/fate-core/challenges |
 | Getting Taken Out | https://fate-srd.com/fate-core/getting-taken-out |
 | Skills List | https://fate-srd.com/fate-core/default-skill-list |
 | Types of Aspects | https://fate-srd.com/fate-core/types-aspects |
