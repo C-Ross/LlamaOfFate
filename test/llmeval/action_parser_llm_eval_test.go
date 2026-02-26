@@ -26,6 +26,7 @@ type ActionParserTestCase struct {
 	ExpectedSkills     []string // Any of these skills would be acceptable
 	ExpectedDifficulty int      // Expected difficulty (ignored for Attack actions)
 	Description        string   // Human-readable description of why this should be classified this way
+	OtherCharacters    []*character.Character // NPCs in the scene (optional)
 }
 
 // getTestCharacter creates a well-rounded test character for evaluation
@@ -609,6 +610,134 @@ func getThirdPersonTestCases() []ActionParserTestCase {
 	}
 }
 
+// getHeistNPCs creates NPCs matching the heist scenario where the stealth-attack bug was discovered.
+func getHeistNPCs() []*character.Character {
+	chen := character.NewCharacter("corp-agent", "Agent Chen")
+	chen.Aspects.HighConcept = "Nexus Industries Troubleshooter"
+	chen.Aspects.AddAspect("Augmented Combat Implants")
+	chen.SetSkill("Fight", dice.Good)
+	chen.SetSkill("Shoot", dice.Good)
+	chen.SetSkill("Notice", dice.Fair)
+	chen.SetSkill("Athletics", dice.Fair)
+	chen.SetSkill("Will", dice.Average)
+	chen.SetSkill("Physique", dice.Average)
+
+	drone := character.NewCharacter("drone-1", "Security Drone Alpha")
+	drone.Aspects.HighConcept = "Automated Threat Response Unit"
+	drone.SetSkill("Shoot", dice.Fair)
+	drone.SetSkill("Notice", dice.Average)
+
+	return []*character.Character{chen, drone}
+}
+
+// getHeistPlayer creates the Zero character from the heist preset.
+func getHeistPlayer() *character.Character {
+	char := character.NewCharacter("zero", "Ghost")
+	char.Aspects.HighConcept = "Ex-Corporate Netrunner Gone Rogue"
+	char.Aspects.Trouble = "Every Megacorp Wants Me Dead"
+	char.Aspects.AddAspect("Military-Grade Cybernetic Reflexes")
+	char.Aspects.AddAspect("Nobody Gets Left Behind")
+	char.Aspects.AddAspect("I Know a Guy for Everything")
+
+	char.SetSkill("Burglary", dice.Superb)
+	char.SetSkill("Stealth", dice.Great)
+	char.SetSkill("Notice", dice.Great)
+	char.SetSkill("Crafts", dice.Good)
+	char.SetSkill("Athletics", dice.Good)
+	char.SetSkill("Shoot", dice.Good)
+	char.SetSkill("Deceive", dice.Fair)
+	char.SetSkill("Will", dice.Fair)
+	char.SetSkill("Investigate", dice.Fair)
+	char.SetSkill("Contacts", dice.Fair)
+	char.SetSkill("Fight", dice.Average)
+	char.SetSkill("Physique", dice.Average)
+	char.SetSkill("Provoke", dice.Average)
+	char.SetSkill("Resources", dice.Average)
+
+	return char
+}
+
+// getStealthAttackTestCases returns cases where a player combines stealth
+// movement with an attack. The skill should be Fight/Shoot (how harm is dealt),
+// NOT Stealth (how they got into position).
+//
+// Bug reproduction: During MCP playtest, "I slip through the blindspot in the
+// drone patrols and try to disable Agent Chen with a neural stunner" was
+// parsed as Stealth instead of Fight/Shoot.
+func getStealthAttackTestCases() []ActionParserTestCase {
+	npcs := getHeistNPCs()
+	heistContext := "Inside Nexus Industries' data vault — humming server racks, cold blue light. " +
+		"Security drones patrol the aisles. Agent Chen reviews a datapad near the central terminal."
+
+	return []ActionParserTestCase{
+		// The exact scenario that triggered the bug during the MCP playtest
+		{
+			Name:            "Sneak and disable with stunner (original bug)",
+			RawInput:        "I slip through the blindspot in the drone patrols and try to disable Agent Chen with a neural stunner",
+			Context:         heistContext,
+			OtherCharacters: npcs,
+			ExpectedType:    action.Attack,
+			ExpectedSkills:  []string{"Fight", "Shoot"},
+			Description:     "Player sneaks AND attacks — skill should be Fight or Shoot, not Stealth",
+		},
+		{
+			Name:            "Sneak up and stab",
+			RawInput:        "I creep up behind Agent Chen and stab him with my blade",
+			Context:         heistContext,
+			OtherCharacters: npcs,
+			ExpectedType:    action.Attack,
+			ExpectedSkills:  []string{"Fight"},
+			Description:     "Sneaking is the approach, stabbing is the action — Attack with Fight",
+		},
+		{
+			Name:            "Quietly take out the guard",
+			RawInput:        "I silently move up behind Agent Chen and take him out",
+			Context:         heistContext,
+			OtherCharacters: npcs,
+			ExpectedType:    action.Attack,
+			ExpectedSkills:  []string{"Fight", "Shoot"},
+			Description:     "Silent takedown is still harm/Attack — Stealth is the approach, not the skill",
+		},
+		{
+			Name:            "Ambush with ranged weapon",
+			RawInput:        "I hide behind a server rack and shoot Agent Chen with my silenced pistol",
+			Context:         heistContext,
+			OtherCharacters: npcs,
+			ExpectedType:    action.Attack,
+			ExpectedSkills:  []string{"Shoot"},
+			Description:     "Hiding is the setup, shooting is the action — Attack with Shoot",
+		},
+		{
+			Name:            "Sneak and strangle",
+			RawInput:        "I sneak up behind Agent Chen and put him in a chokehold",
+			Context:         heistContext,
+			OtherCharacters: npcs,
+			ExpectedType:    action.Attack,
+			ExpectedSkills:  []string{"Fight", "Physique"},
+			Description:     "Stealth approach + physical attack = Attack with Fight",
+		},
+		// Contrast: pure stealth SHOULD use Stealth
+		{
+			Name:            "Pure stealth — no attack (contrast)",
+			RawInput:        "I sneak past Agent Chen without him noticing",
+			Context:         heistContext,
+			OtherCharacters: npcs,
+			ExpectedType:    action.Overcome,
+			ExpectedSkills:  []string{"Stealth"},
+			Description:     "Pure stealth with no attack intent — Stealth is correct here",
+		},
+		{
+			Name:            "Use darkness to attack",
+			RawInput:        "Using the darkness as cover, I rush Agent Chen and hit him with my stun baton",
+			Context:         heistContext + " The lights have gone out from an EMP blast.",
+			OtherCharacters: npcs,
+			ExpectedType:    action.Attack,
+			ExpectedSkills:  []string{"Fight"},
+			Description:     "Cover/darkness is context, the action is a melee attack — Fight",
+		},
+	}
+}
+
 // EvaluationResult stores the result of a single test case evaluation
 type EvaluationResult struct {
 	TestCase         ActionParserTestCase
@@ -663,16 +792,18 @@ func TestActionParser_LLMEvaluation(t *testing.T) {
 	char := getTestCharacter()
 	ctx := context.Background()
 
-	// Collect all test cases
+	// Collect all test cases with optional per-category character overrides
 	allTestCases := []struct {
 		category string
 		cases    []ActionParserTestCase
+		char     *character.Character // nil = use default test character
 	}{
-		{"Overcome", getOvercomeTestCases()},
-		{"Attack", getAttackTestCases()},
-		{"CreateAdvantage", getCreateAdvantageTestCases()},
-		{"OvercomeVsCaAEdgeCases", getOvercomeVsCaAEdgeCases()},
-		{"ThirdPerson", getThirdPersonTestCases()},
+		{"Overcome", getOvercomeTestCases(), nil},
+		{"Attack", getAttackTestCases(), nil},
+		{"CreateAdvantage", getCreateAdvantageTestCases(), nil},
+		{"OvercomeVsCaAEdgeCases", getOvercomeVsCaAEdgeCases(), nil},
+		{"ThirdPerson", getThirdPersonTestCases(), nil},
+		{"StealthAttack", getStealthAttackTestCases(), getHeistPlayer()},
 	}
 
 	var results []EvaluationResult
@@ -689,9 +820,13 @@ func TestActionParser_LLMEvaluation(t *testing.T) {
 	// Run each test case
 	for _, category := range allTestCases {
 		t.Run(category.category, func(t *testing.T) {
+			testChar := char
+			if category.char != nil {
+				testChar = category.char
+			}
 			for _, tc := range category.cases {
 				t.Run(tc.Name, func(t *testing.T) {
-					result := evaluateTestCase(ctx, parser, char, tc)
+					result := evaluateTestCase(ctx, parser, testChar, tc)
 					results = append(results, result)
 
 					if result.Error != nil {
@@ -819,9 +954,10 @@ func TestActionParser_LLMEvaluation(t *testing.T) {
 // evaluateTestCase runs a single test case and returns the result
 func evaluateTestCase(ctx context.Context, parser engine.ActionParser, char *character.Character, tc ActionParserTestCase) EvaluationResult {
 	req := engine.ActionParseRequest{
-		Character: char,
-		RawInput:  tc.RawInput,
-		Context:   tc.Context,
+		Character:       char,
+		RawInput:        tc.RawInput,
+		Context:         tc.Context,
+		OtherCharacters: tc.OtherCharacters,
 	}
 
 	parsedAction, err := parser.ParseAction(ctx, req)
