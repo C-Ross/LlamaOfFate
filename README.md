@@ -39,6 +39,7 @@ Fate™ is a trademark of Evil Hat Productions, LLC.
 - **Complete Skill System**: All 18 default Fate Core skills with proper action mappings
 - **Stress and Consequences**: Proper implementation of physical and mental damage
 - **Fate Point Economy**: Track and manage fate point spending and gaining
+- **Challenge System**: Multi-step skill challenges with task tracking and progress management
 
 ### Scene Management
 - **Dynamic Scenes**: Create and modify scenes with situation aspects
@@ -119,7 +120,10 @@ Run `just` without arguments to see all available commands. Common commands incl
 
 **Go:**
 - **`just build`** - Build the CLI application
+- **`just build-server`** - Build the WebSocket server
+- **`just build-mcpserver`** - Build the MCP server
 - **`just run`** - Build and run the CLI
+- **`just serve`** - Build and run the WebSocket server
 - **`just go-test`** - Run Go tests
 - **`just go-lint`** - Run golangci-lint
 - **`just go-validate`** - vet + fmtcheck + lint + test + build
@@ -168,7 +172,8 @@ LlamaOfFate automatically saves your game progress at key points during play. Wh
 LlamaOfFate/
 ├── cmd/
 │   ├── cli/                    # Command-line interface
-│   └── server/                 # WebSocket server entry point
+│   ├── server/                 # WebSocket server entry point
+│   └── mcpserver/              # MCP (Model Context Protocol) server for AI assistant integration
 ├── internal/
 │   ├── core/                   # Core game mechanics
 │   │   ├── action/             # Action resolution system
@@ -183,6 +188,7 @@ LlamaOfFate/
 │   ├── session/                # Session logging for game transcripts
 │   ├── storage/                # Game state persistence (YAML save/load)
 │   ├── logging/                # Application logging
+│   ├── mcpserver/              # MCP server implementation and tool handlers
 │   └── ui/
 │       ├── terminal/           # Terminal-based interface
 │       └── web/                # WebSocket UI implementation
@@ -206,6 +212,7 @@ LlamaOfFate/
 
 - **`cmd/cli/`**: Entry point for the command-line application
 - **`cmd/server/`**: Entry point for the WebSocket server
+- **`cmd/mcpserver/`**: Entry point for the MCP (Model Context Protocol) server, enabling AI assistants to interact with the game
 - **`internal/core/`**: Core Fate mechanics implementation (character, dice, scene, action, skills)
 - **`internal/engine/`**: Purely async/event-driven game engine (GameSessionManager interface: Start/HandleInput/ProvideInvokeResponse/ProvideMidFlowResponse/Save); emits GameEvents for UI rendering
 - **`internal/syncdriver/`**: Synchronous blocking game loop that wraps the engine's async API for terminal-style UIs (Run function drives: ReadInput → HandleInput → Emit events → drive prompts → repeat)
@@ -214,6 +221,7 @@ LlamaOfFate/
 - **`internal/session/`**: Session logging for game transcripts
 - **`internal/storage/`**: Game state persistence with YAML-based save/load
 - **`internal/uicontract/`**: UI interface contracts (UI, SceneInfo, GameEvent types, etc.) for decoupling engine from UI implementations
+- **`internal/mcpserver/`**: MCP (Model Context Protocol) server implementation with game management tools
 - **`internal/ui/terminal/`**: Terminal UI implementation; handles meta-commands and renders GameEvents to console
 - **`internal/ui/web/`**: WebSocket UI implementation; bridges engine events to WebSocket clients
 - **`web/`**: React frontend — Vite 7, React 19, TypeScript, Tailwind CSS v4, shadcn/ui, Vitest
@@ -229,6 +237,7 @@ LlamaOfFate/
 - ✅ Complete Fate Core dice system (4dF) and skill ladder
 - ✅ All 18 default Fate Core skills with action mappings
 - ✅ Game engine with scene and scenario management
+- ✅ Challenge system with multi-step skill challenges
 - ✅ LLM integration with Azure OpenAI
 - ✅ Action parsing from natural language input
 - ✅ Conflict resolution system with stress and consequences
@@ -239,6 +248,32 @@ LlamaOfFate/
 - ✅ Integration tests and LLM evaluation tests
 - ✅ Web UI scaffold (React + Vite + Tailwind + shadcn/ui)
 - ✅ WebSocket server backend
+- ✅ MCP (Model Context Protocol) server for AI assistant integration
+
+## MCP Server
+
+LlamaOfFate includes an MCP (Model Context Protocol) server that allows AI assistants like GitHub Copilot and Claude Desktop to interact with the game engine. The MCP server provides tools for:
+
+- Starting new game sessions with predefined scenarios
+- Handling player input and receiving game events
+- Inspecting current game state (character, scene, conflict status)
+- Managing game flow (invoke responses, mid-flow prompts)
+
+### Building and Running
+
+```bash
+# Build the MCP server
+just build-mcpserver
+
+# Run the MCP server (stdio mode)
+./bin/mcpserver
+```
+
+The MCP server reads the same configuration as the CLI and WebSocket server (`configs/azure-llm.yaml`).
+
+### VS Code Integration
+
+The repository includes a VS Code MCP configuration in `.vscode/mcp.json` for local development integration with GitHub Copilot.
 
 ### Planned Features
 - 📋 Additional LLM backends (Ollama, OpenAI direct)
