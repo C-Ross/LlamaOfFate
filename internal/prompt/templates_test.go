@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core/action"
+	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -260,4 +263,258 @@ func TestChallengeBuildTemplate(t *testing.T) {
 	assert.Contains(t, rendered, "Patrolling Guards")
 	assert.Contains(t, rendered, "Moonless Night")
 	assert.Contains(t, rendered, "SITUATION ASPECTS")
+}
+
+func TestRenderInputClassification(t *testing.T) {
+	testScene := scene.NewScene("test-scene", "Harbor District", "A busy port")
+	data := InputClassificationData{
+		Scene:       testScene,
+		PlayerInput: "I want to sneak past the guards",
+	}
+
+	result, err := RenderInputClassification(data)
+	require.NoError(t, err)
+	assert.Contains(t, result, "Harbor District")
+	assert.Contains(t, result, "I want to sneak past the guards")
+}
+
+func TestRenderSceneResponse(t *testing.T) {
+	testScene := scene.NewScene("test-scene", "Moonlit Alley", "A narrow alley under the moon")
+	data := SceneResponseData{
+		Scene:               testScene,
+		CharacterContext:    "A skilled rogue",
+		AspectsContext:      "Shadows everywhere",
+		ConversationContext: "Previous dialogue",
+		PlayerInput:         "I look for a hiding spot",
+		InteractionType:     "action",
+	}
+
+	result, err := RenderSceneResponse(data)
+	require.NoError(t, err)
+	assert.Contains(t, result, "Moonlit Alley")
+	assert.Contains(t, result, "A skilled rogue")
+	assert.Contains(t, result, "I look for a hiding spot")
+}
+
+func TestRenderConflictResponse(t *testing.T) {
+	testScene := scene.NewScene("conflict-scene", "Arena Floor", "An ancient arena")
+	testScene.StartConflict(scene.PhysicalConflict, []scene.ConflictParticipant{})
+	data := ConflictResponseData{
+		Scene:                testScene,
+		CharacterContext:     "Brave warrior",
+		AspectsContext:       "Battle-hardened",
+		ConversationContext:  "Round started",
+		PlayerInput:          "I attack the goblin",
+		CurrentCharacterName: "Hero",
+		ParticipantMap:       map[string]*scene.ConflictParticipant{},
+		CharacterMap:         map[string]*character.Character{},
+	}
+
+	result, err := RenderConflictResponse(data)
+	require.NoError(t, err)
+	assert.Contains(t, result, "Arena Floor")
+	assert.Contains(t, result, "I attack the goblin")
+}
+
+func TestRenderActionNarrative(t *testing.T) {
+	testScene := scene.NewScene("scene-1", "Training Ground", "A place for training")
+	act := action.NewAction("act-1", "hero-1", action.Overcome, "Athletics", "Sprint across the gap")
+	act.Outcome = &dice.Outcome{Type: dice.Success, Shifts: 2}
+	data := ActionNarrativeData{
+		Scene:            testScene,
+		CharacterContext: "A nimble hero",
+		AspectsContext:   "No aspects",
+		Action:           act,
+	}
+
+	result, err := RenderActionNarrative(data)
+	require.NoError(t, err)
+	assert.Contains(t, result, "Sprint across the gap")
+	assert.NotEmpty(t, result)
+}
+
+func TestRenderNPCActionDecision(t *testing.T) {
+	data := NPCActionDecisionData{
+		ConflictType:     "physical",
+		Round:            2,
+		SceneName:        "Tavern Brawl",
+		SceneDescription: "Tables and chairs flying",
+		NPCName:          "Bandit",
+		NPCHighConcept:   "Desperate Outlaw",
+		NPCTrouble:       "Greedy to a Fault",
+		NPCAspects:       []string{"Quick with a Blade"},
+		NPCSkills:        map[string]int{"Fight": 3, "Athletics": 2},
+		NPCPhysicalStress: []bool{false, false, false},
+		NPCMentalStress:   []bool{false, false},
+		Targets: []NPCTargetInfo{
+			{ID: "player-1", Name: "Hero", HighConcept: "Wandering Knight"},
+		},
+		SituationAspects: []scene.SituationAspect{
+			{ID: "asp-1", Aspect: "Broken Furniture"},
+		},
+	}
+
+	result, err := RenderNPCActionDecision(data)
+	require.NoError(t, err)
+	assert.Contains(t, result, "Bandit")
+	assert.Contains(t, result, "Tavern Brawl")
+	assert.Contains(t, result, "Hero")
+}
+
+func TestRenderNPCAttack(t *testing.T) {
+	data := NPCAttackData{
+		ConflictType:       "physical",
+		Round:              1,
+		SceneName:          "Dark Alley",
+		NPCName:            "Shadow Assassin",
+		NPCHighConcept:     "Silent Killer",
+		NPCAspects:         []string{"Moves Like a Ghost"},
+		Skill:              "Fight",
+		TargetName:         "Detective",
+		TargetHighConcept:  "World-Weary Investigator",
+		SituationAspects:   []scene.SituationAspect{{ID: "asp-1", Aspect: "Heavy Fog"}},
+		OutcomeDescription: "The assassin strikes from the shadows, landing a blow.",
+	}
+
+	result, err := RenderNPCAttack(data)
+	require.NoError(t, err)
+	assert.Contains(t, result, "Shadow Assassin")
+	assert.Contains(t, result, "Detective")
+	assert.Contains(t, result, "Dark Alley")
+}
+
+func TestRenderActionParse(t *testing.T) {
+	char := character.NewCharacter("player-1", "Aria Swift")
+	char.Skills["Athletics"] = dice.Great
+	char.Skills["Fight"] = dice.Good
+	data := ActionParseTemplateData{
+		Character:   char,
+		RawInput:    "I want to leap over the gap",
+		Context:     "Rooftop chase",
+		DifficultyGuidance: DifficultyGuidance{
+			DifficultyMin:     1,
+			DifficultyMax:     5,
+			DifficultyDefault: 2,
+			DifficultyGuide:   "1=easy, 2=moderate, 5=hard",
+		},
+	}
+
+	result, err := RenderActionParse(data)
+	require.NoError(t, err)
+	assert.Contains(t, result, "Aria Swift")
+	assert.Contains(t, result, "I want to leap over the gap")
+}
+
+func TestRenderActionParseSystem(t *testing.T) {
+	result, err := RenderActionParseSystem()
+	require.NoError(t, err)
+	assert.NotEmpty(t, result)
+}
+
+func TestRenderAspectGeneration(t *testing.T) {
+	char := character.NewCharacter("player-1", "Rex Bold")
+	act := action.NewAction("act-1", "player-1", action.CreateAdvantage, "Notice", "Search the crime scene")
+	act.Outcome = &dice.Outcome{Type: dice.Success, Shifts: 1}
+	outcome := &dice.Outcome{Type: dice.Success, Shifts: 1}
+	data := AspectGenerationRequest{
+		Character:       char,
+		Action:          act,
+		Outcome:         outcome,
+		Context:         "A dusty office with overturned furniture",
+		TargetType:      "scene",
+		ExistingAspects: []string{"Dim Lighting"},
+	}
+
+	result, err := RenderAspectGeneration(data)
+	require.NoError(t, err)
+	assert.Contains(t, result, "Rex Bold")
+	assert.NotEmpty(t, result)
+}
+
+func TestRenderAspectGenerationSystem(t *testing.T) {
+	result, err := RenderAspectGenerationSystem()
+	require.NoError(t, err)
+	assert.NotEmpty(t, result)
+}
+
+func TestRenderSceneGeneration(t *testing.T) {
+	scenario := &scene.Scenario{
+		Title:   "The Lost City",
+		Problem: "An ancient evil has awakened beneath the city",
+		Setting: "Fantasy city built on ruins",
+	}
+	data := SceneGenerationData{
+		TransitionHint:    "The underground ruins",
+		Scenario:          scenario,
+		PlayerName:        "Zara",
+		PlayerHighConcept: "Fearless Archaeologist",
+		PlayerTrouble:     "Reckless Curiosity",
+		PlayerAspects:     []string{"Ancient Languages Expert"},
+		PreviousSummaries: []SceneSummary{},
+		Complications:     []string{},
+		KnownNPCs:         []NPCSummary{},
+	}
+
+	result, err := RenderSceneGeneration(data)
+	require.NoError(t, err)
+	assert.Contains(t, result, "Zara")
+	assert.Contains(t, result, "The Lost City")
+}
+
+func TestRenderSceneSummary(t *testing.T) {
+	data := SceneSummaryData{
+		SceneName:        "The Market Square",
+		SceneDescription: "A busy marketplace",
+		SituationAspects: []string{"Crowded Streets", "Merchant Stalls"},
+		ConversationHistory: []ConversationEntry{
+			{PlayerInput: "I ask the merchant about the theft.", GMResponse: "The merchant nervously denies knowing anything."},
+		},
+		NPCsInScene: []NPCSummary{
+			{Name: "Merchant", Attitude: "nervous"},
+		},
+		HowEnded:       "transition",
+		TransitionHint: "The docks",
+	}
+
+	result, err := RenderSceneSummary(data)
+	require.NoError(t, err)
+	assert.Contains(t, result, "The Market Square")
+	assert.Contains(t, result, "Merchant")
+}
+
+func TestRenderScenarioGeneration(t *testing.T) {
+	data := ScenarioGenerationData{
+		PlayerName:        "Marcus",
+		PlayerHighConcept: "Former Detective",
+		PlayerTrouble:     "The Case That Broke Me",
+		PlayerAspects:     []string{"Friends in Low Places"},
+		Genre:             "noir",
+		Theme:             "corruption",
+	}
+
+	result, err := RenderScenarioGeneration(data)
+	require.NoError(t, err)
+	assert.Contains(t, result, "Marcus")
+	assert.Contains(t, result, "Former Detective")
+}
+
+func TestRenderScenarioResolution(t *testing.T) {
+	scenario := &scene.Scenario{
+		Title:          "The Conspiracy",
+		Problem:        "A secret society controls the city government",
+		StoryQuestions: []string{"Can the player expose them?", "Will the city be saved?"},
+	}
+	data := ScenarioResolutionData{
+		Scenario:   scenario,
+		PlayerName: "Investigator",
+		PlayerAspects: []string{"Dogged Reporter"},
+		SceneSummaries: []SceneSummary{
+			{NarrativeProse: "The player found evidence of the conspiracy."},
+		},
+	}
+
+	result, err := RenderScenarioResolution(data)
+	require.NoError(t, err)
+	assert.Contains(t, result, "The Conspiracy")
+	assert.Contains(t, result, "A secret society controls the city government")
 }
