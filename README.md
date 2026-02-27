@@ -79,6 +79,21 @@ model_name: "Llama-4-Maverick-17B-128E-Instruct-FP8"
 timeout: 300
 ```
 
+## Development Automation
+
+LlamaOfFate uses **GitHub Agentic Workflows** ([gh-aw](https://github.com/github/gh-aw)) for automated development tasks. The repository includes several AI-powered workflows:
+
+- **readme-updater**: Automatically updates README.md when significant changes are pushed to main
+- **skills-updater**: Updates `.github/skills/` documentation when relevant code changes
+- **coverage-improver**: Analyzes test coverage and suggests improvements
+
+These workflows run automatically on push events and can also be triggered manually. See `.github/workflows/*.md` for workflow definitions.
+
+**Installing gh-aw CLI:**
+```bash
+gh extension install github/gh-aw
+```
+
 ## Building and Running
 
 LlamaOfFate uses [`just`](https://github.com/casey/just) as a command runner for common development tasks.
@@ -199,6 +214,10 @@ LlamaOfFate/
 │   ├── scenario-generator/     # Scenario generation example
 │   ├── scenario-walkthrough/   # Scenario walkthrough example
 │   └── scene-generator/        # Scene generation example
+├── .github/
+│   ├── workflows/              # GitHub Agentic Workflows (automated AI agents)
+│   ├── skills/                 # Project-specific Copilot skills
+│   └── agents/                 # Custom agent definitions
 ├── configs/                    # Configuration files (azure-llm.yaml)
 ├── docs/                       # Documentation
 │   └── architecture.md         # Architecture documentation
@@ -226,6 +245,9 @@ LlamaOfFate/
 - **`internal/mcpserver/`**: MCP server implementation; exposes game tools for programmatic interaction (start game, send input, inspect state)
 - **`web/`**: React frontend — Vite 7, React 19, TypeScript, Tailwind CSS v4, shadcn/ui, Vitest
 - **`examples/`**: Example programs demonstrating LLM scene loops, scenario generation, and walkthroughs
+- **`.github/workflows/`**: GitHub Agentic Workflows - automated AI agents for README updates, skill documentation, and test coverage improvement
+- **`.github/skills/`**: Project-specific Copilot skills for game mechanics, prompt engineering, web UI development, and more
+- **`.github/agents/`**: Custom agent definitions for specialized development tasks
 - **`configs/`**: YAML configuration files (azure-llm.yaml)
 - **`test/integration/`**: Integration tests for the game system
 - **`test/llmeval/`**: LLM evaluation tests for prompt behavior
