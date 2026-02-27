@@ -27,6 +27,7 @@ type ActionParserTestCase struct {
 	ExpectedDifficulty int                    // Expected difficulty (ignored for Attack actions)
 	Description        string                 // Human-readable description of why this should be classified this way
 	OtherCharacters    []*character.Character // NPCs in the scene (optional)
+	ExpectedOpposition string                 // "passive" or "active"; empty means skip check
 }
 
 // getTestCharacter creates a well-rounded test character for evaluation
@@ -91,6 +92,7 @@ func getOvercomeTestCases() []ActionParserTestCase {
 			ExpectedType:       action.Overcome,
 			ExpectedSkills:     []string{"Deceive", "Rapport"},
 			ExpectedDifficulty: 3, // Good - stern guard implies difficulty
+			ExpectedOpposition: "passive", // guard mentioned in context but not in OtherCharacters
 			Description:        "Social obstacle blocking immediate progress - should be Overcome",
 		},
 		{
@@ -154,6 +156,7 @@ func getOvercomeTestCases() []ActionParserTestCase {
 			ExpectedType:       action.Overcome,
 			ExpectedSkills:     []string{"Stealth"},
 			ExpectedDifficulty: 3, // Good - patrolling guards are alert
+			ExpectedOpposition: "passive", // guards mentioned in context but not in OtherCharacters
 			Description:        "Bypassing opposition through stealth - Overcome",
 		},
 		// Social deception can be Overcome or Create Advantage depending on interpretation.
@@ -166,6 +169,7 @@ func getOvercomeTestCases() []ActionParserTestCase {
 			ExpectedType:       action.CreateAdvantage,
 			ExpectedSkills:     []string{"Deceive"},
 			ExpectedDifficulty: 3, // Good - guard is suspicious
+			ExpectedOpposition: "passive", // guard mentioned in context but not in OtherCharacters
 			Description:        "Creating false identity aspect to manipulate situation - Create Advantage",
 		},
 		{
@@ -211,6 +215,7 @@ func getOvercomeTestCases() []ActionParserTestCase {
 			ExpectedType:       action.Overcome,
 			ExpectedSkills:     []string{"Rapport", "Resources"},
 			ExpectedDifficulty: 2, // Fair - trader wants profit
+			ExpectedOpposition: "passive", // trader mentioned in context but not in OtherCharacters
 			Description:        "Honest negotiation uses Rapport, not Deceive",
 		},
 		{
@@ -254,6 +259,7 @@ func getOvercomeVsCaAEdgeCases() []ActionParserTestCase {
 			ExpectedType:       action.Overcome,
 			ExpectedSkills:     []string{"Rapport", "Deceive"},
 			ExpectedDifficulty: 3, // Good - bouncers are trained
+			ExpectedOpposition: "passive", // bouncer mentioned in context but not in OtherCharacters
 			Description:        "Getting past a bouncer is an immediate obstacle — Overcome",
 		},
 		{
@@ -442,6 +448,7 @@ func getCreateAdvantageTestCases() []ActionParserTestCase {
 			ExpectedType:       action.CreateAdvantage,
 			ExpectedSkills:     []string{"Rapport", "Empathy"},
 			ExpectedDifficulty: 2, // Fair - servants are often friendly
+			ExpectedOpposition: "passive", // servant mentioned but not in OtherCharacters
 			Description:        "Building social connection for future information - Create Advantage",
 		},
 		{
@@ -451,6 +458,7 @@ func getCreateAdvantageTestCases() []ActionParserTestCase {
 			ExpectedType:       action.CreateAdvantage,
 			ExpectedSkills:     []string{"Deceive", "Provoke", "Stealth"},
 			ExpectedDifficulty: 3, // Good - palace guards are alert
+			ExpectedOpposition: "passive", // guards mentioned in context but not in OtherCharacters
 			Description:        "Creating an advantage (distracted guards) for ally's action - Create Advantage",
 		},
 		{
@@ -460,6 +468,7 @@ func getCreateAdvantageTestCases() []ActionParserTestCase {
 			ExpectedType:       action.CreateAdvantage,
 			ExpectedSkills:     []string{"Notice", "Fight", "Empathy"},
 			ExpectedDifficulty: 3, // Good - renowned fighter hides weaknesses
+			ExpectedOpposition: "passive", // opponent mentioned in context but not in OtherCharacters
 			Description:        "Discovering aspect on opponent - Create Advantage",
 		},
 		{
@@ -469,6 +478,7 @@ func getCreateAdvantageTestCases() []ActionParserTestCase {
 			ExpectedType:       action.CreateAdvantage,
 			ExpectedSkills:     []string{"Deceive", "Contacts", "Rapport", "Provoke"},
 			ExpectedDifficulty: 2, // Fair - people love gossip
+			ExpectedOpposition: "passive", // merchant mentioned in context but not in OtherCharacters
 			Description:        "Creating a social situation aspect - Create Advantage",
 		},
 		{
@@ -496,6 +506,7 @@ func getCreateAdvantageTestCases() []ActionParserTestCase {
 			ExpectedType:       action.CreateAdvantage,
 			ExpectedSkills:     []string{"Athletics", "Crafts", "Burglary", "Stealth"},
 			ExpectedDifficulty: 2, // Fair - setting up a trap
+			ExpectedOpposition: "passive", // guard mentioned in context but not in OtherCharacters
 			Description:        "Preparing a trap before combat - Create Advantage",
 		},
 		{
@@ -596,6 +607,7 @@ func getThirdPersonTestCases() []ActionParserTestCase {
 			ExpectedType:       action.CreateAdvantage,
 			ExpectedSkills:     []string{"Notice", "Fight"},
 			ExpectedDifficulty: 3,
+			ExpectedOpposition: "passive", // knight mentioned in context but not in OtherCharacters
 			Description:        "Third person tactical analysis - Create Advantage",
 		},
 		{
@@ -605,6 +617,7 @@ func getThirdPersonTestCases() []ActionParserTestCase {
 			ExpectedType:       action.CreateAdvantage,
 			ExpectedSkills:     []string{"Deceive", "Stealth", "Shoot"},
 			ExpectedDifficulty: 2,
+			ExpectedOpposition: "passive", // guards mentioned in context but not in OtherCharacters
 			Description:        "Third person distraction - Create Advantage",
 		},
 	}
@@ -746,6 +759,7 @@ type EvaluationResult struct {
 	TypeMatches      bool
 	SkillAcceptable  bool
 	ActualDifficulty int
+	ActualOpposition string // "active" when OpposingNPCID is set, otherwise "passive"
 	Reasoning        string
 	Confidence       int
 	Error            error
@@ -886,6 +900,9 @@ func TestActionParser_LLMEvaluation(t *testing.T) {
 						if tc.ExpectedType != action.Attack {
 							t.Logf("  Difficulty: expected=%d, got=%d (within range: %v)", tc.ExpectedDifficulty, result.ActualDifficulty, diffWithinRange)
 						}
+						if tc.ExpectedOpposition != "" {
+							t.Logf("  Opposition: expected=%s, got=%s", tc.ExpectedOpposition, result.ActualOpposition)
+						}
 						t.Logf("  Reasoning: %s", result.Reasoning)
 					}
 
@@ -900,6 +917,12 @@ func TestActionParser_LLMEvaluation(t *testing.T) {
 					if tc.ExpectedType != action.Attack {
 						assert.True(t, diffWithinRange,
 							"Difficulty mismatch for '%s': expected %d (+/-1), got %d", tc.RawInput, tc.ExpectedDifficulty, result.ActualDifficulty)
+					}
+
+					// Check opposition type when specified
+					if tc.ExpectedOpposition != "" {
+						assert.Equal(t, tc.ExpectedOpposition, result.ActualOpposition,
+							"Opposition mismatch for '%s': expected %s, got %s", tc.RawInput, tc.ExpectedOpposition, result.ActualOpposition)
 					}
 				})
 			}
@@ -977,6 +1000,11 @@ func evaluateTestCase(ctx context.Context, parser engine.ActionParser, char *cha
 		}
 	}
 
+	actualOpposition := "passive"
+	if parsedAction.OpposingNPCID != "" {
+		actualOpposition = "active"
+	}
+
 	return EvaluationResult{
 		TestCase:         tc,
 		ActualType:       parsedAction.Type,
@@ -984,6 +1012,7 @@ func evaluateTestCase(ctx context.Context, parser engine.ActionParser, char *cha
 		TypeMatches:      parsedAction.Type == tc.ExpectedType,
 		SkillAcceptable:  skillAcceptable,
 		ActualDifficulty: int(parsedAction.Difficulty),
+		ActualOpposition: actualOpposition,
 		// Note: Reasoning and Confidence aren't exposed from ParseAction currently
 		// We'd need to modify the parser to return these for full evaluation
 	}

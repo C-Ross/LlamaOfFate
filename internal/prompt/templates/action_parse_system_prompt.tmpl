@@ -51,14 +51,18 @@ When targeting a character listed in OTHER CHARACTERS IN SCENE, copy their EXACT
 
 OPPOSITION TYPE (Fate Core: Active vs Passive Opposition):
 - "passive": A flat difficulty rating. Use for environmental obstacles, abstract challenges, narrative-only threats (drones, traps, weather described in the scene but not listed as NPCs), or when no specific NPC is the one being acted against.
-- "active": A specific NPC rolls their skill as opposition instead of a flat difficulty. Use ONLY when the player's action is directed against a specific NPC listed in OTHER CHARACTERS IN SCENE AND that NPC would directly and deliberately resist (e.g., sneaking past a guard NPC → guard opposes with Notice, lying to a merchant NPC → merchant opposes with Empathy).
+- "active": A specific NPC rolls their skill as opposition instead of a flat difficulty. Use ONLY when ALL of the following are true:
+  1. The player's action is directed against a specific NPC
+  2. That NPC appears in the OTHER CHARACTERS IN SCENE list (with an ID in parentheses)
+  3. That NPC would directly and deliberately resist the action
+  If the OTHER CHARACTERS IN SCENE section is absent or empty, active opposition is IMPOSSIBLE — always use passive.
 
-CRITICAL: The opposing NPC must be the character the player is acting against, not just any NPC present. If the player is avoiding a hazard mentioned in the scene description (drones, traps, patrols) but that hazard is NOT listed in OTHER CHARACTERS IN SCENE, use PASSIVE opposition with an appropriate difficulty.
+CRITICAL: Characters described only in CURRENT SITUATION text (guards, merchants, servants, bouncers, etc.) but NOT listed in OTHER CHARACTERS IN SCENE are treated as part of the environment. They are NOT valid targets for active opposition. Use PASSIVE opposition with an appropriate difficulty instead.
 
 For active opposition:
 - Set "opposing_npc_id" to the NPC's exact ID from OTHER CHARACTERS IN SCENE
 - Set "opposing_skill" to the NPC's most relevant opposing skill
-- Set "difficulty" to 0 (it will be replaced by the NPC's roll)
+- STILL set "difficulty" to your best estimate of the passive difficulty (used as fallback if the NPC cannot be resolved)
 For passive opposition: leave "opposing_npc_id" and "opposing_skill" as empty strings.
 Attack and Defend ALWAYS use "passive" (active defense is handled separately by the system).
 
@@ -69,7 +73,7 @@ Your response must be valid JSON with no additional text:
   "description": "What they're trying to do",
   "target": "Exact character ID copied from OTHER CHARACTERS IN SCENE, or object name, or empty string",
   "opposition_type": "passive or active",
-  "difficulty": "Integer from DIFFICULTY RANGE (use 0 for Attack, Defend, or active opposition)",
+  "difficulty": "Integer from DIFFICULTY RANGE (use 0 for Attack and Defend only; always set a meaningful value for Overcome and Create an Advantage even with active opposition)",
   "opposing_npc_id": "Exact NPC ID from OTHER CHARACTERS IN SCENE, or empty string",
   "opposing_skill": "NPC skill name, or empty string",
   "reasoning": "Brief explanation including difficulty or opposition justification",
