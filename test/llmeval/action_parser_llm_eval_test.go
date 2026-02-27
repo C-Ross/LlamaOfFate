@@ -23,9 +23,9 @@ type ActionParserTestCase struct {
 	RawInput           string
 	Context            string
 	ExpectedType       action.ActionType
-	ExpectedSkills     []string // Any of these skills would be acceptable
-	ExpectedDifficulty int      // Expected difficulty (ignored for Attack actions)
-	Description        string   // Human-readable description of why this should be classified this way
+	ExpectedSkills     []string               // Any of these skills would be acceptable
+	ExpectedDifficulty int                    // Expected difficulty (ignored for Attack actions)
+	Description        string                 // Human-readable description of why this should be classified this way
 	OtherCharacters    []*character.Character // NPCs in the scene (optional)
 }
 

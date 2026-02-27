@@ -335,15 +335,15 @@ func TestRenderActionNarrative(t *testing.T) {
 
 func TestRenderNPCActionDecision(t *testing.T) {
 	data := NPCActionDecisionData{
-		ConflictType:     "physical",
-		Round:            2,
-		SceneName:        "Tavern Brawl",
-		SceneDescription: "Tables and chairs flying",
-		NPCName:          "Bandit",
-		NPCHighConcept:   "Desperate Outlaw",
-		NPCTrouble:       "Greedy to a Fault",
-		NPCAspects:       []string{"Quick with a Blade"},
-		NPCSkills:        map[string]int{"Fight": 3, "Athletics": 2},
+		ConflictType:      "physical",
+		Round:             2,
+		SceneName:         "Tavern Brawl",
+		SceneDescription:  "Tables and chairs flying",
+		NPCName:           "Bandit",
+		NPCHighConcept:    "Desperate Outlaw",
+		NPCTrouble:        "Greedy to a Fault",
+		NPCAspects:        []string{"Quick with a Blade"},
+		NPCSkills:         map[string]int{"Fight": 3, "Athletics": 2},
 		NPCPhysicalStress: []bool{false, false, false},
 		NPCMentalStress:   []bool{false, false},
 		Targets: []NPCTargetInfo{
@@ -388,9 +388,9 @@ func TestRenderActionParse(t *testing.T) {
 	char.Skills["Athletics"] = dice.Great
 	char.Skills["Fight"] = dice.Good
 	data := ActionParseTemplateData{
-		Character:   char,
-		RawInput:    "I want to leap over the gap",
-		Context:     "Rooftop chase",
+		Character: char,
+		RawInput:  "I want to leap over the gap",
+		Context:   "Rooftop chase",
 		DifficultyGuidance: DifficultyGuidance{
 			DifficultyMin:     1,
 			DifficultyMax:     5,
@@ -505,8 +505,8 @@ func TestRenderScenarioResolution(t *testing.T) {
 		StoryQuestions: []string{"Can the player expose them?", "Will the city be saved?"},
 	}
 	data := ScenarioResolutionData{
-		Scenario:   scenario,
-		PlayerName: "Investigator",
+		Scenario:      scenario,
+		PlayerName:    "Investigator",
 		PlayerAspects: []string{"Dogged Reporter"},
 		SceneSummaries: []SceneSummary{
 			{NarrativeProse: "The player found evidence of the conspiracy."},
