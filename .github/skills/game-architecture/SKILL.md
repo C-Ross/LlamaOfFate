@@ -15,9 +15,10 @@ syncdriver.Run()     ← blocking terminal loop (wraps async engine API)
   └─ GameManager (GameSessionManager interface) ← async API: Start/HandleInput/Provide*Response
        └─ ScenarioManager ← multi-scene loop, scene generation, summaries, NPC registry, recovery
             └─ SceneManager ← single-scene loop, input classification, dialog/action, conflict turns
-                 ├─ ActionParser    ← LLM: free-text → structured action
-                 ├─ AspectGenerator ← LLM: Create Advantage → aspect name
-                 └─ invoke.go       ← post-roll aspect invocation loop
+                 ├─ ActionParser      ← LLM: free-text → structured action
+                 ├─ AspectGenerator   ← LLM: Create Advantage → aspect name
+                 ├─ ChallengeManager  ← multi-task challenge orchestration
+                 └─ invoke.go         ← post-roll aspect invocation loop
 ```
 
 **syncdriver** wraps the async engine for blocking UIs. Engine itself is purely event-driven. Each layer creates/configures the layer below. **Do not skip layers.**
@@ -121,6 +122,20 @@ HandleInput(input)
 ### Action flow
 
 `handleAction()`: `ActionParser.ParseAction()` → `resolveAction()` (auto-initiates conflict for attacks) → `applyActionEffects()` → `generateActionNarrative()`.
+
+## Challenge System (`challenge_manager.go`)
+
+Multi-task challenges with skill-based overcome actions and outcome tallying. Managed by `ChallengeManager` (wired by `SceneManager`).
+
+### Lifecycle
+
+```
+initiateChallenge(type) → ChallengeGenerator.Generate() → builds tasks
+  → player acts against task → resolveAction() → mark success/failure
+  → all tasks resolved → tallyChallengeOutcome() → Victory/Partial/Defeat
+```
+
+Challenge data stored in `scene.Challenge`. Each task has skill, difficulty, status (pending/success/failure).
 
 ## Conflict System (`conflict.go`)
 
