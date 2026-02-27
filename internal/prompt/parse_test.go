@@ -116,3 +116,229 @@ func TestParseFateNarration_InvalidJSON(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "no valid JSON")
 }
+
+func TestParseGeneratedScene_ValidJSON(t *testing.T) {
+	input := `{
+		"scene_name": "The Dockside Tavern",
+		"description": "A rowdy tavern near the harbor, thick with smoke and sailors.",
+		"purpose": "Will the player find the smuggler before the ship departs?",
+		"opening_hook": "A fight breaks out near the bar",
+		"situation_aspects": ["Crowded Bar", "Smoke-Filled Room"],
+		"npcs": [
+			{"name": "One-Eye Pete", "high_concept": "Grizzled Dock Worker", "disposition": "neutral"}
+		]
+	}`
+
+	result, err := ParseGeneratedScene(input)
+	require.NoError(t, err)
+	assert.Equal(t, "The Dockside Tavern", result.SceneName)
+	assert.Equal(t, "A rowdy tavern near the harbor, thick with smoke and sailors.", result.Description)
+	assert.Equal(t, "Will the player find the smuggler before the ship departs?", result.Purpose)
+	assert.Equal(t, "A fight breaks out near the bar", result.OpeningHook)
+	assert.Equal(t, []string{"Crowded Bar", "Smoke-Filled Room"}, result.SituationAspects)
+	require.Len(t, result.NPCs, 1)
+	assert.Equal(t, "One-Eye Pete", result.NPCs[0].Name)
+	assert.Equal(t, "Grizzled Dock Worker", result.NPCs[0].HighConcept)
+	assert.Equal(t, "neutral", result.NPCs[0].Disposition)
+}
+
+func TestParseGeneratedScene_JSONEmbeddedInText(t *testing.T) {
+	input := `Sure, here's the scene:
+	{
+		"scene_name": "The Alley",
+		"description": "A dark narrow alley.",
+		"purpose": "Can the hero escape the pursuers?",
+		"situation_aspects": [],
+		"npcs": []
+	}
+	End of scene.`
+
+	result, err := ParseGeneratedScene(input)
+	require.NoError(t, err)
+	assert.Equal(t, "The Alley", result.SceneName)
+	assert.Equal(t, "A dark narrow alley.", result.Description)
+}
+
+func TestParseGeneratedScene_MissingSceneName(t *testing.T) {
+	input := `{"description": "A scene.", "purpose": "A purpose.", "situation_aspects": [], "npcs": []}`
+
+	_, err := ParseGeneratedScene(input)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing scene_name")
+}
+
+func TestParseGeneratedScene_MissingDescription(t *testing.T) {
+	input := `{"scene_name": "Test", "purpose": "A purpose.", "situation_aspects": [], "npcs": []}`
+
+	_, err := ParseGeneratedScene(input)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing description")
+}
+
+func TestParseGeneratedScene_MissingPurpose(t *testing.T) {
+	input := `{"scene_name": "Test", "description": "A description.", "situation_aspects": [], "npcs": []}`
+
+	_, err := ParseGeneratedScene(input)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing purpose")
+}
+
+func TestParseGeneratedScene_InvalidJSON(t *testing.T) {
+	input := `not json at all`
+
+	_, err := ParseGeneratedScene(input)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no valid JSON")
+}
+
+func TestParseGeneratedScene_InvalidJSONEmbedded(t *testing.T) {
+	input := `{ invalid json }`
+
+	_, err := ParseGeneratedScene(input)
+	require.Error(t, err)
+}
+
+func TestParseSceneSummary_ValidJSON(t *testing.T) {
+	input := `{
+		"scene_description": "A tense standoff at the saloon",
+		"key_events": ["Hero disarmed the bandit", "Sheriff arrived"],
+		"npcs_encountered": [{"name": "Black Jack", "attitude": "hostile"}],
+		"aspects_discovered": ["Wanted Dead or Alive"],
+		"unresolved_threads": ["The real mastermind is still out there"],
+		"how_ended": "transition",
+		"narrative_prose": "The dust settled as the lawman rode into town."
+	}`
+
+	result, err := ParseSceneSummary(input)
+	require.NoError(t, err)
+	assert.Equal(t, "A tense standoff at the saloon", result.SceneDescription)
+	assert.Equal(t, []string{"Hero disarmed the bandit", "Sheriff arrived"}, result.KeyEvents)
+	assert.Equal(t, "The dust settled as the lawman rode into town.", result.NarrativeProse)
+}
+
+func TestParseSceneSummary_JSONEmbeddedInText(t *testing.T) {
+	input := `Here is the summary: {"scene_description": "ok", "narrative_prose": "It happened."} Done.`
+
+	result, err := ParseSceneSummary(input)
+	require.NoError(t, err)
+	assert.Equal(t, "It happened.", result.NarrativeProse)
+}
+
+func TestParseSceneSummary_MissingNarrativeProse(t *testing.T) {
+	input := `{"scene_description": "A scene.", "narrative_prose": ""}`
+
+	_, err := ParseSceneSummary(input)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing narrative_prose")
+}
+
+func TestParseSceneSummary_InvalidJSON(t *testing.T) {
+	input := `this is not json`
+
+	_, err := ParseSceneSummary(input)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no valid JSON")
+}
+
+func TestParseSceneSummary_InvalidJSONEmbedded(t *testing.T) {
+	input := `{ bad json }`
+
+	_, err := ParseSceneSummary(input)
+	require.Error(t, err)
+}
+
+func TestParseScenarioResolution_ValidJSON(t *testing.T) {
+	input := `{
+		"is_resolved": true,
+		"answered_questions": ["Was the villain stopped?"],
+		"reasoning": "The player defeated the final boss."
+	}`
+
+	result, err := ParseScenarioResolution(input)
+	require.NoError(t, err)
+	assert.True(t, result.IsResolved)
+	assert.Equal(t, []string{"Was the villain stopped?"}, result.AnsweredQuestions)
+	assert.Equal(t, "The player defeated the final boss.", result.Reasoning)
+}
+
+func TestParseScenarioResolution_JSONEmbeddedInText(t *testing.T) {
+	input := `Analysis: {"is_resolved": false, "answered_questions": [], "reasoning": "Still ongoing."} End.`
+
+	result, err := ParseScenarioResolution(input)
+	require.NoError(t, err)
+	assert.False(t, result.IsResolved)
+	assert.Equal(t, "Still ongoing.", result.Reasoning)
+}
+
+func TestParseScenarioResolution_InvalidJSON(t *testing.T) {
+	input := `not json`
+
+	_, err := ParseScenarioResolution(input)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no valid JSON")
+}
+
+func TestParseScenarioResolution_InvalidJSONEmbedded(t *testing.T) {
+	input := `{ bad json }`
+
+	_, err := ParseScenarioResolution(input)
+	require.Error(t, err)
+}
+
+func TestParseScenario_ValidJSON(t *testing.T) {
+	input := `{
+		"title": "The Lost Crown",
+		"problem": "The kingdom's crown has been stolen by a rogue sorcerer.",
+		"story_questions": ["Can the hero recover the crown before coronation?", "Will the sorcerer be brought to justice?"],
+		"setting": "A medieval kingdom in turmoil",
+		"genre": "Fantasy"
+	}`
+
+	result, err := ParseScenario(input)
+	require.NoError(t, err)
+	assert.Equal(t, "The Lost Crown", result.Title)
+	assert.Equal(t, "The kingdom's crown has been stolen by a rogue sorcerer.", result.Problem)
+	assert.Len(t, result.StoryQuestions, 2)
+	assert.Equal(t, "A medieval kingdom in turmoil", result.Setting)
+	assert.Equal(t, "Fantasy", result.Genre)
+}
+
+func TestParseScenario_JSONEmbeddedInText(t *testing.T) {
+	input := `Generated scenario: {"title": "Dark Roads", "problem": "Bandits terrorize the highway."} Done.`
+
+	result, err := ParseScenario(input)
+	require.NoError(t, err)
+	assert.Equal(t, "Dark Roads", result.Title)
+	assert.Equal(t, "Bandits terrorize the highway.", result.Problem)
+}
+
+func TestParseScenario_MissingTitle(t *testing.T) {
+	input := `{"problem": "A problem exists.", "story_questions": []}`
+
+	_, err := ParseScenario(input)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing title")
+}
+
+func TestParseScenario_MissingProblem(t *testing.T) {
+	input := `{"title": "A Title", "story_questions": []}`
+
+	_, err := ParseScenario(input)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing problem")
+}
+
+func TestParseScenario_InvalidJSON(t *testing.T) {
+	input := `not json`
+
+	_, err := ParseScenario(input)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no valid JSON")
+}
+
+func TestParseScenario_InvalidJSONEmbedded(t *testing.T) {
+	input := `{ invalid json }`
+
+	_, err := ParseScenario(input)
+	require.Error(t, err)
+}
