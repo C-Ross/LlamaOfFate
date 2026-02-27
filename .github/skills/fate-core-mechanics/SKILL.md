@@ -360,6 +360,36 @@ if !defender.TakeStress(character.PhysicalStress, outcome.Shifts) {
 }
 ```
 
+## Challenges
+
+Challenges represent complex, multi-step tasks where characters face several obstacles. See [SRD: Challenges](https://fate-srd.com/fate-core/challenges).
+
+**Code:** `internal/core/scene/challenge.go`, `internal/engine/challenge.go`
+
+Challenges consist of multiple tasks, each requiring a skill roll:
+
+```go
+// Create challenge tasks
+tasks := []scene.ChallengeTask{
+    {Skill: "Athletics", Difficulty: dice.Good, Description: "Climb the wall"},
+    {Skill: "Burglary", Difficulty: dice.Fair, Description: "Pick the lock"},
+}
+
+// Start challenge on scene
+scene.StartChallenge("Scale the fortress", tasks)
+
+// Resolve individual task
+scene.ResolveTask(0, scene.TaskSuccess)  // Mark task 0 as succeeded
+
+// Check completion
+outcome := scene.CheckChallengeCompletion()  // Victory, PartialVictory, or Defeat
+```
+
+**Outcomes:**
+- Victory: All or most tasks succeeded
+- Partial Victory: Mix of success/failure  
+- Defeat: Most or all tasks failed
+
 ## SRD Quick Reference
 
 | Topic | SRD Link |
@@ -372,6 +402,7 @@ if !defender.TakeStress(character.PhysicalStress, outcome.Shifts) {
 | Stress & Consequences | https://fate-srd.com/fate-core/stress-consequences |
 | Resolving Attacks | https://fate-srd.com/fate-core/resolving-attacks |
 | Conflicts | https://fate-srd.com/fate-core/conflicts |
+| Challenges | https://fate-srd.com/fate-core/challenges |
 | Getting Taken Out | https://fate-srd.com/fate-core/getting-taken-out |
 | Skills List | https://fate-srd.com/fate-core/default-skill-list |
 | Types of Aspects | https://fate-srd.com/fate-core/types-aspects |

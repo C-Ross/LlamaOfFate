@@ -57,6 +57,8 @@ prompt.RenderSceneSummary(data SceneSummaryData) (string, error)
 prompt.RenderScenarioGeneration(data ScenarioGenerationData) (string, error)
 prompt.RenderScenarioResolution(data ScenarioResolutionData) (string, error)
 prompt.RenderRecoveryNarrative(data RecoveryNarrativeData) (string, error)
+prompt.RenderFateNarration(data FateNarrationData) (string, error)
+prompt.RenderChallengeBuild(data ChallengeBuildData) (string, error)
 ```
 
 ## Adding New Markers
