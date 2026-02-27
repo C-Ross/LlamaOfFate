@@ -3,16 +3,57 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
+	"github.com/C-Ross/LlamaOfFate/internal/config"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
+	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// mockSession implements engine.GameSessionManager for testing.
+type mockSession struct {
+	handleInputFn            func(ctx context.Context, input string) (*engine.InputResult, error)
+	provideInvokeResponseFn  func(ctx context.Context, resp engine.InvokeResponse) (*engine.InputResult, error)
+	provideMidFlowResponseFn func(ctx context.Context, resp engine.MidFlowResponse) (*engine.InputResult, error)
+	saveFn                   func() error
+}
+
+func (m *mockSession) Start(_ context.Context) ([]engine.GameEvent, error) { return nil, nil }
+
+func (m *mockSession) HandleInput(ctx context.Context, input string) (*engine.InputResult, error) {
+	if m.handleInputFn != nil {
+		return m.handleInputFn(ctx, input)
+	}
+	return &engine.InputResult{}, nil
+}
+
+func (m *mockSession) ProvideInvokeResponse(ctx context.Context, resp engine.InvokeResponse) (*engine.InputResult, error) {
+	if m.provideInvokeResponseFn != nil {
+		return m.provideInvokeResponseFn(ctx, resp)
+	}
+	return &engine.InputResult{}, nil
+}
+
+func (m *mockSession) ProvideMidFlowResponse(ctx context.Context, resp engine.MidFlowResponse) (*engine.InputResult, error) {
+	if m.provideMidFlowResponseFn != nil {
+		return m.provideMidFlowResponseFn(ctx, resp)
+	}
+	return &engine.InputResult{}, nil
+}
+
+func (m *mockSession) Save() error {
+	if m.saveFn != nil {
+		return m.saveFn()
+	}
+	return nil
+}
 
 // --- clonePlayer tests ---
 
@@ -234,4 +275,233 @@ func extractText(t *testing.T, result *mcp.CallToolResult) string {
 	}
 	t.Fatal("no text content in result")
 	return ""
+}
+
+// --- MCPServer accessor ---
+
+func TestMCPServer_ReturnsNonNil(t *testing.T) {
+	gs := newTestServer(t)
+	assert.NotNil(t, gs.MCPServer())
+}
+
+// --- New with invalid config root ---
+
+func TestNew_InvalidConfigRoot(t *testing.T) {
+	gs, err := New(nil, "/nonexistent/path/to/configs")
+	require.NoError(t, err)
+	require.NotNil(t, gs)
+	assert.Empty(t, gs.presets)
+}
+
+// --- handleListPresets with presets ---
+
+func TestListPresets_WithPresets(t *testing.T) {
+	gs := newTestServer(t)
+	gs.presets["saloon"] = &config.LoadedScenario{
+		Raw: config.ScenarioFile{
+			ID:          "saloon",
+			Title:       "Showdown at High Noon",
+			Genre:       "Western",
+			Description: "A dusty saloon standoff.",
+		},
+		Scenario: &scene.Scenario{Title: "Showdown at High Noon"},
+	}
+
+	result := callTool(t, gs, makeRequest("list_presets", nil))
+
+	require.NotNil(t, result)
+	assert.False(t, result.IsError)
+
+	text := extractText(t, result)
+	var presets []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(text), &presets))
+	require.Len(t, presets, 1)
+	assert.Equal(t, "saloon", presets[0]["id"])
+	assert.Equal(t, "Showdown at High Noon", presets[0]["title"])
+}
+
+// --- handleHandleInput with mock session ---
+
+func newServerWithMockSession(t *testing.T, ms *mockSession) *GameServer {
+	t.Helper()
+	gs := newTestServer(t)
+	gs.session = ms
+	return gs
+}
+
+func TestHandleInput_EmptyText(t *testing.T) {
+	gs := newServerWithMockSession(t, &mockSession{})
+
+	result := callTool(t, gs, makeRequest("handle_input", map[string]any{"text": ""}))
+
+	require.NotNil(t, result)
+	assert.True(t, result.IsError)
+	assert.Contains(t, extractText(t, result), "text is required")
+}
+
+func TestHandleInput_Success(t *testing.T) {
+	ms := &mockSession{
+		handleInputFn: func(_ context.Context, input string) (*engine.InputResult, error) {
+			assert.Equal(t, "look around", input)
+			return &engine.InputResult{
+				Events: []uicontract.GameEvent{
+					uicontract.NarrativeEvent{Text: "You see the room."},
+				},
+				AwaitingInvoke: false,
+			}, nil
+		},
+	}
+	gs := newServerWithMockSession(t, ms)
+
+	result := callTool(t, gs, makeRequest("handle_input", map[string]any{"text": "look around"}))
+
+	require.NotNil(t, result)
+	assert.False(t, result.IsError)
+
+	var out inputResultJSON
+	require.NoError(t, json.Unmarshal([]byte(extractText(t, result)), &out))
+	assert.False(t, out.AwaitingInvoke)
+	assert.False(t, out.GameOver)
+}
+
+func TestHandleInput_SessionError(t *testing.T) {
+	ms := &mockSession{
+		handleInputFn: func(_ context.Context, _ string) (*engine.InputResult, error) {
+			return nil, errors.New("engine failed")
+		},
+	}
+	gs := newServerWithMockSession(t, ms)
+
+	result := callTool(t, gs, makeRequest("handle_input", map[string]any{"text": "attack"}))
+
+	require.NotNil(t, result)
+	assert.True(t, result.IsError)
+	assert.Contains(t, extractText(t, result), "handle_input failed")
+}
+
+// --- handleInvokeResponse with mock session ---
+
+func TestInvokeResponse_Success(t *testing.T) {
+	ms := &mockSession{
+		provideInvokeResponseFn: func(_ context.Context, resp engine.InvokeResponse) (*engine.InputResult, error) {
+			assert.Equal(t, 0, resp.AspectIndex)
+			assert.False(t, resp.IsReroll)
+			return &engine.InputResult{AwaitingInvoke: false}, nil
+		},
+	}
+	gs := newServerWithMockSession(t, ms)
+
+	result := callTool(t, gs, makeRequest("provide_invoke_response", map[string]any{
+		"aspect_index": float64(0),
+		"is_reroll":    false,
+	}))
+
+	require.NotNil(t, result)
+	assert.False(t, result.IsError)
+}
+
+func TestInvokeResponse_SessionError(t *testing.T) {
+	ms := &mockSession{
+		provideInvokeResponseFn: func(_ context.Context, _ engine.InvokeResponse) (*engine.InputResult, error) {
+			return nil, errors.New("invoke failed")
+		},
+	}
+	gs := newServerWithMockSession(t, ms)
+
+	result := callTool(t, gs, makeRequest("provide_invoke_response", map[string]any{"aspect_index": float64(-1)}))
+
+	require.NotNil(t, result)
+	assert.True(t, result.IsError)
+	assert.Contains(t, extractText(t, result), "invoke_response failed")
+}
+
+// --- handleMidflowResponse with mock session ---
+
+func TestMidflowResponse_Success(t *testing.T) {
+	ms := &mockSession{
+		provideMidFlowResponseFn: func(_ context.Context, resp engine.MidFlowResponse) (*engine.InputResult, error) {
+			assert.Equal(t, 1, resp.ChoiceIndex)
+			return &engine.InputResult{AwaitingMidFlow: false}, nil
+		},
+	}
+	gs := newServerWithMockSession(t, ms)
+
+	result := callTool(t, gs, makeRequest("provide_midflow_response", map[string]any{
+		"choice_index": float64(1),
+		"text":         "",
+	}))
+
+	require.NotNil(t, result)
+	assert.False(t, result.IsError)
+}
+
+func TestMidflowResponse_SessionError(t *testing.T) {
+	ms := &mockSession{
+		provideMidFlowResponseFn: func(_ context.Context, _ engine.MidFlowResponse) (*engine.InputResult, error) {
+			return nil, errors.New("midflow failed")
+		},
+	}
+	gs := newServerWithMockSession(t, ms)
+
+	result := callTool(t, gs, makeRequest("provide_midflow_response", map[string]any{"choice_index": float64(0)}))
+
+	require.NotNil(t, result)
+	assert.True(t, result.IsError)
+	assert.Contains(t, extractText(t, result), "midflow_response failed")
+}
+
+// --- handleSaveGame with mock session ---
+
+func TestSaveGame_Success(t *testing.T) {
+	ms := &mockSession{
+		saveFn: func() error { return nil },
+	}
+	gs := newServerWithMockSession(t, ms)
+
+	result := callTool(t, gs, makeRequest("save_game", nil))
+
+	require.NotNil(t, result)
+	assert.False(t, result.IsError)
+	assert.Contains(t, extractText(t, result), "saved")
+}
+
+func TestSaveGame_Error(t *testing.T) {
+	ms := &mockSession{
+		saveFn: func() error { return errors.New("disk full") },
+	}
+	gs := newServerWithMockSession(t, ms)
+
+	result := callTool(t, gs, makeRequest("save_game", nil))
+
+	require.NotNil(t, result)
+	assert.True(t, result.IsError)
+	assert.Contains(t, extractText(t, result), "save failed")
+}
+
+// --- handleGetGameState with a real GameManager ---
+
+func TestGetGameState_WithGameManager(t *testing.T) {
+	eng, err := engine.New()
+	require.NoError(t, err)
+
+	gm := engine.NewGameManager(eng)
+	player := character.NewCharacter("player1", "Test Hero")
+	player.Aspects.HighConcept = "Courageous Fighter"
+	gm.SetPlayer(player)
+
+	gs := newTestServer(t)
+	gs.gm = gm
+
+	result := callTool(t, gs, makeRequest("get_game_state", nil))
+
+	require.NotNil(t, result)
+	assert.False(t, result.IsError)
+
+	text := extractText(t, result)
+	var snap map[string]any
+	require.NoError(t, json.Unmarshal([]byte(text), &snap))
+
+	playerSnap, ok := snap["player"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "Test Hero", playerSnap["name"])
 }
