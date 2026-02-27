@@ -134,11 +134,10 @@ If minor refactoring enables better testing:
 Run the full validation suite to ensure nothing is broken:
 
 ```bash
-go test -v ./...
-go vet ./...
+just validate
 ```
 
-If tests fail, fix them. If your changes broke existing tests, revert the problematic changes and narrow your scope.
+This runs all Go and Web checks (vet, fmt, lint, tests, build). If anything fails, fix the issues. If your changes broke existing tests, revert the problematic changes and narrow your scope.
 
 ### Step 9: Verify Coverage Improved
 
