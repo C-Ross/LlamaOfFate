@@ -91,7 +91,7 @@ func getOvercomeTestCases() []ActionParserTestCase {
 			Context:            "A stern guard blocks the entrance to the restricted area you need to access",
 			ExpectedType:       action.Overcome,
 			ExpectedSkills:     []string{"Deceive", "Rapport"},
-			ExpectedDifficulty: 3, // Good - stern guard implies difficulty
+			ExpectedDifficulty: 3,         // Good - stern guard implies difficulty
 			ExpectedOpposition: "passive", // guard mentioned in context but not in OtherCharacters
 			Description:        "Social obstacle blocking immediate progress - should be Overcome",
 		},
@@ -155,7 +155,7 @@ func getOvercomeTestCases() []ActionParserTestCase {
 			Context:            "In the castle courtyard with two guards patrolling near the main entrance",
 			ExpectedType:       action.Overcome,
 			ExpectedSkills:     []string{"Stealth"},
-			ExpectedDifficulty: 3, // Good - patrolling guards are alert
+			ExpectedDifficulty: 3,         // Good - patrolling guards are alert
 			ExpectedOpposition: "passive", // guards mentioned in context but not in OtherCharacters
 			Description:        "Bypassing opposition through stealth - Overcome",
 		},
@@ -168,7 +168,7 @@ func getOvercomeTestCases() []ActionParserTestCase {
 			Context:            "Standing near the entrance to the lord's private chambers, with a single guard blocking the way",
 			ExpectedType:       action.CreateAdvantage,
 			ExpectedSkills:     []string{"Deceive"},
-			ExpectedDifficulty: 3, // Good - guard is suspicious
+			ExpectedDifficulty: 3,         // Good - guard is suspicious
 			ExpectedOpposition: "passive", // guard mentioned in context but not in OtherCharacters
 			Description:        "Creating false identity aspect to manipulate situation - Create Advantage",
 		},
@@ -214,7 +214,7 @@ func getOvercomeTestCases() []ActionParserTestCase {
 			Context:            "At the stables, the horse trader has quoted a price",
 			ExpectedType:       action.Overcome,
 			ExpectedSkills:     []string{"Rapport", "Resources"},
-			ExpectedDifficulty: 2, // Fair - trader wants profit
+			ExpectedDifficulty: 2,         // Fair - trader wants profit
 			ExpectedOpposition: "passive", // trader mentioned in context but not in OtherCharacters
 			Description:        "Honest negotiation uses Rapport, not Deceive",
 		},
@@ -258,7 +258,7 @@ func getOvercomeVsCaAEdgeCases() []ActionParserTestCase {
 			Context:            "At the entrance to the exclusive back room of a club, a large bouncer blocks entry",
 			ExpectedType:       action.Overcome,
 			ExpectedSkills:     []string{"Rapport", "Deceive"},
-			ExpectedDifficulty: 3, // Good - bouncers are trained
+			ExpectedDifficulty: 3,         // Good - bouncers are trained
 			ExpectedOpposition: "passive", // bouncer mentioned in context but not in OtherCharacters
 			Description:        "Getting past a bouncer is an immediate obstacle — Overcome",
 		},
@@ -447,7 +447,7 @@ func getCreateAdvantageTestCases() []ActionParserTestCase {
 			Context:            "Undercover at a noble's estate, gathering intelligence",
 			ExpectedType:       action.CreateAdvantage,
 			ExpectedSkills:     []string{"Rapport", "Empathy"},
-			ExpectedDifficulty: 2, // Fair - servants are often friendly
+			ExpectedDifficulty: 2,         // Fair - servants are often friendly
 			ExpectedOpposition: "passive", // servant mentioned but not in OtherCharacters
 			Description:        "Building social connection for future information - Create Advantage",
 		},
@@ -457,7 +457,7 @@ func getCreateAdvantageTestCases() []ActionParserTestCase {
 			Context:            "Trying to sneak into the palace, guards block the entrance",
 			ExpectedType:       action.CreateAdvantage,
 			ExpectedSkills:     []string{"Deceive", "Provoke", "Stealth"},
-			ExpectedDifficulty: 3, // Good - palace guards are alert
+			ExpectedDifficulty: 3,         // Good - palace guards are alert
 			ExpectedOpposition: "passive", // guards mentioned in context but not in OtherCharacters
 			Description:        "Creating an advantage (distracted guards) for ally's action - Create Advantage",
 		},
@@ -467,7 +467,7 @@ func getCreateAdvantageTestCases() []ActionParserTestCase {
 			Context:            "About to duel a renowned swordsman, watching him warm up",
 			ExpectedType:       action.CreateAdvantage,
 			ExpectedSkills:     []string{"Notice", "Fight", "Empathy"},
-			ExpectedDifficulty: 3, // Good - renowned fighter hides weaknesses
+			ExpectedDifficulty: 3,         // Good - renowned fighter hides weaknesses
 			ExpectedOpposition: "passive", // opponent mentioned in context but not in OtherCharacters
 			Description:        "Discovering aspect on opponent - Create Advantage",
 		},
@@ -477,7 +477,7 @@ func getCreateAdvantageTestCases() []ActionParserTestCase {
 			Context:            "Working to undermine a corrupt merchant's influence in town",
 			ExpectedType:       action.CreateAdvantage,
 			ExpectedSkills:     []string{"Deceive", "Contacts", "Rapport", "Provoke"},
-			ExpectedDifficulty: 2, // Fair - people love gossip
+			ExpectedDifficulty: 2,         // Fair - people love gossip
 			ExpectedOpposition: "passive", // merchant mentioned in context but not in OtherCharacters
 			Description:        "Creating a social situation aspect - Create Advantage",
 		},
@@ -505,7 +505,7 @@ func getCreateAdvantageTestCases() []ActionParserTestCase {
 			Context:            "Facing a heavily armored guard in the castle corridor, combat hasn't started yet",
 			ExpectedType:       action.CreateAdvantage,
 			ExpectedSkills:     []string{"Athletics", "Crafts", "Burglary", "Stealth"},
-			ExpectedDifficulty: 2, // Fair - setting up a trap
+			ExpectedDifficulty: 2,         // Fair - setting up a trap
 			ExpectedOpposition: "passive", // guard mentioned in context but not in OtherCharacters
 			Description:        "Preparing a trap before combat - Create Advantage",
 		},
