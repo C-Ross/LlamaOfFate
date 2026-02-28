@@ -79,6 +79,21 @@ model_name: "Llama-4-Maverick-17B-128E-Instruct-FP8"
 timeout: 300
 ```
 
+## Development Automation
+
+LlamaOfFate uses **GitHub Agentic Workflows** ([gh-aw](https://github.com/github/gh-aw)) for automated development tasks. The repository includes several AI-powered workflows:
+
+- **readme-updater**: Automatically updates README.md when significant changes are pushed to main
+- **skills-updater**: Updates `.github/skills/` documentation when relevant code changes
+- **coverage-improver**: Analyzes test coverage and suggests improvements
+
+These workflows [run automatically](https://github.github.com/gh-aw/introduction/overview/).
+
+**Installing gh-aw CLI:**
+```bash
+gh extension install github/gh-aw
+```
+
 ## Building and Running
 
 LlamaOfFate uses [`just`](https://github.com/casey/just) as a command runner for common development tasks.
