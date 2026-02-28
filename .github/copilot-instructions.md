@@ -76,6 +76,10 @@ just web-install    # npm install
 - **Exception: LLM structured responses** use JSON (industry standard, better parsing reliability)
 - Config files use YAML (e.g., `azure-llm.yaml`)
 
+### Tools
+
+Use `jq` to parse and filter JSON.  Avoid using python unless necessary.
+
 ## Key Patterns
 
 ### Dynamic Character Aspects (NOT traditional 5-aspect)
