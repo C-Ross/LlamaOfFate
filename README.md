@@ -218,7 +218,6 @@ LlamaOfFate/
 ├── docs/                       # Documentation
 │   └── architecture.md         # Architecture documentation
 ├── test/                       # Tests
-│   ├── integration/            # Integration tests
 │   └── llmeval/                # LLM evaluation tests
 └── [standard Go project files]
 ```
@@ -242,7 +241,6 @@ LlamaOfFate/
 - **`web/`**: React frontend — Vite 7, React 19, TypeScript, Tailwind CSS v4, shadcn/ui, Vitest
 - **`examples/`**: Example programs demonstrating LLM scene loops, scenario generation, and walkthroughs
 - **`configs/`**: YAML configuration files (azure-llm.yaml)
-- **`test/integration/`**: Integration tests for the game system
 - **`test/llmeval/`**: LLM evaluation tests for prompt behavior
 
 ## Implementation Status

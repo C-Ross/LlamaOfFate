@@ -35,5 +35,4 @@ action.Outcome = result.CompareAgainst(action.Difficulty)
 ## Test Coverage
 
 - **67 unit tests** with 79-100% coverage per package
-- **4 integration tests** demonstrating gameplay scenarios
 - Run tests: `go test ./internal/core/... -v`

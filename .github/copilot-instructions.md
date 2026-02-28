@@ -20,7 +20,6 @@ internal/
   ui/terminal/              - Terminal UI implementation
   ui/web/                   - WebSocket UI implementation
 test/
-  integration/              - Integration tests
   llmeval/                  - LLM behavior evaluation tests (requires -tags=llmeval)
 configs/                    - Configuration files (azure-llm.yaml)
 web/                        - React frontend (Vite, Tailwind v4, shadcn/ui, Vitest)
@@ -40,7 +39,7 @@ Use inversion of control to enable multiple UI's.  The core game logic should no
 
 ### Testing (REQUIRED)
 - Use testify for ALL tests: `assert.Equal(t, expected, actual)`, `require.NotNil(t, object)`
-- Maintain high coverage: Unit tests per package + integration tests
+- Maintain high coverage: Unit tests per package + pipeline tests in engine (see internal/engine/agents.md)
 - Specify dice rolls: Whenever reasonable, specify the dice roll instead of using a roller.
 - Seeded rollers for tests: `dice.NewSeededRoller(12345)` for predictable results if you need a roller.
 
