@@ -129,6 +129,10 @@ Run `just` without arguments to see all available commands. Common commands incl
 - **`just go-lint`** - Run golangci-lint
 - **`just go-validate`** - vet + fmtcheck + lint + test + build
 - **`just test-llm`** - Run LLM evaluation tests (requires Azure credentials)
+- **`just test-llm-track`** - Run LLM tests and track results for flakiness analysis
+- **`just test-llm-report`** - Show LLM test stability report
+- **`just test-llm-flaky`** - Show only flaky LLM tests
+- **`just test-llm-fetch`** - Fetch LLM test results from CI
 - **`just go-fmt`** - Format Go code with gofmt
 
 **Web:**
@@ -174,7 +178,8 @@ LlamaOfFate/
 ├── cmd/
 │   ├── cli/                    # Command-line interface
 │   ├── server/                 # WebSocket server entry point
-│   └── mcpserver/              # MCP (Model Context Protocol) server
+│   ├── mcpserver/              # MCP (Model Context Protocol) server
+│   └── llmeval-tracker/        # LLM test flakiness tracking tool
 ├── internal/
 │   ├── core/                   # Core game mechanics
 │   │   ├── action/             # Action resolution system
@@ -199,6 +204,8 @@ LlamaOfFate/
 │   ├── scenario-generator/     # Scenario generation example
 │   ├── scenario-walkthrough/   # Scenario walkthrough example
 │   └── scene-generator/        # Scene generation example
+├── scripts/                    # Utility scripts
+│   └── llmeval-fetch-results.sh # Fetch LLM test results from CI
 ├── configs/                    # Configuration files (azure-llm.yaml)
 ├── docs/                       # Documentation
 │   └── architecture.md         # Architecture documentation
@@ -213,6 +220,7 @@ LlamaOfFate/
 - **`cmd/cli/`**: Entry point for the command-line application
 - **`cmd/server/`**: Entry point for the WebSocket server
 - **`cmd/mcpserver/`**: Entry point for the MCP server (programmatic game interaction via Model Context Protocol)
+- **`cmd/llmeval-tracker/`**: Tool for tracking LLM test flakiness and generating stability reports
 - **`internal/core/`**: Core Fate mechanics implementation (character, dice, scene, action, skills, challenges)
 - **`internal/engine/`**: Purely async/event-driven game engine (GameSessionManager interface: Start/HandleInput/ProvideInvokeResponse/ProvideMidFlowResponse/Save); emits GameEvents for UI rendering; includes conflict and challenge managers
 - **`internal/syncdriver/`**: Synchronous blocking game loop that wraps the engine's async API for terminal-style UIs (Run function drives: ReadInput → HandleInput → Emit events → drive prompts → repeat)
@@ -226,6 +234,7 @@ LlamaOfFate/
 - **`internal/mcpserver/`**: MCP server implementation; exposes game tools for programmatic interaction (start game, send input, inspect state)
 - **`web/`**: React frontend — Vite 7, React 19, TypeScript, Tailwind CSS v4, shadcn/ui, Vitest
 - **`examples/`**: Example programs demonstrating LLM scene loops, scenario generation, and walkthroughs
+- **`scripts/`**: Utility scripts for development and testing workflows
 - **`configs/`**: YAML configuration files (azure-llm.yaml)
 - **`test/integration/`**: Integration tests for the game system
 - **`test/llmeval/`**: LLM evaluation tests for prompt behavior
