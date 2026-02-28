@@ -91,6 +91,10 @@ test-llm-report:
 test-llm-flaky:
     @{{gocmd}} run ./cmd/llmeval-tracker report --flaky
 
+# Fetch llmeval results from CI and show a combined report
+test-llm-fetch *args:
+    ./scripts/llmeval-fetch-results.sh {{args}}
+
 # Run go vet
 go-vet:
     @echo "Running go vet..."
