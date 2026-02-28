@@ -1558,3 +1558,47 @@ func TestSceneManager_HandleAction_ExcludesTakenOutFromTargets(t *testing.T) {
 	assert.Contains(t, allPrompts, "Angry Orc",
 		"Active NPC should appear in action parser prompt")
 }
+
+// TestApplyTargetTakenOut_SetsFateOnCharacter verifies that applyTargetTakenOut
+// sets target.Fate so that IsTakenOut() returns true immediately. This is
+// required for BuildStateSnapshot to report isTakenOut correctly.
+// Regression test for https://github.com/C-Ross/LlamaOfFate/issues/118
+func TestApplyTargetTakenOut_SetsFateOnCharacter(t *testing.T) {
+	engine, err := New()
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+
+	player := character.NewCharacter("player-1", "Hero")
+	target := character.NewCharacter("target-1", "Goblin")
+
+	engine.AddCharacter(player)
+	engine.AddCharacter(target)
+
+	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(target.ID)
+	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
+	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
+
+	// Start a conflict
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, target.ID)
+	require.NoError(t, err)
+
+	// Precondition: target is not taken out
+	assert.False(t, target.IsTakenOut(), "target should not be taken out before damage")
+
+	// Take out the target
+	dmgEvent := &DamageResolutionEvent{TargetName: target.Name}
+	sm.conflict.applyTargetTakenOut(context.Background(), target, dmgEvent)
+
+	// The character's Fate must be set so IsTakenOut() is true immediately
+	assert.True(t, target.IsTakenOut(),
+		"target.IsTakenOut() should be true after applyTargetTakenOut (issue #118)")
+	require.NotNil(t, target.Fate,
+		"target.Fate must be set by applyTargetTakenOut")
+}

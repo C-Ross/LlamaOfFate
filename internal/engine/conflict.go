@@ -350,6 +350,14 @@ func (cm *ConflictManager) fillTargetStressOverflow(ctx context.Context, target 
 func (cm *ConflictManager) applyTargetTakenOut(ctx context.Context, target *character.Character, dmgEvent *DamageResolutionEvent) {
 	dmgEvent.TakenOut = true
 
+	// Mark the character as taken out immediately so IsTakenOut() returns true.
+	// processFateNarration will later overwrite Fate with the player's narration.
+	if target.Fate == nil {
+		target.Fate = &character.TakenOutFate{
+			Description: "taken out",
+		}
+	}
+
 	// Track this character as taken out during this scene
 	cm.takenOutChars = append(cm.takenOutChars, target.ID)
 
