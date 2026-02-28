@@ -1,0 +1,65 @@
+name: LLM Eval Tests
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      has_changes: ${{ steps.check.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for changes in last 24 hours
+        id: check
+        run: |
+          COMMITS=$(git log --since="24 hours ago" --oneline | wc -l)
+          if [ "$COMMITS" -gt 0 ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Found $COMMITS commits in the last 24 hours"
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No commits in the last 24 hours, skipping"
+          fi
+
+  llm-eval:
+    runs-on: ubuntu-latest
+    needs: [check-changes]
+    if: needs.check-changes.outputs.has_changes == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run LLM evaluation tests with tracking
+        env:
+          AZURE_API_ENDPOINT: ${{ secrets.AZURE_API_ENDPOINT }}
+          AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
+        run: |
+          go test -v -json -tags=llmeval -timeout 10m ./test/llmeval/... \
+            | go run ./cmd/llmeval-tracker record
+
+      - name: Show stability report
+        if: always()
+        run: go run ./cmd/llmeval-tracker report
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: llmeval-results
+          path: test/llmeval/results.jsonl
+          retention-days: 90

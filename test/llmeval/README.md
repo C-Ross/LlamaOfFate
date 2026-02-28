@@ -65,6 +65,37 @@ Each test file follows a consistent pattern:
 3. **Difficulty tolerance** of ±1 accounts for reasonable LLM variance
 4. **Summary reports** show pass/fail rates by category
 
+## Tracking Flakiness
+
+LLM tests are non-deterministic. Use the tracker to record results over multiple runs and identify which tests are reliably passing vs. flaky.
+
+```bash
+# Run all LLM eval tests and record results
+just test-llm-track
+
+# Run a specific test 5 times to check stability
+just test-llm-track-n TestSceneTransition 5
+
+# View stability report (last 10 runs)
+just test-llm-report
+
+# Show only flaky tests
+just test-llm-flaky
+```
+
+Results accumulate in `test/llmeval/results.jsonl` (gitignored). Each run appends one record with per-subtest pass/fail status and the git commit SHA.
+
+You can also query results directly with `jq`:
+
+```bash
+# Which tests failed in the most recent run?
+tail -1 test/llmeval/results.jsonl | jq '[.tests | to_entries[] | select(.value=="fail") | .key]'
+
+# Count pass/fail for a specific test across all runs
+jq -r '.tests["TestSceneTransition_LLMEvaluation/ShouldExit/Step_outside"] // empty' \
+  test/llmeval/results.jsonl | sort | uniq -c
+```
+
 ## Known Issues
 
 - Intimidation inputs can be ambiguously classified as Attack or Create Advantage depending on context. See [Issue #9](https://github.com/C-Ross/LlamaOfFate/issues/9).

@@ -67,6 +67,30 @@ test-llm:
     @echo "Requires AZURE_API_ENDPOINT and AZURE_API_KEY environment variables"
     {{gocmd}} test -v -tags=llmeval ./test/llmeval/...
 
+# Run LLM eval tests and record results for flakiness tracking
+test-llm-track:
+    @echo "Running LLM eval tests with tracking..."
+    {{gocmd}} test -v -json -tags=llmeval -timeout 10m ./test/llmeval/... \
+      | {{gocmd}} run ./cmd/llmeval-tracker record
+
+# Run a specific LLM eval test N times and record each run
+test-llm-track-n test count="5":
+    #!/usr/bin/env bash
+    for i in $(seq 1 {{count}}); do
+      echo "=== Run $i/{{count}} ==="
+      {{gocmd}} test -v -json -tags=llmeval -timeout 10m \
+        -run {{test}} ./test/llmeval/... \
+        | {{gocmd}} run ./cmd/llmeval-tracker record
+    done
+
+# Show LLM eval stability report
+test-llm-report:
+    @{{gocmd}} run ./cmd/llmeval-tracker report
+
+# Show only flaky LLM eval tests
+test-llm-flaky:
+    @{{gocmd}} run ./cmd/llmeval-tracker report --flaky
+
 # Run go vet
 go-vet:
     @echo "Running go vet..."

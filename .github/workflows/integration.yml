@@ -59,29 +59,3 @@ jobs:
 
       - name: Run integration tests
         run: go test -v -race ./test/integration/...
-
-  llm-eval:
-    runs-on: ubuntu-latest
-    needs: [check-changes]
-    # Only run on schedule (if changes) or manual trigger — not on push or PR
-    if: |
-      needs.check-changes.outputs.has_changes == 'true' && 
-      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Install dependencies
-        run: go mod download
-
-      - name: Run LLM evaluation tests
-        env:
-          AZURE_API_ENDPOINT: ${{ secrets.AZURE_API_ENDPOINT }}
-          AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
-        run: go test -v -tags=llmeval ./test/llmeval/...

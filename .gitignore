@@ -31,6 +31,7 @@ bin/
 /server
 /mcpserver
 /cli
+/llmeval-tracker
 
 # Configuration files with sensitive information
 *.local.yaml
@@ -47,3 +48,6 @@ web/dist/
 
 # Playwright MCP session artifacts
 .playwright-mcp/
+
+# LLM eval tracking results (local accumulation)
+test/llmeval/results.jsonl
