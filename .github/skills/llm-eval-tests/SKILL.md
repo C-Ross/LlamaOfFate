@@ -116,45 +116,37 @@ for _, r := range results {
 
 ## Running Tests
 
-All commands tee output to a temp file for review and tail the last lines to
-keep terminal output manageable:
+```bash
+# Run all tests (requires AZURE_API_ENDPOINT and AZURE_API_KEY)
+just test-llm
+
+# Run tests and track results for flakiness analysis
+just test-llm-track
+
+# Run specific test N times and track each run
+just test-llm-track-n TestName 5
+
+# View stability report
+just test-llm-report
+
+# View only flaky tests
+just test-llm-flaky
+
+# Fetch results from CI and combine with local results
+just test-llm-fetch
+```
+
+### Direct go test commands
 
 ```bash
 # Run specific test
-go test -v -tags=llmeval -run TestName ./test/llmeval/ -timeout 5m \
-  2>&1 | tee /tmp/llmeval_results.txt | tail -3
-
-# Run with verbose output
-VERBOSE=1 go test -tags=llmeval -run TestName ./test/llmeval/ \
-  2>&1 | tee /tmp/llmeval_results.txt | tail -3
+go test -v -tags=llmeval -run TestName ./test/llmeval/ -timeout 5m
 
 # Run all llmeval tests
-go test -v -tags=llmeval ./test/llmeval/ -timeout 10m \
-  2>&1 | tee /tmp/llmeval_results.txt | tail -3
-```
+go test -v -tags=llmeval ./test/llmeval/ -timeout 10m
 
-### Reviewing Results
-
-```bash
-# Review full output
-cat /tmp/llmeval_results.txt
-
-# Check accuracy across runs
-grep "Accuracy:" /tmp/llmeval_results.txt
-
-# Check which tests failed
-grep "FAIL:" /tmp/llmeval_results.txt
-```
-
-### Durability Testing
-
-LLM responses are non-deterministic. Use `-count=N` to run tests multiple times
-and validate that results are stable:
-
-```bash
-# Run 5 iterations, save full output, show only final result
-go test -v -tags=llmeval -count=5 -run TestName ./test/llmeval/ \
-  2>&1 | tee /tmp/llmeval_results.txt | tail -3
+# Run tests with JSON output for tracking
+go test -v -json -tags=llmeval ./test/llmeval/ | go run ./cmd/llmeval-tracker record
 ```
 
 ## Example: Scene Transition Test
