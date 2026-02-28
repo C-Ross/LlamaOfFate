@@ -45,6 +45,12 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
+	defer func() {
+		if closeErr := gs.Close(); closeErr != nil {
+			slog.Warn("failed to close game server", "error", closeErr)
+		}
+	}()
+
 	slog.Info("LlamaOfFate MCP server starting on stdio")
 	if err := stdio.Listen(ctx, os.Stdin, os.Stdout); err != nil {
 		fmt.Fprintf(os.Stderr, "server error: %v\n", err)

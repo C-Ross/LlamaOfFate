@@ -15,6 +15,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
 )
 
@@ -24,9 +25,10 @@ type GameServer struct {
 	presets   map[string]*config.LoadedScenario
 	mcpServer *server.MCPServer
 
-	mu      sync.Mutex
-	session engine.GameSessionManager // current active game session
-	gm      *engine.GameManager       // underlying GameManager (for state inspection)
+	mu            sync.Mutex
+	session       engine.GameSessionManager // current active game session
+	gm            *engine.GameManager       // underlying GameManager (for state inspection)
+	sessionLogger *session.Logger           // session log writer (closed on new game or Close)
 }
 
 // New creates a GameServer. If llmClient is nil, only preset games can be
@@ -60,6 +62,24 @@ func New(llmClient llm.LLMClient, configRoot string) (*GameServer, error) {
 // MCPServer returns the underlying MCP server for use with stdio or HTTP transports.
 func (gs *GameServer) MCPServer() *server.MCPServer {
 	return gs.mcpServer
+}
+
+// Close shuts down the game server, closing the session logger if active.
+func (gs *GameServer) Close() error {
+	gs.mu.Lock()
+	defer gs.mu.Unlock()
+	return gs.closeSessionLogger()
+}
+
+// closeSessionLogger closes the current session logger if one is active.
+// Caller must hold gs.mu.
+func (gs *GameServer) closeSessionLogger() error {
+	if gs.sessionLogger != nil {
+		err := gs.sessionLogger.Close()
+		gs.sessionLogger = nil
+		return err
+	}
+	return nil
 }
 
 const mcpInstructions = `LlamaOfFate is a text-based RPG implementing the Fate Core System.
@@ -287,6 +307,26 @@ func (gs *GameServer) handleStartGame(ctx context.Context, req mcp.CallToolReque
 		})
 	}
 
+	// Close any previous session logger before starting a new one
+	if err := gs.closeSessionLogger(); err != nil {
+		slog.Warn("failed to close previous session logger", "error", err)
+	}
+
+	// Set up session logging (same mechanism as the terminal CLI)
+	logger, err := gs.createSessionLogger(ls, player)
+	if err != nil {
+		slog.Warn("session logging disabled", "error", err)
+	} else {
+		gs.sessionLogger = logger
+		gm.SetSessionLogger(logger)
+		logger.Log("scenario", ls.Scenario)
+		logger.Log("player", map[string]any{
+			"name":         player.Name,
+			"high_concept": player.Aspects.HighConcept,
+			"trouble":      player.Aspects.Trouble,
+		})
+	}
+
 	events, err := gm.Start(ctx)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("start failed: %v", err)), nil
@@ -421,6 +461,28 @@ func (gs *GameServer) newEngine() (*engine.Engine, error) {
 		return engine.NewWithLLM(gs.llmClient)
 	}
 	return engine.New()
+}
+
+// createSessionLogger builds a session logger for this game, mirroring the CLI's
+// setupSessionLogger. The log file is written to the sessions/ directory.
+// Caller must hold gs.mu.
+func (gs *GameServer) createSessionLogger(ls *config.LoadedScenario, player *character.Character) (*session.Logger, error) {
+	label := ls.Raw.Genre
+	if label == "" {
+		label = ls.Raw.ID
+	}
+
+	logPath, err := session.GenerateLogPath("session", []string{label, player.Name}, 20)
+	if err != nil {
+		return nil, fmt.Errorf("generate session log path: %w", err)
+	}
+
+	logger, err := session.NewLogger(logPath)
+	if err != nil {
+		return nil, fmt.Errorf("create session logger: %w", err)
+	}
+	slog.Info("Session log started", "path", logPath)
+	return logger, nil
 }
 
 // clonePlayer creates a shallow copy of the player character so that
