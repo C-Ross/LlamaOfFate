@@ -121,7 +121,7 @@ func cmdRecord() {
 		fmt.Fprintf(os.Stderr, "Error opening %s: %v\n", resultsPath, err)
 		os.Exit(1)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	enc := json.NewEncoder(f)
 	enc.SetEscapeHTML(false)
@@ -155,7 +155,7 @@ func cmdReport() {
 		switch os.Args[i] {
 		case "--last":
 			if i+1 < len(os.Args) {
-				fmt.Sscanf(os.Args[i+1], "%d", &last)
+				_, _ = fmt.Sscanf(os.Args[i+1], "%d", &last)
 				i++
 			}
 		case "--flaky":
@@ -201,10 +201,11 @@ func cmdReport() {
 				continue
 			}
 			h.results = append(h.results, result)
-			if result == "pass" {
+			switch result {
+			case "pass":
 				h.passes++
 				h.total++
-			} else if result == "fail" {
+			case "fail":
 				h.fails++
 				h.total++
 			}
@@ -352,7 +353,7 @@ func loadRecords(path string) ([]RunRecord, error) {
 		}
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var records []RunRecord
 	dec := json.NewDecoder(f)

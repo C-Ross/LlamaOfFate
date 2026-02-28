@@ -120,7 +120,7 @@ func TestLoadRecords_RoundTrip(t *testing.T) {
 	for _, rec := range records {
 		require.NoError(t, enc.Encode(rec))
 	}
-	f.Close()
+	require.NoError(t, f.Close())
 
 	loaded, err := loadRecords(path)
 	require.NoError(t, err)
