@@ -4,16 +4,13 @@ package llmeval_test
 
 import (
 	"context"
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
-	llmazure "github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // ScenarioResTestCase represents a test case for scenario resolution checking
@@ -244,17 +241,10 @@ func getUnresolvedTestCases() []ScenarioResTestCase {
 // - Story questions should have clear yes/no answers when resolved
 // - The LLM should be conservative — only mark resolved with clear closure
 func TestScenarioResolution_LLMEvaluation(t *testing.T) {
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	config, err := llmazure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	client := llmazure.NewClient(*config)
+	client := RequireLLMClient(t)
 	ctx := context.Background()
 
-	verboseLogging := os.Getenv("VERBOSE") == "1"
+	verboseLogging := VerboseLoggingEnabled()
 
 	allCategories := []struct {
 		category string

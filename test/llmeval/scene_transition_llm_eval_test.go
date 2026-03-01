@@ -4,17 +4,14 @@ package llmeval_test
 
 import (
 	"context"
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
-	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // SceneTransitionTestCase represents a test case for scene transition detection
@@ -31,8 +28,7 @@ type SceneTransitionTestCase struct {
 
 // getExitTestCases returns inputs that SHOULD trigger scene transition markers
 func getExitTestCases() []SceneTransitionTestCase {
-	bartender := character.NewCharacter("bartender", "Maggie Two-Rivers")
-	bartender.Aspects.HighConcept = "Weathered Saloon Owner"
+	bartender := NewBartender()
 
 	return []SceneTransitionTestCase{
 		{
@@ -107,8 +103,7 @@ func getExitTestCases() []SceneTransitionTestCase {
 
 // getNoExitTestCases returns inputs that should NOT trigger scene transition markers
 func getNoExitTestCases() []SceneTransitionTestCase {
-	bartender := character.NewCharacter("bartender", "Maggie Two-Rivers")
-	bartender.Aspects.HighConcept = "Weathered Saloon Owner"
+	bartender := NewBartender()
 
 	return []SceneTransitionTestCase{
 		{
@@ -203,17 +198,10 @@ type SceneTransitionResult struct {
 // Run with: go test -v -tags=llmeval ./test/llmeval/ -run TestSceneTransition
 // Requires AZURE_API_ENDPOINT and AZURE_API_KEY environment variables
 func TestSceneTransition_LLMEvaluation(t *testing.T) {
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	client := azure.NewClient(*config)
+	client := RequireLLMClient(t)
 	ctx := context.Background()
 
-	verboseLogging := os.Getenv("VERBOSE") == "1"
+	verboseLogging := VerboseLoggingEnabled()
 
 	allTestCases := []struct {
 		category string
@@ -266,13 +254,13 @@ func TestSceneTransition_LLMEvaluation(t *testing.T) {
 						}
 						t.Logf("  Why: %s", tc.Description)
 						if !result.Matches {
-							t.Logf("  Response: %s", truncateResponse(result.Response, 200))
+							t.Logf("  Response: %s", TruncateResponse(result.Response, 200))
 						}
 					}
 
 					assert.Equal(t, tc.ExpectTransitionMarker, result.HasMarker,
 						"Transition marker mismatch for '%s'. %s\nResponse: %s",
-						tc.PlayerInput, tc.Description, truncateResponse(result.Response, 300))
+						tc.PlayerInput, tc.Description, TruncateResponse(result.Response, 300))
 
 					// If we expected a marker with specific hint content, verify it
 					if tc.ExpectTransitionMarker && tc.ExpectedHintContains != "" && result.HasMarker {
@@ -313,7 +301,7 @@ func TestSceneTransition_LLMEvaluation(t *testing.T) {
 			t.Logf("      Expected marker: %v, Got marker: %v", r.TestCase.ExpectTransitionMarker, r.HasMarker)
 			t.Logf("      Scene: %s", r.TestCase.SceneDescription)
 			t.Logf("      Why: %s", r.TestCase.Description)
-			t.Logf("      Response: %s", truncateResponse(r.Response, 200))
+			t.Logf("      Response: %s", TruncateResponse(r.Response, 200))
 		}
 	}
 }
@@ -328,10 +316,10 @@ func evaluateSceneTransition(ctx context.Context, client llm.LLMClient, tc Scene
 	player.Aspects.HighConcept = "Wandering Stranger"
 
 	// Build character context
-	charContext := buildCharacterContext(player)
+	charContext := BuildCharacterContext(player)
 
 	// Build aspects context
-	aspectsContext := buildAspectsContext(testScene, player, tc.OtherCharacters)
+	aspectsContext := BuildAspectsContext(testScene, player, tc.OtherCharacters)
 
 	// Prepare template data
 	data := promptpkg.SceneResponseData{
@@ -375,63 +363,4 @@ func evaluateSceneTransition(ctx context.Context, client llm.LLMClient, tc Scene
 		ExtractedHint: hint,
 		Matches:       hasMarker == tc.ExpectTransitionMarker,
 	}
-}
-
-// buildCharacterContext creates a character context string for the template
-func buildCharacterContext(player *character.Character) string {
-	var sb strings.Builder
-	sb.WriteString("Name: ")
-	sb.WriteString(player.Name)
-	sb.WriteString("\n")
-	if player.Aspects.HighConcept != "" {
-		sb.WriteString("High Concept: ")
-		sb.WriteString(player.Aspects.HighConcept)
-		sb.WriteString("\n")
-	}
-	if player.Aspects.Trouble != "" {
-		sb.WriteString("Trouble: ")
-		sb.WriteString(player.Aspects.Trouble)
-		sb.WriteString("\n")
-	}
-	return sb.String()
-}
-
-// buildAspectsContext creates an aspects context string for the template
-func buildAspectsContext(s *scene.Scene, player *character.Character, others []*character.Character) string {
-	var sb strings.Builder
-	sb.WriteString("Scene Aspects:\n")
-	for _, aspect := range s.SituationAspects {
-		sb.WriteString("  - ")
-		sb.WriteString(aspect.Aspect)
-		sb.WriteString("\n")
-	}
-	sb.WriteString("\nCharacter Aspects:\n")
-	if player.Aspects.HighConcept != "" {
-		sb.WriteString("  - ")
-		sb.WriteString(player.Aspects.HighConcept)
-		sb.WriteString(" (")
-		sb.WriteString(player.Name)
-		sb.WriteString(")\n")
-	}
-	for _, other := range others {
-		if other.Aspects.HighConcept != "" {
-			sb.WriteString("  - ")
-			sb.WriteString(other.Aspects.HighConcept)
-			sb.WriteString(" (")
-			sb.WriteString(other.Name)
-			sb.WriteString(")\n")
-		}
-	}
-	return sb.String()
-}
-
-// truncateResponse truncates a response string for display
-func truncateResponse(s string, maxLen int) string {
-	// Remove newlines for cleaner display
-	s = strings.ReplaceAll(s, "\n", " ")
-	s = strings.Join(strings.Fields(s), " ")
-	if len(s) > maxLen {
-		return s[:maxLen] + "..."
-	}
-	return s
 }

@@ -5,16 +5,13 @@ package llmeval_test
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
-	llmazure "github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // SceneGenTestCase represents a test case for scene generation
@@ -264,17 +261,10 @@ func evaluateSceneGeneration(ctx context.Context, client llm.LLMClient, tc Scene
 // - Descriptions should be evocative but concise
 // - Scenes should advance the scenario's story questions
 func TestSceneGeneration_LLMEvaluation(t *testing.T) {
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	config, err := llmazure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	client := llmazure.NewClient(*config)
+	client := RequireLLMClient(t)
 	ctx := context.Background()
 
-	verboseLogging := os.Getenv("VERBOSE") == "1"
+	verboseLogging := VerboseLoggingEnabled()
 	testCases := getSceneGenTestCases()
 
 	var results []SceneGenResult

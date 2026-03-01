@@ -1,11 +1,10 @@
 //go:build llmeval
 
-package llmeval
+package llmeval_test
 
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 
@@ -13,7 +12,6 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
-	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,21 +42,8 @@ type AspectGeneratorEvaluationSummary struct {
 }
 
 func TestAspectGeneratorLLMEvaluation(t *testing.T) {
-	// Check for Azure credentials
-	endpoint := os.Getenv("AZURE_API_ENDPOINT")
-	apiKey := os.Getenv("AZURE_API_KEY")
-	if endpoint == "" || apiKey == "" {
-		t.Skip("Skipping LLM evaluation: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	verboseLogging := os.Getenv("VERBOSE_TESTS") != ""
-
-	// Load Azure configuration
-	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	// Create Azure ML client
-	azureClient := azure.NewClient(*config)
+	azureClient := RequireLLMClient(t)
+	verboseLogging := VerboseLoggingEnabled()
 
 	// Create aspect generator
 	aspectGenerator := engine.NewAspectGenerator(azureClient)
@@ -469,19 +454,9 @@ func getAspectGeneratorTestCases() []AspectGeneratorTestCase {
 }
 
 func TestAspectGeneratorEdgeCases(t *testing.T) {
-	// Check for Azure credentials
-	endpoint := os.Getenv("AZURE_API_ENDPOINT")
-	apiKey := os.Getenv("AZURE_API_KEY")
-	if endpoint == "" || apiKey == "" {
-		t.Skip("Skipping LLM evaluation: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
+	azureClient := RequireLLMClient(t)
+	verboseLogging := VerboseLoggingEnabled()
 
-	verboseLogging := os.Getenv("VERBOSE_TESTS") != ""
-
-	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	azureClient := azure.NewClient(*config)
 	aspectGenerator := engine.NewAspectGenerator(azureClient)
 	char := createTestCharacter()
 	ctx := context.Background()

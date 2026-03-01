@@ -5,7 +5,6 @@ package llmeval_test
 import (
 	"context"
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -13,7 +12,6 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
-	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -60,12 +58,8 @@ type MarkerLeakResult struct {
 // These are borderline cases where the LLM might feel the need to explain its
 // marker reasoning rather than just writing fiction.
 func getMarkerLeakTestCases() []MarkerLeakTestCase {
-	bartender := character.NewCharacter("bartender", "Maggie Two-Rivers")
-	bartender.Aspects.HighConcept = "Weathered Saloon Owner"
-
-	blackJack := character.NewCharacter("blackjack", "Black Jack McCoy")
-	blackJack.Aspects.HighConcept = "Dangerous Outlaw with a Quick Draw"
-	blackJack.Aspects.Trouble = "Wanted Dead or Alive"
+	bartender := NewBartender()
+	blackJack := NewBlackJack()
 
 	guard := character.NewCharacter("guard", "Gate Guard")
 	guard.Aspects.HighConcept = "Dutiful Town Watchman"
@@ -161,17 +155,10 @@ func getMarkerLeakTestCases() []MarkerLeakTestCase {
 //
 // Run with: VERBOSE=1 go test -v -tags=llmeval -run TestMarkerLeak ./test/llmeval/ -timeout 5m
 func TestMarkerLeak_LLMEvaluation(t *testing.T) {
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	client := azure.NewClient(*config)
+	client := RequireLLMClient(t)
 	ctx := context.Background()
 
-	verboseLogging := os.Getenv("VERBOSE") == "1"
+	verboseLogging := VerboseLoggingEnabled()
 	testCases := getMarkerLeakTestCases()
 
 	var results []MarkerLeakResult
@@ -207,7 +194,7 @@ func TestMarkerLeak_LLMEvaluation(t *testing.T) {
 				if result.JudgeLeak {
 					t.Logf("  Judge found leak: %s", result.JudgeReasoning)
 				}
-				t.Logf("  Cleaned text: %s", truncateResponseText(result.CleanedText, 300))
+				t.Logf("  Cleaned text: %s", TruncateResponse(result.CleanedText, 300))
 			}
 
 			assert.True(t, result.Passed,
@@ -215,7 +202,7 @@ func TestMarkerLeak_LLMEvaluation(t *testing.T) {
 					"Regex leak: %v (%s)\nJudge leak: %v (%s)\nResponse: %s",
 				result.RegexLeakFound, result.RegexLeakText,
 				result.JudgeLeak, result.JudgeReasoning,
-				truncateResponseText(result.Response, 400))
+				TruncateResponse(result.Response, 400))
 		})
 	}
 
@@ -228,14 +215,14 @@ func TestMarkerLeak_LLMEvaluation(t *testing.T) {
 	for _, r := range results {
 		if !r.Passed {
 			t.Logf("FAIL: %s", r.TestCase.Name)
-			t.Logf("      Input: %s", truncateResponseText(r.TestCase.PlayerInput, 80))
+			t.Logf("      Input: %s", TruncateResponse(r.TestCase.PlayerInput, 80))
 			if r.RegexLeakFound {
 				t.Logf("      Regex: %q", r.RegexLeakText)
 			}
 			if r.JudgeLeak {
 				t.Logf("      Judge: %s", r.JudgeReasoning)
 			}
-			t.Logf("      Response: %s", truncateResponseText(r.Response, 200))
+			t.Logf("      Response: %s", TruncateResponse(r.Response, 200))
 		}
 	}
 }
@@ -249,8 +236,8 @@ func evaluateMarkerLeak(ctx context.Context, client llm.LLMClient, tc MarkerLeak
 	player.Aspects.HighConcept = "Shadow Operative with a Hidden Past"
 	player.Aspects.Trouble = "Trust No One — Not Even Yourself"
 
-	charContext := buildSceneResponseCharContext(player)
-	aspectsContext := buildSceneResponseAspectsContext(testScene, player, tc.OtherCharacters)
+	charContext := BuildCharacterContext(player)
+	aspectsContext := BuildAspectsContext(testScene, player, tc.OtherCharacters)
 
 	conversationContext := tc.ConversationContext
 	if conversationContext == "" {
@@ -336,17 +323,10 @@ func stripValidMarkers(response string) string {
 //
 // Run with: VERBOSE=1 go test -v -tags=llmeval -run TestMarkerLeak_NeoTechEntrance -count=10 ./test/llmeval/ -timeout 10m
 func TestMarkerLeak_NeoTechEntrance_LLMEvaluation(t *testing.T) {
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	client := azure.NewClient(*config)
+	client := RequireLLMClient(t)
 	ctx := context.Background()
 
-	verboseLogging := os.Getenv("VERBOSE") == "1"
+	verboseLogging := VerboseLoggingEnabled()
 
 	// Reproduce the exact save state from a9d335d8115517ec
 	player := character.NewCharacter("zero", "Zero")
@@ -368,8 +348,8 @@ func TestMarkerLeak_NeoTechEntrance_LLMEvaluation(t *testing.T) {
 	// The boost from the prior action
 	testScene.AddSituationAspect(scene.SituationAspect{Aspect: "Blended with the Crowd", FreeInvokes: 1, IsBoost: true, Duration: "scene", CreatedBy: "zero"})
 
-	charContext := buildSceneResponseCharContext(player)
-	aspectsContext := buildSceneResponseAspectsContext(testScene, player, []*character.Character{raven})
+	charContext := BuildCharacterContext(player)
+	aspectsContext := BuildAspectsContext(testScene, player, []*character.Character{raven})
 
 	conversationHistory := `GM: As Zero weaves through the crowd with an ease that belies their bulky cybernetic enhancements, they expertly evade the probing spotlight of a security drone, its hum receding into the distance as they slip into the shadows cast by NeoTech's warehouses. The rain-soaked air is filled with the scent of wet pavement and ozone as Zero disappears into the darkness, the thrum of the city's underbelly growing louder. With their newfound position at the warehouse's rear, the soft glow of a service entrance beckons, a potential backdoor into the heart of NeoTech's operations.`
 
@@ -421,12 +401,12 @@ func TestMarkerLeak_NeoTechEntrance_LLMEvaluation(t *testing.T) {
 		if judgeResult.Pass {
 			t.Logf("  Judge: %s", judgeResult.Reasoning)
 		}
-		t.Logf("  Cleaned: %s", truncateResponseText(cleanedText, 400))
+		t.Logf("  Cleaned: %s", TruncateResponse(cleanedText, 400))
 	}
 
 	assert.True(t, passed,
 		"Response contains out-of-fiction marker reference.\nRegex: %v (%s)\nJudge: %v (%s)\nResponse: %s",
 		regexLeakFound, regexLeakText,
 		judgeResult.Pass, judgeResult.Reasoning,
-		truncateResponseText(response, 500))
+		TruncateResponse(response, 500))
 }

@@ -5,7 +5,6 @@ package llmeval_test
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 
@@ -14,10 +13,8 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
-	llmazure "github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // ActionNarrativeTestCase defines a test scenario for action narrative evaluation.
@@ -371,17 +368,10 @@ func countSentences(text string) int {
 // Per Fate Core SRD, the four outcomes (Fail, Tie, Succeed, Succeed with Style)
 // each have distinct narrative weight that the GM narration should reflect.
 func TestActionNarrative_LLMEvaluation(t *testing.T) {
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	config, err := llmazure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	client := llmazure.NewClient(*config)
+	client := RequireLLMClient(t)
 	ctx := context.Background()
 
-	verboseLogging := os.Getenv("VERBOSE") == "1"
+	verboseLogging := VerboseLoggingEnabled()
 
 	overcomeTests := getOvercomeNarrativeTestCases()
 	caATests := getCreateAdvantageNarrativeTestCases()

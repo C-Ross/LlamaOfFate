@@ -4,17 +4,13 @@ package llmeval_test
 
 import (
 	"context"
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
-	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
-	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // ActionParserTestCase represents a single test case for LLM action parsing evaluation
@@ -30,30 +26,9 @@ type ActionParserTestCase struct {
 	ExpectedOpposition string                 // "passive" or "active"; empty means skip check
 }
 
-// getTestCharacter creates a well-rounded test character for evaluation
-func getTestCharacter() *character.Character {
-	char := character.NewCharacter("eval-char", "Magnus the Versatile")
-	char.Aspects.HighConcept = "Resourceful Problem Solver"
-	char.Aspects.Trouble = "Curiosity Killed the Cat"
-	char.Aspects.AddAspect("Former Street Urchin")
-	char.Aspects.AddAspect("Quick on My Feet")
-
-	// Give the character a range of skills so any action type is plausible
-	char.SetSkill("Athletics", dice.Good)
-	char.SetSkill("Fight", dice.Fair)
-	char.SetSkill("Shoot", dice.Average)
-	char.SetSkill("Stealth", dice.Good)
-	char.SetSkill("Notice", dice.Fair)
-	char.SetSkill("Investigate", dice.Good)
-	char.SetSkill("Deceive", dice.Fair)
-	char.SetSkill("Rapport", dice.Average)
-	char.SetSkill("Will", dice.Fair)
-	char.SetSkill("Provoke", dice.Average)
-	char.SetSkill("Burglary", dice.Good)
-	char.SetSkill("Lore", dice.Fair)
-
-	return char
-}
+// getTestCharacter returns the shared eval character.
+// Deprecated: use NewEvalCharacter() directly.
+var getTestCharacter = NewEvalCharacter
 
 // getOvercomeTestCases returns test cases that should clearly result in Overcome actions
 func getOvercomeTestCases() []ActionParserTestCase {
@@ -623,52 +598,13 @@ func getThirdPersonTestCases() []ActionParserTestCase {
 	}
 }
 
-// getHeistNPCs creates NPCs matching the heist scenario where the stealth-attack bug was discovered.
-func getHeistNPCs() []*character.Character {
-	chen := character.NewCharacter("corp-agent", "Agent Chen")
-	chen.Aspects.HighConcept = "Nexus Industries Troubleshooter"
-	chen.Aspects.AddAspect("Augmented Combat Implants")
-	chen.SetSkill("Fight", dice.Good)
-	chen.SetSkill("Shoot", dice.Good)
-	chen.SetSkill("Notice", dice.Fair)
-	chen.SetSkill("Athletics", dice.Fair)
-	chen.SetSkill("Will", dice.Average)
-	chen.SetSkill("Physique", dice.Average)
+// getHeistNPCs returns the shared heist NPCs.
+// Deprecated: use NewHeistNPCs() directly.
+var getHeistNPCs = NewHeistNPCs
 
-	drone := character.NewCharacter("drone-1", "Security Drone Alpha")
-	drone.Aspects.HighConcept = "Automated Threat Response Unit"
-	drone.SetSkill("Shoot", dice.Fair)
-	drone.SetSkill("Notice", dice.Average)
-
-	return []*character.Character{chen, drone}
-}
-
-// getHeistPlayer creates the Zero character from the heist preset.
-func getHeistPlayer() *character.Character {
-	char := character.NewCharacter("zero", "Ghost")
-	char.Aspects.HighConcept = "Ex-Corporate Netrunner Gone Rogue"
-	char.Aspects.Trouble = "Every Megacorp Wants Me Dead"
-	char.Aspects.AddAspect("Military-Grade Cybernetic Reflexes")
-	char.Aspects.AddAspect("Nobody Gets Left Behind")
-	char.Aspects.AddAspect("I Know a Guy for Everything")
-
-	char.SetSkill("Burglary", dice.Superb)
-	char.SetSkill("Stealth", dice.Great)
-	char.SetSkill("Notice", dice.Great)
-	char.SetSkill("Crafts", dice.Good)
-	char.SetSkill("Athletics", dice.Good)
-	char.SetSkill("Shoot", dice.Good)
-	char.SetSkill("Deceive", dice.Fair)
-	char.SetSkill("Will", dice.Fair)
-	char.SetSkill("Investigate", dice.Fair)
-	char.SetSkill("Contacts", dice.Fair)
-	char.SetSkill("Fight", dice.Average)
-	char.SetSkill("Physique", dice.Average)
-	char.SetSkill("Provoke", dice.Average)
-	char.SetSkill("Resources", dice.Average)
-
-	return char
-}
+// getHeistPlayer returns the shared heist player.
+// Deprecated: use NewHeistPlayer() directly.
+var getHeistPlayer = NewHeistPlayer
 
 // getStealthAttackTestCases returns cases where a player combines stealth
 // movement with an attack. The skill should be Fight/Shoot (how harm is dealt),
@@ -784,24 +720,12 @@ type TypeSummary struct {
 	SkillCorrect int
 }
 
-// Set to true to enable verbose logging for each test case
-var verboseLogging = os.Getenv("VERBOSE_TESTS") != ""
-
 // TestActionParser_LLMEvaluation runs all test cases against the real LLM
 // Run with: go test -v -tags=llmeval ./test/llmeval/
-// Set VERBOSE_TESTS=1 for detailed per-test logging
+// Set VERBOSE=1 for detailed per-test logging
 // Requires AZURE_API_ENDPOINT and AZURE_API_KEY environment variables
 func TestActionParser_LLMEvaluation(t *testing.T) {
-	// Skip if not running integration tests
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	// Load config and create LLM client
-	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	client := azure.NewClient(*config)
+	client := RequireLLMClient(t)
 	parser := engine.NewActionParser(client)
 	char := getTestCharacter()
 	ctx := context.Background()
@@ -884,8 +808,8 @@ func TestActionParser_LLMEvaluation(t *testing.T) {
 						}
 					}
 
-					// Verbose logging (enable with VERBOSE_TESTS=1)
-					if verboseLogging {
+					// Verbose logging (enable with VERBOSE=1)
+					if VerboseLoggingEnabled() {
 						typeStatus := "✓"
 						if !result.TypeMatches {
 							typeStatus = "✗"
@@ -1029,16 +953,7 @@ func abs(x int) int {
 // TestActionParser_SpecificOvercomeVsCreateAdvantage focuses on the edge cases
 // between Overcome and Create an Advantage which are often confused
 func TestActionParser_SpecificOvercomeVsCreateAdvantage(t *testing.T) {
-	// Skip if not running integration tests
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	// Load config and create LLM client
-	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	client := azure.NewClient(*config)
+	client := RequireLLMClient(t)
 	parser := engine.NewActionParser(client)
 	char := getTestCharacter()
 	ctx := context.Background()
@@ -1128,7 +1043,7 @@ func TestActionParser_SpecificOvercomeVsCreateAdvantage(t *testing.T) {
 		},
 	}
 
-	if verboseLogging {
+	if VerboseLoggingEnabled() {
 		t.Log("Testing Overcome vs Create an Advantage edge cases")
 		t.Log("=" + strings.Repeat("=", 60))
 	}
@@ -1162,7 +1077,7 @@ func TestActionParser_SpecificOvercomeVsCreateAdvantage(t *testing.T) {
 				}
 			}
 
-			if verboseLogging {
+			if VerboseLoggingEnabled() {
 				status := "✓ PASS"
 				if !result.TypeMatches {
 					status = "✗ FAIL"
@@ -1178,7 +1093,7 @@ func TestActionParser_SpecificOvercomeVsCreateAdvantage(t *testing.T) {
 		})
 	}
 
-	if verboseLogging {
+	if VerboseLoggingEnabled() {
 		t.Log("\n" + strings.Repeat("=", 60))
 		t.Logf("Overcome accuracy: %d/%d (%.1f%%)",
 			overcomeResults.correct, overcomeResults.total,
@@ -1192,16 +1107,7 @@ func TestActionParser_SpecificOvercomeVsCreateAdvantage(t *testing.T) {
 // BenchmarkActionParser_LLM benchmarks the action parser with real LLM calls
 // Run with: go test -bench=BenchmarkActionParser_LLM -tags=llmeval ./test/llmeval/
 func BenchmarkActionParser_LLM(b *testing.B) {
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		b.Skip("Skipping benchmark: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-	if err != nil {
-		b.Fatalf("Failed to load config: %v", err)
-	}
-
-	client := azure.NewClient(*config)
+	client := RequireLLMClient(b)
 	parser := engine.NewActionParser(client)
 	char := getTestCharacter()
 	ctx := context.Background()

@@ -4,16 +4,13 @@ package llmeval_test
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
-	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // ChallengeTransitionTestCase tests whether the LLM respects the
@@ -102,8 +99,8 @@ func evaluateChallengeTransition(ctx context.Context, client llm.LLMClient, tc C
 	player := character.NewCharacter("player-1", "Test Character")
 	player.Aspects.HighConcept = "Wandering Stranger"
 
-	charContext := buildCharacterContext(player)
-	aspectsContext := buildAspectsContext(testScene, player, nil)
+	charContext := BuildCharacterContext(player)
+	aspectsContext := BuildAspectsContext(testScene, player, nil)
 
 	data := promptpkg.SceneResponseData{
 		Scene:               testScene,
@@ -139,14 +136,7 @@ func evaluateChallengeTransition(ctx context.Context, client llm.LLMClient, tc C
 // suppresses [SCENE_TRANSITION] markers when a challenge is active.
 // Run with: go test -v -tags=llmeval ./test/llmeval/ -run TestChallengeTransition
 func TestChallengeTransition_LLMEvaluation(t *testing.T) {
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	client := azure.NewClient(*config)
+	client := RequireLLMClient(t)
 	ctx := context.Background()
 
 	cases := getChallengeExitAttempts()
@@ -169,7 +159,7 @@ func TestChallengeTransition_LLMEvaluation(t *testing.T) {
 
 			assert.Equal(t, tc.ExpectMarker, result.HasMarker,
 				"Transition marker mismatch for '%s'. %s\nResponse: %s",
-				tc.PlayerInput, tc.Description, truncateResponse(result.Response, 300))
+				tc.PlayerInput, tc.Description, TruncateResponse(result.Response, 300))
 		})
 	}
 
@@ -184,7 +174,7 @@ func TestChallengeTransition_LLMEvaluation(t *testing.T) {
 			t.Logf("FAIL: '%s'", r.TestCase.PlayerInput)
 			t.Logf("      Scene: %s", r.TestCase.SceneDescription)
 			t.Logf("      Why: %s", r.TestCase.Description)
-			t.Logf("      Response: %s", truncateResponse(r.Response, 200))
+			t.Logf("      Response: %s", TruncateResponse(r.Response, 200))
 		}
 	}
 }

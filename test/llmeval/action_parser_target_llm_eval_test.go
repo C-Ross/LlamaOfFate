@@ -4,7 +4,6 @@ package llmeval_test
 
 import (
 	"context"
-	"os"
 	"strings"
 	"testing"
 
@@ -12,10 +11,8 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
-	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // TargetTestCase represents a test case that validates target resolution
@@ -365,17 +362,11 @@ func isCharacterTarget(target string, chars []*character.Character) bool {
 // when characters are present in the scene.
 // Run with: go test -v -tags=llmeval -run TestActionParser_TargetResolution ./test/llmeval/ -timeout 5m
 func TestActionParser_TargetResolution(t *testing.T) {
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	client := azure.NewClient(*config)
+	client := RequireLLMClient(t)
 	parser := engine.NewActionParser(client)
 	char := getTestCharacter()
 	ctx := context.Background()
+	verboseLogging := VerboseLoggingEnabled()
 
 	allTestCases := []struct {
 		category string

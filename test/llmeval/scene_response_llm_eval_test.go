@@ -4,17 +4,14 @@ package llmeval_test
 
 import (
 	"context"
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
-	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // noOptionsJudgeQuestion asks whether the response presents CYOA-style player choices.
@@ -36,12 +33,9 @@ type SceneResponseTestCase struct {
 
 // getNoOptionsTestCases returns cases where the LLM should NOT present options
 func getNoOptionsTestCases() []SceneResponseTestCase {
-	blackJack := character.NewCharacter("blackjack", "Black Jack McCoy")
-	blackJack.Aspects.HighConcept = "Dangerous Outlaw with a Quick Draw"
-	blackJack.Aspects.Trouble = "Wanted Dead or Alive"
+	blackJack := NewBlackJack()
 
-	bartender := character.NewCharacter("bartender", "Maggie Two-Rivers")
-	bartender.Aspects.HighConcept = "Weathered Saloon Owner"
+	bartender := NewBartender()
 
 	return []SceneResponseTestCase{
 		{
@@ -99,8 +93,7 @@ func getNoOptionsTestCases() []SceneResponseTestCase {
 
 // getTransitionAfterLeaveTestCases returns cases where player leaves and transition should occur
 func getTransitionAfterLeaveTestCases() []SceneResponseTestCase {
-	blackJack := character.NewCharacter("blackjack", "Black Jack McCoy")
-	blackJack.Aspects.HighConcept = "Dangerous Outlaw with a Quick Draw"
+	blackJack := NewBlackJack()
 
 	return []SceneResponseTestCase{
 		{
@@ -154,17 +147,10 @@ type SceneResponseResult struct {
 
 // TestSceneResponse_NoOptions_LLMEvaluation tests that LLM doesn't present CYOA-style options
 func TestSceneResponse_NoOptions_LLMEvaluation(t *testing.T) {
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	client := azure.NewClient(*config)
+	client := RequireLLMClient(t)
 	ctx := context.Background()
 
-	verboseLogging := os.Getenv("VERBOSE") == "1"
+	verboseLogging := VerboseLoggingEnabled()
 	testCases := getNoOptionsTestCases()
 
 	var results []SceneResponseResult
@@ -195,12 +181,12 @@ func TestSceneResponse_NoOptions_LLMEvaluation(t *testing.T) {
 				if result.HasOptions {
 					t.Logf("  Options found: %s", result.OptionsFound)
 				}
-				t.Logf("  Response: %s", truncateResponseText(result.Response, 300))
+				t.Logf("  Response: %s", TruncateResponse(result.Response, 300))
 			}
 
 			assert.False(t, result.HasOptions,
 				"Response should NOT contain options/choices. Found: %s\nResponse: %s",
-				result.OptionsFound, truncateResponseText(result.Response, 400))
+				result.OptionsFound, TruncateResponse(result.Response, 400))
 		})
 	}
 
@@ -213,7 +199,7 @@ func TestSceneResponse_NoOptions_LLMEvaluation(t *testing.T) {
 	for _, r := range results {
 		if !r.Matches {
 			t.Logf("FAIL: '%s'", r.TestCase.Name)
-			t.Logf("      Input: %s", truncateResponseText(r.TestCase.PlayerInput, 80))
+			t.Logf("      Input: %s", TruncateResponse(r.TestCase.PlayerInput, 80))
 			t.Logf("      Options found: %s", r.OptionsFound)
 		}
 	}
@@ -221,17 +207,10 @@ func TestSceneResponse_NoOptions_LLMEvaluation(t *testing.T) {
 
 // TestSceneResponse_TransitionOnLeave_LLMEvaluation tests that scene transitions happen when player leaves
 func TestSceneResponse_TransitionOnLeave_LLMEvaluation(t *testing.T) {
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	client := azure.NewClient(*config)
+	client := RequireLLMClient(t)
 	ctx := context.Background()
 
-	verboseLogging := os.Getenv("VERBOSE") == "1"
+	verboseLogging := VerboseLoggingEnabled()
 	testCases := getTransitionAfterLeaveTestCases()
 
 	var results []SceneResponseResult
@@ -262,12 +241,12 @@ func TestSceneResponse_TransitionOnLeave_LLMEvaluation(t *testing.T) {
 				if result.HasTransition {
 					t.Logf("  Transition hint: %s", result.TransitionHint)
 				}
-				t.Logf("  Response: %s", truncateResponseText(result.Response, 300))
+				t.Logf("  Response: %s", TruncateResponse(result.Response, 300))
 			}
 
 			assert.True(t, result.HasTransition,
 				"Response should have SCENE_TRANSITION marker when player leaves.\nResponse: %s",
-				truncateResponseText(result.Response, 400))
+				TruncateResponse(result.Response, 400))
 
 			// Check hint content if specified
 			if tc.ExpectedHintContains != "" && result.HasTransition {
@@ -286,8 +265,8 @@ func TestSceneResponse_TransitionOnLeave_LLMEvaluation(t *testing.T) {
 	for _, r := range results {
 		if !r.Matches {
 			t.Logf("FAIL: '%s'", r.TestCase.Name)
-			t.Logf("      Input: %s", truncateResponseText(r.TestCase.PlayerInput, 80))
-			t.Logf("      Response: %s", truncateResponseText(r.Response, 200))
+			t.Logf("      Input: %s", TruncateResponse(r.TestCase.PlayerInput, 80))
+			t.Logf("      Response: %s", TruncateResponse(r.Response, 200))
 		}
 	}
 }
@@ -299,11 +278,9 @@ func getNoFalseTransitionTestCases() []SceneResponseTestCase {
 	dustyCowboy := character.NewCharacter("scene_1_npc_1", "The Dusty Cowboy")
 	dustyCowboy.Aspects.HighConcept = "Mysterious Drifter with a Watchful Eye"
 
-	bartender := character.NewCharacter("bartender", "Maggie Two-Rivers")
-	bartender.Aspects.HighConcept = "Weathered Saloon Owner"
+	bartender := NewBartender()
 
-	blackJack := character.NewCharacter("blackjack", "Black Jack McCoy")
-	blackJack.Aspects.HighConcept = "Dangerous Outlaw with a Quick Draw"
+	blackJack := NewBlackJack()
 
 	return []SceneResponseTestCase{
 		{
@@ -369,17 +346,10 @@ func getNoFalseTransitionTestCases() []SceneResponseTestCase {
 // session_western_jesse_calhoun_20260208_190311.yaml where "steps into the eaves"
 // caused a false [SCENE_TRANSITION:the eaves outside the saloon].
 func TestSceneResponse_NoFalseTransition_LLMEvaluation(t *testing.T) {
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	client := azure.NewClient(*config)
+	client := RequireLLMClient(t)
 	ctx := context.Background()
 
-	verboseLogging := os.Getenv("VERBOSE") == "1"
+	verboseLogging := VerboseLoggingEnabled()
 	testCases := getNoFalseTransitionTestCases()
 
 	var results []SceneResponseResult
@@ -413,12 +383,12 @@ func TestSceneResponse_NoFalseTransition_LLMEvaluation(t *testing.T) {
 				if result.HasTransition {
 					t.Logf("  False transition hint: %s", result.TransitionHint)
 				}
-				t.Logf("  Response: %s", truncateResponseText(result.Response, 300))
+				t.Logf("  Response: %s", TruncateResponse(result.Response, 300))
 			}
 
 			assert.False(t, result.HasTransition,
 				"Response should NOT have SCENE_TRANSITION marker for within-scene movement.\nInput: %s\nTransition hint: %s\nResponse: %s",
-				tc.PlayerInput, result.TransitionHint, truncateResponseText(result.Response, 400))
+				tc.PlayerInput, result.TransitionHint, TruncateResponse(result.Response, 400))
 		})
 	}
 
@@ -431,7 +401,7 @@ func TestSceneResponse_NoFalseTransition_LLMEvaluation(t *testing.T) {
 	for _, r := range results {
 		if !r.Matches {
 			t.Logf("FAIL: '%s'", r.TestCase.Name)
-			t.Logf("      Input: %s", truncateResponseText(r.TestCase.PlayerInput, 80))
+			t.Logf("      Input: %s", TruncateResponse(r.TestCase.PlayerInput, 80))
 			t.Logf("      False transition: %s", r.TransitionHint)
 		}
 	}
@@ -448,8 +418,8 @@ func evaluateSceneResponseBehavior(ctx context.Context, client llm.LLMClient, tc
 	player.Aspects.Trouble = "The Cortez Gang Burned My Life"
 
 	// Build contexts
-	charContext := buildSceneResponseCharContext(player)
-	aspectsContext := buildSceneResponseAspectsContext(testScene, player, tc.OtherCharacters)
+	charContext := BuildCharacterContext(player)
+	aspectsContext := BuildAspectsContext(testScene, player, tc.OtherCharacters)
 
 	conversationContext := tc.ConversationContext
 	if conversationContext == "" {
@@ -518,63 +488,4 @@ func evaluateSceneResponseBehavior(ctx context.Context, client llm.LLMClient, tc
 		TransitionHint: transitionHint,
 		Matches:        matches,
 	}
-}
-
-// buildSceneResponseCharContext creates character context for scene response
-func buildSceneResponseCharContext(player *character.Character) string {
-	var sb strings.Builder
-	sb.WriteString("Name: ")
-	sb.WriteString(player.Name)
-	sb.WriteString("\n")
-	if player.Aspects.HighConcept != "" {
-		sb.WriteString("High Concept: ")
-		sb.WriteString(player.Aspects.HighConcept)
-		sb.WriteString("\n")
-	}
-	if player.Aspects.Trouble != "" {
-		sb.WriteString("Trouble: ")
-		sb.WriteString(player.Aspects.Trouble)
-		sb.WriteString("\n")
-	}
-	return sb.String()
-}
-
-// buildSceneResponseAspectsContext creates aspects context for scene response
-func buildSceneResponseAspectsContext(s *scene.Scene, player *character.Character, others []*character.Character) string {
-	var sb strings.Builder
-	sb.WriteString("Scene Aspects:\n")
-	for _, aspect := range s.SituationAspects {
-		sb.WriteString("  - ")
-		sb.WriteString(aspect.Aspect)
-		sb.WriteString("\n")
-	}
-	sb.WriteString("\nCharacter Aspects:\n")
-	if player.Aspects.HighConcept != "" {
-		sb.WriteString("  - ")
-		sb.WriteString(player.Aspects.HighConcept)
-		sb.WriteString(" (")
-		sb.WriteString(player.Name)
-		sb.WriteString(")\n")
-	}
-	for _, other := range others {
-		if other.Aspects.HighConcept != "" {
-			sb.WriteString("  - ")
-			sb.WriteString(other.Aspects.HighConcept)
-			sb.WriteString(" (")
-			sb.WriteString(other.Name)
-			sb.WriteString(")\n")
-		}
-	}
-	return sb.String()
-}
-
-// truncateResponseText truncates a response string for display
-func truncateResponseText(s string, maxLen int) string {
-	// Remove newlines for cleaner display
-	s = strings.ReplaceAll(s, "\n", " ")
-	s = strings.Join(strings.Fields(s), " ")
-	if len(s) > maxLen {
-		return s[:maxLen] + "..."
-	}
-	return s
 }

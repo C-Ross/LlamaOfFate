@@ -4,7 +4,6 @@ package llmeval_test
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
@@ -12,9 +11,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
-	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // ChallengeActionParserTestCase tests that actions during active challenges
@@ -158,14 +155,7 @@ func evaluateChallengeAction(ctx context.Context, parser engine.ActionParser, ch
 // returns Overcome (not Create Advantage) for actions matching challenge tasks.
 // Run with: go test -v -tags=llmeval ./test/llmeval/ -run TestChallengeActionParser
 func TestChallengeActionParser_LLMEvaluation(t *testing.T) {
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	client := azure.NewClient(*config)
+	client := RequireLLMClient(t)
 	parser := engine.NewActionParser(client)
 	char := getChallengeTestCharacter()
 	ctx := context.Background()

@@ -4,15 +4,12 @@ package llmeval_test
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
-	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // ChallengeClassificationTestCase validates that inputs matching challenge
@@ -125,14 +122,7 @@ func evaluateChallengeClassification(ctx context.Context, client llm.LLMClient, 
 // challenge task skills are classified as "action" when a challenge is active.
 // Run with: go test -v -tags=llmeval ./test/llmeval/ -run TestChallengeClassification
 func TestChallengeClassification_LLMEvaluation(t *testing.T) {
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	client := azure.NewClient(*config)
+	client := RequireLLMClient(t)
 	ctx := context.Background()
 
 	cases := getChallengeActionCases()

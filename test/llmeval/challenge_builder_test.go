@@ -4,14 +4,12 @@ package llmeval_test
 
 import (
 	"context"
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
-	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -97,18 +95,9 @@ type ChallengeBuilderResult struct {
 }
 
 func TestChallengeBuilder_LLMEvaluation(t *testing.T) {
-	endpoint := os.Getenv("AZURE_API_ENDPOINT")
-	apiKey := os.Getenv("AZURE_API_KEY")
-	if endpoint == "" || apiKey == "" {
-		t.Skip("Skipping LLM evaluation: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
+	verbose := VerboseLoggingEnabled()
 
-	verbose := os.Getenv("VERBOSE_TESTS") != ""
-
-	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	client := azure.NewClient(*config)
+	client := RequireLLMClient(t)
 	generator := engine.NewChallengeGenerator(client)
 
 	ctx := context.Background()

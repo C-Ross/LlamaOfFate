@@ -4,16 +4,13 @@ package llmeval_test
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
-	llmazure "github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // Proactive GM evaluation tests for issue #104.
@@ -83,12 +80,7 @@ type ProactiveGMResult struct {
 // --- Test cases ---
 
 func getTroublePressureTestCases() []ProactiveGMTestCase {
-	blackJack := character.NewCharacter("blackjack", "Black Jack McCoy")
-	blackJack.Aspects.HighConcept = "Dangerous Outlaw with a Quick Draw"
-	blackJack.Aspects.Trouble = "Wanted Dead or Alive"
-
-	bartender := character.NewCharacter("bartender", "Maggie Two-Rivers")
-	bartender.Aspects.HighConcept = "Weathered Saloon Owner"
+	bartender := NewBartender()
 
 	return []ProactiveGMTestCase{
 		{
@@ -191,12 +183,9 @@ func getScenePurposeTestCases() []ProactiveGMTestCase {
 }
 
 func getNPCInitiativeTestCases() []ProactiveGMTestCase {
-	blackJack := character.NewCharacter("blackjack", "Black Jack McCoy")
-	blackJack.Aspects.HighConcept = "Dangerous Outlaw with a Quick Draw"
-	blackJack.Aspects.Trouble = "Wanted Dead or Alive"
+	blackJack := NewBlackJack()
 
-	bartender := character.NewCharacter("bartender", "Maggie Two-Rivers")
-	bartender.Aspects.HighConcept = "Weathered Saloon Owner"
+	bartender := NewBartender()
 
 	gangLt := character.NewCharacter("gang_lt", "El Sombra")
 	gangLt.Aspects.HighConcept = "Cortez's Ruthless Lieutenant"
@@ -263,8 +252,8 @@ func evaluateProactiveGM(ctx context.Context, client llm.LLMClient, tc Proactive
 	}
 
 	// Build contexts using existing helpers from scene_response_llm_eval_test.go
-	charContext := buildSceneResponseCharContext(player)
-	aspectsContext := buildSceneResponseAspectsContext(testScene, player, tc.OtherCharacters)
+	charContext := BuildCharacterContext(player)
+	aspectsContext := BuildAspectsContext(testScene, player, tc.OtherCharacters)
 
 	conversationContext := tc.ConversationContext
 	if conversationContext == "" {
@@ -342,17 +331,10 @@ func evaluateProactiveGM(ctx context.Context, client llm.LLMClient, tc Proactive
 // "Think about the aspects on the PCs' character sheets... use them to generate
 // problems for the PCs." Trouble aspects especially should create ongoing pressure.
 func TestProactiveGM_TroublePressure_LLMEvaluation(t *testing.T) {
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	config, err := llmazure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	client := llmazure.NewClient(*config)
+	client := RequireLLMClient(t)
 	ctx := context.Background()
 
-	verboseLogging := os.Getenv("VERBOSE") == "1"
+	verboseLogging := VerboseLoggingEnabled()
 	testCases := getTroublePressureTestCases()
 
 	var results []ProactiveGMResult
@@ -380,12 +362,12 @@ func TestProactiveGM_TroublePressure_LLMEvaluation(t *testing.T) {
 				t.Logf("%s: %s", status, tc.Name)
 				t.Logf("  Trouble: %s", tc.PlayerTrouble)
 				t.Logf("  Judge reasoning: %s", result.TroublePressureReason)
-				t.Logf("  Response: %s", truncateResponseText(result.Response, 400))
+				t.Logf("  Response: %s", TruncateResponse(result.Response, 400))
 			}
 
 			assert.True(t, result.TroublePressurePass,
 				"GM should weave Trouble aspect '%s' into the response.\nJudge: %s\nResponse: %s",
-				tc.PlayerTrouble, result.TroublePressureReason, truncateResponseText(result.Response, 400))
+				tc.PlayerTrouble, result.TroublePressureReason, TruncateResponse(result.Response, 400))
 		})
 	}
 
@@ -407,17 +389,10 @@ func TestProactiveGM_TroublePressure_LLMEvaluation(t *testing.T) {
 // Every scene should have a purpose — a dramatic question to resolve. The GM should
 // drive toward that purpose, not let scenes drift into aimless conversation.
 func TestProactiveGM_ScenePurpose_LLMEvaluation(t *testing.T) {
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	config, err := llmazure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	client := llmazure.NewClient(*config)
+	client := RequireLLMClient(t)
 	ctx := context.Background()
 
-	verboseLogging := os.Getenv("VERBOSE") == "1"
+	verboseLogging := VerboseLoggingEnabled()
 	testCases := getScenePurposeTestCases()
 
 	var results []ProactiveGMResult
@@ -446,12 +421,12 @@ func TestProactiveGM_ScenePurpose_LLMEvaluation(t *testing.T) {
 				t.Logf("  Scene Purpose: %s", tc.ScenePurpose)
 				t.Logf("  Player Input: %s", tc.PlayerInput)
 				t.Logf("  Judge reasoning: %s", result.ScenePurposeReason)
-				t.Logf("  Response: %s", truncateResponseText(result.Response, 400))
+				t.Logf("  Response: %s", TruncateResponse(result.Response, 400))
 			}
 
 			assert.True(t, result.ScenePurposePass,
 				"GM should advance scene purpose '%s' even with vague player input.\nJudge: %s\nResponse: %s",
-				tc.ScenePurpose, result.ScenePurposeReason, truncateResponseText(result.Response, 400))
+				tc.ScenePurpose, result.ScenePurposeReason, TruncateResponse(result.Response, 400))
 		})
 	}
 
@@ -473,17 +448,10 @@ func TestProactiveGM_ScenePurpose_LLMEvaluation(t *testing.T) {
 // NPCs should "pursue their own goals and react naturally." A hostile NPC shouldn't
 // just stand there when the player is silent — they should threaten, demand, or act.
 func TestProactiveGM_NPCInitiative_LLMEvaluation(t *testing.T) {
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	config, err := llmazure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	client := llmazure.NewClient(*config)
+	client := RequireLLMClient(t)
 	ctx := context.Background()
 
-	verboseLogging := os.Getenv("VERBOSE") == "1"
+	verboseLogging := VerboseLoggingEnabled()
 	testCases := getNPCInitiativeTestCases()
 
 	var results []ProactiveGMResult
@@ -512,12 +480,12 @@ func TestProactiveGM_NPCInitiative_LLMEvaluation(t *testing.T) {
 				t.Logf("  NPC(s): %s", describeNPCs(tc.OtherCharacters))
 				t.Logf("  Player Input: %s", tc.PlayerInput)
 				t.Logf("  Judge reasoning: %s", result.NPCInitiativeReason)
-				t.Logf("  Response: %s", truncateResponseText(result.Response, 400))
+				t.Logf("  Response: %s", TruncateResponse(result.Response, 400))
 			}
 
 			assert.True(t, result.NPCInitiativePass,
 				"NPCs should show initiative, not passively wait.\nJudge: %s\nResponse: %s",
-				result.NPCInitiativeReason, truncateResponseText(result.Response, 400))
+				result.NPCInitiativeReason, TruncateResponse(result.Response, 400))
 		})
 	}
 

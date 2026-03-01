@@ -4,16 +4,13 @@ package llmeval_test
 
 import (
 	"context"
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
-	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // InputClassificationTestCase represents a test case for input classification
@@ -420,15 +417,9 @@ type ClassificationTypeSummary struct {
 // Run with: go test -v -tags=llmeval ./test/llmeval/
 // Requires AZURE_API_ENDPOINT and AZURE_API_KEY environment variables
 func TestInputClassification_LLMEvaluation(t *testing.T) {
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	client := azure.NewClient(*config)
+	client := RequireLLMClient(t)
 	ctx := context.Background()
+	verboseLogging := VerboseLoggingEnabled()
 
 	allTestCases := []struct {
 		category string
@@ -564,15 +555,9 @@ func evaluateInputClassification(ctx context.Context, client llm.LLMClient, tc I
 
 // TestInputClassification_EdgeCases focuses on ambiguous inputs
 func TestInputClassification_EdgeCases(t *testing.T) {
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	client := azure.NewClient(*config)
+	client := RequireLLMClient(t)
 	ctx := context.Background()
+	verboseLogging := VerboseLoggingEnabled()
 
 	edgeCases := []InputClassificationTestCase{
 		// These are tricky - context determines classification
@@ -662,15 +647,9 @@ func TestInputClassification_EdgeCases(t *testing.T) {
 // This addresses over-classification of mundane actions as requiring dice rolls.
 // Run with: go test -v -tags=llmeval -run TestInputClassification_MundaneMovement ./test/llmeval/
 func TestInputClassification_MundaneMovement(t *testing.T) {
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-	}
-
-	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(t, err, "Failed to load Azure config")
-
-	client := azure.NewClient(*config)
+	client := RequireLLMClient(t)
 	ctx := context.Background()
+	verboseLogging := VerboseLoggingEnabled()
 
 	testCases := []InputClassificationTestCase{
 		// === Mundane movement - should be NARRATIVE or CLARIFICATION (no roll) ===
