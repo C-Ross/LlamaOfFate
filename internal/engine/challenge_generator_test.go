@@ -12,7 +12,7 @@ import (
 )
 
 func TestNewChallengeGenerator(t *testing.T) {
-	mockClient := &MockLLMClient{}
+	mockClient := newTestLLMClient()
 	generator := NewChallengeGenerator(mockClient)
 
 	assert.NotNil(t, generator)
@@ -20,15 +20,13 @@ func TestNewChallengeGenerator(t *testing.T) {
 }
 
 func TestBuildChallenge_Success(t *testing.T) {
-	mockClient := &MockLLMClient{
-		response: `{
+	mockClient := newTestLLMClient(`{
 			"tasks": [
 				{"skill": "Athletics", "difficulty": 3, "description": "Scale the outer wall of the fortress"},
 				{"skill": "Stealth", "difficulty": 2, "description": "Sneak past the guards unnoticed"},
 				{"skill": "Burglary", "difficulty": 4, "description": "Pick the vault's complex lock"}
 			]
-		}`,
-	}
+		}`)
 
 	generator := NewChallengeGenerator(mockClient)
 
@@ -64,9 +62,7 @@ func TestBuildChallenge_Success(t *testing.T) {
 
 func TestBuildChallenge_CodeFencedJSON(t *testing.T) {
 	// LLMs sometimes wrap JSON in code fences — CleanJSONResponse strips them
-	mockClient := &MockLLMClient{
-		response: "```json\n{\"tasks\": [{\"skill\": \"Lore\", \"difficulty\": 2, \"description\": \"Decode the ancient runes\"}]}\n```",
-	}
+	mockClient := newTestLLMClient("```json\n{\"tasks\": [{\"skill\": \"Lore\", \"difficulty\": 2, \"description\": \"Decode the ancient runes\"}]}\n```")
 
 	generator := NewChallengeGenerator(mockClient)
 
@@ -84,7 +80,7 @@ func TestBuildChallenge_CodeFencedJSON(t *testing.T) {
 }
 
 func TestBuildChallenge_EmptyDescription(t *testing.T) {
-	generator := NewChallengeGenerator(&MockLLMClient{})
+	generator := NewChallengeGenerator(newTestLLMClient())
 
 	req := prompt.ChallengeBuildData{Description: ""}
 	_, err := generator.BuildChallenge(context.Background(), req)
@@ -94,7 +90,7 @@ func TestBuildChallenge_EmptyDescription(t *testing.T) {
 }
 
 func TestBuildChallenge_LLMError(t *testing.T) {
-	mockClient := &MockLLMClient{err: fmt.Errorf("service unavailable")}
+	mockClient := &testLLMClient{err: fmt.Errorf("service unavailable")}
 
 	generator := NewChallengeGenerator(mockClient)
 
@@ -110,7 +106,7 @@ func TestBuildChallenge_LLMError(t *testing.T) {
 }
 
 func TestBuildChallenge_InvalidJSON(t *testing.T) {
-	mockClient := &MockLLMClient{response: "not valid json at all"}
+	mockClient := newTestLLMClient("not valid json at all")
 
 	generator := NewChallengeGenerator(mockClient)
 
@@ -126,7 +122,7 @@ func TestBuildChallenge_InvalidJSON(t *testing.T) {
 }
 
 func TestBuildChallenge_EmptyTasks(t *testing.T) {
-	mockClient := &MockLLMClient{response: `{"tasks": []}`}
+	mockClient := newTestLLMClient(`{"tasks": []}`)
 
 	generator := NewChallengeGenerator(mockClient)
 
@@ -144,9 +140,7 @@ func TestBuildChallenge_EmptyTasks(t *testing.T) {
 func TestBuildChallenge_ReusesCoreChallengeTask(t *testing.T) {
 	// Verify the generator produces scene.ChallengeState directly —
 	// no intermediate DTO involved.
-	mockClient := &MockLLMClient{
-		response: `{"tasks": [{"skill": "Rapport", "difficulty": 2, "description": "Negotiate passage"}]}`,
-	}
+	mockClient := newTestLLMClient(`{"tasks": [{"skill": "Rapport", "difficulty": 2, "description": "Negotiate passage"}]}`)
 
 	generator := NewChallengeGenerator(mockClient)
 

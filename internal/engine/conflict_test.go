@@ -5,52 +5,16 @@ import (
 	"errors"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
-	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// capturingMockLLMClient captures prompts sent to the LLM and returns a fixed response
-type capturingMockLLMClient struct {
-	response        string
-	capturedPrompts []string
-}
-
-func (c *capturingMockLLMClient) ChatCompletion(ctx context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
-	for _, msg := range req.Messages {
-		c.capturedPrompts = append(c.capturedPrompts, msg.Content)
-	}
-	return &llm.CompletionResponse{
-		ID:      "test",
-		Object:  "chat.completion",
-		Created: time.Now().Unix(),
-		Model:   "test",
-		Choices: []llm.CompletionResponseChoice{
-			{
-				Index:        0,
-				Message:      llm.Message{Role: "assistant", Content: c.response},
-				FinishReason: "stop",
-			},
-		},
-		Usage: llm.CompletionUsage{PromptTokens: 10, CompletionTokens: 10, TotalTokens: 20},
-	}, nil
-}
-
-func (c *capturingMockLLMClient) ChatCompletionStream(ctx context.Context, req llm.CompletionRequest, handler llm.StreamHandler) error {
-	return nil
-}
-
-func (c *capturingMockLLMClient) GetModelInfo() llm.ModelInfo {
-	return llm.ModelInfo{Name: "test", MaxTokens: 4096}
-}
 
 func TestSceneManager_ParseConflictMarker_Physical(t *testing.T) {
 	engine, err := New(session.NullLogger{})
@@ -1387,7 +1351,7 @@ func TestGenerateBoostName_FallbackOnEmptyResponse(t *testing.T) {
 
 func TestSceneManager_ResolveAction_TargetByName(t *testing.T) {
 	// Tests the core fix for issue #25: resolveAction should find targets by name
-	mockClient := &MockLLMClient{response: "The attack strikes true!"}
+	mockClient := newTestLLMClient("The attack strikes true!")
 	engine, err := NewWithLLM(mockClient, session.NullLogger{})
 	require.NoError(t, err)
 
@@ -1453,7 +1417,7 @@ func TestSceneManager_ResolveAction_TargetByName(t *testing.T) {
 func TestSceneManager_ResolveAction_UnknownTarget_AbortsWithoutConsumingTurn(t *testing.T) {
 	// When a target can't be resolved, the action should abort early:
 	// no dice roll, no narrative, no turn advancement.
-	mockClient := &MockLLMClient{response: "Should not be called"}
+	mockClient := newTestLLMClient("Should not be called")
 	engine, err := NewWithLLM(mockClient, session.NullLogger{})
 	require.NoError(t, err)
 
@@ -1517,7 +1481,7 @@ func TestSceneManager_HandleAction_ExcludesTakenOutFromTargets(t *testing.T) {
 		"reasoning": "Physical attack",
 		"confidence": 9
 	}`
-	mockClient := &capturingMockLLMClient{response: actionResponse}
+	mockClient := newTestLLMClient(actionResponse)
 
 	engine, err := NewWithLLM(mockClient, session.NullLogger{})
 	require.NoError(t, err)

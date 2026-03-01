@@ -8,7 +8,6 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
-	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/stretchr/testify/assert"
@@ -223,16 +222,14 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage(t *testing.T) {
 
 func TestSceneManager_ApplyActionEffects_CreateAdvantage_WithLLM(t *testing.T) {
 	// Create a mock LLM client that returns a creative aspect name
-	mockLLM := &MockLLMClient{
-		response: `{
+	mockLLM := newTestLLMClient(`{
 			"aspect_text": "Perfect Vantage Point",
 			"description": "The character has found an excellent position",
 			"duration": "scene",
 			"free_invokes": 1,
 			"is_boost": false,
 			"reasoning": "The jump gave them a tactical advantage"
-		}`,
-	}
+		}`)
 
 	engine, err := NewWithLLM(mockLLM, session.NullLogger{})
 	require.NoError(t, err)
@@ -315,7 +312,7 @@ func TestActionResolver_ApplyActionEffects_NilOutcome_ReturnsNil(t *testing.T) {
 
 func TestActionResolver_AspectGeneratorWiring(t *testing.T) {
 	// When created with an LLM, the ActionResolver should have an AspectGenerator.
-	mockLLM := &MockLLMClient{response: "test"}
+	mockLLM := newTestLLMClient("test")
 	engine, err := NewWithLLM(mockLLM, session.NullLogger{})
 	require.NoError(t, err)
 
@@ -335,10 +332,7 @@ func TestActionResolver_ResolveAction_ActiveOpposition_Overcome(t *testing.T) {
 	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	// Wire a mock narrative provider that won't fail
-	mockLLM := &MockLLMClient{
-		response: "The guard nearly spots you as you slip past.",
-	}
+	mockLLM := newTestLLMClient("The guard nearly spots you as you slip past.")
 	sm := NewSceneManager(engine, mockLLM, engine.actionParser, session.NullLogger{})
 	sm.actions.roller = dice.NewSeededRoller(42) // Predictable rolls
 
@@ -385,9 +379,7 @@ func TestActionResolver_ResolveAction_ActiveOpposition_CreateAdvantage(t *testin
 	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	mockLLM := &MockLLMClient{
-		response: "You study the merchant's body language.",
-	}
+	mockLLM := newTestLLMClient("You study the merchant's body language.")
 	sm := NewSceneManager(engine, mockLLM, engine.actionParser, session.NullLogger{})
 	sm.actions.roller = dice.NewSeededRoller(99)
 
@@ -422,9 +414,7 @@ func TestActionResolver_ResolveAction_ActiveOpposition_NPCNotFound(t *testing.T)
 	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	mockLLM := &MockLLMClient{
-		response: "You attempt the action.",
-	}
+	mockLLM := newTestLLMClient("You attempt the action.")
 	sm := NewSceneManager(engine, mockLLM, engine.actionParser, session.NullLogger{})
 	sm.actions.roller = dice.NewSeededRoller(42)
 
@@ -460,9 +450,7 @@ func TestActionResolver_ResolveAction_PassiveOpposition_NoNPCRoll(t *testing.T) 
 	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	mockLLM := &MockLLMClient{
-		response: "You climb the wall.",
-	}
+	mockLLM := newTestLLMClient("You climb the wall.")
 	sm := NewSceneManager(engine, mockLLM, engine.actionParser, session.NullLogger{})
 	sm.actions.roller = dice.NewSeededRoller(42)
 
@@ -583,7 +571,7 @@ func createTestAction(t *testing.T, actionType, skill, description string) *acti
 
 func TestSceneManager_OtherCharactersInTemplateData(t *testing.T) {
 	// Create engine with mock LLM client
-	mockClient := &MockLLMClient{response: "Test response"}
+	mockClient := newTestLLMClient("Test response")
 	engine, err := NewWithLLM(mockClient, session.NullLogger{})
 	require.NoError(t, err)
 
@@ -629,7 +617,7 @@ func TestSceneManager_OtherCharactersInTemplateData(t *testing.T) {
 
 func TestSceneManager_GenerateActionNarrativeWithTarget(t *testing.T) {
 	// Create engine with mock LLM client
-	mockClient := &MockLLMClient{response: "The attack strikes true!"}
+	mockClient := newTestLLMClient("The attack strikes true!")
 	engine, err := NewWithLLM(mockClient, session.NullLogger{})
 	require.NoError(t, err)
 
@@ -680,7 +668,7 @@ func TestSceneManager_GenerateActionNarrativeWithTarget(t *testing.T) {
 
 func TestSceneManager_GenerateActionNarrativeWithoutTarget(t *testing.T) {
 	// Create engine with mock LLM client
-	mockClient := &MockLLMClient{response: "You successfully overcome the obstacle!"}
+	mockClient := newTestLLMClient("You successfully overcome the obstacle!")
 	engine, err := NewWithLLM(mockClient, session.NullLogger{})
 	require.NoError(t, err)
 
@@ -815,7 +803,7 @@ func TestClassifyInput_TrimsExtraText(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			mockClient := &MockLLMClient{response: tc.response}
+			mockClient := newTestLLMClient(tc.response)
 			engine, err := NewWithLLM(mockClient, session.NullLogger{})
 			require.NoError(t, err)
 
@@ -835,9 +823,7 @@ func TestClassifyInput_TrimsExtraText(t *testing.T) {
 // goes through handleDialog (same as dialog/clarification, no dice roll).
 func TestProcessInput_NarrativeRoutesToDialog(t *testing.T) {
 	// First call returns "narrative" (classification), second returns scene response
-	client := &sequentialMockLLMClient{
-		responses: []string{"narrative", "You walk over to the table and sit down."},
-	}
+	client := newTestLLMClient("narrative", "You walk over to the table and sit down.")
 	engine, err := NewWithLLM(client, session.NullLogger{})
 	require.NoError(t, err)
 
@@ -857,39 +843,6 @@ func TestProcessInput_NarrativeRoutesToDialog(t *testing.T) {
 
 	// Should return a DialogEvent (handleDialog path), not an action result
 	AssertHasEventIn[DialogEvent](t, result.Events)
-}
-
-// sequentialMockLLMClient returns responses in order, cycling through them
-type sequentialMockLLMClient struct {
-	responses []string
-	callIndex int
-}
-
-func (s *sequentialMockLLMClient) ChatCompletion(ctx context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
-	resp := s.responses[s.callIndex%len(s.responses)]
-	s.callIndex++
-	return &llm.CompletionResponse{
-		ID:      "test",
-		Object:  "chat.completion",
-		Created: 0,
-		Model:   "test",
-		Choices: []llm.CompletionResponseChoice{
-			{
-				Index:        0,
-				Message:      llm.Message{Role: "assistant", Content: resp},
-				FinishReason: "stop",
-			},
-		},
-		Usage: llm.CompletionUsage{PromptTokens: 10, CompletionTokens: 10, TotalTokens: 20},
-	}, nil
-}
-
-func (s *sequentialMockLLMClient) ChatCompletionStream(ctx context.Context, req llm.CompletionRequest, handler llm.StreamHandler) error {
-	return nil
-}
-
-func (s *sequentialMockLLMClient) GetModelInfo() llm.ModelInfo {
-	return llm.ModelInfo{Name: "test", MaxTokens: 4096}
 }
 
 func TestSceneManager_StartScene_ClearsConversationHistory(t *testing.T) {
@@ -921,9 +874,7 @@ func TestSceneManager_StartScene_ClearsConversationHistory(t *testing.T) {
 
 func TestHandleInput_DialogReturnsDialogEvent(t *testing.T) {
 	// First call: classification → "dialog", second call: scene response
-	client := &sequentialMockLLMClient{
-		responses: []string{"dialog", "The bartender nods slowly."},
-	}
+	client := newTestLLMClient("dialog", "The bartender nods slowly.")
 	engine, err := NewWithLLM(client, session.NullLogger{})
 	require.NoError(t, err)
 
@@ -954,9 +905,7 @@ func TestHandleInput_DialogReturnsDialogEvent(t *testing.T) {
 
 func TestHandleInput_DialogWithSceneTransition(t *testing.T) {
 	// Response includes a scene transition marker
-	client := &sequentialMockLLMClient{
-		responses: []string{"dialog", "You step outside into the rain. [SCENE_TRANSITION:The rainy streets]"},
-	}
+	client := newTestLLMClient("dialog", "You step outside into the rain. [SCENE_TRANSITION:The rainy streets]")
 	engine, err := NewWithLLM(client, session.NullLogger{})
 	require.NoError(t, err)
 
@@ -994,13 +943,11 @@ func TestHandleInput_DialogWithSceneTransition(t *testing.T) {
 
 func TestHandleInput_ActionPath_ReturnsEvents(t *testing.T) {
 	// Classification returns "action"; the action path now returns events.
-	client := &sequentialMockLLMClient{
-		responses: []string{
-			"action", // classification
-			`{"skill":"Fight","type":"attack","description":"swing sword","target":"Goblin","difficulty":"Good"}`, // action parse
-			"You swing your sword!", // narrative
-		},
-	}
+	client := newTestLLMClient(
+		"action", // classification
+		`{"skill":"Fight","type":"attack","description":"swing sword","target":"Goblin","difficulty":"Good"}`, // action parse
+		"You swing your sword!", // narrative
+	)
 	engine, err := NewWithLLM(client, session.NullLogger{})
 	require.NoError(t, err)
 
@@ -1035,9 +982,7 @@ func TestHandleInput_ActionPath_ReturnsEvents(t *testing.T) {
 
 func TestHandleInput_ClassificationFallbackToDialog(t *testing.T) {
 	// LLM returns garbage for classification — should fallback to dialog
-	client := &sequentialMockLLMClient{
-		responses: []string{"xyzzy_invalid", "The room is quiet."},
-	}
+	client := newTestLLMClient("xyzzy_invalid", "The room is quiet.")
 	engine, err := NewWithLLM(client, session.NullLogger{})
 	require.NoError(t, err)
 
@@ -1067,17 +1012,15 @@ func TestHandleInput_DialogWithChallengeMarker_InitiatesChallenge(t *testing.T) 
 	//  1. classification → "dialog"
 	//  2. scene response → narrative with [CHALLENGE:...] marker
 	//  3. challenge generator (BuildChallenge) → JSON tasks
-	client := &sequentialMockLLMClient{
-		responses: []string{
-			"dialog",
-			"The vault door looms before you. [CHALLENGE:Break into the vault]",
-			`{"tasks": [
-				{"skill": "Athletics", "difficulty": 3, "description": "Scale the wall"},
-				{"skill": "Stealth",   "difficulty": 2, "description": "Sneak past guards"},
-				{"skill": "Burglary",  "difficulty": 4, "description": "Pick the lock"}
-			]}`,
-		},
-	}
+	client := newTestLLMClient(
+		"dialog",
+		"The vault door looms before you. [CHALLENGE:Break into the vault]",
+		`{"tasks": [
+			{"skill": "Athletics", "difficulty": 3, "description": "Scale the wall"},
+			{"skill": "Stealth",   "difficulty": 2, "description": "Sneak past guards"},
+			{"skill": "Burglary",  "difficulty": 4, "description": "Pick the lock"}
+		]}`,
+	)
 
 	engine, err := NewWithLLM(client, session.NullLogger{})
 	require.NoError(t, err)
@@ -1124,13 +1067,11 @@ func TestHandleInput_ActionDuringChallenge_ResolvesTask(t *testing.T) {
 	//  1. classification → "action"
 	//  2. action parse   → overcome with Athletics
 	//  3. narrative       → flavor text
-	client := &sequentialMockLLMClient{
-		responses: []string{
-			"action",
-			`{"action_type":"Overcome","skill":"Athletics","description":"climb the wall","difficulty":3}`,
-			"You scale the wall with ease!",
-		},
-	}
+	client := newTestLLMClient(
+		"action",
+		`{"action_type":"Overcome","skill":"Athletics","description":"climb the wall","difficulty":3}`,
+		"You scale the wall with ease!",
+	)
 
 	engine, err := NewWithLLM(client, session.NullLogger{})
 	require.NoError(t, err)
@@ -1178,13 +1119,11 @@ func TestHandleInput_ActionDuringChallenge_ResolvesTask(t *testing.T) {
 func TestHandleInput_ActionDuringChallenge_CompletesChallenge(t *testing.T) {
 	// Only one task left pending. Resolving it should produce both
 	// ChallengeTaskResultEvent and ChallengeCompleteEvent.
-	client := &sequentialMockLLMClient{
-		responses: []string{
-			"action",
-			`{"action_type":"Overcome","skill":"Stealth","description":"sneak past the guards","difficulty":2}`,
-			"You slip past unnoticed!",
-		},
-	}
+	client := newTestLLMClient(
+		"action",
+		`{"action_type":"Overcome","skill":"Stealth","description":"sneak past the guards","difficulty":2}`,
+		"You slip past unnoticed!",
+	)
 
 	engine, err := NewWithLLM(client, session.NullLogger{})
 	require.NoError(t, err)

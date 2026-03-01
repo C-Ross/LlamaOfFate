@@ -109,7 +109,7 @@ func TestSceneManager_Snapshot_CopiesConversationHistory(t *testing.T) {
 // --- ScenarioManager.Snapshot tests ---
 
 func TestScenarioManager_Snapshot(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
@@ -161,7 +161,7 @@ func TestScenarioManager_Snapshot(t *testing.T) {
 }
 
 func TestScenarioManager_Snapshot_CopiesMaps(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
@@ -185,7 +185,7 @@ func TestScenarioManager_Snapshot_CopiesMaps(t *testing.T) {
 }
 
 func TestScenarioManager_SetSaveFunc(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
@@ -206,7 +206,7 @@ func TestScenarioManager_SetSaveFunc(t *testing.T) {
 // --- GameManager.Save / SetSaver tests ---
 
 func TestGameManager_SetSaver(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine, session.NullLogger{})
@@ -221,7 +221,7 @@ func TestGameManager_SetSaver(t *testing.T) {
 }
 
 func TestGameManager_SetSaver_NilFallsBackToNoop(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine, session.NullLogger{})
@@ -232,7 +232,7 @@ func TestGameManager_SetSaver_NilFallsBackToNoop(t *testing.T) {
 }
 
 func TestGameManager_Save_NoScenarioManager(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine, session.NullLogger{})
@@ -246,7 +246,7 @@ func TestGameManager_Save_NoScenarioManager(t *testing.T) {
 }
 
 func TestGameManager_Save_CascadesSnapshot(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
@@ -391,7 +391,7 @@ func TestSceneManager_Restore_RoundTrip(t *testing.T) {
 // --- ScenarioManager.Restore tests ---
 
 func TestScenarioManager_Restore(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
@@ -447,7 +447,7 @@ func TestScenarioManager_Restore(t *testing.T) {
 }
 
 func TestScenarioManager_Restore_RegistersNPCsWithEngine(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
@@ -477,7 +477,7 @@ func TestScenarioManager_Restore_RegistersNPCsWithEngine(t *testing.T) {
 }
 
 func TestScenarioManager_Restore_NilMaps(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
@@ -495,7 +495,7 @@ func TestScenarioManager_Restore_NilMaps(t *testing.T) {
 }
 
 func TestScenarioManager_Restore_CascadesToSceneManager(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
@@ -518,7 +518,7 @@ func TestScenarioManager_Restore_CascadesToSceneManager(t *testing.T) {
 }
 
 func TestScenarioManager_Restore_RoundTrip(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
@@ -543,7 +543,7 @@ func TestScenarioManager_Restore_RoundTrip(t *testing.T) {
 	scenarioState, sceneState := sm.Snapshot()
 
 	// Create a new engine and scenario manager, then restore
-	engine2, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine2, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	sm2 := NewScenarioManager(engine2, player, session.NullLogger{})
@@ -566,7 +566,7 @@ func TestScenarioManager_Restore_RoundTrip(t *testing.T) {
 // --- GameManager.Start load-on-startup tests ---
 
 func TestGameManager_Start_LoadsOnStartup(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
@@ -616,7 +616,7 @@ func TestGameManager_Start_LoadsOnStartup(t *testing.T) {
 }
 
 func TestGameManager_Start_CompletedScenario_StartsFresh(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
@@ -660,7 +660,7 @@ func TestGameManager_Start_CompletedScenario_StartsFresh(t *testing.T) {
 }
 
 func TestGameManager_Start_NoSave_FreshStart(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")

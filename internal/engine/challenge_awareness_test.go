@@ -21,12 +21,10 @@ func TestHandleInput_SceneTransitionSuppressedDuringChallenge(t *testing.T) {
 	// Sequence:
 	//  1. classification → "dialog"
 	//  2. scene response → narrative with [SCENE_TRANSITION:...] marker
-	client := &sequentialMockLLMClient{
-		responses: []string{
-			"dialog",
-			"You glance at the door but the corridor still rumbles. [SCENE_TRANSITION:the corridor outside]",
-		},
-	}
+	client := newTestLLMClient(
+		"dialog",
+		"You glance at the door but the corridor still rumbles. [SCENE_TRANSITION:the corridor outside]",
+	)
 
 	engine, err := NewWithLLM(client, session.NullLogger{})
 	require.NoError(t, err)
@@ -76,12 +74,10 @@ func TestHandleInput_SceneTransitionSuppressedDuringChallenge(t *testing.T) {
 
 func TestHandleInput_SceneTransitionAllowedWithoutChallenge(t *testing.T) {
 	// Same scenario without a challenge — transition should proceed normally.
-	client := &sequentialMockLLMClient{
-		responses: []string{
-			"dialog",
-			"You step out into the rain. [SCENE_TRANSITION:the rainy streets]",
-		},
-	}
+	client := newTestLLMClient(
+		"dialog",
+		"You step out into the rain. [SCENE_TRANSITION:the rainy streets]",
+	)
 
 	engine, err := NewWithLLM(client, session.NullLogger{})
 	require.NoError(t, err)
@@ -121,13 +117,11 @@ func TestHandleInput_ChallengeCreateAdvantageOverriddenToOvercome(t *testing.T) 
 	//  1. classification → "action"
 	//  2. action parse   → Create an Advantage with Notice (matches challenge task)
 	//  3. narrative       → flavor text
-	client := &sequentialMockLLMClient{
-		responses: []string{
-			"action",
-			`{"action_type":"Create an Advantage","skill":"Notice","description":"identify hidden hazards","difficulty":2}`,
-			"You scan the corridor and spot the hazards!",
-		},
-	}
+	client := newTestLLMClient(
+		"action",
+		`{"action_type":"Create an Advantage","skill":"Notice","description":"identify hidden hazards","difficulty":2}`,
+		"You scan the corridor and spot the hazards!",
+	)
 
 	engine, err := NewWithLLM(client, session.NullLogger{})
 	require.NoError(t, err)
@@ -174,13 +168,11 @@ func TestHandleInput_ChallengeCreateAdvantageOverriddenToOvercome(t *testing.T) 
 func TestHandleInput_ChallengeOvercomeNotOverridden(t *testing.T) {
 	// When the LLM correctly classifies as Overcome during a challenge,
 	// no override should happen — just normal resolution.
-	client := &sequentialMockLLMClient{
-		responses: []string{
-			"action",
-			`{"action_type":"Overcome","skill":"Athletics","description":"dodge the rocks","difficulty":3}`,
-			"You dodge the falling debris!",
-		},
-	}
+	client := newTestLLMClient(
+		"action",
+		`{"action_type":"Overcome","skill":"Athletics","description":"dodge the rocks","difficulty":3}`,
+		"You dodge the falling debris!",
+	)
 
 	engine, err := NewWithLLM(client, session.NullLogger{})
 	require.NoError(t, err)

@@ -34,15 +34,13 @@ func newChallengeTestSetup() (*ChallengeManager, *scene.Scene, *character.Charac
 }
 
 func TestChallengeManager_InitiateChallenge(t *testing.T) {
-	mockClient := &MockLLMClient{
-		response: `{
+	mockClient := newTestLLMClient(`{
 			"tasks": [
 				{"skill": "Athletics", "difficulty": 3, "description": "Scale the wall"},
 				{"skill": "Stealth", "difficulty": 2, "description": "Sneak past guards"},
 				{"skill": "Burglary", "difficulty": 4, "description": "Pick the lock"}
 			]
-		}`,
-	}
+		}`)
 
 	chm, s, player := newChallengeTestSetup()
 	chm.llmClient = mockClient
@@ -76,9 +74,7 @@ func TestChallengeManager_InitiateChallenge_NoGenerator(t *testing.T) {
 }
 
 func TestChallengeManager_InitiateChallenge_MutualExclusion(t *testing.T) {
-	mockClient := &MockLLMClient{
-		response: `{"tasks": [{"skill": "Athletics", "difficulty": 3, "description": "Run"}]}`,
-	}
+	mockClient := newTestLLMClient(`{"tasks": [{"skill": "Athletics", "difficulty": 3, "description": "Run"}]}`)
 
 	chm, s, _ := newChallengeTestSetup()
 	chm.llmClient = mockClient

@@ -322,9 +322,7 @@ func TestProcessNPCOvercome_DefaultSkill(t *testing.T) {
 // We test this with an LLM-driven decision by providing a mock LLM that
 // returns a DEFEND decision.
 func TestProcessNPCTurn_DispatchDefend(t *testing.T) {
-	mockLLM := &capturingMockLLMClient{
-		response: `{"action_type":"DEFEND","skill":"","target_id":"","description":"hunkers down"}`,
-	}
+	mockLLM := newTestLLMClient(`{"action_type":"DEFEND","skill":"","target_id":"","description":"hunkers down"}`)
 	engine, err := NewWithLLM(mockLLM, session.NullLogger{})
 	require.NoError(t, err)
 

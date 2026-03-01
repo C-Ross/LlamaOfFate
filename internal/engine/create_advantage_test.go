@@ -21,7 +21,7 @@ import (
 func setupCreateAdvantageSM(t *testing.T, fatePoints int) *SceneManager {
 	t.Helper()
 
-	mockClient := &MockLLMClient{response: `{"aspect_text": "Tactical Opening", "description": "A brief opening", "reasoning": "test"}`}
+	mockClient := newTestLLMClient(`{"aspect_text": "Tactical Opening", "description": "A brief opening", "reasoning": "test"}`)
 	engine, err := NewWithLLM(mockClient, session.NullLogger{})
 	require.NoError(t, err)
 

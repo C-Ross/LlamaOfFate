@@ -3,66 +3,17 @@ package engine
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
-	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// MockLLMClient implements the LLMClient interface for testing
-type MockLLMClient struct {
-	response string
-	err      error
-}
-
-func (m *MockLLMClient) ChatCompletion(ctx context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-
-	return &llm.CompletionResponse{
-		ID:      "test-response",
-		Object:  "chat.completion",
-		Created: time.Now().Unix(),
-		Model:   "test-model",
-		Choices: []llm.CompletionResponseChoice{
-			{
-				Index: 0,
-				Message: llm.Message{
-					Role:    "assistant",
-					Content: m.response,
-				},
-				FinishReason: "stop",
-			},
-		},
-		Usage: llm.CompletionUsage{
-			PromptTokens:     50,
-			CompletionTokens: 100,
-			TotalTokens:      150,
-		},
-	}, nil
-}
-
-func (m *MockLLMClient) ChatCompletionStream(ctx context.Context, req llm.CompletionRequest, handler llm.StreamHandler) error {
-	return nil // Not implemented for tests
-}
-
-func (m *MockLLMClient) GetModelInfo() llm.ModelInfo {
-	return llm.ModelInfo{
-		Name:        "test-model",
-		Provider:    "test",
-		MaxTokens:   4096,
-		Description: "Test model for unit tests",
-	}
-}
-
 func TestNewAspectGenerator(t *testing.T) {
-	mockClient := &MockLLMClient{}
+	mockClient := newTestLLMClient()
 	generator := NewAspectGenerator(mockClient)
 
 	assert.NotNil(t, generator)
@@ -70,16 +21,14 @@ func TestNewAspectGenerator(t *testing.T) {
 }
 
 func TestGenerateAspect_Success(t *testing.T) {
-	mockClient := &MockLLMClient{
-		response: `{
+	mockClient := newTestLLMClient(`{
 			"aspect_text": "High Ground Advantage",
 			"description": "Character has positioned themselves advantageously",
 			"duration": "scene",
 			"free_invokes": 1,
 			"is_boost": false,
 			"reasoning": "Success on Athletics to gain positional advantage"
-		}`,
-	}
+		}`)
 
 	generator := NewAspectGenerator(mockClient)
 
@@ -118,16 +67,14 @@ func TestGenerateAspect_Success(t *testing.T) {
 }
 
 func TestGenerateAspect_SuccessWithStyle(t *testing.T) {
-	mockClient := &MockLLMClient{
-		response: `{
+	mockClient := newTestLLMClient(`{
 			"aspect_text": "Perfect Positioning",
 			"description": "Masterful tactical advantage achieved",
 			"duration": "scene",
 			"free_invokes": 2,
 			"is_boost": false,
 			"reasoning": "Success with Style on a tactical maneuver"
-		}`,
-	}
+		}`)
 
 	generator := NewAspectGenerator(mockClient)
 
@@ -163,16 +110,14 @@ func TestGenerateAspect_SuccessWithStyle(t *testing.T) {
 }
 
 func TestGenerateAspect_Tie(t *testing.T) {
-	mockClient := &MockLLMClient{
-		response: `{
+	mockClient := newTestLLMClient(`{
 			"aspect_text": "Momentary Opening",
 			"description": "Brief opportunity that won't last long",
 			"duration": "scene",
 			"free_invokes": 1,
 			"is_boost": true,
 			"reasoning": "Tie creates a boost"
-		}`,
-	}
+		}`)
 
 	generator := NewAspectGenerator(mockClient)
 
@@ -208,9 +153,7 @@ func TestGenerateAspect_Tie(t *testing.T) {
 }
 
 func TestGenerateAspect_Failure(t *testing.T) {
-	mockClient := &MockLLMClient{
-		response: "Failure - no aspect created",
-	}
+	mockClient := newTestLLMClient("Failure - no aspect created")
 
 	generator := NewAspectGenerator(mockClient)
 
@@ -248,7 +191,7 @@ func TestGenerateAspect_Failure(t *testing.T) {
 }
 
 func TestGenerateAspect_WrongActionType(t *testing.T) {
-	mockClient := &MockLLMClient{}
+	mockClient := newTestLLMClient()
 	generator := NewAspectGenerator(mockClient)
 
 	char := character.NewCharacter("test-char", "Test Hero")
@@ -270,7 +213,7 @@ func TestGenerateAspect_WrongActionType(t *testing.T) {
 }
 
 func TestGenerateAspect_NilOutcome(t *testing.T) {
-	mockClient := &MockLLMClient{}
+	mockClient := newTestLLMClient()
 	generator := NewAspectGenerator(mockClient)
 
 	char := character.NewCharacter("test-char", "Test Hero")
@@ -289,7 +232,7 @@ func TestGenerateAspect_NilOutcome(t *testing.T) {
 }
 
 func TestBuildPrompt(t *testing.T) {
-	generator := NewAspectGenerator(&MockLLMClient{})
+	generator := NewAspectGenerator(newTestLLMClient())
 
 	char := character.NewCharacter("test-char", "Zara the Swift")
 	char.Aspects.HighConcept = "Acrobatic Thief"

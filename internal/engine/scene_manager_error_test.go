@@ -81,7 +81,7 @@ func TestClassifyInput_EmptyResponse(t *testing.T) {
 }
 
 func TestClassifyInput_UnexpectedClassification(t *testing.T) {
-	mockClient := &MockLLMClient{response: "invalid_type"}
+	mockClient := newTestLLMClient("invalid_type")
 	engine, err := NewWithLLM(mockClient, session.NullLogger{})
 	require.NoError(t, err)
 
@@ -114,7 +114,7 @@ func TestClassifyInput_ValidTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockClient := &MockLLMClient{response: tt.response}
+			mockClient := newTestLLMClient(tt.response)
 			engine, err := NewWithLLM(mockClient, session.NullLogger{})
 			require.NoError(t, err)
 

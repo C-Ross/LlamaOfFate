@@ -12,7 +12,7 @@ import (
 )
 
 func TestNewActionParser(t *testing.T) {
-	mockClient := &MockLLMClient{}
+	mockClient := newTestLLMClient()
 	parser := NewActionParser(mockClient)
 
 	assert.NotNil(t, parser)
@@ -30,7 +30,7 @@ func TestActionParser_ParseAction_Overcome(t *testing.T) {
 		"confidence": 9
 	}`
 
-	mockClient := &MockLLMClient{response: mockResponse}
+	mockClient := newTestLLMClient(mockResponse)
 	parser := NewActionParser(mockClient)
 
 	// Create test character
@@ -69,7 +69,7 @@ func TestActionParser_ParseAction_CreateAdvantage(t *testing.T) {
 		"confidence": 8
 	}`
 
-	mockClient := &MockLLMClient{response: mockResponse}
+	mockClient := newTestLLMClient(mockResponse)
 	parser := NewActionParser(mockClient)
 
 	// Create test character
@@ -107,7 +107,7 @@ func TestActionParser_ParseAction_Attack(t *testing.T) {
 		"confidence": 10
 	}`
 
-	mockClient := &MockLLMClient{response: mockResponse}
+	mockClient := newTestLLMClient(mockResponse)
 	parser := NewActionParser(mockClient)
 
 	// Create test character
@@ -144,7 +144,7 @@ func TestActionParser_ParseAction_Defend(t *testing.T) {
 		"confidence": 9
 	}`
 
-	mockClient := &MockLLMClient{response: mockResponse}
+	mockClient := newTestLLMClient(mockResponse)
 	parser := NewActionParser(mockClient)
 
 	// Create test character
@@ -173,7 +173,7 @@ func TestActionParser_ParseAction_InvalidJSON(t *testing.T) {
 	// Setup mock LLM response with invalid JSON
 	mockResponse := `invalid json response`
 
-	mockClient := &MockLLMClient{response: mockResponse}
+	mockClient := newTestLLMClient(mockResponse)
 	parser := NewActionParser(mockClient)
 
 	// Create test character
@@ -205,7 +205,7 @@ func TestActionParser_ParseAction_InvalidActionType(t *testing.T) {
 		"confidence": 5
 	}`
 
-	mockClient := &MockLLMClient{response: mockResponse}
+	mockClient := newTestLLMClient(mockResponse)
 	parser := NewActionParser(mockClient)
 
 	// Create test character
@@ -225,7 +225,7 @@ func TestActionParser_ParseAction_InvalidActionType(t *testing.T) {
 }
 
 func TestBuildPrompts(t *testing.T) {
-	parser := NewActionParser(&MockLLMClient{})
+	parser := NewActionParser(newTestLLMClient())
 
 	// Create test character with various attributes
 	char := character.NewCharacter("test-char", "Zara the Swift")
@@ -308,7 +308,7 @@ func TestActionParser_ParseAction_WithOtherCharacters(t *testing.T) {
 		"confidence": 9
 	}`
 
-	mockClient := &MockLLMClient{response: mockResponse}
+	mockClient := newTestLLMClient(mockResponse)
 	parser := NewActionParser(mockClient)
 
 	// Create test character
@@ -360,7 +360,7 @@ func TestActionParser_TemplateErrorRegression(t *testing.T) {
 		"confidence": 9
 	}`
 
-	mockClient := &MockLLMClient{response: mockResponse}
+	mockClient := newTestLLMClient(mockResponse)
 	parser := NewActionParser(mockClient)
 
 	char := character.NewCharacter("hero", "Hero")
@@ -394,7 +394,7 @@ func TestActionParser_ParseAction_ActiveOpposition(t *testing.T) {
 		"confidence": 9
 	}`
 
-	mockClient := &MockLLMClient{response: mockResponse}
+	mockClient := newTestLLMClient(mockResponse)
 	parser := NewActionParser(mockClient)
 
 	char := character.NewCharacter("test-char", "Sneaky Rogue")
@@ -434,7 +434,7 @@ func TestActionParser_ParseAction_PassiveOpposition(t *testing.T) {
 		"confidence": 9
 	}`
 
-	mockClient := &MockLLMClient{response: mockResponse}
+	mockClient := newTestLLMClient(mockResponse)
 	parser := NewActionParser(mockClient)
 
 	char := character.NewCharacter("test-char", "Test Hero")
@@ -471,7 +471,7 @@ func TestActionParser_ParseAction_ActiveOpposition_MissingNPCID(t *testing.T) {
 		"confidence": 5
 	}`
 
-	mockClient := &MockLLMClient{response: mockResponse}
+	mockClient := newTestLLMClient(mockResponse)
 	parser := NewActionParser(mockClient)
 
 	char := character.NewCharacter("test-char", "Test Hero")
@@ -503,7 +503,7 @@ func TestActionParser_ParseAction_OldFormatBackCompat(t *testing.T) {
 		"confidence": 8
 	}`
 
-	mockClient := &MockLLMClient{response: mockResponse}
+	mockClient := newTestLLMClient(mockResponse)
 	parser := NewActionParser(mockClient)
 
 	char := character.NewCharacter("test-char", "Test Hero")
@@ -525,7 +525,7 @@ func TestActionParser_ParseAction_OldFormatBackCompat(t *testing.T) {
 }
 
 func TestBuildPrompts_IncludesNPCSkills(t *testing.T) {
-	parser := NewActionParser(&MockLLMClient{})
+	parser := NewActionParser(newTestLLMClient())
 
 	char := character.NewCharacter("test-char", "Test Hero")
 	char.SetSkill("Stealth", dice.Good)
@@ -550,7 +550,7 @@ func TestBuildPrompts_IncludesNPCSkills(t *testing.T) {
 }
 
 func TestBuildPrompts_IncludesOppositionInstructions(t *testing.T) {
-	parser := NewActionParser(&MockLLMClient{})
+	parser := NewActionParser(newTestLLMClient())
 
 	systemPrompt, err := parser.buildSystemPrompt()
 	require.NoError(t, err)

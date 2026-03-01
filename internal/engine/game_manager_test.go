@@ -13,7 +13,7 @@ import (
 )
 
 func TestNewGameManager(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine, session.NullLogger{})
@@ -23,7 +23,7 @@ func TestNewGameManager(t *testing.T) {
 }
 
 func TestGameManager_SetPlayer(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine, session.NullLogger{})
@@ -35,7 +35,7 @@ func TestGameManager_SetPlayer(t *testing.T) {
 }
 
 func TestGameManager_SetScenario(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine, session.NullLogger{})
@@ -54,7 +54,7 @@ func TestGameManager_SetScenario(t *testing.T) {
 }
 
 func TestGameManager_SetInitialScene(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine, session.NullLogger{})
@@ -67,7 +67,7 @@ func TestGameManager_SetInitialScene(t *testing.T) {
 }
 
 func TestGameManager_GetEngine(t *testing.T) {
-	eng, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	eng, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	gm := NewGameManager(eng, session.NullLogger{})
@@ -90,7 +90,7 @@ func TestInitialSceneConfig_Fields(t *testing.T) {
 }
 
 func TestGameManager_HandleMilestone_ReturnsMilestoneEvent(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine, session.NullLogger{})
@@ -117,7 +117,7 @@ func TestGameManager_HandleMilestone_ReturnsMilestoneEvent(t *testing.T) {
 }
 
 func TestGameManager_HandleMilestone_WithConsequenceRecovery(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine, session.NullLogger{})
@@ -157,7 +157,7 @@ func TestGameManager_HandleMilestone_WithConsequenceRecovery(t *testing.T) {
 }
 
 func TestGameManager_HandleMilestone_NilScenario(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine, session.NullLogger{})
@@ -204,7 +204,7 @@ func TestGameManager_Start_RequiresEngine(t *testing.T) {
 }
 
 func TestGameManager_Start_RequiresPlayer(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine, session.NullLogger{})
@@ -215,7 +215,7 @@ func TestGameManager_Start_RequiresPlayer(t *testing.T) {
 }
 
 func TestGameManager_Start_FreshStart(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -238,7 +238,7 @@ func TestGameManager_Start_FreshStart(t *testing.T) {
 }
 
 func TestGameManager_HandleInput_BeforeStart(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine, session.NullLogger{})
@@ -250,7 +250,7 @@ func TestGameManager_HandleInput_BeforeStart(t *testing.T) {
 }
 
 func TestGameManager_ProvideInvokeResponse_BeforeStart(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine, session.NullLogger{})
@@ -261,7 +261,7 @@ func TestGameManager_ProvideInvokeResponse_BeforeStart(t *testing.T) {
 }
 
 func TestGameManager_ProvideMidFlowResponse_BeforeStart(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine, session.NullLogger{})
@@ -272,7 +272,7 @@ func TestGameManager_ProvideMidFlowResponse_BeforeStart(t *testing.T) {
 }
 
 func TestGameManager_Start_ResumeFromSave(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -310,7 +310,7 @@ func TestGameManager_Start_ResumeFromSave(t *testing.T) {
 }
 
 func TestGameManager_Start_LoadFailure_EmitsErrorNotification(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")

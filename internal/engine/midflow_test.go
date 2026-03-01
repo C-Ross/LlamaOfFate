@@ -3,11 +3,9 @@ package engine
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
-	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
@@ -64,9 +62,7 @@ func TestStressOverflowNoConsequences_TakenOut(t *testing.T) {
 	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	mockLLM := &capturingMockLLMClient{
-		response: `{"narrative": "You fall.", "outcome": "transition", "new_scene_hint": "You wake up later."}`,
-	}
+	mockLLM := newTestLLMClient(`{"narrative": "You fall.", "outcome": "transition", "new_scene_hint": "You wake up later."}`)
 	engine.llmClient = mockLLM
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
@@ -103,9 +99,7 @@ func TestProvideMidFlowResponse_ConsequenceChoice(t *testing.T) {
 	require.NoError(t, err)
 
 	// LLM returns a consequence name.
-	mockLLM := &capturingMockLLMClient{
-		response: `[CONSEQUENCE_ASPECT:Bruised Ribs]`,
-	}
+	mockLLM := newTestLLMClient(`[CONSEQUENCE_ASPECT:Bruised Ribs]`)
 	engine.llmClient = mockLLM
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
@@ -144,9 +138,7 @@ func TestProvideMidFlowResponse_TakenOutChoice(t *testing.T) {
 	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	mockLLM := &capturingMockLLMClient{
-		response: `{"narrative": "You fall.", "outcome": "transition", "new_scene_hint": "You wake up later."}`,
-	}
+	mockLLM := newTestLLMClient(`{"narrative": "You fall.", "outcome": "transition", "new_scene_hint": "You wake up later."}`)
 	engine.llmClient = mockLLM
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
@@ -252,9 +244,7 @@ func TestProvideMidFlowResponse_FateNarration(t *testing.T) {
 	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	mockLLM := &capturingMockLLMClient{
-		response: `[FATE_NARRATION]{"narrative":"The goblins flee into the forest.","fates":[{"id":"npc-1","name":"Goblin Scout","description":"Fled into the woods","permanent":false}]}[/FATE_NARRATION]`,
-	}
+	mockLLM := newTestLLMClient(`[FATE_NARRATION]{"narrative":"The goblins flee into the forest.","fates":[{"id":"npc-1","name":"Goblin Scout","description":"Fled into the woods","permanent":false}]}[/FATE_NARRATION]`)
 	engine.llmClient = mockLLM
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
@@ -436,7 +426,7 @@ func TestHandleInput_ConcessionSetsAwaitingMidFlow(t *testing.T) {
 	require.NoError(t, err)
 
 	// Need an LLM client for HandleInput (input classification).
-	mockLLM := &capturingMockLLMClient{response: "dialog"}
+	mockLLM := newTestLLMClient("dialog")
 	engine.llmClient = mockLLM
 	engine.actionParser = NewActionParser(mockLLM)
 
@@ -512,9 +502,7 @@ func TestProvideMidFlowResponse_NumberedChoice(t *testing.T) {
 	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	mockLLM := &capturingMockLLMClient{
-		response: `[CONSEQUENCE_ASPECT:Bruised Ribs]`,
-	}
+	mockLLM := newTestLLMClient(`[CONSEQUENCE_ASPECT:Bruised Ribs]`)
 	engine.llmClient = mockLLM
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
@@ -616,14 +604,3 @@ func TestStressOverflowContextFields(t *testing.T) {
 	assert.Equal(t, 5, event.Context["shifts"])
 	assert.Equal(t, "physical", event.Context["stress_type"])
 }
-
-// --- capturingMockLLMClient is defined in conflict_test.go, but we need it here too ---
-// It's in the same package so we can reuse it.
-// If it weren't available we'd define it here — but since both files are in
-// package engine, Go compiles them together.
-
-// Unused variable avoidance — reference imports that might appear unused.
-var (
-	_               = time.Now
-	_ llm.LLMClient = (*capturingMockLLMClient)(nil)
-)

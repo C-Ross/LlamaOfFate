@@ -3,57 +3,17 @@ package engine
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
-	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// MockLLMClientForScenario provides predictable responses for scenario manager tests
-type MockLLMClientForScenario struct {
-	responses []string
-	callIndex int
-}
-
-func (m *MockLLMClientForScenario) ChatCompletion(ctx context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
-	response := `{"scene_name": "Test Scene", "description": "A test scene.", "purpose": "Can the hero survive?", "situation_aspects": ["Aspect 1"], "npcs": []}`
-	if m.callIndex < len(m.responses) {
-		response = m.responses[m.callIndex]
-		m.callIndex++
-	}
-	return &llm.CompletionResponse{
-		ID:      "test-response",
-		Object:  "chat.completion",
-		Created: time.Now().Unix(),
-		Model:   "test-model",
-		Choices: []llm.CompletionResponseChoice{
-			{
-				Index: 0,
-				Message: llm.Message{
-					Role:    "assistant",
-					Content: response,
-				},
-				FinishReason: "stop",
-			},
-		},
-	}, nil
-}
-
-func (m *MockLLMClientForScenario) ChatCompletionStream(ctx context.Context, req llm.CompletionRequest, handler llm.StreamHandler) error {
-	return nil
-}
-
-func (m *MockLLMClientForScenario) GetModelInfo() llm.ModelInfo {
-	return llm.ModelInfo{Name: "test-model"}
-}
-
 func TestNewScenarioManager(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -65,7 +25,7 @@ func TestNewScenarioManager(t *testing.T) {
 }
 
 func TestScenarioManager_SetScenario(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -85,7 +45,7 @@ func TestScenarioManager_SetScenario(t *testing.T) {
 }
 
 func TestScenarioManager_SetInitialScene(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -206,7 +166,7 @@ func TestGeneratedScene_EmptyNPCs(t *testing.T) {
 }
 
 func TestScenarioManager_addSceneSummary(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -236,7 +196,7 @@ func TestScenarioManager_addSceneSummary(t *testing.T) {
 }
 
 func TestScenarioManager_addSceneSummary_NilSummary(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -248,7 +208,7 @@ func TestScenarioManager_addSceneSummary_NilSummary(t *testing.T) {
 }
 
 func TestScenarioManager_extractComplications(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -275,7 +235,7 @@ func TestScenarioManager_extractComplications(t *testing.T) {
 }
 
 func TestScenarioManager_extractComplications_NoThreads(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -577,7 +537,7 @@ func TestRenderSceneResponse_WithoutPurpose(t *testing.T) {
 }
 
 func TestSceneManager_SetScenePurpose(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
@@ -604,7 +564,7 @@ func TestNormalizeNPCName(t *testing.T) {
 }
 
 func TestNewScenarioManager_InitializesNPCRegistry(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -617,7 +577,7 @@ func TestNewScenarioManager_InitializesNPCRegistry(t *testing.T) {
 }
 
 func TestScenarioManager_SetScenarioCount(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -628,7 +588,7 @@ func TestScenarioManager_SetScenarioCount(t *testing.T) {
 }
 
 func TestScenarioManager_GetKnownNPCSummaries(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -652,7 +612,7 @@ func TestScenarioManager_GetKnownNPCSummaries(t *testing.T) {
 }
 
 func TestScenarioManager_GetKnownNPCSummaries_ExcludesPermanentlyRemoved(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -676,7 +636,7 @@ func TestScenarioManager_GetKnownNPCSummaries_ExcludesPermanentlyRemoved(t *test
 }
 
 func TestScenarioManager_GetKnownNPCSummaries_TemporaryDefeatShowsFate(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -695,7 +655,7 @@ func TestScenarioManager_GetKnownNPCSummaries_TemporaryDefeatShowsFate(t *testin
 }
 
 func TestScenarioManager_GetKnownNPCSummaries_MixedFates(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -741,9 +701,7 @@ func TestScenarioManager_GenerateNextScene_SkipsPermanentlyRemovedNPCs(t *testin
 			{"name": "Innkeeper", "high_concept": "Friendly Barkeep", "disposition": "friendly"}
 		]
 	}`
-	engine, err := NewWithLLM(&MockLLMClientForScenario{
-		responses: []string{sceneJSON},
-	}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(sceneJSON), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -788,7 +746,7 @@ func TestScenarioManager_GenerateNextScene_SkipsPermanentlyRemovedNPCs(t *testin
 }
 
 func TestScenarioManager_UpdateNPCAttitudes(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -809,7 +767,7 @@ func TestScenarioManager_UpdateNPCAttitudes(t *testing.T) {
 }
 
 func TestScenarioManager_UpdateNPCAttitudes_NilSummary(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -820,7 +778,7 @@ func TestScenarioManager_UpdateNPCAttitudes_NilSummary(t *testing.T) {
 }
 
 func TestScenarioManager_BestRecoverySkill(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -838,7 +796,7 @@ func TestScenarioManager_BestRecoverySkill(t *testing.T) {
 }
 
 func TestScenarioManager_HandleBetweenSceneRecovery_NoConsequences(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -850,7 +808,7 @@ func TestScenarioManager_HandleBetweenSceneRecovery_NoConsequences(t *testing.T)
 }
 
 func TestScenarioManager_HandleBetweenSceneRecovery_HealedConsequence(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -880,7 +838,7 @@ func TestScenarioManager_HandleBetweenSceneRecovery_HealedConsequence(t *testing
 }
 
 func TestScenarioManager_HandleBetweenSceneRecovery_RollEvents(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -911,7 +869,7 @@ func TestScenarioManager_HandleBetweenSceneRecovery_RollEvents(t *testing.T) {
 }
 
 func TestScenarioManager_BuildRecoveryNarrativeEvents_Empty(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -992,7 +950,7 @@ func TestScenarioManager_Start_RequiresLLM(t *testing.T) {
 }
 
 func TestScenarioManager_Start_RequiresPlayer(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	sm := &ScenarioManager{engine: engine}
@@ -1003,7 +961,7 @@ func TestScenarioManager_Start_RequiresPlayer(t *testing.T) {
 }
 
 func TestScenarioManager_Start_WithInitialScene(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -1026,7 +984,7 @@ func TestScenarioManager_Start_WithInitialScene(t *testing.T) {
 }
 
 func TestScenarioManager_Start_WithPurposeAndHook(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -1056,7 +1014,7 @@ func TestScenarioManager_Start_WithPurposeAndHook(t *testing.T) {
 }
 
 func TestScenarioManager_Start_Resume(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -1085,7 +1043,7 @@ func TestScenarioManager_Start_Resume(t *testing.T) {
 }
 
 func TestScenarioManager_HandleInput_BeforeStart(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -1097,7 +1055,7 @@ func TestScenarioManager_HandleInput_BeforeStart(t *testing.T) {
 }
 
 func TestScenarioManager_ProvideInvokeResponse_BeforeStart(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -1109,7 +1067,7 @@ func TestScenarioManager_ProvideInvokeResponse_BeforeStart(t *testing.T) {
 }
 
 func TestScenarioManager_ProvideMidFlowResponse_BeforeStart(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -1121,7 +1079,7 @@ func TestScenarioManager_ProvideMidFlowResponse_BeforeStart(t *testing.T) {
 }
 
 func TestScenarioManager_HandleSceneEnd_Quit(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -1143,7 +1101,7 @@ func TestScenarioManager_HandleSceneEnd_Quit(t *testing.T) {
 }
 
 func TestScenarioManager_HandleSceneEnd_PlayerTakenOut(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
+	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")

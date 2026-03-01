@@ -18,7 +18,7 @@ import (
 func setupOvercomeSM(t *testing.T, fatePoints int) *SceneManager {
 	t.Helper()
 
-	mockClient := &MockLLMClient{response: "You push through!"}
+	mockClient := newTestLLMClient("You push through!")
 	engine, err := NewWithLLM(mockClient, session.NullLogger{})
 	require.NoError(t, err)
 

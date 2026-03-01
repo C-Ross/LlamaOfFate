@@ -17,7 +17,7 @@ import (
 
 // setupConflictSM creates a SceneManager with a player and attacker in an
 // active physical conflict. The engine optionally has an LLM client.
-func setupConflictSM(t *testing.T, llmClient *capturingMockLLMClient) (*SceneManager, *character.Character, *character.Character) {
+func setupConflictSM(t *testing.T, llmClient *testLLMClient) (*SceneManager, *character.Character, *character.Character) {
 	t.Helper()
 
 	var engine *Engine
@@ -308,9 +308,7 @@ func TestApplyAttackDamageToPlayer_MentalConflict_UsesMentalStress(t *testing.T)
 func TestHandleStressOverflow_NoConsequencesAvailable_TakenOut(t *testing.T) {
 	// Use an LLM mock so handleTakenOut → generateTakenOutNarrativeAndOutcome
 	// can complete without error.
-	mockLLM := &capturingMockLLMClient{
-		response: `{"narrative":"You fall.","outcome":"game_over","new_scene_hint":""}`,
-	}
+	mockLLM := newTestLLMClient(`{"narrative":"You fall.","outcome":"game_over","new_scene_hint":""}`)
 	sm, player, attacker := setupConflictSM(t, mockLLM)
 
 	// Fill all consequence slots so none are available.
@@ -360,9 +358,7 @@ func TestHandleStressOverflow_ConsequencesAvailable_SetsMidFlow(t *testing.T) {
 // SRD (Consequences p.162): A mild consequence absorbs 2 shifts. If that's
 // enough to cover the hit, no further stress is applied.
 func TestApplyConsequence_MildAbsorbsAll(t *testing.T) {
-	mockLLM := &capturingMockLLMClient{
-		response: "Twisted Ankle",
-	}
+	mockLLM := newTestLLMClient("Twisted Ankle")
 	sm, player, attacker := setupConflictSM(t, mockLLM)
 
 	// 2-shift hit → mild (value=2) absorbs all.
@@ -384,9 +380,7 @@ func TestApplyConsequence_MildAbsorbsAll(t *testing.T) {
 // SRD: A moderate consequence absorbs 4 shifts. If hit was 5 shifts,
 // the remaining 1 shift must go to the stress track.
 func TestApplyConsequence_ModerateWithRemainingStress(t *testing.T) {
-	mockLLM := &capturingMockLLMClient{
-		response: "Cracked Ribs",
-	}
+	mockLLM := newTestLLMClient("Cracked Ribs")
 	sm, player, attacker := setupConflictSM(t, mockLLM)
 
 	// 5-shift hit → moderate (value=4) absorbs 4, remaining 1 goes to stress.
@@ -451,9 +445,7 @@ func TestApplyConsequence_RecursiveOverflow(t *testing.T) {
 // SRD (Being Taken Out p.166): When taken out the opponent decides your fate.
 // Outcome "game_over" should set shouldExit=true, sceneEndReason=player_taken_out.
 func TestHandleTakenOut_GameOver(t *testing.T) {
-	mockLLM := &capturingMockLLMClient{
-		response: `{"narrative":"The bandit delivers the final blow.","outcome":"game_over","new_scene_hint":""}`,
-	}
+	mockLLM := newTestLLMClient(`{"narrative":"The bandit delivers the final blow.","outcome":"game_over","new_scene_hint":""}`)
 	sm, _, attacker := setupConflictSM(t, mockLLM)
 
 	events := sm.conflict.handleTakenOut(context.Background(), attacker, testAttackCtx())
@@ -473,9 +465,7 @@ func TestHandleTakenOut_GameOver(t *testing.T) {
 
 // SRD: Outcome "transition" means the scene changes (captured, driven out).
 func TestHandleTakenOut_Transition(t *testing.T) {
-	mockLLM := &capturingMockLLMClient{
-		response: `{"narrative":"You collapse and are dragged away.","outcome":"transition","new_scene_hint":"You awaken in a dark cell."}`,
-	}
+	mockLLM := newTestLLMClient(`{"narrative":"You collapse and are dragged away.","outcome":"transition","new_scene_hint":"You awaken in a dark cell."}`)
 	sm, _, attacker := setupConflictSM(t, mockLLM)
 	sm.conflict.exitOnSceneTransition = true
 
@@ -494,9 +484,7 @@ func TestHandleTakenOut_Transition(t *testing.T) {
 
 // Transition with exitOnSceneTransition=false should NOT set shouldExit.
 func TestHandleTakenOut_Transition_NoExitFlag(t *testing.T) {
-	mockLLM := &capturingMockLLMClient{
-		response: `{"narrative":"You fall.","outcome":"transition","new_scene_hint":"Later..."}`,
-	}
+	mockLLM := newTestLLMClient(`{"narrative":"You fall.","outcome":"transition","new_scene_hint":"Later..."}`)
 	sm, _, attacker := setupConflictSM(t, mockLLM)
 	sm.conflict.exitOnSceneTransition = false
 
@@ -512,9 +500,7 @@ func TestHandleTakenOut_Transition_NoExitFlag(t *testing.T) {
 
 // Outcome "continue" means the scene keeps going (stunned, knocked down).
 func TestHandleTakenOut_Continue(t *testing.T) {
-	mockLLM := &capturingMockLLMClient{
-		response: `{"narrative":"You stumble and fall, dazed.","outcome":"continue","new_scene_hint":""}`,
-	}
+	mockLLM := newTestLLMClient(`{"narrative":"You stumble and fall, dazed.","outcome":"continue","new_scene_hint":""}`)
 	sm, _, attacker := setupConflictSM(t, mockLLM)
 
 	events := sm.conflict.handleTakenOut(context.Background(), attacker, testAttackCtx())
@@ -543,9 +529,7 @@ func TestHandleTakenOut_LLMError_Fallback(t *testing.T) {
 
 // handleTakenOut should end the conflict and clear stress.
 func TestHandleTakenOut_EndsConflictAndClearsStress(t *testing.T) {
-	mockLLM := &capturingMockLLMClient{
-		response: `{"narrative":"Defeated.","outcome":"game_over","new_scene_hint":""}`,
-	}
+	mockLLM := newTestLLMClient(`{"narrative":"Defeated.","outcome":"game_over","new_scene_hint":""}`)
 	sm, player, attacker := setupConflictSM(t, mockLLM)
 
 	// Give player some stress first.
@@ -568,9 +552,7 @@ func TestHandleTakenOut_EndsConflictAndClearsStress(t *testing.T) {
 // Verifies the pendingMidFlow continuation correctly applies a consequence
 // when the player selects one from the overflow prompt.
 func TestStressOverflow_MidFlowContinuation_SelectConsequence(t *testing.T) {
-	mockLLM := &capturingMockLLMClient{
-		response: "Winded",
-	}
+	mockLLM := newTestLLMClient("Winded")
 	sm, player, attacker := setupConflictSM(t, mockLLM)
 
 	// Trigger overflow.
@@ -595,9 +577,7 @@ func TestStressOverflow_MidFlowContinuation_SelectConsequence(t *testing.T) {
 
 // When player selects "Be Taken Out" from overflow prompt.
 func TestStressOverflow_MidFlowContinuation_SelectTakenOut(t *testing.T) {
-	mockLLM := &capturingMockLLMClient{
-		response: `{"narrative":"You choose to yield.","outcome":"game_over","new_scene_hint":""}`,
-	}
+	mockLLM := newTestLLMClient(`{"narrative":"You choose to yield.","outcome":"game_over","new_scene_hint":""}`)
 	sm, _, _ := setupConflictSM(t, mockLLM)
 
 	sm.conflict.handleStressOverflow(context.Background(), 3, character.PhysicalStress,

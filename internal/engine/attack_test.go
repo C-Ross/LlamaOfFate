@@ -29,7 +29,7 @@ func setupAttackSM(t *testing.T, fatePoints int) (*SceneManager, *character.Char
 	t.Helper()
 
 	// The mock response must be valid JSON for the NPC action decision parser.
-	mockClient := &MockLLMClient{response: `{"action":"attack","skill":"Fight","target":"player-1","description":"counter-attack","reasoning":"test"}`}
+	mockClient := newTestLLMClient(`{"action":"attack","skill":"Fight","target":"player-1","description":"counter-attack","reasoning":"test"}`)
 	engine, err := NewWithLLM(mockClient, session.NullLogger{})
 	require.NoError(t, err)
 
