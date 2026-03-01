@@ -6,6 +6,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
 )
 
 // CharacterResolver provides read-only access to the character registry.
@@ -22,25 +23,30 @@ type Engine struct {
 	sceneManager      *SceneManager
 	llmClient         llm.LLMClient
 	characterRegistry map[string]*character.Character
+	sessionLogger     session.SessionLogger
 }
 
-// New creates a new game engine instance
-func New() (*Engine, error) {
+// New creates a new game engine instance.
+// sessionLogger must not be nil; use session.NullLogger{} when logging is not needed.
+func New(sessionLogger session.SessionLogger) (*Engine, error) {
 	engine := &Engine{
 		characterRegistry: make(map[string]*character.Character),
+		sessionLogger:     sessionLogger,
 	}
-	engine.sceneManager = NewSceneManager(engine, nil, nil)
+	engine.sceneManager = NewSceneManager(engine, nil, nil, sessionLogger)
 	return engine, nil
 }
 
-// NewWithLLM creates a new game engine instance with an LLM client
-func NewWithLLM(llmClient llm.LLMClient) (*Engine, error) {
+// NewWithLLM creates a new game engine instance with an LLM client.
+// sessionLogger must not be nil; use session.NullLogger{} when logging is not needed.
+func NewWithLLM(llmClient llm.LLMClient, sessionLogger session.SessionLogger) (*Engine, error) {
 	engine := &Engine{
 		llmClient:         llmClient,
 		actionParser:      NewActionParser(llmClient),
 		characterRegistry: make(map[string]*character.Character),
+		sessionLogger:     sessionLogger,
 	}
-	engine.sceneManager = NewSceneManager(engine, llmClient, engine.actionParser)
+	engine.sceneManager = NewSceneManager(engine, llmClient, engine.actionParser, sessionLogger)
 	return engine, nil
 }
 

@@ -40,7 +40,7 @@ type SceneManager struct {
 	player              *character.Character
 	conversationHistory []prompt.ConversationEntry
 	lastTransition      *prompt.SceneTransition // Captured transition hint when scene ends
-	sessionLogger       *session.Logger
+	sessionLogger       session.SessionLogger
 	scenePurpose        string            // Dramatic question driving the current scene
 	actions             *ActionResolver   // Generic action resolution (dice, invokes, narrative)
 	conflict            *ConflictManager  // Conflict lifecycle (turns, NPC, damage, taken-out)
@@ -60,16 +60,17 @@ func (sm *SceneManager) SetScenePurpose(purpose string) {
 
 // NewSceneManager creates a new scene manager with injected dependencies.
 // llmClient and actionParser may be nil when running without an LLM.
-func NewSceneManager(characters CharacterResolver, llmClient llm.LLMClient, actionParser ActionParser) *SceneManager {
+// sessionLogger must not be nil; use session.NullLogger{} when logging is not needed.
+func NewSceneManager(characters CharacterResolver, llmClient llm.LLMClient, actionParser ActionParser, sessionLogger session.SessionLogger) *SceneManager {
 	roller := dice.NewRoller()
 	var ag AspectGenerator
 	if llmClient != nil {
 		ag = NewAspectGenerator(llmClient)
 	}
 
-	cm := newConflictManager(llmClient, characters)
-	chm := newChallengeManager(llmClient, characters)
-	ar := newActionResolver(roller, characters, ag)
+	cm := newConflictManager(llmClient, characters, sessionLogger)
+	chm := newChallengeManager(llmClient, characters, sessionLogger)
+	ar := newActionResolver(roller, characters, ag, sessionLogger)
 	// Wire cross-references: AR ↔ CM.
 	ar.conflict = cm
 	ar.challenge = chm
@@ -84,20 +85,12 @@ func NewSceneManager(characters CharacterResolver, llmClient llm.LLMClient, acti
 		actions:             ar,
 		conflict:            cm,
 		challenge:           chm,
+		sessionLogger:       sessionLogger,
 	}
 	// SceneManager implements NarrativeProvider — wire it so ActionResolver
 	// can generate narrative and record conversation history.
 	sm.actions.SetNarrativeProvider(sm)
 	return sm
-}
-
-// SetSessionLogger sets the session logger for recording game transcripts.
-// It also propagates to the ConflictManager.
-func (sm *SceneManager) SetSessionLogger(logger *session.Logger) {
-	sm.sessionLogger = logger
-	sm.actions.setSessionLogger(logger)
-	sm.conflict.setSessionLogger(logger)
-	sm.challenge.setSessionLogger(logger)
 }
 
 // SetExitOnSceneTransition configures whether the scene loop should exit on scene transition
@@ -126,14 +119,12 @@ func (sm *SceneManager) StartScene(scene *scene.Scene, player *character.Charact
 	}
 
 	// Log scene start
-	if sm.sessionLogger != nil {
-		sm.sessionLogger.Log("scene_start", map[string]any{
-			"scene_name":        scene.Name,
-			"scene_description": scene.Description,
-			"characters":        scene.Characters,
-			"player_id":         player.ID,
-		})
-	}
+	sm.sessionLogger.Log("scene_start", map[string]any{
+		"scene_name":        scene.Name,
+		"scene_description": scene.Description,
+		"characters":        scene.Characters,
+		"player_id":         player.ID,
+	})
 
 	// Scene description will be displayed by the terminal UI when needed
 
@@ -158,9 +149,7 @@ func (sm *SceneManager) HandleInput(ctx context.Context, input string) (*InputRe
 	result := &InputResult{}
 
 	// Log player input
-	if sm.sessionLogger != nil {
-		sm.sessionLogger.Log("player_input", map[string]any{"input": input})
-	}
+	sm.sessionLogger.Log("player_input", map[string]any{"input": input})
 
 	// Check for concession command during conflict (before any roll per Fate Core rules).
 	if sm.currentScene.IsConflict && sm.conflict.isConcedeCommand(input) {
@@ -184,12 +173,10 @@ func (sm *SceneManager) HandleInput(ctx context.Context, input string) (*InputRe
 	}
 
 	// Log classification result
-	if sm.sessionLogger != nil {
-		sm.sessionLogger.Log("input_classification", map[string]any{
-			"input":          input,
-			"classification": inputType,
-		})
-	}
+	sm.sessionLogger.Log("input_classification", map[string]any{
+		"input":          input,
+		"classification": inputType,
+	})
 
 	slog.Debug("Input classified",
 		"component", componentSceneManager,
@@ -337,12 +324,10 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) []GameEv
 	events = append(events, DialogEvent{PlayerInput: input, GMResponse: cleanedResponse})
 
 	// Log the dialog exchange
-	if sm.sessionLogger != nil {
-		sm.sessionLogger.Log("dialog", map[string]any{
-			"player_input": input,
-			"gm_response":  cleanedResponse,
-		})
-	}
+	sm.sessionLogger.Log("dialog", map[string]any{
+		"player_input": input,
+		"gm_response":  cleanedResponse,
+	})
 
 	// Record this exchange in conversation history
 	sm.RecordConversationEntry(input, cleanedResponse, inputTypeDialog)
@@ -406,11 +391,9 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) []GameEv
 // handleSceneTransition processes a scene transition marker
 func (sm *SceneManager) handleSceneTransition(transition *prompt.SceneTransition) []GameEvent {
 	// Log the scene transition
-	if sm.sessionLogger != nil {
-		sm.sessionLogger.Log("scene_transition", map[string]any{
-			"hint": transition.Hint,
-		})
-	}
+	sm.sessionLogger.Log("scene_transition", map[string]any{
+		"hint": transition.Hint,
+	})
 
 	slog.Info("Scene transition detected",
 		"component", componentSceneManager,
@@ -456,9 +439,7 @@ func (sm *SceneManager) handleAction(ctx context.Context, input string) ([]GameE
 		}
 
 		// Log the parsed action
-		if sm.sessionLogger != nil {
-			sm.sessionLogger.Log("action_parse", action)
-		}
+		sm.sessionLogger.Log("action_parse", action)
 
 		return sm.actions.resolveAction(ctx, action)
 	}

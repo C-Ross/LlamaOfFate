@@ -277,12 +277,6 @@ func (gs *GameServer) handleStartGame(ctx context.Context, req mcp.CallToolReque
 	gs.mu.Lock()
 	defer gs.mu.Unlock()
 
-	// Build the engine
-	gameEngine, err := gs.newEngine()
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("engine creation failed: %v", err)), nil
-	}
-
 	// Build player (allow overrides)
 	player := clonePlayer(ls.Player)
 	if name := req.GetString("player_name", ""); name != "" {
@@ -295,7 +289,35 @@ func (gs *GameServer) handleStartGame(ctx context.Context, req mcp.CallToolReque
 		player.Aspects.Trouble = trouble
 	}
 
-	gm := engine.NewGameManager(gameEngine)
+	// Close any previous session logger before starting a new one
+	if err := gs.closeSessionLogger(); err != nil {
+		slog.Warn("failed to close previous session logger", "error", err)
+	}
+
+	// Set up session logging (same mechanism as the terminal CLI)
+	var sl session.SessionLogger
+	logger, err := gs.createSessionLogger(ls, player)
+	if err != nil {
+		slog.Warn("session logging disabled", "error", err)
+		sl = session.NullLogger{}
+	} else {
+		gs.sessionLogger = logger
+		sl = logger
+		logger.Log("scenario", ls.Scenario)
+		logger.Log("player", map[string]any{
+			"name":         player.Name,
+			"high_concept": player.Aspects.HighConcept,
+			"trouble":      player.Aspects.Trouble,
+		})
+	}
+
+	// Build the engine
+	gameEngine, err := gs.newEngine(sl)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("engine creation failed: %v", err)), nil
+	}
+
+	gm := engine.NewGameManager(gameEngine, sl)
 	gm.SetPlayer(player)
 	gm.SetScenario(ls.Scenario)
 
@@ -304,26 +326,6 @@ func (gs *GameServer) handleStartGame(ctx context.Context, req mcp.CallToolReque
 		gm.SetInitialScene(&engine.InitialSceneConfig{
 			Scene: ls.Scene,
 			NPCs:  ls.NPCs,
-		})
-	}
-
-	// Close any previous session logger before starting a new one
-	if err := gs.closeSessionLogger(); err != nil {
-		slog.Warn("failed to close previous session logger", "error", err)
-	}
-
-	// Set up session logging (same mechanism as the terminal CLI)
-	logger, err := gs.createSessionLogger(ls, player)
-	if err != nil {
-		slog.Warn("session logging disabled", "error", err)
-	} else {
-		gs.sessionLogger = logger
-		gm.SetSessionLogger(logger)
-		logger.Log("scenario", ls.Scenario)
-		logger.Log("player", map[string]any{
-			"name":         player.Name,
-			"high_concept": player.Aspects.HighConcept,
-			"trouble":      player.Aspects.Trouble,
 		})
 	}
 
@@ -456,11 +458,11 @@ func (gs *GameServer) handleSaveGame(_ context.Context, _ mcp.CallToolRequest) (
 // Helpers
 // ---------------------------------------------------------------------------
 
-func (gs *GameServer) newEngine() (*engine.Engine, error) {
+func (gs *GameServer) newEngine(sessionLogger session.SessionLogger) (*engine.Engine, error) {
 	if gs.llmClient != nil {
-		return engine.NewWithLLM(gs.llmClient)
+		return engine.NewWithLLM(gs.llmClient, sessionLogger)
 	}
-	return engine.New()
+	return engine.New(sessionLogger)
 }
 
 // createSessionLogger builds a session logger for this game, mirroring the CLI's

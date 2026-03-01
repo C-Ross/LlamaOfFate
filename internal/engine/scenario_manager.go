@@ -23,7 +23,7 @@ const (
 type ScenarioManager struct {
 	engine               *Engine
 	player               *character.Character
-	sessionLogger        *session.Logger
+	sessionLogger        session.SessionLogger
 	scenario             *scene.Scenario                 // The current scenario with problem and story questions
 	initialScene         *scene.Scene                    // Optional pre-configured starting scene
 	initialNPCs          []*character.Character          // NPCs for initial scene
@@ -42,19 +42,16 @@ type ScenarioManager struct {
 	exitAfterScene       bool                            // Exit after the first scene ends instead of generating next scenes
 }
 
-// NewScenarioManager creates a new scenario manager
-func NewScenarioManager(engine *Engine, player *character.Character) *ScenarioManager {
+// NewScenarioManager creates a new scenario manager.
+// sessionLogger must not be nil; use session.NullLogger{} when logging is not needed.
+func NewScenarioManager(engine *Engine, player *character.Character, sessionLogger session.SessionLogger) *ScenarioManager {
 	return &ScenarioManager{
-		engine:       engine,
-		player:       player,
-		npcRegistry:  make(map[string]*character.Character),
-		npcAttitudes: make(map[string]string),
+		engine:        engine,
+		player:        player,
+		sessionLogger: sessionLogger,
+		npcRegistry:   make(map[string]*character.Character),
+		npcAttitudes:  make(map[string]string),
 	}
-}
-
-// SetSessionLogger sets the session logger
-func (m *ScenarioManager) SetSessionLogger(logger *session.Logger) {
-	m.sessionLogger = logger
 }
 
 // SetScenario sets the scenario for the manager
@@ -120,17 +117,15 @@ func (m *ScenarioManager) emitSceneOpeningEvents() []GameEvent {
 			Purpose: m.lastGeneratedPurpose,
 			Text:    m.lastGeneratedHook,
 		})
-		if m.sessionLogger != nil {
-			if m.lastGeneratedPurpose != "" {
-				m.sessionLogger.Log("scene_purpose", map[string]any{
-					"purpose": m.lastGeneratedPurpose,
-				})
-			}
-			if m.lastGeneratedHook != "" {
-				m.sessionLogger.Log("opening_hook", map[string]any{
-					"hook": m.lastGeneratedHook,
-				})
-			}
+		if m.lastGeneratedPurpose != "" {
+			m.sessionLogger.Log("scene_purpose", map[string]any{
+				"purpose": m.lastGeneratedPurpose,
+			})
+		}
+		if m.lastGeneratedHook != "" {
+			m.sessionLogger.Log("opening_hook", map[string]any{
+				"hook": m.lastGeneratedHook,
+			})
 		}
 	}
 	return events
@@ -246,9 +241,6 @@ func (m *ScenarioManager) Start(ctx context.Context) ([]GameEvent, error) {
 
 	// Set up the scene manager for this scene
 	sceneManager := m.engine.GetSceneManager()
-	if m.sessionLogger != nil {
-		sceneManager.SetSessionLogger(m.sessionLogger)
-	}
 	sceneManager.SetExitOnSceneTransition(true)
 
 	if resuming {
@@ -396,13 +388,11 @@ func (m *ScenarioManager) handleSceneEnd(ctx context.Context, sceneManager *Scen
 	var events []GameEvent
 
 	// Log the scene end
-	if m.sessionLogger != nil {
-		m.sessionLogger.Log("scene_end", map[string]any{
-			"reason":          sceneResult.Reason,
-			"transition_hint": sceneResult.TransitionHint,
-			"taken_out_chars": sceneResult.TakenOutChars,
-		})
-	}
+	m.sessionLogger.Log("scene_end", map[string]any{
+		"reason":          sceneResult.Reason,
+		"transition_hint": sceneResult.TransitionHint,
+		"taken_out_chars": sceneResult.TakenOutChars,
+	})
 
 	slog.Info("Scene ended",
 		"component", componentScenarioManager,
@@ -443,9 +433,7 @@ func (m *ScenarioManager) handleSceneEnd(ctx context.Context, sceneManager *Scen
 		m.addSceneSummary(summary)
 		m.updateNPCAttitudes(summary)
 
-		if m.sessionLogger != nil {
-			m.sessionLogger.Log("scene_summary", summary)
-		}
+		m.sessionLogger.Log("scene_summary", summary)
 
 		// Check if the scenario is resolved
 		if m.scenario != nil && len(m.scenario.StoryQuestions) > 0 {
@@ -461,12 +449,10 @@ func (m *ScenarioManager) handleSceneEnd(ctx context.Context, sceneManager *Scen
 					"component", componentScenarioManager,
 					"scenario_title", m.scenario.Title,
 				)
-				if m.sessionLogger != nil {
-					m.sessionLogger.Log("scenario_resolved", map[string]any{
-						"scenario_title": m.scenario.Title,
-						"scenario":       m.scenario,
-					})
-				}
+				m.sessionLogger.Log("scenario_resolved", map[string]any{
+					"scenario_title": m.scenario.Title,
+					"scenario":       m.scenario,
+				})
 				m.triggerSave("scenario_complete")
 				return events, &ScenarioResult{Reason: ScenarioEndResolved, Scenario: m.scenario}, nil
 			}
@@ -490,9 +476,6 @@ func (m *ScenarioManager) handleSceneEnd(ctx context.Context, sceneManager *Scen
 
 	// Set up the new scene
 	newSceneManager := m.engine.GetSceneManager()
-	if m.sessionLogger != nil {
-		newSceneManager.SetSessionLogger(m.sessionLogger)
-	}
 	newSceneManager.SetExitOnSceneTransition(true)
 
 	if m.lastGeneratedPurpose != "" {
@@ -645,17 +628,15 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 	}
 
 	// Log the generated scene
-	if m.sessionLogger != nil {
-		m.sessionLogger.Log("scene_generated", map[string]any{
-			"scene_id":          sceneID,
-			"scene_name":        generated.SceneName,
-			"description":       generated.Description,
-			"purpose":           generated.Purpose,
-			"opening_hook":      generated.OpeningHook,
-			"situation_aspects": generated.SituationAspects,
-			"npc_count":         len(generated.NPCs),
-		})
-	}
+	m.sessionLogger.Log("scene_generated", map[string]any{
+		"scene_id":          sceneID,
+		"scene_name":        generated.SceneName,
+		"description":       generated.Description,
+		"purpose":           generated.Purpose,
+		"opening_hook":      generated.OpeningHook,
+		"situation_aspects": generated.SituationAspects,
+		"npc_count":         len(generated.NPCs),
+	})
 
 	slog.Info("Generated new scene",
 		"component", componentScenarioManager,
@@ -715,13 +696,11 @@ func (m *ScenarioManager) handleBetweenSceneRecovery(ctx context.Context) []Game
 			Aspect:   conseq.Aspect,
 			Severity: string(conseq.Type),
 		})
-		if m.sessionLogger != nil {
-			m.sessionLogger.Log("consequence_healed", map[string]any{
-				"type":        conseq.Type,
-				"aspect":      conseq.Aspect,
-				"scene_count": m.sceneCount,
-			})
-		}
+		m.sessionLogger.Log("consequence_healed", map[string]any{
+			"type":        conseq.Type,
+			"aspect":      conseq.Aspect,
+			"scene_count": m.sceneCount,
+		})
 	}
 
 	// Find consequences that haven't started recovery yet
@@ -908,11 +887,9 @@ func (m *ScenarioManager) buildRecoveryNarrativeEvents(ctx context.Context, atte
 		}
 	}
 
-	if m.sessionLogger != nil {
-		m.sessionLogger.Log("recovery_attempt", map[string]any{
-			"attempts": attempts,
-		})
-	}
+	m.sessionLogger.Log("recovery_attempt", map[string]any{
+		"attempts": attempts,
+	})
 
 	return events
 }
@@ -1074,13 +1051,11 @@ func (m *ScenarioManager) checkScenarioResolution(ctx context.Context, latestSum
 	)
 
 	// Log the resolution check
-	if m.sessionLogger != nil {
-		m.sessionLogger.Log("scenario_resolution_check", map[string]any{
-			"is_resolved":        result.IsResolved,
-			"answered_questions": result.AnsweredQuestions,
-			"reasoning":          result.Reasoning,
-		})
-	}
+	m.sessionLogger.Log("scenario_resolution_check", map[string]any{
+		"is_resolved":        result.IsResolved,
+		"answered_questions": result.AnsweredQuestions,
+		"reasoning":          result.Reasoning,
+	})
 
 	return result.IsResolved, nil
 }

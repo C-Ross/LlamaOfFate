@@ -8,6 +8,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,13 +23,13 @@ func setupConflictSM(t *testing.T, llmClient *capturingMockLLMClient) (*SceneMan
 	var engine *Engine
 	var err error
 	if llmClient != nil {
-		engine, err = NewWithLLM(llmClient)
+		engine, err = NewWithLLM(llmClient, session.NullLogger{})
 	} else {
-		engine, err = New()
+		engine, err = New(session.NullLogger{})
 	}
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	attacker := character.NewCharacter("npc-1", "Bandit")
@@ -257,10 +258,10 @@ func TestApplyAttackDamageToPlayer_DefendWithStyle_PlayerGetsBoost(t *testing.T)
 
 // Fate Core SRD: mental conflict uses the mental stress track.
 func TestApplyAttackDamageToPlayer_MentalConflict_UsesMentalStress(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	attacker := character.NewCharacter("npc-1", "Illusionist")

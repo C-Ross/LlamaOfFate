@@ -8,6 +8,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,10 +20,10 @@ import (
 // aspects, and a situation aspect with free invokes.
 func buildInvokeTestSM(t *testing.T, fatePoints int) (*SceneManager, *MockUI) {
 	t.Helper()
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	sm.actions.roller = dice.NewSeededRoller(42)
 
 	player := character.NewCharacter("player-1", "Test Hero")
@@ -414,10 +415,10 @@ func TestInvokeSkipConstant(t *testing.T) {
 // Fate Core SRD (Boosts): "A boost vanishes as soon as it's used for the first time."
 // After the boost's free invoke is consumed, it must be removed from the scene.
 func TestApplyInvokeChoice_Boost_RemovedAfterFreeInvokeUsed(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	player.FatePoints = 3
@@ -470,10 +471,10 @@ func TestApplyInvokeChoice_Boost_RemovedAfterFreeInvokeUsed(t *testing.T) {
 // A regular situation aspect (non-boost) should NOT be removed after its last
 // free invoke is used — only boosts are auto-removed.
 func TestApplyInvokeChoice_RegularAspect_NotRemovedAfterFreeInvoke(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	player.FatePoints = 3

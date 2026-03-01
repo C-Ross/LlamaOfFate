@@ -8,6 +8,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,10 +21,10 @@ import (
 func setupNPCConflictSM(t *testing.T) (*SceneManager, *character.Character, *character.Character) {
 	t.Helper()
 
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	npc := character.NewCharacter("npc-1", "Goblin Scout")
@@ -324,10 +325,10 @@ func TestProcessNPCTurn_DispatchDefend(t *testing.T) {
 	mockLLM := &capturingMockLLMClient{
 		response: `{"action_type":"DEFEND","skill":"","target_id":"","description":"hunkers down"}`,
 	}
-	engine, err := NewWithLLM(mockLLM)
+	engine, err := NewWithLLM(mockLLM, session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	npc := character.NewCharacter("npc-1", "Goblin Scout")
@@ -431,10 +432,10 @@ func TestProcessNPCOvercome_SuccessWithStyle_CreatesBoost(t *testing.T) {
 
 // Fate Core SRD (Attack, Tie): NPC attack on non-player target ties — attacker gets boost.
 func TestProcessNPCAttack_NonPlayerTarget_Tie_CreatesBoost(t *testing.T) {
-	eng, err := New()
+	eng, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(eng, eng.llmClient, eng.actionParser)
+	sm := NewSceneManager(eng, eng.llmClient, eng.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	npc := character.NewCharacter("npc-1", "Goblin Scout")
@@ -493,10 +494,10 @@ func TestProcessNPCAttack_NonPlayerTarget_Tie_CreatesBoost(t *testing.T) {
 // Fate Core SRD (Defend): When the defender succeeds with style (attacker fails
 // by ≥3 shifts), the defender gets a boost.
 func TestProcessNPCAttack_NonPlayerTarget_DefendWithStyle_GrantsTargetBoost(t *testing.T) {
-	eng, err := New()
+	eng, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(eng, eng.llmClient, eng.actionParser)
+	sm := NewSceneManager(eng, eng.llmClient, eng.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	npc := character.NewCharacter("npc-1", "Goblin Scout")

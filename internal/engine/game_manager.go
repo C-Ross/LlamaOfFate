@@ -34,7 +34,7 @@ var _ GameSessionManager = (*GameManager)(nil)
 type GameManager struct {
 	engine          *Engine
 	player          *character.Character
-	sessionLogger   *session.Logger
+	sessionLogger   session.SessionLogger
 	scenario        *scene.Scenario     // The scenario to run (can be provided or generated)
 	initialScene    *InitialSceneConfig // Optional pre-configured starting scene (for demos/tests)
 	scenarioCount   int                 // Number of scenarios completed
@@ -42,22 +42,19 @@ type GameManager struct {
 	scenarioManager *ScenarioManager    // Current scenario manager (stored for Save access)
 }
 
-// NewGameManager creates a new game manager
-func NewGameManager(engine *Engine) *GameManager {
+// NewGameManager creates a new game manager. The sessionLogger must not be nil;
+// use session.NullLogger{} when logging is not needed (e.g. in tests).
+func NewGameManager(engine *Engine, sessionLogger session.SessionLogger) *GameManager {
 	return &GameManager{
-		engine: engine,
-		saver:  noopSaver{},
+		engine:        engine,
+		sessionLogger: sessionLogger,
+		saver:         noopSaver{},
 	}
 }
 
 // SetPlayer sets the player character
 func (g *GameManager) SetPlayer(player *character.Character) {
 	g.player = player
-}
-
-// SetSessionLogger sets the session logger
-func (g *GameManager) SetSessionLogger(logger *session.Logger) {
-	g.sessionLogger = logger
 }
 
 // SetScenario sets the scenario to run
@@ -139,16 +136,13 @@ func (g *GameManager) Start(ctx context.Context) ([]GameEvent, error) {
 	}
 
 	// Fresh start
-	g.scenarioManager = NewScenarioManager(g.engine, g.player)
+	g.scenarioManager = NewScenarioManager(g.engine, g.player, g.sessionLogger)
 	g.scenarioManager.SetScenario(g.scenario)
 	g.scenarioManager.SetScenarioCount(g.scenarioCount)
 	g.scenarioManager.SetSaveFunc(g.Save)
 	if g.initialScene != nil {
 		g.scenarioManager.SetInitialScene(g.initialScene.Scene, g.initialScene.NPCs)
 		g.scenarioManager.SetExitAfterScene(g.initialScene.ExitAfterScene)
-	}
-	if g.sessionLogger != nil {
-		g.scenarioManager.SetSessionLogger(g.sessionLogger)
 	}
 
 	events, err := g.scenarioManager.Start(ctx)
@@ -174,11 +168,8 @@ func (g *GameManager) Start(ctx context.Context) ([]GameEvent, error) {
 func (g *GameManager) startFromSave(ctx context.Context, state *GameState) ([]GameEvent, error) {
 	g.player = state.Scenario.Player
 
-	g.scenarioManager = NewScenarioManager(g.engine, g.player)
+	g.scenarioManager = NewScenarioManager(g.engine, g.player, g.sessionLogger)
 	g.scenarioManager.SetSaveFunc(g.Save)
-	if g.sessionLogger != nil {
-		g.scenarioManager.SetSessionLogger(g.sessionLogger)
-	}
 
 	g.scenarioManager.Restore(state.Scenario, state.Scene)
 
@@ -187,13 +178,11 @@ func (g *GameManager) startFromSave(ctx context.Context, state *GameState) ([]Ga
 		"scenario", state.Scenario.Scenario.Title,
 	)
 
-	if g.sessionLogger != nil {
-		g.sessionLogger.Log("game_resumed", map[string]any{
-			"scene_name":     state.Scene.CurrentScene.Name,
-			"scenario_title": state.Scenario.Scenario.Title,
-			"scene_count":    state.Scenario.SceneCount,
-		})
-	}
+	g.sessionLogger.Log("game_resumed", map[string]any{
+		"scene_name":     state.Scene.CurrentScene.Name,
+		"scenario_title": state.Scenario.Scenario.Title,
+		"scene_count":    state.Scenario.SceneCount,
+	})
 
 	scenarioEvents, err := g.scenarioManager.Start(ctx)
 	if err != nil {
@@ -298,13 +287,11 @@ func (g *GameManager) handleMilestone() []GameEvent {
 			Severity: string(conseq.Type),
 			Aspect:   conseq.Aspect,
 		})
-		if g.sessionLogger != nil {
-			g.sessionLogger.Log("consequence_healed", map[string]any{
-				"type":      conseq.Type,
-				"aspect":    conseq.Aspect,
-				"healed_at": "scenario_milestone",
-			})
-		}
+		g.sessionLogger.Log("consequence_healed", map[string]any{
+			"type":      conseq.Type,
+			"aspect":    conseq.Aspect,
+			"healed_at": "scenario_milestone",
+		})
 	}
 
 	// Milestone event
@@ -319,14 +306,12 @@ func (g *GameManager) handleMilestone() []GameEvent {
 	})
 
 	// Log the milestone
-	if g.sessionLogger != nil {
-		g.sessionLogger.Log("milestone", map[string]any{
-			"type":           "scenario_complete",
-			"fate_points":    g.player.FatePoints,
-			"player":         g.player.Name,
-			"scenario_title": scenarioTitle,
-		})
-	}
+	g.sessionLogger.Log("milestone", map[string]any{
+		"type":           "scenario_complete",
+		"fate_points":    g.player.FatePoints,
+		"player":         g.player.Name,
+		"scenario_title": scenarioTitle,
+	})
 
 	return events
 }

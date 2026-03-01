@@ -362,13 +362,11 @@ func (cm *ConflictManager) applyTargetTakenOut(ctx context.Context, target *char
 	cm.takenOutChars = append(cm.takenOutChars, target.ID)
 
 	// Log the taken out event
-	if cm.sessionLogger != nil {
-		cm.sessionLogger.Log("taken_out", map[string]any{
-			"character_id":   target.ID,
-			"character_name": target.Name,
-			"by_player":      cm.player.ID,
-		})
-	}
+	cm.sessionLogger.Log("taken_out", map[string]any{
+		"character_id":   target.ID,
+		"character_name": target.Name,
+		"by_player":      cm.player.ID,
+	})
 
 	// Mark the target as taken out for the duration of this scene
 	cm.currentScene.MarkCharacterTakenOut(target.ID)
@@ -530,13 +528,11 @@ func (cm *ConflictManager) processFateNarration(ctx context.Context, input strin
 	}
 
 	// Log the fate narration
-	if cm.sessionLogger != nil {
-		cm.sessionLogger.Log("fate_narration", map[string]any{
-			"player_input": input,
-			"fates":        result.Fates,
-			"narrative":    result.Narrative,
-		})
-	}
+	cm.sessionLogger.Log("fate_narration", map[string]any{
+		"player_input": input,
+		"fates":        result.Fates,
+		"narrative":    result.Narrative,
+	})
 
 	return []GameEvent{NarrativeEvent{Text: result.Narrative}}
 }

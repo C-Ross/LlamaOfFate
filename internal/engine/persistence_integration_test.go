@@ -8,6 +8,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,7 +19,7 @@ import (
 func TestIntegration_SaveCascade_ThroughGameManagerStart(t *testing.T) {
 	// Set up engine with mock LLM (not used — initial scene is pre-configured and quit is immediate)
 	mockLLM := &MockLLMClientForScenario{}
-	engine, err := NewWithLLM(mockLLM)
+	engine, err := NewWithLLM(mockLLM, session.NullLogger{})
 	require.NoError(t, err)
 
 	// Create a player with real state
@@ -52,7 +53,7 @@ func TestIntegration_SaveCascade_ThroughGameManagerStart(t *testing.T) {
 	}
 
 	// Wire up GameManager
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	gm.SetPlayer(player)
 	gm.SetSaver(recorder)
 	gm.SetScenario(scenario)
@@ -105,7 +106,7 @@ func TestIntegration_SaveCascade_ThroughGameManagerStart(t *testing.T) {
 // set by GameManager on ScenarioManager correctly cascades to the recorder saver.
 func TestIntegration_SaveFunc_WiredThroughStart(t *testing.T) {
 	mockLLM := &MockLLMClientForScenario{}
-	engine, err := NewWithLLM(mockLLM)
+	engine, err := NewWithLLM(mockLLM, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -115,7 +116,7 @@ func TestIntegration_SaveFunc_WiredThroughStart(t *testing.T) {
 
 	recorder := &recordingSaver{}
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	gm.SetPlayer(player)
 	gm.SetSaver(recorder)
 	gm.SetScenario(&scene.Scenario{
@@ -153,7 +154,7 @@ func TestIntegration_SaveFunc_WiredThroughStart(t *testing.T) {
 // scene setup are captured in the snapshot's NPC registry.
 func TestIntegration_SaveCascade_NPCRegistry(t *testing.T) {
 	mockLLM := &MockLLMClientForScenario{}
-	engine, err := NewWithLLM(mockLLM)
+	engine, err := NewWithLLM(mockLLM, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
@@ -171,7 +172,7 @@ func TestIntegration_SaveCascade_NPCRegistry(t *testing.T) {
 
 	recorder := &recordingSaver{}
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	gm.SetPlayer(player)
 	gm.SetSaver(recorder)
 	gm.SetScenario(&scene.Scenario{
@@ -201,7 +202,7 @@ func TestIntegration_SaveCascade_NPCRegistry(t *testing.T) {
 // produce independent snapshots that reflect state changes between saves.
 func TestIntegration_SaveCascade_MultipleSaves(t *testing.T) {
 	mockLLM := &MockLLMClientForScenario{}
-	engine, err := NewWithLLM(mockLLM)
+	engine, err := NewWithLLM(mockLLM, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
@@ -211,7 +212,7 @@ func TestIntegration_SaveCascade_MultipleSaves(t *testing.T) {
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
 	recorder := &recordingSaver{}
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	gm.SetPlayer(player)
 	gm.SetSaver(recorder)
 	gm.SetScenario(&scene.Scenario{
@@ -250,13 +251,13 @@ func TestIntegration_SaveCascade_MultipleSaves(t *testing.T) {
 // SetSaver, GameManager uses noopSaver and Save() succeeds silently.
 func TestIntegration_SaveCascade_NoopSaverByDefault(t *testing.T) {
 	mockLLM := &MockLLMClientForScenario{}
-	engine, err := NewWithLLM(mockLLM)
+	engine, err := NewWithLLM(mockLLM, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	gm.SetPlayer(player)
 	// Deliberately NOT calling SetSaver
 
@@ -277,14 +278,14 @@ func TestIntegration_SaveCascade_NoopSaverByDefault(t *testing.T) {
 // history accumulated during the scene loop is captured in the snapshot.
 func TestIntegration_SaveCascade_ConversationHistory(t *testing.T) {
 	mockLLM := &MockLLMClientForScenario{}
-	engine, err := NewWithLLM(mockLLM)
+	engine, err := NewWithLLM(mockLLM, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
 	recorder := &recordingSaver{}
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	gm.SetPlayer(player)
 	gm.SetSaver(recorder)
 	gm.SetScenario(&scene.Scenario{
@@ -321,14 +322,14 @@ func TestIntegration_SaveCascade_ConversationHistory(t *testing.T) {
 // accumulated across scene transitions are captured in the snapshot.
 func TestIntegration_SaveCascade_SceneSummaries(t *testing.T) {
 	mockLLM := &MockLLMClientForScenario{}
-	engine, err := NewWithLLM(mockLLM)
+	engine, err := NewWithLLM(mockLLM, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
 	recorder := &recordingSaver{}
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	gm.SetPlayer(player)
 	gm.SetSaver(recorder)
 	gm.SetScenario(&scene.Scenario{
@@ -378,7 +379,7 @@ func TestIntegration_SaveCascade_SceneSummaries(t *testing.T) {
 // an automatic scene_start save.
 func TestIntegration_AutomaticSaveTriggers(t *testing.T) {
 	mockLLM := &MockLLMClientForScenario{}
-	engine, err := NewWithLLM(mockLLM)
+	engine, err := NewWithLLM(mockLLM, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
@@ -386,7 +387,7 @@ func TestIntegration_AutomaticSaveTriggers(t *testing.T) {
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
 	recorder := &recordingSaver{}
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	gm.SetPlayer(player)
 	gm.SetSaver(recorder)
 	gm.SetScenario(&scene.Scenario{
@@ -414,7 +415,7 @@ func TestIntegration_AutomaticSaveTriggers(t *testing.T) {
 // loads the save and resumes mid-scene.
 func TestIntegration_SaveThenResume(t *testing.T) {
 	// --- Session 1: Start and save ---
-	engine1, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine1, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse Calhoun")
@@ -439,7 +440,7 @@ func TestIntegration_SaveThenResume(t *testing.T) {
 		Setting: "Frontier town",
 	}
 
-	gm1 := NewGameManager(engine1)
+	gm1 := NewGameManager(engine1, session.NullLogger{})
 	gm1.SetPlayer(player)
 	gm1.SetSaver(recorder1)
 	gm1.SetScenario(scenario)
@@ -461,12 +462,12 @@ func TestIntegration_SaveThenResume(t *testing.T) {
 	lastSave := recorder1.savedStates[len(recorder1.savedStates)-1]
 
 	// --- Session 2: Resume from save ---
-	engine2, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine2, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
 	recorder2 := &recordingSaver{loadResult: &lastSave}
 
-	gm2 := NewGameManager(engine2)
+	gm2 := NewGameManager(engine2, session.NullLogger{})
 	gm2.SetPlayer(character.NewCharacter("dummy", "Should Be Overridden"))
 	gm2.SetSaver(recorder2)
 	gm2.SetScenario(&scene.Scenario{Title: "Should Be Overridden"})
@@ -496,7 +497,7 @@ func TestIntegration_SaveThenResume(t *testing.T) {
 // registry are available after resume and appear in subsequent saves.
 func TestIntegration_Resume_PreservesNPCRegistry(t *testing.T) {
 	// Session 1: Start with NPCs
-	engine1, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine1, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
@@ -510,7 +511,7 @@ func TestIntegration_Resume_PreservesNPCRegistry(t *testing.T) {
 
 	recorder := &recordingSaver{}
 
-	gm1 := NewGameManager(engine1)
+	gm1 := NewGameManager(engine1, session.NullLogger{})
 	gm1.SetPlayer(player)
 	gm1.SetSaver(recorder)
 	gm1.SetScenario(&scene.Scenario{Title: "Test", Problem: "Test", Genre: "Western"})
@@ -533,12 +534,12 @@ func TestIntegration_Resume_PreservesNPCRegistry(t *testing.T) {
 	require.Contains(t, lastSave.Scenario.NPCRegistry, "marshal dan")
 
 	// Session 2: Resume
-	engine2, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine2, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
 	recorder2 := &recordingSaver{loadResult: &lastSave}
 
-	gm2 := NewGameManager(engine2)
+	gm2 := NewGameManager(engine2, session.NullLogger{})
 	gm2.SetPlayer(player)
 	gm2.SetSaver(recorder2)
 
@@ -561,7 +562,7 @@ func TestIntegration_Resume_PreservesNPCRegistry(t *testing.T) {
 // TestIntegration_Resume_SkipsSceneStartSave verifies that resuming does NOT
 // trigger a redundant "scene_start" save.
 func TestIntegration_Resume_SkipsSceneStartSave(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
@@ -579,7 +580,7 @@ func TestIntegration_Resume_SkipsSceneStartSave(t *testing.T) {
 
 	recorder := &recordingSaver{loadResult: savedState}
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	gm.SetPlayer(player)
 	gm.SetSaver(recorder)
 
@@ -594,7 +595,7 @@ func TestIntegration_Resume_SkipsSceneStartSave(t *testing.T) {
 // TestIntegration_Resume_MidConflict verifies that resuming into a scene with
 // an active conflict preserves the conflict state.
 func TestIntegration_Resume_MidConflict(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
@@ -633,7 +634,7 @@ func TestIntegration_Resume_MidConflict(t *testing.T) {
 
 	recorder := &recordingSaver{loadResult: savedState}
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	gm.SetPlayer(player)
 	gm.SetSaver(recorder)
 
@@ -659,7 +660,7 @@ func TestIntegration_Resume_MidConflict(t *testing.T) {
 // TestIntegration_Resume_MidChallenge verifies that resuming into a scene with
 // an active challenge preserves the challenge state through save/load.
 func TestIntegration_Resume_MidChallenge(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
@@ -694,7 +695,7 @@ func TestIntegration_Resume_MidChallenge(t *testing.T) {
 
 	recorder := &recordingSaver{loadResult: savedState}
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	gm.SetPlayer(player)
 	gm.SetSaver(recorder)
 
@@ -727,11 +728,11 @@ func TestIntegration_Resume_MidChallenge(t *testing.T) {
 // TestIntegration_ChallengeState_SnapshotRoundTrip verifies that a challenge
 // state survives Snapshot → Restore on SceneManager.
 func TestIntegration_ChallengeState_SnapshotRoundTrip(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
 	// Build first scene manager with active challenge
-	sm1 := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm1 := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	player := character.NewCharacter("player1", "Jesse")
 	testScene := scene.NewScene("vault", "Vault", "A massive vault")
 	require.NoError(t, sm1.StartScene(testScene, player))
@@ -752,7 +753,7 @@ func TestIntegration_ChallengeState_SnapshotRoundTrip(t *testing.T) {
 	snapshot := sm1.Snapshot()
 
 	// Restore into a fresh scene manager
-	sm2 := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm2 := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	sm2.Restore(snapshot, player)
 
 	// Verify challenge state survived the round-trip

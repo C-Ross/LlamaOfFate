@@ -9,6 +9,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -52,10 +53,10 @@ func (s *recordingSaver) Load() (*GameState, error) {
 // --- SceneManager.Snapshot tests ---
 
 func TestSceneManager_Snapshot_Empty(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	snapshot := sm.Snapshot()
 
 	assert.Nil(t, snapshot.CurrentScene)
@@ -64,10 +65,10 @@ func TestSceneManager_Snapshot_Empty(t *testing.T) {
 }
 
 func TestSceneManager_Snapshot_WithState(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	testScene := scene.NewScene("scene1", "Saloon", "A dusty saloon")
 	player := character.NewCharacter("player1", "Jesse")
@@ -88,10 +89,10 @@ func TestSceneManager_Snapshot_WithState(t *testing.T) {
 }
 
 func TestSceneManager_Snapshot_CopiesConversationHistory(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	sm.conversationHistory = []prompt.ConversationEntry{
 		{PlayerInput: "hello", GMResponse: "hi", Timestamp: time.Now(), Type: "dialog"},
 	}
@@ -108,14 +109,14 @@ func TestSceneManager_Snapshot_CopiesConversationHistory(t *testing.T) {
 // --- ScenarioManager.Snapshot tests ---
 
 func TestScenarioManager_Snapshot(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
 	player.Aspects.HighConcept = "Gunslinger"
 	player.SetSkill("shoot", dice.Great)
 
-	sm := NewScenarioManager(engine, player)
+	sm := NewScenarioManager(engine, player, session.NullLogger{})
 	sm.SetScenario(&scene.Scenario{
 		Title:          "The Train Heist",
 		Problem:        "A train carrying gold",
@@ -160,11 +161,11 @@ func TestScenarioManager_Snapshot(t *testing.T) {
 }
 
 func TestScenarioManager_Snapshot_CopiesMaps(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
-	sm := NewScenarioManager(engine, player)
+	sm := NewScenarioManager(engine, player, session.NullLogger{})
 	sm.npcRegistry["bandit"] = character.NewCharacter("npc1", "Bandit")
 	sm.npcAttitudes["bandit"] = "neutral"
 	sm.sceneSummaries = []prompt.SceneSummary{
@@ -184,11 +185,11 @@ func TestScenarioManager_Snapshot_CopiesMaps(t *testing.T) {
 }
 
 func TestScenarioManager_SetSaveFunc(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
-	sm := NewScenarioManager(engine, player)
+	sm := NewScenarioManager(engine, player, session.NullLogger{})
 
 	called := false
 	sm.SetSaveFunc(func() error {
@@ -205,10 +206,10 @@ func TestScenarioManager_SetSaveFunc(t *testing.T) {
 // --- GameManager.Save / SetSaver tests ---
 
 func TestGameManager_SetSaver(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 
 	// Default should be noopSaver
 	assert.IsType(t, noopSaver{}, gm.saver)
@@ -220,10 +221,10 @@ func TestGameManager_SetSaver(t *testing.T) {
 }
 
 func TestGameManager_SetSaver_NilFallsBackToNoop(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	gm.SetSaver(&recordingSaver{})
 	gm.SetSaver(nil)
 
@@ -231,10 +232,10 @@ func TestGameManager_SetSaver_NilFallsBackToNoop(t *testing.T) {
 }
 
 func TestGameManager_Save_NoScenarioManager(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	recorder := &recordingSaver{}
 	gm.SetSaver(recorder)
 
@@ -245,20 +246,20 @@ func TestGameManager_Save_NoScenarioManager(t *testing.T) {
 }
 
 func TestGameManager_Save_CascadesSnapshot(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
 	player.Aspects.HighConcept = "Gunslinger"
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	gm.SetPlayer(player)
 
 	recorder := &recordingSaver{}
 	gm.SetSaver(recorder)
 
 	// Manually wire up scenario manager as Run() would
-	gm.scenarioManager = NewScenarioManager(engine, player)
+	gm.scenarioManager = NewScenarioManager(engine, player, session.NullLogger{})
 	gm.scenarioManager.SetScenario(&scene.Scenario{
 		Title:   "Test Scenario",
 		Problem: "A test problem",
@@ -304,10 +305,10 @@ func TestRecordingSaver_ImplementsInterface(t *testing.T) {
 // --- SceneManager.Restore tests ---
 
 func TestSceneManager_Restore_Empty(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	player := character.NewCharacter("player1", "Jesse")
 
 	sm.Restore(SceneState{}, player)
@@ -319,10 +320,10 @@ func TestSceneManager_Restore_Empty(t *testing.T) {
 }
 
 func TestSceneManager_Restore_WithState(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	player := character.NewCharacter("player1", "Jesse")
 
 	testScene := scene.NewScene("scene1", "Saloon", "A dusty saloon")
@@ -345,10 +346,10 @@ func TestSceneManager_Restore_WithState(t *testing.T) {
 }
 
 func TestSceneManager_Restore_AddsPlayerToScene(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	player := character.NewCharacter("player1", "Jesse")
 
 	testScene := scene.NewScene("scene1", "Saloon", "A dusty saloon")
@@ -361,11 +362,11 @@ func TestSceneManager_Restore_AddsPlayerToScene(t *testing.T) {
 }
 
 func TestSceneManager_Restore_RoundTrip(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
 	// Create and populate a scene manager
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	player := character.NewCharacter("player1", "Jesse")
 	testScene := scene.NewScene("scene1", "Saloon", "A dusty saloon")
 	require.NoError(t, sm.StartScene(testScene, player))
@@ -378,7 +379,7 @@ func TestSceneManager_Restore_RoundTrip(t *testing.T) {
 	snapshot := sm.Snapshot()
 
 	// Restore into a fresh scene manager
-	sm2 := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm2 := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	sm2.Restore(snapshot, player)
 
 	assert.Equal(t, testScene, sm2.currentScene)
@@ -390,7 +391,7 @@ func TestSceneManager_Restore_RoundTrip(t *testing.T) {
 // --- ScenarioManager.Restore tests ---
 
 func TestScenarioManager_Restore(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
@@ -398,7 +399,7 @@ func TestScenarioManager_Restore(t *testing.T) {
 	player.SetSkill("Shoot", dice.Great)
 	player.FatePoints = 5
 
-	sm := NewScenarioManager(engine, player)
+	sm := NewScenarioManager(engine, player, session.NullLogger{})
 
 	bartender := character.NewCharacter("npc_bartender", "Old Pete")
 	bartender.Aspects.HighConcept = "Grizzled Barkeep"
@@ -446,11 +447,11 @@ func TestScenarioManager_Restore(t *testing.T) {
 }
 
 func TestScenarioManager_Restore_RegistersNPCsWithEngine(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
-	sm := NewScenarioManager(engine, player)
+	sm := NewScenarioManager(engine, player, session.NullLogger{})
 
 	bartender := character.NewCharacter("npc_bartender", "Old Pete")
 	marshal := character.NewCharacter("npc_marshal", "Marshal Dan")
@@ -476,11 +477,11 @@ func TestScenarioManager_Restore_RegistersNPCsWithEngine(t *testing.T) {
 }
 
 func TestScenarioManager_Restore_NilMaps(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
-	sm := NewScenarioManager(engine, player)
+	sm := NewScenarioManager(engine, player, session.NullLogger{})
 
 	// Restore with nil maps — should not panic
 	sm.Restore(ScenarioState{
@@ -494,11 +495,11 @@ func TestScenarioManager_Restore_NilMaps(t *testing.T) {
 }
 
 func TestScenarioManager_Restore_CascadesToSceneManager(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
-	sm := NewScenarioManager(engine, player)
+	sm := NewScenarioManager(engine, player, session.NullLogger{})
 
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
 	sceneState := SceneState{
@@ -517,13 +518,13 @@ func TestScenarioManager_Restore_CascadesToSceneManager(t *testing.T) {
 }
 
 func TestScenarioManager_Restore_RoundTrip(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
 	player.Aspects.HighConcept = "Gunslinger"
 
-	sm := NewScenarioManager(engine, player)
+	sm := NewScenarioManager(engine, player, session.NullLogger{})
 	sm.SetScenario(&scene.Scenario{Title: "Train Heist", Genre: "Western"})
 	sm.SetScenarioCount(1)
 	sm.sceneCount = 2
@@ -542,10 +543,10 @@ func TestScenarioManager_Restore_RoundTrip(t *testing.T) {
 	scenarioState, sceneState := sm.Snapshot()
 
 	// Create a new engine and scenario manager, then restore
-	engine2, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine2, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
-	sm2 := NewScenarioManager(engine2, player)
+	sm2 := NewScenarioManager(engine2, player, session.NullLogger{})
 	sm2.Restore(scenarioState, sceneState)
 
 	// Verify round-trip
@@ -565,7 +566,7 @@ func TestScenarioManager_Restore_RoundTrip(t *testing.T) {
 // --- GameManager.Start load-on-startup tests ---
 
 func TestGameManager_Start_LoadsOnStartup(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
@@ -593,7 +594,7 @@ func TestGameManager_Start_LoadsOnStartup(t *testing.T) {
 
 	recorder := &recordingSaver{loadResult: savedState}
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	gm.SetPlayer(character.NewCharacter("different", "Different Player"))
 	gm.SetSaver(recorder)
 	gm.SetScenario(&scene.Scenario{Title: "Different Scenario"})
@@ -615,7 +616,7 @@ func TestGameManager_Start_LoadsOnStartup(t *testing.T) {
 }
 
 func TestGameManager_Start_CompletedScenario_StartsFresh(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
@@ -636,7 +637,7 @@ func TestGameManager_Start_CompletedScenario_StartsFresh(t *testing.T) {
 
 	recorder := &recordingSaver{loadResult: savedState}
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	gm.SetPlayer(player)
 	gm.SetSaver(recorder)
 
@@ -659,14 +660,14 @@ func TestGameManager_Start_CompletedScenario_StartsFresh(t *testing.T) {
 }
 
 func TestGameManager_Start_NoSave_FreshStart(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
 	recorder := &recordingSaver{loadResult: nil} // No saved state
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	gm.SetPlayer(player)
 	gm.SetSaver(recorder)
 

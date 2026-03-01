@@ -8,6 +8,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,7 +22,7 @@ func setupCreateAdvantageSM(t *testing.T, fatePoints int) *SceneManager {
 	t.Helper()
 
 	mockClient := &MockLLMClient{response: `{"aspect_text": "Tactical Opening", "description": "A brief opening", "reasoning": "test"}`}
-	engine, err := NewWithLLM(mockClient)
+	engine, err := NewWithLLM(mockClient, session.NullLogger{})
 	require.NoError(t, err)
 
 	sm := engine.GetSceneManager()

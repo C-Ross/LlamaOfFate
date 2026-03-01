@@ -16,7 +16,7 @@ type ChallengeManager struct {
 	llmClient          llm.LLMClient
 	characters         CharacterResolver
 	challengeGenerator ChallengeGenerator
-	sessionLogger      *session.Logger
+	sessionLogger      session.SessionLogger
 
 	// ActionResolver — used for dice rolling, invoke loops, mid-flow.
 	// Wired after construction by SceneManager.
@@ -31,6 +31,7 @@ type ChallengeManager struct {
 func newChallengeManager(
 	llmClient llm.LLMClient,
 	characters CharacterResolver,
+	sessionLogger session.SessionLogger,
 ) *ChallengeManager {
 	var cg ChallengeGenerator
 	if llmClient != nil {
@@ -40,6 +41,7 @@ func newChallengeManager(
 		llmClient:          llmClient,
 		characters:         characters,
 		challengeGenerator: cg,
+		sessionLogger:      sessionLogger,
 	}
 }
 
@@ -52,11 +54,6 @@ func (chm *ChallengeManager) setSceneState(s *scene.Scene, player *character.Cha
 // resetState clears per-scene challenge state.
 func (chm *ChallengeManager) resetState() {
 	// No mutable state to clear beyond what's on the Scene itself.
-}
-
-// setSessionLogger updates the session logger (may be called after construction).
-func (chm *ChallengeManager) setSessionLogger(logger *session.Logger) {
-	chm.sessionLogger = logger
 }
 
 // buildChallengeTaskInfos converts ChallengeState tasks to UI-friendly infos.

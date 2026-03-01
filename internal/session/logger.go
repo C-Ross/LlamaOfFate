@@ -67,6 +67,27 @@ func sanitizePart(s string, maxLen int) string {
 	return s
 }
 
+// SessionLogger is the interface for game session logging. Use NullLogger as
+// the no-op implementation in tests or when logging is not desired.
+type SessionLogger interface {
+	// Log writes a typed entry to the session log.
+	Log(entryType string, data any)
+	// Close releases any underlying resources (e.g. file handles).
+	Close() error
+}
+
+// Compile-time checks
+var (
+	_ SessionLogger = (*Logger)(nil)
+	_ SessionLogger = NullLogger{}
+)
+
+// NullLogger is a no-op SessionLogger for use in tests and when logging is disabled.
+type NullLogger struct{}
+
+func (NullLogger) Log(string, any) {}
+func (NullLogger) Close() error    { return nil }
+
 // Entry represents a single log entry in the session
 type Entry struct {
 	Timestamp time.Time `yaml:"timestamp"`

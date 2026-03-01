@@ -18,6 +18,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/C-Ross/LlamaOfFate/internal/storage"
 	"github.com/C-Ross/LlamaOfFate/internal/ui/web"
 )
@@ -110,11 +111,12 @@ func newGameSession(ctx context.Context, llmClient llm.LLMClient, gameID string,
 			return nil, nil // no saved game — enter setup flow
 		}
 
-		gameEngine, err := engine.NewWithLLM(llmClient)
+		sl := createSessionLogger("resume", gameID)
+		gameEngine, err := engine.NewWithLLM(llmClient, sl)
 		if err != nil {
 			return nil, fmt.Errorf("create engine: %w", err)
 		}
-		gm := engine.NewGameManager(gameEngine)
+		gm := engine.NewGameManager(gameEngine, sl)
 		gm.SetSaver(saver)
 
 		// Save exists: provide the player from state; Start() will hydrate from state.
@@ -155,17 +157,35 @@ func newGameSession(ctx context.Context, llmClient llm.LLMClient, gameID string,
 		return nil, fmt.Errorf("setup message has neither presetId nor custom data")
 	}
 
-	gameEngine, err := engine.NewWithLLM(llmClient)
+	sl := createSessionLogger(scenario.Genre, player.Name)
+	gameEngine, err := engine.NewWithLLM(llmClient, sl)
 	if err != nil {
 		return nil, fmt.Errorf("create engine: %w", err)
 	}
 
-	gm := engine.NewGameManager(gameEngine)
+	gm := engine.NewGameManager(gameEngine, sl)
 	gm.SetPlayer(player)
 	gm.SetScenario(scenario)
 	gm.SetSaver(saver)
 
 	return gm, nil
+}
+
+// createSessionLogger builds a session logger for a web game session.
+// On failure it logs a warning and returns a NullLogger so the game can proceed.
+func createSessionLogger(label, name string) session.SessionLogger {
+	logPath, err := session.GenerateLogPath("session", []string{label, name}, 20)
+	if err != nil {
+		slog.Warn("session logging disabled: failed to generate log path", "error", err)
+		return session.NullLogger{}
+	}
+	logger, err := session.NewLogger(logPath)
+	if err != nil {
+		slog.Warn("session logging disabled: failed to create logger", "error", err)
+		return session.NullLogger{}
+	}
+	slog.Info("Session log started", "path", logPath)
+	return logger
 }
 
 // scenarioGenerationTimeout is the maximum time allowed for LLM scenario generation.

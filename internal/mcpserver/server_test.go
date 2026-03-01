@@ -484,10 +484,10 @@ func TestSaveGame_Error(t *testing.T) {
 // --- handleGetGameState with a real GameManager ---
 
 func TestGetGameState_WithGameManager(t *testing.T) {
-	eng, err := engine.New()
+	eng, err := engine.New(session.NullLogger{})
 	require.NoError(t, err)
 
-	gm := engine.NewGameManager(eng)
+	gm := engine.NewGameManager(eng, session.NullLogger{})
 	player := character.NewCharacter("player1", "Test Hero")
 	player.Aspects.HighConcept = "Courageous Fighter"
 	gm.SetPlayer(player)

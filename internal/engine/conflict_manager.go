@@ -15,7 +15,7 @@ type ConflictManager struct {
 	// Shared dependencies — set once at construction.
 	llmClient     llm.LLMClient
 	characters    CharacterResolver
-	sessionLogger *session.Logger
+	sessionLogger session.SessionLogger
 
 	// ActionResolver — used for dice rolling, invoke loops, mid-flow prompts,
 	// and narrative. Wired after construction by SceneManager.
@@ -41,10 +41,12 @@ type ConflictManager struct {
 func newConflictManager(
 	llmClient llm.LLMClient,
 	characters CharacterResolver,
+	sessionLogger session.SessionLogger,
 ) *ConflictManager {
 	return &ConflictManager{
-		llmClient:  llmClient,
-		characters: characters,
+		llmClient:     llmClient,
+		characters:    characters,
+		sessionLogger: sessionLogger,
 	}
 }
 
@@ -60,11 +62,6 @@ func (cm *ConflictManager) resetState() {
 	cm.shouldExit = false
 	cm.sceneEndReason = ""
 	cm.playerTakenOutHint = ""
-}
-
-// setSessionLogger updates the session logger (may be called after construction).
-func (cm *ConflictManager) setSessionLogger(logger *session.Logger) {
-	cm.sessionLogger = logger
 }
 
 // --- Accessor methods ---

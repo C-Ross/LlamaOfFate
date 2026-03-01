@@ -7,25 +7,26 @@ import (
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewGameManager(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 
 	assert.NotNil(t, gm)
 	assert.Equal(t, engine, gm.engine)
 }
 
 func TestGameManager_SetPlayer(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	player := character.NewCharacter("player1", "Test Hero")
 
 	gm.SetPlayer(player)
@@ -34,10 +35,10 @@ func TestGameManager_SetPlayer(t *testing.T) {
 }
 
 func TestGameManager_SetScenario(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	scenario := &scene.Scenario{
 		Title:   "Test Scenario",
 		Problem: "A test problem",
@@ -53,10 +54,10 @@ func TestGameManager_SetScenario(t *testing.T) {
 }
 
 func TestGameManager_SetInitialScene(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 
 	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
 	config := &InitialSceneConfig{Scene: testScene}
@@ -66,10 +67,10 @@ func TestGameManager_SetInitialScene(t *testing.T) {
 }
 
 func TestGameManager_GetEngine(t *testing.T) {
-	eng, err := NewWithLLM(&MockLLMClientForScenario{})
+	eng, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
-	gm := NewGameManager(eng)
+	gm := NewGameManager(eng, session.NullLogger{})
 
 	assert.Equal(t, eng, gm.GetEngine())
 }
@@ -89,10 +90,10 @@ func TestInitialSceneConfig_Fields(t *testing.T) {
 }
 
 func TestGameManager_HandleMilestone_ReturnsMilestoneEvent(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	player := character.NewCharacter("player1", "Test Hero")
 	player.FatePoints = 1
 	player.Refresh = 3
@@ -116,10 +117,10 @@ func TestGameManager_HandleMilestone_ReturnsMilestoneEvent(t *testing.T) {
 }
 
 func TestGameManager_HandleMilestone_WithConsequenceRecovery(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	player := character.NewCharacter("player1", "Test Hero")
 	player.FatePoints = 2
 	player.Refresh = 3
@@ -156,10 +157,10 @@ func TestGameManager_HandleMilestone_WithConsequenceRecovery(t *testing.T) {
 }
 
 func TestGameManager_HandleMilestone_NilScenario(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	player := character.NewCharacter("player1", "Test Hero")
 	player.Refresh = 3
 	gm.SetPlayer(player)
@@ -203,10 +204,10 @@ func TestGameManager_Start_RequiresEngine(t *testing.T) {
 }
 
 func TestGameManager_Start_RequiresPlayer(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 
 	_, err = gm.Start(context.Background())
 	assert.Error(t, err)
@@ -214,13 +215,13 @@ func TestGameManager_Start_RequiresPlayer(t *testing.T) {
 }
 
 func TestGameManager_Start_FreshStart(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
 	player.Aspects.HighConcept = "Brave Knight"
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	gm.SetPlayer(player)
 
 	gm.SetScenario(&scene.Scenario{Title: "The Tournament", Genre: "Fantasy"})
@@ -237,10 +238,10 @@ func TestGameManager_Start_FreshStart(t *testing.T) {
 }
 
 func TestGameManager_HandleInput_BeforeStart(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	gm.SetPlayer(character.NewCharacter("player1", "Test Hero"))
 
 	_, err = gm.HandleInput(context.Background(), "hello")
@@ -249,10 +250,10 @@ func TestGameManager_HandleInput_BeforeStart(t *testing.T) {
 }
 
 func TestGameManager_ProvideInvokeResponse_BeforeStart(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 
 	_, err = gm.ProvideInvokeResponse(context.Background(), InvokeResponse{})
 	assert.Error(t, err)
@@ -260,10 +261,10 @@ func TestGameManager_ProvideInvokeResponse_BeforeStart(t *testing.T) {
 }
 
 func TestGameManager_ProvideMidFlowResponse_BeforeStart(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 
 	_, err = gm.ProvideMidFlowResponse(context.Background(), MidFlowResponse{})
 	assert.Error(t, err)
@@ -271,7 +272,7 @@ func TestGameManager_ProvideMidFlowResponse_BeforeStart(t *testing.T) {
 }
 
 func TestGameManager_Start_ResumeFromSave(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -290,7 +291,7 @@ func TestGameManager_Start_ResumeFromSave(t *testing.T) {
 		},
 	}
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	gm.SetPlayer(player)
 	gm.SetSaver(&mockSaver{savedState: savedState})
 
@@ -309,13 +310,13 @@ func TestGameManager_Start_ResumeFromSave(t *testing.T) {
 }
 
 func TestGameManager_Start_LoadFailure_EmitsErrorNotification(t *testing.T) {
-	engine, err := NewWithLLM(&MockLLMClientForScenario{})
+	engine, err := NewWithLLM(&MockLLMClientForScenario{}, session.NullLogger{})
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
 	player.Aspects.HighConcept = "Brave Knight"
 
-	gm := NewGameManager(engine)
+	gm := NewGameManager(engine, session.NullLogger{})
 	gm.SetPlayer(player)
 	gm.SetScenario(&scene.Scenario{Title: "The Tournament", Genre: "Fantasy"})
 	gm.SetSaver(&mockSaver{loadErr: fmt.Errorf("save file is corrupt or incompatible: invalid save state: player has no high concept")})

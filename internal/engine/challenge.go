@@ -48,12 +48,10 @@ func (chm *ChallengeManager) initiateChallenge(ctx context.Context, description 
 		"tasks", len(state.Tasks))
 
 	// Session logging
-	if chm.sessionLogger != nil {
-		chm.sessionLogger.Log("challenge_start", map[string]any{
-			"description": state.Description,
-			"tasks":       state.Tasks,
-		})
-	}
+	chm.sessionLogger.Log("challenge_start", map[string]any{
+		"description": state.Description,
+		"tasks":       state.Tasks,
+	})
 
 	taskInfos := buildChallengeTaskInfos(chm.currentScene.ChallengeState)
 	return []GameEvent{ChallengeStartEvent{
@@ -98,14 +96,12 @@ func (chm *ChallengeManager) resolveTask(taskID string, outcome dice.OutcomeType
 		"status", status,
 		"shifts", shifts)
 
-	if chm.sessionLogger != nil {
-		chm.sessionLogger.Log("challenge_task_result", map[string]any{
-			"task_id": taskID,
-			"skill":   task.Skill,
-			"outcome": string(status),
-			"shifts":  shifts,
-		})
-	}
+	chm.sessionLogger.Log("challenge_task_result", map[string]any{
+		"task_id": taskID,
+		"skill":   task.Skill,
+		"outcome": string(status),
+		"shifts":  shifts,
+	})
 
 	events := []GameEvent{ChallengeTaskResultEvent{
 		TaskID:      taskID,
@@ -141,14 +137,12 @@ func (chm *ChallengeManager) completeChallenge() []GameEvent {
 		"ties", ties,
 		"overall", overall)
 
-	if chm.sessionLogger != nil {
-		chm.sessionLogger.Log("challenge_complete", map[string]any{
-			"successes": successes,
-			"failures":  failures,
-			"ties":      ties,
-			"overall":   string(overall),
-		})
-	}
+	chm.sessionLogger.Log("challenge_complete", map[string]any{
+		"successes": successes,
+		"failures":  failures,
+		"ties":      ties,
+		"overall":   string(overall),
+	})
 
 	chm.currentScene.EndChallenge()
 

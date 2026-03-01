@@ -10,6 +10,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,10 +22,10 @@ type MockUI struct {
 }
 
 func TestNewSceneManager(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	assert.NotNil(t, sm)
 	assert.Equal(t, engine, sm.characters)
@@ -32,10 +33,10 @@ func TestNewSceneManager(t *testing.T) {
 }
 
 func TestSceneManager_StartScene(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	player := character.NewCharacter("player1", "Test Character")
 
 	testScene := scene.NewScene("scene1", "Test Scene", "A test scene description")
@@ -52,10 +53,10 @@ func TestSceneManager_StartScene(t *testing.T) {
 }
 
 func TestSceneManager_ConversationHistory(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	// Test initial state
 	assert.Empty(t, sm.conversationHistory)
@@ -71,10 +72,10 @@ func TestSceneManager_ConversationHistory(t *testing.T) {
 }
 
 func TestSceneManager_BuildContexts(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	player := character.NewCharacter("player1", "Test Character")
 	player.Aspects.HighConcept = "Brave Warrior"
 	player.Aspects.Trouble = "Quick to Anger"
@@ -106,7 +107,7 @@ func TestSceneManager_BuildContexts(t *testing.T) {
 }
 
 func TestBuildCharacterContext_OtherAspects(t *testing.T) {
-	sm := NewSceneManager(nil, nil, nil)
+	sm := NewSceneManager(nil, nil, nil, session.NullLogger{})
 	player := character.NewCharacter("p1", "Lyra")
 	player.Aspects.HighConcept = "Wandering Wizard"
 	player.Aspects.Trouble = "Haunted Past"
@@ -123,7 +124,7 @@ func TestBuildCharacterContext_OtherAspects(t *testing.T) {
 }
 
 func TestBuildAspectsContext_FreeInvokes(t *testing.T) {
-	sm := NewSceneManager(nil, nil, nil)
+	sm := NewSceneManager(nil, nil, nil, session.NullLogger{})
 	player := character.NewCharacter("p1", "Hero")
 	player.Aspects.HighConcept = "Bold Knight"
 	testScene := scene.NewScene("s1", "Hall", "A great hall")
@@ -144,7 +145,7 @@ func TestBuildAspectsContext_FreeInvokes(t *testing.T) {
 }
 
 func TestBuildAspectsContext_Empty(t *testing.T) {
-	sm := NewSceneManager(nil, nil, nil)
+	sm := NewSceneManager(nil, nil, nil, session.NullLogger{})
 	sm.player = nil
 	sm.conflict.player = nil
 	sm.actions.player = nil
@@ -158,7 +159,7 @@ func TestBuildAspectsContext_Empty(t *testing.T) {
 }
 
 func TestAddToConversationHistory_TrimsBeyond10(t *testing.T) {
-	sm := NewSceneManager(nil, nil, nil)
+	sm := NewSceneManager(nil, nil, nil, session.NullLogger{})
 
 	// Add 12 entries
 	for i := 0; i < 12; i++ {
@@ -169,7 +170,7 @@ func TestAddToConversationHistory_TrimsBeyond10(t *testing.T) {
 }
 
 func TestBuildSceneEndResult_PlayerTakenOut(t *testing.T) {
-	sm := NewSceneManager(nil, nil, nil)
+	sm := NewSceneManager(nil, nil, nil, session.NullLogger{})
 	sm.conflict.sceneEndReason = SceneEndPlayerTakenOut
 	sm.conflict.playerTakenOutHint = "You collapse in a heap."
 
@@ -179,17 +180,17 @@ func TestBuildSceneEndResult_PlayerTakenOut(t *testing.T) {
 }
 
 func TestBuildSceneEndResult_DefaultReason(t *testing.T) {
-	sm := NewSceneManager(nil, nil, nil)
+	sm := NewSceneManager(nil, nil, nil, session.NullLogger{})
 	// sceneEndReason is empty
 	result := sm.buildSceneEndResult()
 	assert.Equal(t, SceneEndQuit, result.Reason)
 }
 
 func TestSceneManager_ApplyActionEffects_CreateAdvantage(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player1", "Test Character")
 	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
@@ -233,7 +234,7 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage_WithLLM(t *testing.T) {
 		}`,
 	}
 
-	engine, err := NewWithLLM(mockLLM)
+	engine, err := NewWithLLM(mockLLM, session.NullLogger{})
 	require.NoError(t, err)
 
 	sm := engine.GetSceneManager()
@@ -273,10 +274,10 @@ func TestActionResolver_ApplyActionEffects_Overcome_NoMechanicalEffect(t *testin
 	// Overcome actions currently produce no mechanical side effects via
 	// applyActionEffects — this test documents that expectation so a future
 	// ChallengeManager can add its own branch without breaking existing logic.
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player1", "Test Character")
 	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
@@ -293,10 +294,10 @@ func TestActionResolver_ApplyActionEffects_Overcome_NoMechanicalEffect(t *testin
 }
 
 func TestActionResolver_ApplyActionEffects_NilOutcome_ReturnsNil(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player1", "Test Character")
 	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
@@ -315,7 +316,7 @@ func TestActionResolver_ApplyActionEffects_NilOutcome_ReturnsNil(t *testing.T) {
 func TestActionResolver_AspectGeneratorWiring(t *testing.T) {
 	// When created with an LLM, the ActionResolver should have an AspectGenerator.
 	mockLLM := &MockLLMClient{response: "test"}
-	engine, err := NewWithLLM(mockLLM)
+	engine, err := NewWithLLM(mockLLM, session.NullLogger{})
 	require.NoError(t, err)
 
 	sm := engine.GetSceneManager()
@@ -324,21 +325,21 @@ func TestActionResolver_AspectGeneratorWiring(t *testing.T) {
 
 func TestActionResolver_AspectGeneratorWiring_NoLLM(t *testing.T) {
 	// Without an LLM, AspectGenerator should be nil.
-	sm := NewSceneManager(nil, nil, nil)
+	sm := NewSceneManager(nil, nil, nil, session.NullLogger{})
 	assert.Nil(t, sm.actions.aspectGenerator, "ActionResolver should have nil aspectGenerator without LLM")
 }
 
 func TestActionResolver_ResolveAction_ActiveOpposition_Overcome(t *testing.T) {
 	// When an Overcome action has OpposingNPCID set, the resolver should roll
 	// the NPC's skill and use it as the difficulty instead of the static value.
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
 	// Wire a mock narrative provider that won't fail
 	mockLLM := &MockLLMClient{
 		response: "The guard nearly spots you as you slip past.",
 	}
-	sm := NewSceneManager(engine, mockLLM, engine.actionParser)
+	sm := NewSceneManager(engine, mockLLM, engine.actionParser, session.NullLogger{})
 	sm.actions.roller = dice.NewSeededRoller(42) // Predictable rolls
 
 	player := character.NewCharacter("player1", "Sneaky Rogue")
@@ -381,13 +382,13 @@ func TestActionResolver_ResolveAction_ActiveOpposition_Overcome(t *testing.T) {
 
 func TestActionResolver_ResolveAction_ActiveOpposition_CreateAdvantage(t *testing.T) {
 	// Create Advantage with active opposition should also roll the NPC's skill.
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
 	mockLLM := &MockLLMClient{
 		response: "You study the merchant's body language.",
 	}
-	sm := NewSceneManager(engine, mockLLM, engine.actionParser)
+	sm := NewSceneManager(engine, mockLLM, engine.actionParser, session.NullLogger{})
 	sm.actions.roller = dice.NewSeededRoller(99)
 
 	player := character.NewCharacter("player1", "Observant Detective")
@@ -418,13 +419,13 @@ func TestActionResolver_ResolveAction_ActiveOpposition_CreateAdvantage(t *testin
 
 func TestActionResolver_ResolveAction_ActiveOpposition_NPCNotFound(t *testing.T) {
 	// If the opposing NPC ID can't be resolved, fall back to passive difficulty.
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
 	mockLLM := &MockLLMClient{
 		response: "You attempt the action.",
 	}
-	sm := NewSceneManager(engine, mockLLM, engine.actionParser)
+	sm := NewSceneManager(engine, mockLLM, engine.actionParser, session.NullLogger{})
 	sm.actions.roller = dice.NewSeededRoller(42)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -456,13 +457,13 @@ func TestActionResolver_ResolveAction_ActiveOpposition_NPCNotFound(t *testing.T)
 
 func TestActionResolver_ResolveAction_PassiveOpposition_NoNPCRoll(t *testing.T) {
 	// Standard passive opposition should NOT trigger any NPC roll.
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
 	mockLLM := &MockLLMClient{
 		response: "You climb the wall.",
 	}
-	sm := NewSceneManager(engine, mockLLM, engine.actionParser)
+	sm := NewSceneManager(engine, mockLLM, engine.actionParser, session.NullLogger{})
 	sm.actions.roller = dice.NewSeededRoller(42)
 
 	player := character.NewCharacter("player1", "Test Hero")
@@ -497,10 +498,10 @@ func TestActionResolver_ResolveAction_PassiveOpposition_NoNPCRoll(t *testing.T) 
 
 func TestActionResolver_GenerateAspectName_Fallback(t *testing.T) {
 	// Without an aspect generator, generateAspectName should return a fallback.
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player1", "Test Character")
 	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
@@ -517,10 +518,10 @@ func TestActionResolver_GenerateAspectName_Fallback(t *testing.T) {
 }
 
 func TestActionResolver_GenerateAspectName_SuccessWithStyle_TwoFreeInvokes(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player1", "Test Character")
 	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
@@ -536,10 +537,10 @@ func TestActionResolver_GenerateAspectName_SuccessWithStyle_TwoFreeInvokes(t *te
 }
 
 func TestSceneManager_GetCurrentScene(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	assert.Nil(t, sm.GetCurrentScene())
 
@@ -554,10 +555,10 @@ func TestSceneManager_GetCurrentScene(t *testing.T) {
 }
 
 func TestSceneManager_GetPlayer(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	assert.Nil(t, sm.GetPlayer())
 
@@ -583,10 +584,10 @@ func createTestAction(t *testing.T, actionType, skill, description string) *acti
 func TestSceneManager_OtherCharactersInTemplateData(t *testing.T) {
 	// Create engine with mock LLM client
 	mockClient := &MockLLMClient{response: "Test response"}
-	engine, err := NewWithLLM(mockClient)
+	engine, err := NewWithLLM(mockClient, session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	// Create test characters
 	player := character.NewCharacter("player1", "Player Character")
@@ -629,10 +630,10 @@ func TestSceneManager_OtherCharactersInTemplateData(t *testing.T) {
 func TestSceneManager_GenerateActionNarrativeWithTarget(t *testing.T) {
 	// Create engine with mock LLM client
 	mockClient := &MockLLMClient{response: "The attack strikes true!"}
-	engine, err := NewWithLLM(mockClient)
+	engine, err := NewWithLLM(mockClient, session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	// Create test characters
 	player := character.NewCharacter("player1", "Player Character")
@@ -680,10 +681,10 @@ func TestSceneManager_GenerateActionNarrativeWithTarget(t *testing.T) {
 func TestSceneManager_GenerateActionNarrativeWithoutTarget(t *testing.T) {
 	// Create engine with mock LLM client
 	mockClient := &MockLLMClient{response: "You successfully overcome the obstacle!"}
-	engine, err := NewWithLLM(mockClient)
+	engine, err := NewWithLLM(mockClient, session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	// Create test character
 	player := character.NewCharacter("player1", "Player Character")
@@ -724,7 +725,7 @@ func TestSceneManager_GenerateActionNarrativeWithoutTarget(t *testing.T) {
 }
 
 func TestEngine_GetCharacterByName_ExactMatch(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
 	npc := character.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
@@ -737,7 +738,7 @@ func TestEngine_GetCharacterByName_ExactMatch(t *testing.T) {
 }
 
 func TestEngine_GetCharacterByName_CaseInsensitive(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
 	npc := character.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
@@ -753,7 +754,7 @@ func TestEngine_GetCharacterByName_CaseInsensitive(t *testing.T) {
 }
 
 func TestEngine_GetCharacterByName_Trimmed(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
 	npc := character.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
@@ -765,7 +766,7 @@ func TestEngine_GetCharacterByName_Trimmed(t *testing.T) {
 }
 
 func TestEngine_GetCharacterByName_NoMatch(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
 	npc := character.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
@@ -777,7 +778,7 @@ func TestEngine_GetCharacterByName_NoMatch(t *testing.T) {
 
 func TestEngine_GetCharacterByName_IDDoesNotMatch(t *testing.T) {
 	// Reproduces issue #25: the LLM returns a name, not an ID
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
 	npc := character.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
@@ -815,10 +816,10 @@ func TestClassifyInput_TrimsExtraText(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mockClient := &MockLLMClient{response: tc.response}
-			engine, err := NewWithLLM(mockClient)
+			engine, err := NewWithLLM(mockClient, session.NullLogger{})
 			require.NoError(t, err)
 
-			sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+			sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 			sm.currentScene = scene.NewScene("test", "Test", "Test scene")
 			sm.conflict.currentScene = scene.NewScene("test", "Test", "Test scene")
 			sm.actions.currentScene = scene.NewScene("test", "Test", "Test scene")
@@ -837,10 +838,10 @@ func TestProcessInput_NarrativeRoutesToDialog(t *testing.T) {
 	client := &sequentialMockLLMClient{
 		responses: []string{"narrative", "You walk over to the table and sit down."},
 	}
-	engine, err := NewWithLLM(client)
+	engine, err := NewWithLLM(client, session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	testScene := scene.NewScene("test-scene", "Tavern", "A cozy tavern")
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
@@ -892,10 +893,10 @@ func (s *sequentialMockLLMClient) GetModelInfo() llm.ModelInfo {
 }
 
 func TestSceneManager_StartScene_ClearsConversationHistory(t *testing.T) {
-	gameEngine, err := New()
+	gameEngine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(gameEngine, gameEngine.llmClient, gameEngine.actionParser)
+	sm := NewSceneManager(gameEngine, gameEngine.llmClient, gameEngine.actionParser, session.NullLogger{})
 	player := character.NewCharacter("player1", "Test Character")
 
 	// Restore with conversation history (simulating a previous scene)
@@ -923,10 +924,10 @@ func TestHandleInput_DialogReturnsDialogEvent(t *testing.T) {
 	client := &sequentialMockLLMClient{
 		responses: []string{"dialog", "The bartender nods slowly."},
 	}
-	engine, err := NewWithLLM(client)
+	engine, err := NewWithLLM(client, session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	testScene := scene.NewScene("tavern", "Tavern", "A dimly lit tavern")
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
@@ -956,10 +957,10 @@ func TestHandleInput_DialogWithSceneTransition(t *testing.T) {
 	client := &sequentialMockLLMClient{
 		responses: []string{"dialog", "You step outside into the rain. [SCENE_TRANSITION:The rainy streets]"},
 	}
-	engine, err := NewWithLLM(client)
+	engine, err := NewWithLLM(client, session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	sm.conflict.exitOnSceneTransition = true
 	testScene := scene.NewScene("tavern", "Tavern", "A dimly lit tavern")
 	sm.currentScene = testScene
@@ -1000,10 +1001,10 @@ func TestHandleInput_ActionPath_ReturnsEvents(t *testing.T) {
 			"You swing your sword!", // narrative
 		},
 	}
-	engine, err := NewWithLLM(client)
+	engine, err := NewWithLLM(client, session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	sm.actions.roller = dice.NewSeededRoller(12345)
 	testScene := scene.NewScene("arena", "Arena", "A fighting arena")
 
@@ -1037,10 +1038,10 @@ func TestHandleInput_ClassificationFallbackToDialog(t *testing.T) {
 	client := &sequentialMockLLMClient{
 		responses: []string{"xyzzy_invalid", "The room is quiet."},
 	}
-	engine, err := NewWithLLM(client)
+	engine, err := NewWithLLM(client, session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	testScene := scene.NewScene("room", "Room", "A quiet room")
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
@@ -1078,10 +1079,10 @@ func TestHandleInput_DialogWithChallengeMarker_InitiatesChallenge(t *testing.T) 
 		},
 	}
 
-	engine, err := NewWithLLM(client)
+	engine, err := NewWithLLM(client, session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	testScene := scene.NewScene("vault", "Vault", "A massive vault")
 	player := character.NewCharacter("player-1", "Hero")
 	player.SetSkill("Athletics", dice.Good)
@@ -1131,10 +1132,10 @@ func TestHandleInput_ActionDuringChallenge_ResolvesTask(t *testing.T) {
 		},
 	}
 
-	engine, err := NewWithLLM(client)
+	engine, err := NewWithLLM(client, session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	sm.actions.roller = dice.NewSeededRoller(42)
 
 	testScene := scene.NewScene("vault", "Vault", "A massive vault")
@@ -1185,10 +1186,10 @@ func TestHandleInput_ActionDuringChallenge_CompletesChallenge(t *testing.T) {
 		},
 	}
 
-	engine, err := NewWithLLM(client)
+	engine, err := NewWithLLM(client, session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	sm.actions.roller = dice.NewSeededRoller(42)
 
 	testScene := scene.NewScene("vault", "Vault", "A massive vault")

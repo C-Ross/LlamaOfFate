@@ -7,6 +7,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,8 +26,9 @@ func newChallengeTestSetup() (*ChallengeManager, *scene.Scene, *character.Charac
 	s.AddCharacter(player.ID)
 
 	chm := &ChallengeManager{
-		player:       player,
-		currentScene: s,
+		player:        player,
+		currentScene:  s,
+		sessionLogger: session.NullLogger{},
 	}
 	return chm, s, player
 }

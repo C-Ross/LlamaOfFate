@@ -25,7 +25,7 @@ const (
 )
 
 // initializeEngine creates a game engine with LLM support
-func initializeEngine() *engine.Engine {
+func initializeEngine(sessionLogger session.SessionLogger) *engine.Engine {
 	configPath := "configs/azure-llm.yaml"
 	if _, err := os.Stat(configPath); err != nil {
 		log.Fatalf("LLM config not found at %s", configPath)
@@ -39,7 +39,7 @@ func initializeEngine() *engine.Engine {
 	azureClient := azure.NewClient(*config)
 	retryClient := llm.NewRetryingClient(azureClient, llm.DefaultRetryConfig())
 
-	gameEngine, err := engine.NewWithLLM(retryClient)
+	gameEngine, err := engine.NewWithLLM(retryClient, sessionLogger)
 	if err != nil {
 		log.Fatalf("Failed to create engine with LLM: %v", err)
 	}
@@ -70,8 +70,6 @@ func main() {
 	fmt.Printf("%s v%s - A Fate Core RPG with LLM integration\n", AppName, AppVersion)
 	fmt.Println("====================================================")
 
-	gameEngine := initializeEngine()
-
 	// Use hardcoded scenario and player (see scenario.go)
 	scenario := defaultScenario()
 	player := defaultPlayer()
@@ -85,7 +83,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create session logger: %v", err)
 	}
+	var sl session.SessionLogger
 	if sessionLogger != nil {
+		sl = sessionLogger
 		defer func() {
 			if closeErr := sessionLogger.Close(); closeErr != nil {
 				log.Printf("Warning: Failed to close session logger: %v", closeErr)
@@ -97,18 +97,19 @@ func main() {
 			"high_concept": player.Aspects.HighConcept,
 			"trouble":      player.Aspects.Trouble,
 		})
+	} else {
+		sl = session.NullLogger{}
 	}
+
+	gameEngine := initializeEngine(sl)
 
 	// Wire everything into the GameManager and run
 	terminalUI := terminal.NewTerminalUI()
 
-	gm := engine.NewGameManager(gameEngine)
+	gm := engine.NewGameManager(gameEngine, sl)
 	gm.SetPlayer(player)
 	gm.SetScenario(scenario)
 	gm.SetSaver(newSaver())
-	if sessionLogger != nil {
-		gm.SetSessionLogger(sessionLogger)
-	}
 
 	fmt.Println("Type naturally to interact, 'quit' to exit.")
 	fmt.Println("====================================================")

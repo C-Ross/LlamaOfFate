@@ -5,12 +5,13 @@ import (
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewConflictManager(t *testing.T) {
-	cm := newConflictManager(nil, nil)
+	cm := newConflictManager(nil, nil, session.NullLogger{})
 	require.NotNil(t, cm)
 	assert.Nil(t, cm.llmClient)
 	assert.Nil(t, cm.characters)
@@ -18,7 +19,7 @@ func TestNewConflictManager(t *testing.T) {
 }
 
 func TestConflictManager_SetSceneState(t *testing.T) {
-	cm := newConflictManager(nil, nil)
+	cm := newConflictManager(nil, nil, session.NullLogger{})
 	player := character.NewCharacter("p1", "Hero")
 	s := scene.NewScene("s1", "Room", "A room")
 
@@ -29,7 +30,7 @@ func TestConflictManager_SetSceneState(t *testing.T) {
 }
 
 func TestConflictManager_ResetState(t *testing.T) {
-	cm := newConflictManager(nil, nil)
+	cm := newConflictManager(nil, nil, session.NullLogger{})
 	cm.takenOutChars = []string{"npc1"}
 
 	cm.resetState()
@@ -38,10 +39,10 @@ func TestConflictManager_ResetState(t *testing.T) {
 }
 
 func TestSceneManager_ConflictManagerWiring(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	require.NotNil(t, sm.conflict, "ConflictManager should be created by NewSceneManager")
 
 	player := character.NewCharacter("p1", "Hero")
@@ -54,7 +55,7 @@ func TestSceneManager_ConflictManagerWiring(t *testing.T) {
 }
 
 func TestSceneManager_ResetSceneState_ResetsConflictManager(t *testing.T) {
-	sm := NewSceneManager(nil, nil, nil)
+	sm := NewSceneManager(nil, nil, nil, session.NullLogger{})
 	sm.actions.pendingInvoke = &invokeState{}
 	sm.actions.pendingMidFlow = &midFlowState{}
 	sm.conflict.takenOutChars = []string{"npc1"}
@@ -67,7 +68,7 @@ func TestSceneManager_ResetSceneState_ResetsConflictManager(t *testing.T) {
 }
 
 func TestSceneManager_Restore_WiresConflictManager(t *testing.T) {
-	sm := NewSceneManager(nil, nil, nil)
+	sm := NewSceneManager(nil, nil, nil, session.NullLogger{})
 	player := character.NewCharacter("p1", "Hero")
 	s := scene.NewScene("s1", "Room", "A room")
 

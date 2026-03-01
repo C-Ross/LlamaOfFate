@@ -81,8 +81,36 @@ func main() {
 	// Create Azure ML client
 	azureClient := azure.NewClient(*config)
 
+	// Set up session logging (default: enabled with auto-generated filename)
+	logPath := *logFlag
+	if logPath == "auto" {
+		var err error
+		logPath, err = session.GenerateLogPath("session", []string{selectedScene}, 0)
+		if err != nil {
+			log.Fatalf("Failed to generate log path: %v", err)
+		}
+	}
+	var sessionLogger *session.Logger
+	var sl session.SessionLogger
+	if logPath != "" {
+		var err error
+		sessionLogger, err = session.NewLogger(logPath)
+		if err != nil {
+			log.Fatalf("Failed to create session logger: %v", err)
+		}
+		defer func() {
+			if err := sessionLogger.Close(); err != nil {
+				log.Printf("Warning: Failed to close session logger: %v", err)
+			}
+		}()
+		fmt.Printf("Session log: %s\n\n", logPath)
+		sl = sessionLogger
+	} else {
+		sl = session.NullLogger{}
+	}
+
 	// Create the game engine with LLM
-	gameEngine, err := engine.NewWithLLM(azureClient)
+	gameEngine, err := engine.NewWithLLM(azureClient, sl)
 	if err != nil {
 		log.Fatalf("Failed to create engine with LLM: %v", err)
 	}
@@ -113,30 +141,6 @@ func main() {
 		Farewell:    ls.Farewell,
 	}
 
-	// Set up session logging (default: enabled with auto-generated filename)
-	logPath := *logFlag
-	if logPath == "auto" {
-		var err error
-		logPath, err = session.GenerateLogPath("session", []string{selectedScene}, 0)
-		if err != nil {
-			log.Fatalf("Failed to generate log path: %v", err)
-		}
-	}
-	var sessionLogger *session.Logger
-	if logPath != "" {
-		var err error
-		sessionLogger, err = session.NewLogger(logPath)
-		if err != nil {
-			log.Fatalf("Failed to create session logger: %v", err)
-		}
-		defer func() {
-			if err := sessionLogger.Close(); err != nil {
-				log.Printf("Warning: Failed to close session logger: %v", err)
-			}
-		}()
-		fmt.Printf("Session log: %s\n\n", logPath)
-	}
-
 	ctx := context.Background()
 	terminalUI := terminal.NewTerminalUI()
 
@@ -145,7 +149,7 @@ func main() {
 		fmt.Println()
 	}
 
-	runGame(ctx, gameEngine, sceneConfig, terminalUI, sessionLogger, *multiFlag)
+	runGame(ctx, gameEngine, sceneConfig, terminalUI, sl, *multiFlag)
 
 	// Stop the engine
 	if err := gameEngine.Stop(); err != nil {
@@ -160,13 +164,10 @@ func main() {
 // runGame sets up a GameManager and runs the game. In single-scene mode
 // (multi=false), ExitAfterScene causes the game to end when the first scene
 // completes. In multi-scene mode, scenes continue to be generated on transition.
-func runGame(ctx context.Context, gameEngine *engine.Engine, sceneConfig SceneConfig, terminalUI *terminal.TerminalUI, sessionLogger *session.Logger, multi bool) {
+func runGame(ctx context.Context, gameEngine *engine.Engine, sceneConfig SceneConfig, terminalUI *terminal.TerminalUI, sessionLogger session.SessionLogger, multi bool) {
 	// Create and configure the game manager
-	gameManager := engine.NewGameManager(gameEngine)
+	gameManager := engine.NewGameManager(gameEngine, sessionLogger)
 	gameManager.SetPlayer(sceneConfig.Player)
-	if sessionLogger != nil {
-		gameManager.SetSessionLogger(sessionLogger)
-	}
 
 	// Set genre-appropriate scenario
 	gameManager.SetScenario(sceneConfig.Scenario)

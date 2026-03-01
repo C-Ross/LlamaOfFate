@@ -8,6 +8,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,7 +19,7 @@ func setupOvercomeSM(t *testing.T, fatePoints int) *SceneManager {
 	t.Helper()
 
 	mockClient := &MockLLMClient{response: "You push through!"}
-	engine, err := NewWithLLM(mockClient)
+	engine, err := NewWithLLM(mockClient, session.NullLogger{})
 	require.NoError(t, err)
 
 	sm := engine.GetSceneManager()

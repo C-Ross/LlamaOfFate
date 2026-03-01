@@ -9,6 +9,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,10 +18,10 @@ import (
 // --- handleStressOverflow tests ---
 
 func TestStressOverflowEmitsChoiceEvent(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	attacker := character.NewCharacter("enemy-1", "Orc")
@@ -60,7 +61,7 @@ func TestStressOverflowEmitsChoiceEvent(t *testing.T) {
 }
 
 func TestStressOverflowNoConsequences_TakenOut(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
 	mockLLM := &capturingMockLLMClient{
@@ -68,7 +69,7 @@ func TestStressOverflowNoConsequences_TakenOut(t *testing.T) {
 	}
 	engine.llmClient = mockLLM
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	attacker := character.NewCharacter("enemy-1", "Orc")
@@ -98,7 +99,7 @@ func TestStressOverflowNoConsequences_TakenOut(t *testing.T) {
 }
 
 func TestProvideMidFlowResponse_ConsequenceChoice(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
 	// LLM returns a consequence name.
@@ -107,7 +108,7 @@ func TestProvideMidFlowResponse_ConsequenceChoice(t *testing.T) {
 	}
 	engine.llmClient = mockLLM
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	player.SetSkill("Fight", 2)
@@ -140,7 +141,7 @@ func TestProvideMidFlowResponse_ConsequenceChoice(t *testing.T) {
 }
 
 func TestProvideMidFlowResponse_TakenOutChoice(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
 	mockLLM := &capturingMockLLMClient{
@@ -148,7 +149,7 @@ func TestProvideMidFlowResponse_TakenOutChoice(t *testing.T) {
 	}
 	engine.llmClient = mockLLM
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	attacker := character.NewCharacter("enemy-1", "Orc")
@@ -180,10 +181,10 @@ func TestProvideMidFlowResponse_TakenOutChoice(t *testing.T) {
 // --- promptPlayerForFates tests ---
 
 func TestFateNarrationEmitsFreeTextEvent(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	npc1 := character.NewCharacter("npc-1", "Goblin Scout")
@@ -225,10 +226,10 @@ func TestFateNarrationEmitsFreeTextEvent(t *testing.T) {
 }
 
 func TestFateNarrationNoTakenOut_NoPendingMidFlow(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	engine.AddCharacter(player)
@@ -248,7 +249,7 @@ func TestFateNarrationNoTakenOut_NoPendingMidFlow(t *testing.T) {
 }
 
 func TestProvideMidFlowResponse_FateNarration(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
 	mockLLM := &capturingMockLLMClient{
@@ -256,7 +257,7 @@ func TestProvideMidFlowResponse_FateNarration(t *testing.T) {
 	}
 	engine.llmClient = mockLLM
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	npc1 := character.NewCharacter("npc-1", "Goblin Scout")
@@ -291,10 +292,10 @@ func TestProvideMidFlowResponse_FateNarration(t *testing.T) {
 // --- handleConcession tests ---
 
 func TestConcessionEmitsFreeTextEvent(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	enemy := character.NewCharacter("enemy-1", "Goblin")
@@ -337,10 +338,10 @@ func TestConcessionEmitsFreeTextEvent(t *testing.T) {
 }
 
 func TestProvideMidFlowResponse_ConcessionNarration(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	enemy := character.NewCharacter("enemy-1", "Goblin")
@@ -381,10 +382,10 @@ func TestProvideMidFlowResponse_ConcessionNarration(t *testing.T) {
 }
 
 func TestProvideMidFlowResponse_EmptyConcessionNarration(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	enemy := character.NewCharacter("enemy-1", "Goblin")
@@ -417,10 +418,10 @@ func TestProvideMidFlowResponse_EmptyConcessionNarration(t *testing.T) {
 // --- ProvideMidFlowResponse error cases ---
 
 func TestProvideMidFlowResponse_NoPending(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	ctx := context.Background()
 	_, err = sm.ProvideMidFlowResponse(ctx, MidFlowResponse{})
@@ -431,7 +432,7 @@ func TestProvideMidFlowResponse_NoPending(t *testing.T) {
 // --- HandleInput integration ---
 
 func TestHandleInput_ConcessionSetsAwaitingMidFlow(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
 	// Need an LLM client for HandleInput (input classification).
@@ -439,7 +440,7 @@ func TestHandleInput_ConcessionSetsAwaitingMidFlow(t *testing.T) {
 	engine.llmClient = mockLLM
 	engine.actionParser = NewActionParser(mockLLM)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	enemy := character.NewCharacter("enemy-1", "Goblin")
@@ -477,10 +478,10 @@ func TestHandleInput_ConcessionSetsAwaitingMidFlow(t *testing.T) {
 }
 
 func TestHandleInput_RejectsInputWhileMidFlowPending(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	engine.AddCharacter(player)
@@ -508,7 +509,7 @@ func TestHandleInput_RejectsInputWhileMidFlowPending(t *testing.T) {
 // --- ProvideMidFlowResponse integration tests ---
 
 func TestProvideMidFlowResponse_NumberedChoice(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
 	mockLLM := &capturingMockLLMClient{
@@ -516,7 +517,7 @@ func TestProvideMidFlowResponse_NumberedChoice(t *testing.T) {
 	}
 	engine.llmClient = mockLLM
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	attacker := character.NewCharacter("enemy-1", "Orc")
@@ -547,10 +548,10 @@ func TestProvideMidFlowResponse_NumberedChoice(t *testing.T) {
 }
 
 func TestProvideMidFlowResponse_FreeText(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	enemy := character.NewCharacter("enemy-1", "Goblin")
@@ -587,10 +588,10 @@ func TestProvideMidFlowResponse_FreeText(t *testing.T) {
 // --- midFlowState helpers ---
 
 func TestStressOverflowContextFields(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	attacker := character.NewCharacter("enemy-1", "Orc")

@@ -13,6 +13,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -52,10 +53,10 @@ func (c *capturingMockLLMClient) GetModelInfo() llm.ModelInfo {
 }
 
 func TestSceneManager_ParseConflictMarker_Physical(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	response := "The orc swings his axe at you! [CONFLICT:physical:orc-1] Roll for initiative!"
 	trigger, cleanedResponse := sm.conflict.parseConflictMarker(response)
@@ -67,10 +68,10 @@ func TestSceneManager_ParseConflictMarker_Physical(t *testing.T) {
 }
 
 func TestSceneManager_ParseConflictMarker_Mental(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	response := "The sorcerer locks eyes with you, attempting to dominate your mind. [CONFLICT:mental:sorcerer-1]"
 	trigger, cleanedResponse := sm.conflict.parseConflictMarker(response)
@@ -82,10 +83,10 @@ func TestSceneManager_ParseConflictMarker_Mental(t *testing.T) {
 }
 
 func TestSceneManager_ParseConflictMarker_NoMarker(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	response := "The merchant smiles and offers you a deal."
 	trigger, cleanedResponse := sm.conflict.parseConflictMarker(response)
@@ -95,10 +96,10 @@ func TestSceneManager_ParseConflictMarker_NoMarker(t *testing.T) {
 }
 
 func TestSceneManager_CalculateInitiative_Physical(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	char := character.NewCharacter("char1", "Fighter")
 	char.SetSkill("Notice", 3)
@@ -110,10 +111,10 @@ func TestSceneManager_CalculateInitiative_Physical(t *testing.T) {
 }
 
 func TestSceneManager_CalculateInitiative_Physical_NoNotice(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	char := character.NewCharacter("char1", "Fighter")
 	char.SetSkill("Athletics", 2)
@@ -124,10 +125,10 @@ func TestSceneManager_CalculateInitiative_Physical_NoNotice(t *testing.T) {
 }
 
 func TestSceneManager_CalculateInitiative_Mental(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	char := character.NewCharacter("char1", "Wizard")
 	char.SetSkill("Empathy", 4)
@@ -139,10 +140,10 @@ func TestSceneManager_CalculateInitiative_Mental(t *testing.T) {
 }
 
 func TestSceneManager_CalculateInitiative_Mental_NoEmpathy(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	char := character.NewCharacter("char1", "Diplomat")
 	char.SetSkill("Rapport", 3)
@@ -153,10 +154,10 @@ func TestSceneManager_CalculateInitiative_Mental_NoEmpathy(t *testing.T) {
 }
 
 func TestSceneManager_InitiateConflict(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	// Create player and enemy
 	player := character.NewCharacter("player1", "Hero")
@@ -188,10 +189,10 @@ func TestSceneManager_InitiateConflict(t *testing.T) {
 }
 
 func TestSceneManager_InitiateConflict_AlreadyInConflict(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	// Create characters
 	player := character.NewCharacter("player1", "Hero")
@@ -217,10 +218,10 @@ func TestSceneManager_InitiateConflict_AlreadyInConflict(t *testing.T) {
 }
 
 func TestSceneManager_InitiateConflict_NotEnoughParticipants(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	// Create only one character
 	player := character.NewCharacter("player1", "Hero")
@@ -239,10 +240,10 @@ func TestSceneManager_InitiateConflict_NotEnoughParticipants(t *testing.T) {
 }
 
 func TestSceneManager_InitiateConflict_UnknownInitiator(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	// Create player and enemy
 	player := character.NewCharacter("player1", "Hero")
@@ -267,10 +268,10 @@ func TestSceneManager_InitiateConflict_UnknownInitiator(t *testing.T) {
 }
 
 func TestSceneManager_HandleConflictEscalation(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	// Create characters
 	player := character.NewCharacter("player1", "Hero")
@@ -315,10 +316,10 @@ func TestSceneManager_HandleConflictEscalation(t *testing.T) {
 }
 
 func TestSceneManager_ParseConflictEndMarker_Surrender(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	response := "The goblin drops his spear and raises his hands. \"I yield!\" [CONFLICT:end:surrender]"
 	resolution, cleanedResponse := sm.conflict.parseConflictEndMarker(response)
@@ -329,10 +330,10 @@ func TestSceneManager_ParseConflictEndMarker_Surrender(t *testing.T) {
 }
 
 func TestSceneManager_ParseConflictEndMarker_Agreement(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	response := "The merchant nods slowly. \"Very well, we have a deal.\" [CONFLICT:end:agreement]"
 	resolution, cleanedResponse := sm.conflict.parseConflictEndMarker(response)
@@ -343,10 +344,10 @@ func TestSceneManager_ParseConflictEndMarker_Agreement(t *testing.T) {
 }
 
 func TestSceneManager_ParseConflictEndMarker_Retreat(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	response := "The orc looks at his fallen comrades and flees into the forest. [CONFLICT:end:retreat]"
 	resolution, cleanedResponse := sm.conflict.parseConflictEndMarker(response)
@@ -357,10 +358,10 @@ func TestSceneManager_ParseConflictEndMarker_Retreat(t *testing.T) {
 }
 
 func TestSceneManager_ParseConflictEndMarker_NoMarker(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	response := "The guard eyes you suspiciously but does not attack."
 	resolution, cleanedResponse := sm.conflict.parseConflictEndMarker(response)
@@ -370,10 +371,10 @@ func TestSceneManager_ParseConflictEndMarker_NoMarker(t *testing.T) {
 }
 
 func TestSceneManager_ResolveConflictPeacefully(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	// Create test characters
 	player := character.NewCharacter("player-1", "Hero")
@@ -408,10 +409,10 @@ func TestSceneManager_ResolveConflictPeacefully(t *testing.T) {
 }
 
 func TestSceneManager_ResolveConflictPeacefully_ClearsStress(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	// Create test characters
 	player := character.NewCharacter("player-1", "Hero")
@@ -455,10 +456,10 @@ func TestSceneManager_ResolveConflictPeacefully_ClearsStress(t *testing.T) {
 }
 
 func TestSceneManager_ResolveConflictPeacefully_NotInConflict(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	// Setup scene (no conflict)
 	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
@@ -487,10 +488,10 @@ func TestSceneManager_ResolveConflictPeacefully_AllReasons(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.reason, func(t *testing.T) {
-			engine, err := New()
+			engine, err := New(session.NullLogger{})
 			require.NoError(t, err)
 
-			sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+			sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 			player := character.NewCharacter("p1", "Hero")
 			player.SetSkill("Notice", 2)
 			enemy := character.NewCharacter("e1", "Goblin")
@@ -519,10 +520,10 @@ func TestSceneManager_ResolveConflictPeacefully_AllReasons(t *testing.T) {
 }
 
 func TestSceneManager_HandleConflictEscalation_NotInConflict(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	testScene := scene.NewScene("s1", "Room", "A room")
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
@@ -533,10 +534,10 @@ func TestSceneManager_HandleConflictEscalation_NotInConflict(t *testing.T) {
 }
 
 func TestSceneManager_HandleConflictEscalation_SameType(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	player := character.NewCharacter("p1", "Hero")
 	player.SetSkill("Notice", 2)
 	enemy := character.NewCharacter("e1", "Goblin")
@@ -562,10 +563,10 @@ func TestSceneManager_HandleConflictEscalation_SameType(t *testing.T) {
 }
 
 func TestSceneManager_GatherInvokableAspects_ConsequencesAndSituation(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	player := character.NewCharacter("p1", "Hero")
 	player.Aspects.HighConcept = "Bold Knight"
 	player.AddConsequence(character.Consequence{
@@ -609,10 +610,10 @@ func TestSceneManager_GatherInvokableAspects_ConsequencesAndSituation(t *testing
 }
 
 func TestSceneManager_RollTargetDefense(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	sm.actions.roller = dice.NewSeededRoller(12345) // Predictable rolls
 
 	target := character.NewCharacter("target-1", "Goblin")
@@ -632,10 +633,10 @@ func TestSceneManager_RollTargetDefense(t *testing.T) {
 }
 
 func TestSceneManager_ApplyDamageToTarget_StressAbsorbed(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	target := character.NewCharacter("target-1", "Goblin")
 	// Default stress track should be able to absorb small hits
@@ -723,10 +724,10 @@ func TestHandleTargetStressOverflow_ConsequenceSelection(t *testing.T) {
 }
 
 func TestSceneManager_HandleTargetTakenOut(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	target := character.NewCharacter("target-1", "Goblin")
@@ -767,10 +768,10 @@ func TestSceneManager_HandleTargetTakenOut(t *testing.T) {
 }
 
 func TestSceneManager_HandleTargetTakenOut_ConflictEnds(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	target := character.NewCharacter("target-1", "Goblin")
@@ -804,10 +805,10 @@ func TestSceneManager_HandleTargetTakenOut_ConflictEnds(t *testing.T) {
 }
 
 func TestSceneManager_HandleTargetTakenOut_MarksSceneLevelTakenOut(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	target := character.NewCharacter("target-1", "Goblin")
@@ -839,10 +840,10 @@ func TestSceneManager_HandleTargetTakenOut_MarksSceneLevelTakenOut(t *testing.T)
 }
 
 func TestSceneManager_InitiateConflict_ExcludesTakenOutCharacters(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	enemy1 := character.NewCharacter("enemy-1", "Goblin")
@@ -890,10 +891,10 @@ func TestSceneManager_InitiateConflict_ExcludesTakenOutCharacters(t *testing.T) 
 }
 
 func TestSceneManager_InitiateConflict_TakenOutInitiatorFails(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	enemy := character.NewCharacter("enemy-1", "Goblin")
@@ -929,10 +930,10 @@ func TestSceneManager_InitiateConflict_TakenOutInitiatorFails(t *testing.T) {
 }
 
 func TestSceneManager_ApplyActionEffects_Attack(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	target := character.NewCharacter("target-1", "Goblin")
@@ -973,10 +974,10 @@ func TestSceneManager_ApplyActionEffects_Attack(t *testing.T) {
 }
 
 func TestSceneManager_IsConcedeCommand(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	tests := []struct {
 		name     string
@@ -1007,10 +1008,10 @@ func TestSceneManager_IsConcedeCommand(t *testing.T) {
 }
 
 func TestSceneManager_HandleConcession(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	enemy := character.NewCharacter("enemy-1", "Goblin")
@@ -1047,10 +1048,10 @@ func TestSceneManager_HandleConcession(t *testing.T) {
 }
 
 func TestSceneManager_HandleConcession_WithConsequences(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	enemy := character.NewCharacter("enemy-1", "Goblin")
@@ -1102,10 +1103,10 @@ func TestSceneManager_HandleConcession_WithConsequences(t *testing.T) {
 }
 
 func TestSceneManager_ApplyActionEffects_Attack_NilTarget_ShowsError(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
@@ -1137,10 +1138,10 @@ func TestSceneManager_ApplyActionEffects_Attack_NilTarget_ShowsError(t *testing.
 }
 
 func TestSceneManager_ApplyActionEffects_Attack_DealsDamage(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	target := character.NewCharacter("target-1", "Goblin")
@@ -1188,10 +1189,10 @@ func TestSceneManager_ApplyActionEffects_Attack_DealsDamage(t *testing.T) {
 }
 
 func TestSceneManager_ApplyActionEffects_Attack_Tie_GrantsBoost(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	target := character.NewCharacter("target-1", "Goblin")
@@ -1239,10 +1240,10 @@ func TestSceneManager_ApplyActionEffects_Attack_Tie_GrantsBoost(t *testing.T) {
 // get a boost instead of just succeeding." When the NPC player attacks and the
 // NPC defender rolls 3+ more than the attacker, the NPC gets a boost.
 func TestSceneManager_ApplyActionEffects_Attack_Failure_DefendWithStyle_GrantsTargetBoost(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	target := character.NewCharacter("target-1", "Goblin")
@@ -1273,10 +1274,10 @@ func TestSceneManager_ApplyActionEffects_Attack_Failure_DefendWithStyle_GrantsTa
 
 // Fate Core SRD (Create Advantage, Tie): "You get a boost instead of the full aspect."
 func TestSceneManager_ApplyActionEffects_CreateAdvantage_Tie_CreatesBoost(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	engine.AddCharacter(player)
@@ -1303,10 +1304,10 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage_Tie_CreatesBoost(t *tes
 // Fate Core SRD (Overcome, SWS): "You succeed with style and... can be used to
 // gain a boost." Overcome with SWS grants the player a boost.
 func TestSceneManager_ApplyActionEffects_Overcome_SWS_CreatesBoost(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	engine.AddCharacter(player)
@@ -1347,10 +1348,10 @@ func (e *emptyAspectGenerator) GenerateAspect(_ context.Context, _ prompt.Aspect
 }
 
 func TestGenerateBoostName_FallbackOnError(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	sm.actions.aspectGenerator = &errorAspectGenerator{}
 
 	player := character.NewCharacter("player-1", "Hero")
@@ -1366,10 +1367,10 @@ func TestGenerateBoostName_FallbackOnError(t *testing.T) {
 }
 
 func TestGenerateBoostName_FallbackOnEmptyResponse(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	sm.actions.aspectGenerator = &emptyAspectGenerator{}
 
 	player := character.NewCharacter("player-1", "Hero")
@@ -1387,7 +1388,7 @@ func TestGenerateBoostName_FallbackOnEmptyResponse(t *testing.T) {
 func TestSceneManager_ResolveAction_TargetByName(t *testing.T) {
 	// Tests the core fix for issue #25: resolveAction should find targets by name
 	mockClient := &MockLLMClient{response: "The attack strikes true!"}
-	engine, err := NewWithLLM(mockClient)
+	engine, err := NewWithLLM(mockClient, session.NullLogger{})
 	require.NoError(t, err)
 
 	sm := engine.GetSceneManager()
@@ -1453,7 +1454,7 @@ func TestSceneManager_ResolveAction_UnknownTarget_AbortsWithoutConsumingTurn(t *
 	// When a target can't be resolved, the action should abort early:
 	// no dice roll, no narrative, no turn advancement.
 	mockClient := &MockLLMClient{response: "Should not be called"}
-	engine, err := NewWithLLM(mockClient)
+	engine, err := NewWithLLM(mockClient, session.NullLogger{})
 	require.NoError(t, err)
 
 	sm := engine.GetSceneManager()
@@ -1518,10 +1519,10 @@ func TestSceneManager_HandleAction_ExcludesTakenOutFromTargets(t *testing.T) {
 	}`
 	mockClient := &capturingMockLLMClient{response: actionResponse}
 
-	engine, err := NewWithLLM(mockClient)
+	engine, err := NewWithLLM(mockClient, session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	player.SetSkill("Fight", dice.Good)
@@ -1564,10 +1565,10 @@ func TestSceneManager_HandleAction_ExcludesTakenOutFromTargets(t *testing.T) {
 // required for BuildStateSnapshot to report isTakenOut correctly.
 // Regression test for https://github.com/C-Ross/LlamaOfFate/issues/118
 func TestApplyTargetTakenOut_SetsFateOnCharacter(t *testing.T) {
-	engine, err := New()
+	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser)
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	player := character.NewCharacter("player-1", "Hero")
 	target := character.NewCharacter("target-1", "Goblin")

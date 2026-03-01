@@ -282,15 +282,13 @@ func (ar *ActionResolver) applyInvokeChoice(is *invokeState, selected *Invokable
 	})
 
 	// Log the invoke
-	if ar.sessionLogger != nil {
-		ar.sessionLogger.Log("invoke", map[string]any{
-			"aspect":    selected.Name,
-			"source":    selected.Source,
-			"is_free":   useFree,
-			"is_reroll": isReroll,
-			"new_total": is.result.FinalValue.String(),
-		})
-	}
+	ar.sessionLogger.Log("invoke", map[string]any{
+		"aspect":    selected.Name,
+		"source":    selected.Source,
+		"is_free":   useFree,
+		"is_reroll": isReroll,
+		"new_total": is.result.FinalValue.String(),
+	})
 
 	return events
 }

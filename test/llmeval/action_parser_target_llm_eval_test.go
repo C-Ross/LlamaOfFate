@@ -13,6 +13,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -309,7 +310,7 @@ func evaluateTargetTestCase(ctx context.Context, parser engine.ActionParser, cha
 		targetResolved = parsedAction.Target == "" || !isCharacterTarget(parsedAction.Target, tc.OtherCharacters)
 	} else {
 		// Build a temporary engine to test resolution
-		eng, _ := engine.New()
+		eng, _ := engine.New(session.NullLogger{})
 		for _, npc := range tc.OtherCharacters {
 			eng.AddCharacter(npc)
 		}

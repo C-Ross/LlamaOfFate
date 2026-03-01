@@ -49,7 +49,7 @@ type ActionResolver struct {
 	roller          dice.DiceRoller
 	characters      CharacterResolver
 	narrative       NarrativeProvider
-	sessionLogger   *session.Logger
+	sessionLogger   session.SessionLogger
 	aspectGenerator AspectGenerator
 
 	// ConflictManager — used for conflict-specific side effects (initiate,
@@ -71,11 +71,12 @@ type ActionResolver struct {
 // newActionResolver creates an ActionResolver with the given shared dependencies.
 // The conflict back-reference and NarrativeProvider are wired separately after
 // construction to break the circular dependency.
-func newActionResolver(roller dice.DiceRoller, characters CharacterResolver, ag AspectGenerator) *ActionResolver {
+func newActionResolver(roller dice.DiceRoller, characters CharacterResolver, ag AspectGenerator, sessionLogger session.SessionLogger) *ActionResolver {
 	return &ActionResolver{
 		roller:          roller,
 		characters:      characters,
 		aspectGenerator: ag,
+		sessionLogger:   sessionLogger,
 	}
 }
 
@@ -95,11 +96,6 @@ func (ar *ActionResolver) setSceneState(s *scene.Scene, player *character.Charac
 func (ar *ActionResolver) resetState() {
 	ar.pendingInvoke = nil
 	ar.pendingMidFlow = nil
-}
-
-// setSessionLogger updates the session logger (may be called after construction).
-func (ar *ActionResolver) setSessionLogger(logger *session.Logger) {
-	ar.sessionLogger = logger
 }
 
 // RecordConversation is a convenience method that delegates to the
@@ -259,23 +255,21 @@ func (ar *ActionResolver) resolveAction(ctx context.Context, parsedAction *actio
 	})
 
 	// Log the dice roll
-	if ar.sessionLogger != nil {
-		logData := map[string]any{
-			"skill":       parsedAction.Skill,
-			"skill_level": int(skillLevel),
-			"bonus":       parsedAction.CalculateBonus(),
-			"roll_result": result.String(),
-			"final_value": int(result.FinalValue),
-			"difficulty":  int(parsedAction.Difficulty),
-			"outcome":     initialOutcome.Type.String(),
-			"shifts":      initialOutcome.Shifts,
-		}
-		if opposingChar != nil {
-			logData["opposing_npc"] = opposingChar.Name
-			logData["opposing_skill"] = parsedAction.OpposingSkill
-		}
-		ar.sessionLogger.Log("dice_roll", logData)
+	logData := map[string]any{
+		"skill":       parsedAction.Skill,
+		"skill_level": int(skillLevel),
+		"bonus":       parsedAction.CalculateBonus(),
+		"roll_result": result.String(),
+		"final_value": int(result.FinalValue),
+		"difficulty":  int(parsedAction.Difficulty),
+		"outcome":     initialOutcome.Type.String(),
+		"shifts":      initialOutcome.Shifts,
 	}
+	if opposingChar != nil {
+		logData["opposing_npc"] = opposingChar.Name
+		logData["opposing_skill"] = parsedAction.OpposingSkill
+	}
+	ar.sessionLogger.Log("dice_roll", logData)
 
 	// Build the continuation that runs after invokes complete.
 	// Capture the variables needed by the post-invoke logic.
@@ -327,13 +321,11 @@ func (ar *ActionResolver) finishResolveAction(
 	events = append(events, NarrativeEvent{Text: narrative})
 
 	// Log the narrative
-	if ar.sessionLogger != nil {
-		ar.sessionLogger.Log("narrative", map[string]any{
-			"text":    narrative,
-			"action":  parsedAction.Type.String(),
-			"outcome": outcome.Type.String(),
-		})
-	}
+	ar.sessionLogger.Log("narrative", map[string]any{
+		"text":    narrative,
+		"action":  parsedAction.Type.String(),
+		"outcome": outcome.Type.String(),
+	})
 
 	// Apply mechanical effects based on action type and outcome
 	effectEvents := ar.applyActionEffects(ctx, parsedAction, targetChar)
