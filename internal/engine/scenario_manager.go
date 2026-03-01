@@ -299,56 +299,37 @@ func (m *ScenarioManager) Start(ctx context.Context) ([]GameEvent, error) {
 // This is the primary entry point for event-driven UIs (web via WebSocket).
 // Terminal UIs use Run() which wraps this in a blocking loop.
 func (m *ScenarioManager) HandleInput(ctx context.Context, input string) (*InputResult, error) {
-	if !m.started {
-		return nil, fmt.Errorf("HandleInput called before Start")
-	}
-
-	sceneManager := m.engine.GetSceneManager()
-	result, err := sceneManager.HandleInput(ctx, input)
-	if err != nil {
-		return nil, err
-	}
-
-	// If scene hasn't ended or we're awaiting a response, save and return
-	if !result.SceneEnded || result.AwaitingInvoke || result.AwaitingMidFlow {
-		m.triggerSave("dialog")
-		return result, nil
-	}
-
-	// Scene ended — do between-scene work and bundle events
-	return m.completeSceneTransition(ctx, result)
+	return m.processResult(ctx, "HandleInput", func(sm *SceneManager) (*InputResult, error) {
+		return sm.HandleInput(ctx, input)
+	})
 }
 
 // ProvideInvokeResponse forwards an invoke response to the SceneManager and
 // handles any resulting scene-end transition, just like HandleInput.
 func (m *ScenarioManager) ProvideInvokeResponse(ctx context.Context, resp InvokeResponse) (*InputResult, error) {
-	if !m.started {
-		return nil, fmt.Errorf("ProvideInvokeResponse called before Start")
-	}
-
-	sceneManager := m.engine.GetSceneManager()
-	result, err := sceneManager.ProvideInvokeResponse(ctx, resp)
-	if err != nil {
-		return nil, err
-	}
-
-	if !result.SceneEnded || result.AwaitingInvoke || result.AwaitingMidFlow {
-		m.triggerSave("dialog")
-		return result, nil
-	}
-
-	return m.completeSceneTransition(ctx, result)
+	return m.processResult(ctx, "ProvideInvokeResponse", func(sm *SceneManager) (*InputResult, error) {
+		return sm.ProvideInvokeResponse(ctx, resp)
+	})
 }
 
 // ProvideMidFlowResponse forwards a mid-flow response to the SceneManager and
 // handles any resulting scene-end transition, just like HandleInput.
 func (m *ScenarioManager) ProvideMidFlowResponse(ctx context.Context, resp MidFlowResponse) (*InputResult, error) {
+	return m.processResult(ctx, "ProvideMidFlowResponse", func(sm *SceneManager) (*InputResult, error) {
+		return sm.ProvideMidFlowResponse(ctx, resp)
+	})
+}
+
+// processResult is the shared implementation for HandleInput, ProvideInvokeResponse,
+// and ProvideMidFlowResponse. It guards against unstarted state, delegates to the
+// SceneManager via fn, and handles scene-end transitions.
+func (m *ScenarioManager) processResult(ctx context.Context, caller string, fn func(*SceneManager) (*InputResult, error)) (*InputResult, error) {
 	if !m.started {
-		return nil, fmt.Errorf("ProvideMidFlowResponse called before Start")
+		return nil, fmt.Errorf("%s called before Start", caller)
 	}
 
 	sceneManager := m.engine.GetSceneManager()
-	result, err := sceneManager.ProvideMidFlowResponse(ctx, resp)
+	result, err := fn(sceneManager)
 	if err != nil {
 		return nil, err
 	}
