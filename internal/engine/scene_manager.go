@@ -269,6 +269,11 @@ func (sm *SceneManager) classifyInput(ctx context.Context, input string) (string
 		Scene:       sm.currentScene,
 		PlayerInput: input,
 	}
+	if sm.currentScene.IsChallenge && sm.currentScene.ChallengeState != nil {
+		for _, task := range sm.currentScene.ChallengeState.PendingTasks() {
+			data.ActiveChallengeSkills = append(data.ActiveChallengeSkills, task.Skill)
+		}
+	}
 
 	promptText, err := prompt.RenderInputClassification(data)
 	if err != nil {
@@ -380,9 +385,13 @@ func (sm *SceneManager) handleDialog(ctx context.Context, input string) []GameEv
 		}
 	}
 
-	// Handle scene transition if detected
-	if sceneTransition != nil {
+	// Handle scene transition if detected (suppress during active challenges)
+	if sceneTransition != nil && !sm.currentScene.IsChallenge {
 		events = append(events, sm.handleSceneTransition(sceneTransition)...)
+	} else if sceneTransition != nil {
+		slog.Warn("Suppressed scene transition during active challenge",
+			"component", componentSceneManager,
+			"hint", sceneTransition.Hint)
 	}
 
 	return events

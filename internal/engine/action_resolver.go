@@ -341,6 +341,15 @@ func (ar *ActionResolver) finishResolveAction(
 	if ar.currentScene.ActiveSceneType() == scene.SceneTypeChallenge && ar.challenge != nil {
 		task := ar.challenge.findTaskForSkill(parsedAction.Skill)
 		if task != nil {
+			// Override Create an Advantage → Overcome when resolving a challenge facet.
+			// Challenge tasks are obstacles to get past, not aspects to create.
+			if parsedAction.Type == action.CreateAdvantage {
+				slog.Warn("Overriding Create an Advantage to Overcome for challenge task",
+					"component", "action_resolver",
+					"skill", parsedAction.Skill,
+					"task_id", task.ID)
+				parsedAction.Type = action.Overcome
+			}
 			challengeEvents := ar.challenge.resolveTask(task.ID, outcome.Type, outcome.Shifts)
 			events = append(events, challengeEvents...)
 		}

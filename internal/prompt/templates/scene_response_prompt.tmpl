@@ -75,6 +75,10 @@ Never present the player with a list of options or choices.
 
 SCENE MARKERS (internal system use only - never explain these to the player):
 
+{{- if .Scene.IsChallenge}}
+SCENE TRANSITION:
+Do not emit [SCENE_TRANSITION] — the player is in the middle of a challenge and cannot leave until it is resolved or abandoned. If they try to leave, narrate what draws them back or blocks their exit.
+{{- else}}
 SCENE TRANSITION - When the player explicitly leaves/exits the current location:
 If the player's action or dialogue clearly indicates they are LEAVING the current location (walking out, departing, exiting the building, riding away, etc.), AND your narrative describes them actually leaving, add at the end:
 [SCENE_TRANSITION:brief description of where they're going]
@@ -83,6 +87,7 @@ Examples:
 - Player says "I ride off toward the canyon" → narrate departure → [SCENE_TRANSITION:the road to Red Rock Canyon]
 - Player says "I leave this place" → narrate them leaving → [SCENE_TRANSITION:outside the building]
 Only add this when the player is PHYSICALLY LEAVING the location, not just moving within it.
+{{- end}}
 
 CONFLICT MARKERS:
 {{- if .Scene.IsConflict}}

@@ -31,6 +31,12 @@ CURRENT SITUATION:
 {{.Context}}
 {{- end}}
 
+{{- if .ChallengeContext}}
+ACTIVE CHALLENGE: {{.ChallengeContext.Description}}
+Pending task skills: {{range $i, $s := .ChallengeContext.PendingSkills}}{{if $i}}, {{end}}{{$s}}{{end}}
+Actions matching a pending task skill are Overcome actions — the character is getting past a challenge facet, not creating an aspect.
+{{- end}}
+
 DIFFICULTY RANGE: {{.DifficultyMin}} to {{.DifficultyMax}} ({{.DifficultyGuide}}), default {{.DifficultyDefault}}
 
 PLAYER INPUT:

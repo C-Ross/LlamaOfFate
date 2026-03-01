@@ -11,6 +11,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
+	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 )
@@ -164,6 +165,19 @@ func (ap *LLMActionParser) buildUserPrompt(req ActionParseRequest) (string, erro
 		Scene:              req.Scene,
 		OtherCharacters:    req.OtherCharacters,
 		DifficultyGuidance: guidance,
+	}
+
+	// Populate challenge context when a challenge is active
+	if s, ok := req.Scene.(*scene.Scene); ok && s.IsChallenge && s.ChallengeState != nil {
+		pending := s.ChallengeState.PendingTasks()
+		skills := make([]string, 0, len(pending))
+		for _, t := range pending {
+			skills = append(skills, t.Skill)
+		}
+		templateData.ChallengeContext = &prompt.ChallengeContext{
+			Description:   s.ChallengeState.Description,
+			PendingSkills: skills,
+		}
 	}
 
 	return prompt.RenderActionParse(templateData)

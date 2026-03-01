@@ -15,6 +15,11 @@ KEY TEST: Ask yourself "What happens if they fail?"
 SCENE CONTEXT:
 Scene: {{.Scene.Name}}
 Description: {{.Scene.Description}}
+{{- if .ActiveChallengeSkills}}
+
+ACTIVE CHALLENGE — the following skills have pending tasks: {{range $i, $s := .ActiveChallengeSkills}}{{if $i}}, {{end}}{{$s}}{{end}}.
+If the player's input could involve one of these skills, classify as "action" — the challenge needs this roll resolved.
+{{- end}}
 
 PLAYER INPUT: "{{.PlayerInput}}"
 
@@ -43,7 +48,12 @@ Examples:
 - "I pace around the room" -> narrative (mundane movement)
 - "I walk over to the table and sit down" -> narrative (trivial action)
 - "Examine the mysterious door" -> clarification (unless there's danger/time pressure)
+{{- if .ActiveChallengeSkills}}{{$hasNotice := false}}{{range .ActiveChallengeSkills}}{{if eq . "Notice"}}{{$hasNotice = true}}{{end}}{{end}}{{if $hasNotice}}
+- "Notice if anyone is watching" during an active challenge needing Notice -> action (challenge task)
+{{- end}}
+{{- else}}
 - "Notice if anyone is watching" in a safe place -> clarification (basic awareness)
+{{- end}}
 - "Check if anyone is following me" when in danger/being pursued -> action (failure has consequences)
 - "Attack the goblin" -> action (clear opposition and consequences)
 - "Sneak past the guard" -> action (meaningful opposition, consequences for failure)

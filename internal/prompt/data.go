@@ -70,8 +70,9 @@ type ChallengeBuildData struct {
 
 // InputClassificationData holds the data for input classification template
 type InputClassificationData struct {
-	Scene       *scene.Scene
-	PlayerInput string
+	Scene                 *scene.Scene
+	PlayerInput           string
+	ActiveChallengeSkills []string // Pending task skills from an active challenge (e.g., ["Notice", "Stealth"])
 }
 
 // SceneResponseData holds the data for scene response template
@@ -293,6 +294,13 @@ type RecoveryAttempt struct {
 // Existing code can continue using prompt.ConversationEntry without changes.
 type ConversationEntry = uicontract.ConversationEntry
 
+// ChallengeContext provides active challenge info for prompt templates.
+// When non-nil, prompts adapt to guide LLM behaviour during challenges.
+type ChallengeContext struct {
+	Description   string   // Overall challenge description
+	PendingSkills []string // Skills of pending (unresolved) tasks
+}
+
 // ActionParseTemplateData holds the data for action parse template
 type ActionParseTemplateData struct {
 	Character          *character.Character
@@ -300,7 +308,8 @@ type ActionParseTemplateData struct {
 	Context            string
 	Scene              interface{}
 	OtherCharacters    []*character.Character
-	DifficultyGuidance // Embedded difficulty thresholds
+	DifficultyGuidance                   // Embedded difficulty thresholds
+	ChallengeContext   *ChallengeContext // Non-nil when an active challenge is in progress
 }
 
 // FateNarrationData holds the data for the fate narration template.
