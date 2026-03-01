@@ -5,10 +5,7 @@ import (
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
-	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
-	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,26 +17,13 @@ import (
 // resolveAction.
 func setupCreateAdvantageSM(t *testing.T, fatePoints int) *SceneManager {
 	t.Helper()
-
-	mockClient := newTestLLMClient(`{"aspect_text": "Tactical Opening", "description": "A brief opening", "reasoning": "test"}`)
-	engine, err := NewWithLLM(mockClient, session.NullLogger{})
-	require.NoError(t, err)
-
-	sm := engine.GetSceneManager()
-
-	player := character.NewCharacter("player-1", "Hero")
-	player.Aspects.HighConcept = "Cunning Strategist"
-	player.Aspects.Trouble = "Overconfident"
-	player.FatePoints = fatePoints
-	player.SetSkill("Notice", dice.Fair) // Fair (+2)
-
-	engine.AddCharacter(player)
-
-	testScene := scene.NewScene("test-scene", "Test Room", "A room for testing.")
-	testScene.AddCharacter(player.ID)
-	err = sm.StartScene(testScene, player)
-	require.NoError(t, err)
-
+	sm, _, _ := setupTestSM(t, smTestOpts{
+		llmResponses: []string{`{"aspect_text": "Tactical Opening", "description": "A brief opening", "reasoning": "test"}`},
+		fatePoints:   fatePoints,
+		highConcept:  "Cunning Strategist",
+		trouble:      "Overconfident",
+		skills:       map[string]dice.Ladder{"Notice": dice.Fair},
+	})
 	return sm
 }
 

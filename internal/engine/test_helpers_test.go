@@ -2,9 +2,15 @@ package engine
 
 import (
 	"context"
+	"testing"
 	"time"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
+	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
+	"github.com/C-Ross/LlamaOfFate/internal/session"
+	"github.com/stretchr/testify/require"
 )
 
 // testLLMClient is a configurable mock LLM client that replaces the four
@@ -71,4 +77,94 @@ func (m *testLLMClient) GetModelInfo() llm.ModelInfo {
 		Provider:  "test",
 		MaxTokens: 4096,
 	}
+}
+
+// --- Unified SceneManager test setup ---
+
+// smTestNPC configures an NPC for setupTestSM.
+type smTestNPC struct {
+	id          string
+	name        string
+	highConcept string
+	skills      map[string]dice.Ladder
+}
+
+// smTestOpts configures setupTestSM. Zero values give sensible defaults.
+type smTestOpts struct {
+	llmResponses []string               // empty → no LLM client
+	fatePoints   int                    // player fate points
+	highConcept  string                 // player high concept
+	trouble      string                 // player trouble
+	skills       map[string]dice.Ladder // player skills (name → level)
+	npc          *smTestNPC             // optional NPC
+	conflictType scene.ConflictType     // non-empty → initiate conflict with NPC
+}
+
+// setupTestSM builds a SceneManager with a player (and optional NPC) for testing.
+// When conflictType is set, the NPC is enrolled in a conflict.
+// The second return is always the player; the third is the NPC (nil if none).
+func setupTestSM(t *testing.T, opts smTestOpts) (*SceneManager, *character.Character, *character.Character) {
+	t.Helper()
+
+	var client *testLLMClient
+	if len(opts.llmResponses) > 0 {
+		client = newTestLLMClient(opts.llmResponses...)
+	}
+
+	var engine *Engine
+	var err error
+	if client != nil {
+		engine, err = NewWithLLM(client, session.NullLogger{})
+	} else {
+		engine, err = New(session.NullLogger{})
+	}
+	require.NoError(t, err)
+
+	// Player
+	player := character.NewCharacter("player-1", "Hero")
+	player.Aspects.HighConcept = opts.highConcept
+	player.Aspects.Trouble = opts.trouble
+	player.FatePoints = opts.fatePoints
+	for skill, level := range opts.skills {
+		player.SetSkill(skill, level)
+	}
+	engine.AddCharacter(player)
+
+	// Scene
+	testScene := scene.NewScene("test-scene", "Test Room", "A room for testing.")
+	testScene.AddCharacter(player.ID)
+
+	// NPC
+	var npc *character.Character
+	if opts.npc != nil {
+		npc = character.NewCharacter(opts.npc.id, opts.npc.name)
+		npc.Aspects.HighConcept = opts.npc.highConcept
+		for skill, level := range opts.npc.skills {
+			npc.SetSkill(skill, level)
+		}
+		engine.AddCharacter(npc)
+		testScene.AddCharacter(npc.ID)
+	}
+
+	// Conflict path: manual wiring + initiateConflict
+	if opts.conflictType != "" {
+		sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
+		sm.currentScene = testScene
+		sm.conflict.currentScene = testScene
+		sm.actions.currentScene = testScene
+		sm.player = player
+		sm.conflict.player = player
+		sm.actions.player = player
+		if npc != nil {
+			err = sm.conflict.initiateConflict(opts.conflictType, npc.ID)
+			require.NoError(t, err)
+		}
+		return sm, player, npc
+	}
+
+	// Normal path: public API
+	sm := engine.GetSceneManager()
+	err = sm.StartScene(testScene, player)
+	require.NoError(t, err)
+	return sm, player, npc
 }

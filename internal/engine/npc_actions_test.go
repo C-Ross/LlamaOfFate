@@ -20,36 +20,19 @@ import (
 // with a PlannedRoller before calling NPC action functions.
 func setupNPCConflictSM(t *testing.T) (*SceneManager, *character.Character, *character.Character) {
 	t.Helper()
-
-	engine, err := New(session.NullLogger{})
-	require.NoError(t, err)
-
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
-
-	player := character.NewCharacter("player-1", "Hero")
-	npc := character.NewCharacter("npc-1", "Goblin Scout")
-	npc.Aspects.HighConcept = "Sneaky Goblin"
-	npc.SetSkill("Notice", 2)
-	npc.SetSkill("Athletics", 2)
-	npc.SetSkill("Fight", 2)
-
-	engine.AddCharacter(player)
-	engine.AddCharacter(npc)
-
-	testScene := scene.NewScene("test-scene", "Forest Clearing", "A dim clearing in the woods.")
-	testScene.AddCharacter(player.ID)
-	testScene.AddCharacter(npc.ID)
-	sm.currentScene = testScene
-	sm.conflict.currentScene = testScene
-	sm.actions.currentScene = testScene
-	sm.player = player
-	sm.conflict.player = player
-	sm.actions.player = player
-
-	err = sm.conflict.initiateConflict(scene.PhysicalConflict, npc.ID)
-	require.NoError(t, err)
-
-	return sm, player, npc
+	return setupTestSM(t, smTestOpts{
+		npc: &smTestNPC{
+			id:          "npc-1",
+			name:        "Goblin Scout",
+			highConcept: "Sneaky Goblin",
+			skills: map[string]dice.Ladder{
+				"Notice":    2,
+				"Athletics": 2,
+				"Fight":     2,
+			},
+		},
+		conflictType: scene.PhysicalConflict,
+	})
 }
 
 // --- processNPCDefend ---

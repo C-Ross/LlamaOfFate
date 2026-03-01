@@ -5,10 +5,7 @@ import (
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
-	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
-	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,26 +14,13 @@ import (
 // Athletics at Fair (+2), and an active scene. Passive opposition only.
 func setupOvercomeSM(t *testing.T, fatePoints int) *SceneManager {
 	t.Helper()
-
-	mockClient := newTestLLMClient("You push through!")
-	engine, err := NewWithLLM(mockClient, session.NullLogger{})
-	require.NoError(t, err)
-
-	sm := engine.GetSceneManager()
-
-	player := character.NewCharacter("player-1", "Hero")
-	player.Aspects.HighConcept = "Nimble Acrobat"
-	player.Aspects.Trouble = "Fear of Heights"
-	player.FatePoints = fatePoints
-	player.SetSkill("Athletics", dice.Fair) // Fair (+2)
-
-	engine.AddCharacter(player)
-
-	testScene := scene.NewScene("test-scene", "Test Room", "A room for testing.")
-	testScene.AddCharacter(player.ID)
-	err = sm.StartScene(testScene, player)
-	require.NoError(t, err)
-
+	sm, _, _ := setupTestSM(t, smTestOpts{
+		llmResponses: []string{"You push through!"},
+		fatePoints:   fatePoints,
+		highConcept:  "Nimble Acrobat",
+		trouble:      "Fear of Heights",
+		skills:       map[string]dice.Ladder{"Athletics": dice.Fair},
+	})
 	return sm
 }
 

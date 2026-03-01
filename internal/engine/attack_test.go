@@ -7,8 +7,6 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
-	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
-	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,36 +25,26 @@ import (
 // Provide at least 4 planned rolls. Extra 0s are safe padding.
 func setupAttackSM(t *testing.T, fatePoints int) (*SceneManager, *character.Character) {
 	t.Helper()
-
-	// The mock response must be valid JSON for the NPC action decision parser.
-	mockClient := newTestLLMClient(`{"action":"attack","skill":"Fight","target":"player-1","description":"counter-attack","reasoning":"test"}`)
-	engine, err := NewWithLLM(mockClient, session.NullLogger{})
-	require.NoError(t, err)
-
-	sm := engine.GetSceneManager()
-
-	player := character.NewCharacter("player-1", "Hero")
-	player.Aspects.HighConcept = "Fearsome Brawler"
-	player.Aspects.Trouble = "Short Temper"
-	player.FatePoints = fatePoints
-	player.SetSkill("Fight", dice.Good)     // Good (+3)
-	player.SetSkill("Athletics", dice.Fair) // Fair (+2) — defense against NPC attacks
-	player.SetSkill("Notice", dice.Fair)    // Initiative skill
-
-	npc := character.NewCharacter("npc-1", "Thug")
-	npc.SetSkill("Fight", dice.Fair)      // Fair (+2) — NPC's attack skill
-	npc.SetSkill("Athletics", dice.Fair)  // Fair (+2) — defense skill for Fight
-	npc.SetSkill("Notice", dice.Mediocre) // Low initiative
-
-	engine.AddCharacter(player)
-	engine.AddCharacter(npc)
-
-	testScene := scene.NewScene("test-scene", "Test Arena", "An arena for testing.")
-	testScene.AddCharacter(player.ID)
-	testScene.AddCharacter(npc.ID)
-	err = sm.StartScene(testScene, player)
-	require.NoError(t, err)
-
+	sm, _, npc := setupTestSM(t, smTestOpts{
+		llmResponses: []string{`{"action":"attack","skill":"Fight","target":"player-1","description":"counter-attack","reasoning":"test"}`},
+		fatePoints:   fatePoints,
+		highConcept:  "Fearsome Brawler",
+		trouble:      "Short Temper",
+		skills: map[string]dice.Ladder{
+			"Fight":     dice.Good,
+			"Athletics": dice.Fair,
+			"Notice":    dice.Fair,
+		},
+		npc: &smTestNPC{
+			id:   "npc-1",
+			name: "Thug",
+			skills: map[string]dice.Ladder{
+				"Fight":     dice.Fair,
+				"Athletics": dice.Fair,
+				"Notice":    dice.Mediocre,
+			},
+		},
+	})
 	return sm, npc
 }
 

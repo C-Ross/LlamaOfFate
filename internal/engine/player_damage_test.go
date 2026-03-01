@@ -19,39 +19,18 @@ import (
 // active physical conflict. The engine optionally has an LLM client.
 func setupConflictSM(t *testing.T, llmClient *testLLMClient) (*SceneManager, *character.Character, *character.Character) {
 	t.Helper()
-
-	var engine *Engine
-	var err error
-	if llmClient != nil {
-		engine, err = NewWithLLM(llmClient, session.NullLogger{})
-	} else {
-		engine, err = New(session.NullLogger{})
+	opts := smTestOpts{
+		npc: &smTestNPC{
+			id:          "npc-1",
+			name:        "Bandit",
+			highConcept: "Ruthless Highwayman",
+		},
+		conflictType: scene.PhysicalConflict,
 	}
-	require.NoError(t, err)
-
-	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
-
-	player := character.NewCharacter("player-1", "Hero")
-	attacker := character.NewCharacter("npc-1", "Bandit")
-	attacker.Aspects.HighConcept = "Ruthless Highwayman"
-
-	engine.AddCharacter(player)
-	engine.AddCharacter(attacker)
-
-	testScene := scene.NewScene("test-scene", "Dusty Road", "A lonely stretch of highway.")
-	testScene.AddCharacter(player.ID)
-	testScene.AddCharacter(attacker.ID)
-	sm.currentScene = testScene
-	sm.conflict.currentScene = testScene
-	sm.actions.currentScene = testScene
-	sm.player = player
-	sm.conflict.player = player
-	sm.actions.player = player
-
-	err = sm.conflict.initiateConflict(scene.PhysicalConflict, attacker.ID)
-	require.NoError(t, err)
-
-	return sm, player, attacker
+	if llmClient != nil {
+		opts.llmResponses = llmClient.responses
+	}
+	return setupTestSM(t, opts)
 }
 
 // testAttackCtx returns a minimal AttackContext for test use.
