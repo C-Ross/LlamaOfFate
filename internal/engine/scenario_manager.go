@@ -504,9 +504,7 @@ func (m *ScenarioManager) getInitialScene(ctx context.Context) (*scene.Scene, er
 			m.engine.AddCharacter(npc)
 			m.initialScene.AddCharacter(npc.ID)
 			// Register named NPCs for persistence across scenes
-			if npc.CharacterType != character.CharacterTypeNamelessGood &&
-				npc.CharacterType != character.CharacterTypeNamelessFair &&
-				npc.CharacterType != character.CharacterTypeNamelessAverage {
+			if !npc.CharacterType.IsNameless() {
 				m.npcRegistry[normalizeNPCName(npc.Name)] = npc
 				m.npcAttitudes[normalizeNPCName(npc.Name)] = "neutral"
 			}
@@ -619,9 +617,7 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 		newScene.AddCharacter(npc.ID)
 
 		// Register named NPCs (non-nameless) for persistence
-		if npc.CharacterType != character.CharacterTypeNamelessGood &&
-			npc.CharacterType != character.CharacterTypeNamelessFair &&
-			npc.CharacterType != character.CharacterTypeNamelessAverage {
+		if !npc.CharacterType.IsNameless() {
 			m.npcRegistry[normalizedName] = npc
 			m.npcAttitudes[normalizedName] = npcData.Disposition
 		}
