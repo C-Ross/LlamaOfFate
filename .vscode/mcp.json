@@ -1,20 +1,34 @@
 {
-  "servers": {
-    "shellwright": {
-      "command": "npx",
-      "args": ["-y", "@dwmkerr/shellwright@latest"]
-    },
-     "playwright": {
-      "command": "npx",
-      "args": ["@playwright/mcp@latest"]
-    },
-     "llamaoffate": {
-      "command": "./bin/mcpserver",
-      "args": [],
-      "env": {
-        "LLM_CONFIG": "configs/azure-llm.yaml",
-        "CONFIG_ROOT": "configs"
-      }
-    }
-  }
+	"servers": {
+		"shellwright": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@dwmkerr/shellwright@latest"
+			],
+			"type": "stdio"
+		},
+		"playwright": {
+			"command": "npx",
+			"args": [
+				"@playwright/mcp@latest"
+			],
+			"type": "stdio"
+		},
+		"llamaoffate": {
+			"command": "./bin/mcpserver",
+			"args": [],
+			"env": {
+				"LLM_CONFIG": "configs/azure-llm.yaml",
+				"CONFIG_ROOT": "configs"
+			},
+			"type": "stdio"
+		},
+		"gopls": {
+			"type": "stdio",
+			"command": "gopls",
+			"args": ["mcp"]
+		}
+	},
+	"inputs": []
 }
