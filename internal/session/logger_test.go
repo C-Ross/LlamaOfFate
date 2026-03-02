@@ -213,6 +213,41 @@ func TestGenerateLogPath(t *testing.T) {
 	}
 }
 
+func TestNullLogger_Log(t *testing.T) {
+	var nl NullLogger
+	// Should not panic or produce any output
+	nl.Log("event_type", map[string]any{"key": "value"})
+	nl.Log("another_event", nil)
+}
+
+func TestNullLogger_Close(t *testing.T) {
+	var nl NullLogger
+	err := nl.Close()
+	assert.NoError(t, err)
+}
+
+func TestNullLogger_ImplementsSessionLogger(t *testing.T) {
+	// Compile-time check via interface assertion
+	var _ SessionLogger = NullLogger{}
+	var _ SessionLogger = (*Logger)(nil)
+}
+
+func TestLogger_Log_WriteError(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "test_write_error.yaml")
+
+	logger, err := NewLogger(logPath)
+	require.NoError(t, err)
+	require.NotNil(t, logger)
+
+	// Manually close the underlying file to trigger a write error
+	require.NoError(t, logger.file.Close())
+	logger.file = nil // prevent double-close in deferred cleanup
+
+	// Should not panic, just log to stderr
+	logger.Log("some_event", map[string]any{"data": "test"})
+}
+
 func TestSanitizePart(t *testing.T) {
 	tests := []struct {
 		name   string
