@@ -1,5 +1,7 @@
 # LlamaOfFate
 
+[![Validate](https://github.com/C-Ross/LlamaOfFate/actions/workflows/validate.yml/badge.svg)](https://github.com/C-Ross/LlamaOfFate/actions/workflows/validate.yml)
+
 A text-based RPG system implementing the Fate Core rules with LLM-powered generation and action interpretation.
 
 ## Overview
