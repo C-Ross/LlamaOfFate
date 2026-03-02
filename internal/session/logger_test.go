@@ -215,9 +215,8 @@ func TestGenerateLogPath(t *testing.T) {
 
 func TestNullLogger_Log(t *testing.T) {
 	var nl NullLogger
-	// Should not panic or produce any output
-	nl.Log("event_type", map[string]any{"key": "value"})
-	nl.Log("another_event", nil)
+	assert.NotPanics(t, func() { nl.Log("event_type", map[string]any{"key": "value"}) })
+	assert.NotPanics(t, func() { nl.Log("another_event", nil) })
 }
 
 func TestNullLogger_Close(t *testing.T) {
@@ -245,7 +244,7 @@ func TestLogger_Log_WriteError(t *testing.T) {
 	logger.file = nil // prevent double-close in deferred cleanup
 
 	// Should not panic, just log to stderr
-	logger.Log("some_event", map[string]any{"data": "test"})
+	assert.NotPanics(t, func() { logger.Log("some_event", map[string]any{"data": "test"}) })
 }
 
 func TestSanitizePart(t *testing.T) {
