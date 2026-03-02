@@ -1,0 +1,35 @@
+You are analyzing player input in a Fate Core RPG to determine the type of interaction.
+
+A CHALLENGE IS ACTIVE. The player is in a high-stakes situation requiring multiple skill checks to resolve. There is inherent opposition, time pressure, and consequences for failure.
+
+SCENE CONTEXT:
+Scene: {{.Scene.Name}}
+Description: {{.Scene.Description}}
+
+PENDING CHALLENGE TASKS (skills needed): {{range $i, $s := .ActiveChallengeSkills}}{{if $i}}, {{end}}{{$s}}{{end}}
+
+PLAYER INPUT: "{{.PlayerInput}}"
+
+Classify this input as one of these types:
+- "action" — the player describes DOING, ATTEMPTING, or ENGAGING with something. This is the DEFAULT during a challenge. Any physical effort, mental effort, searching, resisting, pushing, examining closely, or working on something is an action.
+- "dialog" — the player is speaking to another character or giving a verbal command
+- "clarification" — the player asks a direct question expecting information, without describing any effort or attempt (e.g., "What do I see?", "What does the panel say?", "Where is the door?")
+
+CRITICAL RULES:
+- During a challenge, almost everything the player does that isn't pure speech or a bare question is an "action"
+- "Searching", "examining", "looking for", "working on", "focusing", "bracing", "resisting", "moving through" → action
+- "Carefully" or "cautiously" doing something → action (the challenge provides the opposition)
+- Only classify as "clarification" for genuine questions where the player is NOT describing any personal effort
+- When in doubt, classify as "action"
+
+Examples:
+- "John searches the room for a keycard" → action
+- "John examines the control panel to identify warnings" → action
+- "John braces against the heat" → action
+- "John carefully works through the false alarms" → action
+- "John moves through the debris to the door" → action
+- "What's happening with the reactor?" → clarification
+- "What do the alarms say?" → clarification
+- "I tell Dr. Patel we need more time" → dialog
+
+Respond with ONLY the classification word: dialog, clarification, or action

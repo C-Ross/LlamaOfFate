@@ -1,0 +1,27 @@
+id: john-macdougal
+name: "John MacDougal"
+aspects:
+  high_concept: "Veteran Nuclear Engineer with Nerves of Steel"
+  trouble: "First Assignment on Europa — Everything is Unfamiliar"
+  other:
+    - "If It Has a Reactor, I Can Fix It"
+    - "Stubborn Enough to Outlast a Meltdown"
+    - "Old-School Hands-On Troubleshooter"
+skills:
+  Crafts: 5      # Superb (engineering/repair)
+  Notice: 4      # Great (reading instruments)
+  Will: 4        # Great (staying calm under pressure)
+  Investigate: 3 # Good (diagnostics)
+  Athletics: 3   # Good (physical stamina)
+  Physique: 3    # Good (endurance)
+  Lore: 2        # Fair (nuclear physics knowledge)
+  Rapport: 2     # Fair (working with crew)
+  Empathy: 2     # Fair (reading people)
+  Drive: 2       # Fair (operating heavy equipment)
+  Shoot: 1       # Average
+  Fight: 1       # Average
+  Stealth: 1     # Average
+  Provoke: 1     # Average
+  Resources: 0   # Mediocre
+fate_points: 3
+refresh: 3

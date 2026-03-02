@@ -278,6 +278,63 @@ func TestRenderInputClassification(t *testing.T) {
 	assert.Contains(t, result, "I want to sneak past the guards")
 }
 
+func TestRenderInputClassification_UsesNormalTemplate_WhenNoChallenge(t *testing.T) {
+	testScene := scene.NewScene("test-scene", "Harbor District", "A busy port")
+	data := InputClassificationData{
+		Scene:       testScene,
+		PlayerInput: "I look around the room",
+	}
+
+	result, err := RenderInputClassification(data)
+	require.NoError(t, err)
+	// Normal template contains Fate Core guidance that the challenge template omits
+	assert.Contains(t, result, "Fate Core principle")
+	assert.Contains(t, result, "clarification")
+	assert.Contains(t, result, "narrative")
+	// Should NOT contain challenge-specific language
+	assert.NotContains(t, result, "A CHALLENGE IS ACTIVE")
+}
+
+func TestRenderInputClassification_UsesChallengeTemplate_WhenChallengeActive(t *testing.T) {
+	testScene := scene.NewScene("test-scene", "Control Room", "Alarms blaring, reactor overheating")
+	data := InputClassificationData{
+		Scene:                 testScene,
+		PlayerInput:           "John searches the room for a keycard",
+		ActiveChallengeSkills: []string{"Notice", "Physique", "Investigate"},
+	}
+
+	result, err := RenderInputClassification(data)
+	require.NoError(t, err)
+	// Challenge template has action-biased language
+	assert.Contains(t, result, "A CHALLENGE IS ACTIVE")
+	assert.Contains(t, result, "Notice")
+	assert.Contains(t, result, "Physique")
+	assert.Contains(t, result, "Investigate")
+	assert.Contains(t, result, "When in doubt, classify as \"action\"")
+	// Should NOT contain the Fate Core guidance that biases toward clarification
+	assert.NotContains(t, result, "Fate Core principle")
+	assert.NotContains(t, result, "narrative")
+}
+
+func TestInputClassificationChallengeTemplate(t *testing.T) {
+	testScene := scene.NewScene("test-scene", "Reactor Room", "A dangerous reactor room")
+	data := InputClassificationData{
+		Scene:                 testScene,
+		PlayerInput:           "John carefully examines the panel",
+		ActiveChallengeSkills: []string{"Notice", "Athletics"},
+	}
+
+	var buf bytes.Buffer
+	err := InputClassificationChallengePrompt.Execute(&buf, data)
+	require.NoError(t, err, "Challenge template execution should not fail")
+
+	result := buf.String()
+	assert.Contains(t, result, "Reactor Room")
+	assert.Contains(t, result, "John carefully examines the panel")
+	assert.Contains(t, result, "Notice, Athletics")
+	assert.Contains(t, result, "DEFAULT during a challenge")
+}
+
 func TestRenderSceneResponse(t *testing.T) {
 	testScene := scene.NewScene("test-scene", "Moonlit Alley", "A narrow alley under the moon")
 	data := SceneResponseData{
@@ -331,6 +388,68 @@ func TestRenderActionNarrative(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, result, "Sprint across the gap")
 	assert.NotEmpty(t, result)
+}
+
+func TestRenderActionNarrative_WithChallengeContext(t *testing.T) {
+	testScene := scene.NewScene("scene-1", "Control Room", "A reactor control room with alarms")
+	act := action.NewAction("act-1", "hero-1", action.Overcome, "Notice", "Identify warning signs on the panel")
+	act.Outcome = &dice.Outcome{Type: dice.Success, Shifts: 3}
+	data := ActionNarrativeData{
+		Scene:                testScene,
+		CharacterContext:     "A resourceful engineer",
+		AspectsContext:       "Warning Alarms Activated",
+		Action:               act,
+		ChallengeDescription: "Prevent the nuclear meltdown",
+		ChallengeTaskDesc:    "Identify the warning signs and alarm codes on the panel",
+	}
+
+	result, err := RenderActionNarrative(data)
+	require.NoError(t, err)
+	assert.Contains(t, result, "Prevent the nuclear meltdown")
+	assert.Contains(t, result, "Identify the warning signs and alarm codes on the panel")
+	assert.Contains(t, result, "player character's own attempt")
+}
+
+func TestRenderActionNarrative_WithoutChallengeContext(t *testing.T) {
+	testScene := scene.NewScene("scene-1", "Training Ground", "A place for training")
+	act := action.NewAction("act-1", "hero-1", action.Overcome, "Athletics", "Sprint across the gap")
+	act.Outcome = &dice.Outcome{Type: dice.Success, Shifts: 2}
+	data := ActionNarrativeData{
+		Scene:            testScene,
+		CharacterContext: "A nimble hero",
+		AspectsContext:   "No aspects",
+		Action:           act,
+	}
+
+	result, err := RenderActionNarrative(data)
+	require.NoError(t, err)
+	// No challenge context should appear
+	assert.NotContains(t, result, "ACTIVE CHALLENGE")
+	assert.Contains(t, result, "Sprint across the gap")
+}
+
+func TestRenderSceneResponse_WithChallenge_ContainsDontResolveRule(t *testing.T) {
+	testScene := scene.NewScene("test-scene", "Control Room", "Alarms blaring everywhere")
+	err := testScene.StartChallenge("Prevent the meltdown", []scene.ChallengeTask{
+		{ID: "task-1", Skill: "Notice", Difficulty: 2, Description: "Find the keycard", Status: scene.TaskPending},
+		{ID: "task-2", Skill: "Physique", Difficulty: 3, Description: "Force the door", Status: scene.TaskPending},
+	})
+	require.NoError(t, err)
+
+	data := SceneResponseData{
+		Scene:               testScene,
+		CharacterContext:    "An engineer",
+		AspectsContext:      "Alarms",
+		ConversationContext: "Previous dialog",
+		PlayerInput:         "I look for the keycard",
+		InteractionType:     "clarification",
+	}
+
+	result, err := RenderSceneResponse(data)
+	require.NoError(t, err)
+	assert.Contains(t, result, "Prevent the meltdown")
+	assert.Contains(t, result, "MUST NOT narrate any pending task being completed")
+	assert.Contains(t, result, "dice roll that hasn't happened yet")
 }
 
 func TestRenderNPCActionDecision(t *testing.T) {

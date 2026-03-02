@@ -23,6 +23,12 @@ AVAILABLE ASPECTS:
 
 RECENT CONVERSATION:
 {{.ConversationContext}}
+{{- if .ChallengeDescription}}
+
+ACTIVE CHALLENGE: {{.ChallengeDescription}}
+This action resolves the task: {{.ChallengeTaskDesc}}
+Your narration must describe the player character's own attempt at this specific task. Do not have other characters solve, bypass, or pre-empt the task. Focus on the player's effort and the outcome of their roll.
+{{- end}}
 
 ACTION DETAILS:
 Action Type: {{.Action.Type.String}}

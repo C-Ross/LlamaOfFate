@@ -1,0 +1,74 @@
+id: europa
+title: "Meltdown on Europa"
+genre: Sci-Fi
+description: "A reactor crisis on Jupiter's moon. Stabilize it before the station is lost."
+problem: "The station's fusion reactor is destabilizing and standard safety systems have failed"
+setting: >-
+  Europa Research Station, a pressurized facility beneath the icy crust of
+  Jupiter's moon Europa. The station houses a small fusion reactor that powers
+  life support, communications, and the deep-ocean drilling rig. Corridors are
+  narrow and utilitarian, lit by harsh fluorescent strips. Outside, the surface
+  is a frozen wasteland of radiation and vacuum. The nearest rescue ship is
+  twelve hours away.
+story_questions:
+  - "Can the reactor be stabilized before a catastrophic meltdown?"
+  - "What caused the safety systems to fail — accident or sabotage?"
+  - "Will the crew survive the crisis?"
+
+default_player: john-macdougal
+
+npcs:
+  - id: dr-patel
+    name: "Dr. Ananya Patel"
+    type: supporting
+    high_concept: "Brilliant Research Lead Under Pressure"
+    aspects:
+      - "Knows Every System on This Station"
+      - "Hiding Something About the Malfunction"
+    skills:
+      Lore: 3       # Good
+      Investigate: 3 # Good
+      Rapport: 2     # Fair
+      Notice: 2      # Fair
+      Will: 1        # Average
+      Empathy: 1     # Average
+    fate_points: 2
+
+  - id: kowalski
+    name: "Chief Kowalski"
+    type: supporting
+    high_concept: "Grizzled Station Maintenance Chief"
+    aspects:
+      - "Thirty Years of Fixing What Shouldn't Break"
+    skills:
+      Crafts: 3    # Good
+      Physique: 2  # Fair
+      Athletics: 2 # Fair
+      Will: 2      # Fair
+      Notice: 1    # Average
+      Fight: 1     # Average
+    fate_points: 1
+
+  - id: station-ai
+    name: "ARIA"
+    type: nameless_average
+    high_concept: "Station AI Running on Backup Power"
+    primary_skill: Lore
+    skills:
+      Notice: 1 # Average
+
+initial_scene:
+  id: reactor-control
+  name: "Reactor Control Room"
+  description: >-
+    You step into the reactor control room and the situation hits you
+    immediately. Warning lights strobe red across every console. The main
+    display shows reactor core temperature climbing steadily — already 15%
+    above nominal. The automated safety shutdown failed twenty minutes ago
+    and nobody knows why. Dr. Patel's voice crackles over the intercom from
+    the research lab two decks up: "MacDougal, thank god you're here. The
+    primary coolant loop is offline and the backup pump isn't responding.
+    We've got maybe an hour before containment becomes a real problem."
+    Chief Kowalski stands by the far wall, tool belt on, waiting for
+    direction. The station AI, ARIA, flickers on a damaged screen:
+    "Core temperature anomaly detected. Manual intervention recommended."

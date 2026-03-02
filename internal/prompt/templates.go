@@ -24,6 +24,9 @@ var actionParsePromptTemplate string
 //go:embed templates/input_classification_prompt.tmpl
 var inputClassificationPromptTemplate string
 
+//go:embed templates/input_classification_challenge_prompt.tmpl
+var inputClassificationChallengePromptTemplate string
+
 //go:embed templates/scene_response_prompt.tmpl
 var sceneResponsePromptTemplate string
 
@@ -68,25 +71,26 @@ var challengeBuildPromptTemplate string
 
 // Template instances
 var (
-	AspectGenerationPrompt       *template.Template
-	AspectGenerationSystemPrompt *template.Template
-	ActionParseSystemPrompt      *template.Template
-	ActionParsePrompt            *template.Template
-	InputClassificationPrompt    *template.Template
-	SceneResponsePrompt          *template.Template
-	ActionNarrativePrompt        *template.Template
-	ConflictResponsePrompt       *template.Template
-	NPCAttackPrompt              *template.Template
-	NPCActionDecisionPrompt      *template.Template
-	ConsequenceAspectPrompt      *template.Template
-	TakenOutPrompt               *template.Template
-	SceneGenerationPrompt        *template.Template
-	SceneSummaryPrompt           *template.Template
-	ScenarioGenerationPrompt     *template.Template
-	ScenarioResolutionPrompt     *template.Template
-	RecoveryNarrativePrompt      *template.Template
-	FateNarrationPrompt          *template.Template
-	ChallengeBuildPrompt         *template.Template
+	AspectGenerationPrompt             *template.Template
+	AspectGenerationSystemPrompt       *template.Template
+	ActionParseSystemPrompt            *template.Template
+	ActionParsePrompt                  *template.Template
+	InputClassificationPrompt          *template.Template
+	InputClassificationChallengePrompt *template.Template
+	SceneResponsePrompt                *template.Template
+	ActionNarrativePrompt              *template.Template
+	ConflictResponsePrompt             *template.Template
+	NPCAttackPrompt                    *template.Template
+	NPCActionDecisionPrompt            *template.Template
+	ConsequenceAspectPrompt            *template.Template
+	TakenOutPrompt                     *template.Template
+	SceneGenerationPrompt              *template.Template
+	SceneSummaryPrompt                 *template.Template
+	ScenarioGenerationPrompt           *template.Template
+	ScenarioResolutionPrompt           *template.Template
+	RecoveryNarrativePrompt            *template.Template
+	FateNarrationPrompt                *template.Template
+	ChallengeBuildPrompt               *template.Template
 )
 
 func init() {
@@ -120,6 +124,12 @@ func init() {
 	InputClassificationPrompt, err = template.New("input_classification").Parse(inputClassificationPromptTemplate)
 	if err != nil {
 		panic("failed to parse input classification prompt template: " + err.Error())
+	}
+
+	// Parse the challenge-specific input classification prompt template
+	InputClassificationChallengePrompt, err = template.New("input_classification_challenge").Parse(inputClassificationChallengePromptTemplate)
+	if err != nil {
+		panic("failed to parse input classification challenge prompt template: " + err.Error())
 	}
 
 	// Parse the scene response prompt template
@@ -216,8 +226,13 @@ func executeTemplate(tmpl *template.Template, data any) (string, error) {
 	return buf.String(), nil
 }
 
-// RenderInputClassification renders the input classification prompt
+// RenderInputClassification renders the input classification prompt.
+// When a challenge is active (ActiveChallengeSkills is non-empty), a
+// challenge-specific template is used that biases heavily toward "action".
 func RenderInputClassification(data InputClassificationData) (string, error) {
+	if len(data.ActiveChallengeSkills) > 0 {
+		return executeTemplate(InputClassificationChallengePrompt, data)
+	}
 	return executeTemplate(InputClassificationPrompt, data)
 }
 

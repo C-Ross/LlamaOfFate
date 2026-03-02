@@ -574,6 +574,14 @@ func (sm *SceneManager) GenerateActionNarrative(ctx context.Context, parsedActio
 		OtherCharacters:     otherCharacters,
 	}
 
+	// Add challenge context if a challenge is active and this skill matches a task
+	if sm.currentScene.IsChallenge && sm.currentScene.ChallengeState != nil {
+		data.ChallengeDescription = sm.currentScene.ChallengeState.Description
+		if task := sm.currentScene.ChallengeState.FindTaskBySkill(parsedAction.Skill); task != nil {
+			data.ChallengeTaskDesc = task.Description
+		}
+	}
+
 	promptText, err := prompt.RenderActionNarrative(data)
 	if err != nil {
 		return "", fmt.Errorf("generateActionNarrative: %w: %v", llm.ErrInvalidResponse, err)

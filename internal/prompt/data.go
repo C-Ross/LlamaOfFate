@@ -105,12 +105,14 @@ type ConflictResponseData struct {
 
 // ActionNarrativeData holds the data for action narrative template
 type ActionNarrativeData struct {
-	Scene               *scene.Scene
-	CharacterContext    string
-	AspectsContext      string
-	ConversationContext string
-	Action              *action.Action
-	OtherCharacters     []*character.Character
+	Scene                *scene.Scene
+	CharacterContext     string
+	AspectsContext       string
+	ConversationContext  string
+	Action               *action.Action
+	OtherCharacters      []*character.Character
+	ChallengeDescription string // Overall challenge description, if active
+	ChallengeTaskDesc    string // Specific task being resolved, if any
 }
 
 // AttackContext holds information about the attack that caused damage
