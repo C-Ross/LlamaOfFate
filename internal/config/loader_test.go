@@ -367,7 +367,7 @@ func TestLoadAll_RealConfigs(t *testing.T) {
 
 	scenarios, err := LoadAll(configRoot)
 	require.NoError(t, err)
-	require.Len(t, scenarios, 3, "expected 3 scenarios (saloon, heist, tower)")
+	require.Len(t, scenarios, 4, "expected 4 scenarios (saloon, heist, tower, europa)")
 
 	// Saloon
 	saloon := scenarios["saloon"]
@@ -400,6 +400,17 @@ func TestLoadAll_RealConfigs(t *testing.T) {
 	assert.Equal(t, "Lyra Moonwhisper", tower.Player.Name)
 	require.Len(t, tower.NPCs, 1)
 	require.NotNil(t, tower.Scene)
+
+	// Europa
+	europa := scenarios["europa"]
+	require.NotNil(t, europa)
+	assert.Equal(t, "Meltdown on Europa", europa.Scenario.Title)
+	assert.Equal(t, "Sci-Fi", europa.Scenario.Genre)
+	require.NotNil(t, europa.Player)
+	assert.Equal(t, "John MacDougal", europa.Player.Name)
+	require.Len(t, europa.NPCs, 3)
+	require.NotNil(t, europa.Scene)
+	assert.Equal(t, "Reactor Control Room", europa.Scene.Name)
 }
 
 // ---------- Helpers ----------------------------------------------------------
