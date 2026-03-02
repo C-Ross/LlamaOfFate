@@ -116,7 +116,7 @@ func TestScenarioManager_Snapshot(t *testing.T) {
 	player.Aspects.HighConcept = "Gunslinger"
 	player.SetSkill("shoot", dice.Great)
 
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 	sm.SetScenario(&scene.Scenario{
 		Title:          "The Train Heist",
 		Problem:        "A train carrying gold",
@@ -128,8 +128,7 @@ func TestScenarioManager_Snapshot(t *testing.T) {
 	sm.sceneCount = 3
 	sm.lastGeneratedPurpose = "Infiltrate the train"
 	sm.lastGeneratedHook = "You hear the whistle in the distance"
-	sm.npcRegistry["marshal"] = character.NewCharacter("npc1", "Marshal Dan")
-	sm.npcAttitudes["marshal"] = "hostile"
+	sm.npcRegistry.Register(character.NewCharacter("npc1", "Marshal Dan"), "hostile")
 	sm.sceneSummaries = []prompt.SceneSummary{
 		{SceneDescription: "The saloon", KeyEvents: []string{"Met the Marshal"}},
 	}
@@ -150,8 +149,8 @@ func TestScenarioManager_Snapshot(t *testing.T) {
 	assert.Equal(t, "Infiltrate the train", scenarioState.LastPurpose)
 	assert.Equal(t, "You hear the whistle in the distance", scenarioState.LastHook)
 	assert.Len(t, scenarioState.NPCRegistry, 1)
-	assert.Equal(t, "Marshal Dan", scenarioState.NPCRegistry["marshal"].Name)
-	assert.Equal(t, "hostile", scenarioState.NPCAttitudes["marshal"])
+	assert.Equal(t, "Marshal Dan", scenarioState.NPCRegistry["marshal dan"].Name)
+	assert.Equal(t, "hostile", scenarioState.NPCAttitudes["marshal dan"])
 	assert.Len(t, scenarioState.SceneSummaries, 1)
 	assert.Equal(t, "The saloon", scenarioState.SceneSummaries[0].SceneDescription)
 
@@ -165,9 +164,8 @@ func TestScenarioManager_Snapshot_CopiesMaps(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
-	sm.npcRegistry["bandit"] = character.NewCharacter("npc1", "Bandit")
-	sm.npcAttitudes["bandit"] = "neutral"
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
+	sm.npcRegistry.Register(character.NewCharacter("npc1", "Bandit"), "neutral")
 	sm.sceneSummaries = []prompt.SceneSummary{
 		{SceneDescription: "Scene one"},
 	}
@@ -175,8 +173,7 @@ func TestScenarioManager_Snapshot_CopiesMaps(t *testing.T) {
 	scenarioState, _ := sm.Snapshot()
 
 	// Mutate originals — snapshot should be unaffected
-	sm.npcRegistry["new_npc"] = character.NewCharacter("npc2", "New NPC")
-	sm.npcAttitudes["new_npc"] = "friendly"
+	sm.npcRegistry.Register(character.NewCharacter("npc2", "New NPC"), "friendly")
 	sm.sceneSummaries = append(sm.sceneSummaries, prompt.SceneSummary{SceneDescription: "Scene two"})
 
 	assert.Len(t, scenarioState.NPCRegistry, 1)
@@ -189,7 +186,7 @@ func TestScenarioManager_SetSaveFunc(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	called := false
 	sm.SetSaveFunc(func() error {
@@ -259,7 +256,7 @@ func TestGameManager_Save_CascadesSnapshot(t *testing.T) {
 	gm.SetSaver(recorder)
 
 	// Manually wire up scenario manager as Run() would
-	gm.scenarioManager = NewScenarioManager(engine, player, session.NullLogger{})
+	gm.scenarioManager = NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 	gm.scenarioManager.SetScenario(&scene.Scenario{
 		Title:   "Test Scenario",
 		Problem: "A test problem",
@@ -399,7 +396,7 @@ func TestScenarioManager_Restore(t *testing.T) {
 	player.SetSkill("Shoot", dice.Great)
 	player.FatePoints = 5
 
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	bartender := character.NewCharacter("npc_bartender", "Old Pete")
 	bartender.Aspects.HighConcept = "Grizzled Barkeep"
@@ -439,8 +436,9 @@ func TestScenarioManager_Restore(t *testing.T) {
 	assert.Equal(t, 4, sm.sceneCount)
 	assert.Len(t, sm.sceneSummaries, 1)
 	assert.Equal(t, "The dusty saloon", sm.sceneSummaries[0].SceneDescription)
-	assert.Contains(t, sm.npcRegistry, "old pete")
-	assert.Equal(t, "friendly", sm.npcAttitudes["old pete"])
+	assert.Contains(t, sm.npcRegistry.All(), "old pete")
+	_, attitudes := sm.npcRegistry.Snapshot()
+	assert.Equal(t, "friendly", attitudes["old pete"])
 	assert.Equal(t, "Confront the marshal", sm.lastGeneratedPurpose)
 	assert.Equal(t, "The doors swing open...", sm.lastGeneratedHook)
 	assert.True(t, sm.resumed)
@@ -451,7 +449,7 @@ func TestScenarioManager_Restore_RegistersNPCsWithEngine(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	bartender := character.NewCharacter("npc_bartender", "Old Pete")
 	marshal := character.NewCharacter("npc_marshal", "Marshal Dan")
@@ -481,7 +479,7 @@ func TestScenarioManager_Restore_NilMaps(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	// Restore with nil maps — should not panic
 	sm.Restore(ScenarioState{
@@ -491,7 +489,8 @@ func TestScenarioManager_Restore_NilMaps(t *testing.T) {
 	}, SceneState{})
 
 	assert.NotNil(t, sm.npcRegistry)
-	assert.NotNil(t, sm.npcAttitudes)
+	registry, _ := sm.npcRegistry.Snapshot()
+	assert.NotNil(t, registry)
 }
 
 func TestScenarioManager_Restore_CascadesToSceneManager(t *testing.T) {
@@ -499,7 +498,7 @@ func TestScenarioManager_Restore_CascadesToSceneManager(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Jesse")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
 	sceneState := SceneState{
@@ -524,12 +523,11 @@ func TestScenarioManager_Restore_RoundTrip(t *testing.T) {
 	player := character.NewCharacter("player1", "Jesse")
 	player.Aspects.HighConcept = "Gunslinger"
 
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 	sm.SetScenario(&scene.Scenario{Title: "Train Heist", Genre: "Western"})
 	sm.SetScenarioCount(1)
 	sm.sceneCount = 2
-	sm.npcRegistry["bandit"] = character.NewCharacter("npc1", "Bandit")
-	sm.npcAttitudes["bandit"] = "hostile"
+	sm.npcRegistry.Register(character.NewCharacter("npc1", "Bandit"), "hostile")
 	sm.lastGeneratedPurpose = "Board the train"
 	sm.lastGeneratedHook = "All aboard!"
 
@@ -546,15 +544,16 @@ func TestScenarioManager_Restore_RoundTrip(t *testing.T) {
 	engine2, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
-	sm2 := NewScenarioManager(engine2, player, session.NullLogger{})
+	sm2 := NewScenarioManager(engine2, player, session.NullLogger{}, NewNPCRegistry())
 	sm2.Restore(scenarioState, sceneState)
 
 	// Verify round-trip
 	assert.Equal(t, "Train Heist", sm2.scenario.Title)
 	assert.Equal(t, 1, sm2.scenarioCount)
 	assert.Equal(t, 2, sm2.sceneCount)
-	assert.Contains(t, sm2.npcRegistry, "bandit")
-	assert.Equal(t, "hostile", sm2.npcAttitudes["bandit"])
+	assert.Contains(t, sm2.npcRegistry.All(), "bandit")
+	_, attitudes2 := sm2.npcRegistry.Snapshot()
+	assert.Equal(t, "hostile", attitudes2["bandit"])
 	assert.Equal(t, "Board the train", sm2.lastGeneratedPurpose)
 	assert.Equal(t, "All aboard!", sm2.lastGeneratedHook)
 	assert.True(t, sm2.resumed)

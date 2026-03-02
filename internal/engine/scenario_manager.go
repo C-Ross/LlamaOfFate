@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
@@ -24,33 +23,31 @@ type ScenarioManager struct {
 	engine               *Engine
 	player               *character.Character
 	sessionLogger        session.SessionLogger
-	scenario             *scene.Scenario                 // The current scenario with problem and story questions
-	initialScene         *scene.Scene                    // Optional pre-configured starting scene
-	initialNPCs          []*character.Character          // NPCs for initial scene
-	sceneSummaries       []prompt.SceneSummary           // Summaries of recent scenes (sliding window of last 3)
-	lastGeneratedPurpose string                          // Purpose from the most recently generated scene
-	lastGeneratedHook    string                          // Opening hook from the most recently generated scene
-	sceneCount           int                             // Total scenes completed in this scenario
-	scenarioCount        int                             // Current scenario number (set by GameManager)
-	npcRegistry          map[string]*character.Character // Named NPCs persisted across scenes, keyed by normalized name
-	npcAttitudes         map[string]string               // Last-known attitude per NPC (keyed by normalized name)
-	saveFunc             func() error                    // Optional callback to trigger a save via GameManager
-	resumed              bool                            // True when restoring from a saved game
-	started              bool                            // True after Start has been called
-	currentScene         *scene.Scene                    // The active scene (set by Start, updated by HandleInput)
-	lastTransitionHint   string                          // Transition hint from the last scene end
-	exitAfterScene       bool                            // Exit after the first scene ends instead of generating next scenes
+	scenario             *scene.Scenario        // The current scenario with problem and story questions
+	initialScene         *scene.Scene           // Optional pre-configured starting scene
+	initialNPCs          []*character.Character // NPCs for initial scene
+	sceneSummaries       []prompt.SceneSummary  // Summaries of recent scenes (sliding window of last 3)
+	lastGeneratedPurpose string                 // Purpose from the most recently generated scene
+	lastGeneratedHook    string                 // Opening hook from the most recently generated scene
+	sceneCount           int                    // Total scenes completed in this scenario
+	scenarioCount        int                    // Current scenario number (set by GameManager)
+	npcRegistry          NPCRegistry            // Named NPCs persisted across scenes
+	saveFunc             func() error           // Optional callback to trigger a save via GameManager
+	resumed              bool                   // True when restoring from a saved game
+	started              bool                   // True after Start has been called
+	currentScene         *scene.Scene           // The active scene (set by Start, updated by HandleInput)
+	lastTransitionHint   string                 // Transition hint from the last scene end
+	exitAfterScene       bool                   // Exit after the first scene ends instead of generating next scenes
 }
 
 // NewScenarioManager creates a new scenario manager.
 // sessionLogger must not be nil; use session.NullLogger{} when logging is not needed.
-func NewScenarioManager(engine *Engine, player *character.Character, sessionLogger session.SessionLogger) *ScenarioManager {
+func NewScenarioManager(engine *Engine, player *character.Character, sessionLogger session.SessionLogger, npcRegistry NPCRegistry) *ScenarioManager {
 	return &ScenarioManager{
 		engine:        engine,
 		player:        player,
 		sessionLogger: sessionLogger,
-		npcRegistry:   make(map[string]*character.Character),
-		npcAttitudes:  make(map[string]string),
+		npcRegistry:   npcRegistry,
 	}
 }
 
@@ -134,17 +131,7 @@ func (m *ScenarioManager) emitSceneOpeningEvents() []GameEvent {
 // Snapshot returns the scenario-level and scene-level state for persistence.
 // It cascades to SceneManager.Snapshot() for the scene layer.
 func (m *ScenarioManager) Snapshot() (ScenarioState, SceneState) {
-	// Copy NPC registry to avoid aliasing
-	npcRegistry := make(map[string]*character.Character, len(m.npcRegistry))
-	for k, v := range m.npcRegistry {
-		npcRegistry[k] = v
-	}
-
-	// Copy NPC attitudes to avoid aliasing
-	npcAttitudes := make(map[string]string, len(m.npcAttitudes))
-	for k, v := range m.npcAttitudes {
-		npcAttitudes[k] = v
-	}
+	npcRegistry, npcAttitudes := m.npcRegistry.Snapshot()
 
 	// Copy scene summaries to avoid aliasing
 	summaries := make([]prompt.SceneSummary, len(m.sceneSummaries))
@@ -177,21 +164,12 @@ func (m *ScenarioManager) Restore(scenarioState ScenarioState, sceneState SceneS
 	m.scenarioCount = scenarioState.ScenarioCount
 	m.sceneCount = scenarioState.SceneCount
 	m.sceneSummaries = scenarioState.SceneSummaries
-	m.npcRegistry = scenarioState.NPCRegistry
-	m.npcAttitudes = scenarioState.NPCAttitudes
+	m.npcRegistry.Restore(scenarioState.NPCRegistry, scenarioState.NPCAttitudes)
 	m.lastGeneratedPurpose = scenarioState.LastPurpose
 	m.lastGeneratedHook = scenarioState.LastHook
 
-	// Initialize maps if nil (defensive against empty saves)
-	if m.npcRegistry == nil {
-		m.npcRegistry = make(map[string]*character.Character)
-	}
-	if m.npcAttitudes == nil {
-		m.npcAttitudes = make(map[string]string)
-	}
-
 	// Register NPCs with the engine so scene character lookups work
-	for _, npc := range m.npcRegistry {
+	for _, npc := range m.npcRegistry.All() {
 		m.engine.AddCharacter(npc)
 	}
 
@@ -412,7 +390,7 @@ func (m *ScenarioManager) handleSceneEnd(ctx context.Context, sceneManager *Scen
 		)
 	} else {
 		m.addSceneSummary(summary)
-		m.updateNPCAttitudes(summary)
+		m.npcRegistry.UpdateAttitudesFromSummary(summary)
 
 		m.sessionLogger.Log("scene_summary", summary)
 
@@ -486,8 +464,7 @@ func (m *ScenarioManager) getInitialScene(ctx context.Context) (*scene.Scene, er
 			m.initialScene.AddCharacter(npc.ID)
 			// Register named NPCs for persistence across scenes
 			if !npc.CharacterType.IsNameless() {
-				m.npcRegistry[normalizeNPCName(npc.Name)] = npc
-				m.npcAttitudes[normalizeNPCName(npc.Name)] = "neutral"
+				m.npcRegistry.Register(npc, "neutral")
 			}
 		}
 		m.initialScene.AddCharacter(m.player.ID)
@@ -517,7 +494,7 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 		PlayerAspects:     playerAspects,
 		PreviousSummaries: m.sceneSummaries, // Include recent scene summaries for context
 		Complications:     m.extractComplications(),
-		KnownNPCs:         m.getKnownNPCSummaries(),
+		KnownNPCs:         m.npcRegistry.KnownSummaries(),
 	}
 
 	promptText, err := prompt.RenderSceneGeneration(data)
@@ -553,10 +530,8 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 
 	// Create and register NPCs, reusing known NPCs from previous scenes
 	for i, npcData := range generated.NPCs {
-		normalizedName := normalizeNPCName(npcData.Name)
-
 		// Check if this NPC already exists in the registry
-		if existingNPC, found := m.npcRegistry[normalizedName]; found {
+		if existingNPC, found := m.npcRegistry.Lookup(npcData.Name); found {
 			// Skip permanently removed NPCs — they should never reappear
 			if existingNPC.IsPermanentlyRemoved() {
 				slog.Info("Skipping permanently removed NPC",
@@ -599,8 +574,7 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 
 		// Register named NPCs (non-nameless) for persistence
 		if !npc.CharacterType.IsNameless() {
-			m.npcRegistry[normalizedName] = npc
-			m.npcAttitudes[normalizedName] = npcData.Disposition
+			m.npcRegistry.Register(npc, npcData.Disposition)
 		}
 	}
 
@@ -869,51 +843,6 @@ func (m *ScenarioManager) buildRecoveryNarrativeEvents(ctx context.Context, atte
 	})
 
 	return events
-}
-
-// updateNPCAttitudes updates the NPC registry with attitude changes from a scene summary
-func (m *ScenarioManager) updateNPCAttitudes(summary *prompt.SceneSummary) {
-	if summary == nil {
-		return
-	}
-	for _, npc := range summary.NPCsEncountered {
-		normalizedName := normalizeNPCName(npc.Name)
-		m.npcAttitudes[normalizedName] = npc.Attitude
-	}
-}
-
-// normalizeNPCName normalizes an NPC name for matching (lowercase, trimmed)
-func normalizeNPCName(name string) string {
-	return strings.ToLower(strings.TrimSpace(name))
-}
-
-// getKnownNPCSummaries returns summaries of known NPCs for scene generation prompts.
-// Permanently removed NPCs (killed, destroyed) are excluded entirely.
-// Temporarily defeated NPCs include their fate description in the attitude.
-func (m *ScenarioManager) getKnownNPCSummaries() []prompt.NPCSummary {
-	var summaries []prompt.NPCSummary
-	for normalizedName, npc := range m.npcRegistry {
-		// Exclude permanently removed NPCs — they should never reappear
-		if npc.IsPermanentlyRemoved() {
-			continue
-		}
-
-		attitude := m.npcAttitudes[normalizedName]
-		if attitude == "" {
-			attitude = "neutral"
-		}
-
-		// For temporarily defeated NPCs, include the fate description
-		if npc.IsTakenOut() && !npc.Fate.Permanent {
-			attitude = fmt.Sprintf("defeated (%s)", npc.Fate.Description)
-		}
-
-		summaries = append(summaries, prompt.NPCSummary{
-			Name:     npc.Name,
-			Attitude: attitude,
-		})
-	}
-	return summaries
 }
 
 // generateSceneSummary creates a summary of the completed scene using LLM

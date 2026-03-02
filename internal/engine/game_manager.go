@@ -136,7 +136,7 @@ func (g *GameManager) Start(ctx context.Context) ([]GameEvent, error) {
 	}
 
 	// Fresh start
-	g.scenarioManager = NewScenarioManager(g.engine, g.player, g.sessionLogger)
+	g.scenarioManager = NewScenarioManager(g.engine, g.player, g.sessionLogger, NewNPCRegistry())
 	g.scenarioManager.SetScenario(g.scenario)
 	g.scenarioManager.SetScenarioCount(g.scenarioCount)
 	g.scenarioManager.SetSaveFunc(g.Save)
@@ -168,7 +168,7 @@ func (g *GameManager) Start(ctx context.Context) ([]GameEvent, error) {
 func (g *GameManager) startFromSave(ctx context.Context, state *GameState) ([]GameEvent, error) {
 	g.player = state.Scenario.Player
 
-	g.scenarioManager = NewScenarioManager(g.engine, g.player, g.sessionLogger)
+	g.scenarioManager = NewScenarioManager(g.engine, g.player, g.sessionLogger, NewNPCRegistry())
 	g.scenarioManager.SetSaveFunc(g.Save)
 
 	g.scenarioManager.Restore(state.Scenario, state.Scene)

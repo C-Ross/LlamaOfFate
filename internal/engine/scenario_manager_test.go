@@ -17,7 +17,7 @@ func TestNewScenarioManager(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	assert.NotNil(t, sm)
 	assert.Equal(t, engine, sm.engine)
@@ -29,7 +29,7 @@ func TestScenarioManager_SetScenario(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	scenario := &scene.Scenario{
 		Title:   "Test Scenario",
@@ -49,7 +49,7 @@ func TestScenarioManager_SetInitialScene(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
 	npc := character.NewCharacter("npc1", "Test NPC")
@@ -170,7 +170,7 @@ func TestScenarioManager_addSceneSummary(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	// Add first summary
 	summary1 := &prompt.SceneSummary{NarrativeProse: "First scene"}
@@ -200,7 +200,7 @@ func TestScenarioManager_addSceneSummary_NilSummary(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	// Adding nil should not panic or add anything
 	sm.addSceneSummary(nil)
@@ -212,7 +212,7 @@ func TestScenarioManager_extractComplications(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	// No summaries — no complications
 	assert.Empty(t, sm.extractComplications())
@@ -239,7 +239,7 @@ func TestScenarioManager_extractComplications_NoThreads(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	sm.addSceneSummary(&prompt.SceneSummary{
 		NarrativeProse: "A scene with no threads",
@@ -568,12 +568,12 @@ func TestNewScenarioManager_InitializesNPCRegistry(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	assert.NotNil(t, sm.npcRegistry)
-	assert.NotNil(t, sm.npcAttitudes)
-	assert.Empty(t, sm.npcRegistry)
-	assert.Empty(t, sm.npcAttitudes)
+	registry, attitudes := sm.npcRegistry.Snapshot()
+	assert.Empty(t, registry)
+	assert.Empty(t, attitudes)
 }
 
 func TestScenarioManager_SetScenarioCount(t *testing.T) {
@@ -581,7 +581,7 @@ func TestScenarioManager_SetScenarioCount(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	sm.SetScenarioCount(3)
 	assert.Equal(t, 3, sm.scenarioCount)
@@ -592,20 +592,19 @@ func TestScenarioManager_GetKnownNPCSummaries(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	// Empty registry
-	summaries := sm.getKnownNPCSummaries()
+	summaries := sm.npcRegistry.KnownSummaries()
 	assert.Empty(t, summaries)
 
 	// Add an NPC to registry
 	npc := character.NewCharacter("npc1", "Greta Ironheart")
 	npc.CharacterType = character.CharacterTypeMainNPC
 	npc.Aspects.HighConcept = "Dwarven Smith"
-	sm.npcRegistry[normalizeNPCName(npc.Name)] = npc
-	sm.npcAttitudes[normalizeNPCName(npc.Name)] = "friendly"
+	sm.npcRegistry.Register(npc, "friendly")
 
-	summaries = sm.getKnownNPCSummaries()
+	summaries = sm.npcRegistry.KnownSummaries()
 	assert.Len(t, summaries, 1)
 	assert.Equal(t, "Greta Ironheart", summaries[0].Name)
 	assert.Equal(t, "friendly", summaries[0].Attitude)
@@ -616,20 +615,18 @@ func TestScenarioManager_GetKnownNPCSummaries_ExcludesPermanentlyRemoved(t *test
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	// Add a normal NPC
 	alive := character.NewCharacter("npc1", "Greta Ironheart")
-	sm.npcRegistry[normalizeNPCName(alive.Name)] = alive
-	sm.npcAttitudes[normalizeNPCName(alive.Name)] = "friendly"
+	sm.npcRegistry.Register(alive, "friendly")
 
 	// Add a permanently removed NPC (killed)
 	dead := character.NewCharacter("npc2", "Bandit Leader")
 	dead.Fate = &character.TakenOutFate{Description: "killed in the explosion", Permanent: true}
-	sm.npcRegistry[normalizeNPCName(dead.Name)] = dead
-	sm.npcAttitudes[normalizeNPCName(dead.Name)] = "hostile"
+	sm.npcRegistry.Register(dead, "hostile")
 
-	summaries := sm.getKnownNPCSummaries()
+	summaries := sm.npcRegistry.KnownSummaries()
 	assert.Len(t, summaries, 1)
 	assert.Equal(t, "Greta Ironheart", summaries[0].Name)
 	assert.Equal(t, "friendly", summaries[0].Attitude)
@@ -640,15 +637,14 @@ func TestScenarioManager_GetKnownNPCSummaries_TemporaryDefeatShowsFate(t *testin
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	// Add a temporarily defeated NPC (knocked unconscious)
 	knocked := character.NewCharacter("npc1", "Guard Captain")
 	knocked.Fate = &character.TakenOutFate{Description: "knocked unconscious", Permanent: false}
-	sm.npcRegistry[normalizeNPCName(knocked.Name)] = knocked
-	sm.npcAttitudes[normalizeNPCName(knocked.Name)] = "hostile"
+	sm.npcRegistry.Register(knocked, "hostile")
 
-	summaries := sm.getKnownNPCSummaries()
+	summaries := sm.npcRegistry.KnownSummaries()
 	require.Len(t, summaries, 1)
 	assert.Equal(t, "Guard Captain", summaries[0].Name)
 	assert.Equal(t, "defeated (knocked unconscious)", summaries[0].Attitude)
@@ -659,24 +655,23 @@ func TestScenarioManager_GetKnownNPCSummaries_MixedFates(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	// Normal NPC
 	normal := character.NewCharacter("npc1", "Shopkeeper")
-	sm.npcRegistry[normalizeNPCName(normal.Name)] = normal
-	sm.npcAttitudes[normalizeNPCName(normal.Name)] = "neutral"
+	sm.npcRegistry.Register(normal, "neutral")
 
 	// Temporarily defeated NPC
 	temp := character.NewCharacter("npc2", "Thug")
 	temp.Fate = &character.TakenOutFate{Description: "fled in terror", Permanent: false}
-	sm.npcRegistry[normalizeNPCName(temp.Name)] = temp
+	sm.npcRegistry.Register(temp, "")
 
 	// Permanently removed NPC
 	perm := character.NewCharacter("npc3", "Assassin")
 	perm.Fate = &character.TakenOutFate{Description: "fell off the cliff", Permanent: true}
-	sm.npcRegistry[normalizeNPCName(perm.Name)] = perm
+	sm.npcRegistry.Register(perm, "")
 
-	summaries := sm.getKnownNPCSummaries()
+	summaries := sm.npcRegistry.KnownSummaries()
 	assert.Len(t, summaries, 2, "should exclude permanently removed NPC")
 
 	nameMap := make(map[string]string)
@@ -705,7 +700,7 @@ func TestScenarioManager_GenerateNextScene_SkipsPermanentlyRemovedNPCs(t *testin
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 	sm.scenario = &scene.Scenario{
 		Title:   "Test Scenario",
 		Problem: "A test problem",
@@ -715,7 +710,7 @@ func TestScenarioManager_GenerateNextScene_SkipsPermanentlyRemovedNPCs(t *testin
 	// Pre-register "Bandit Leader" as permanently removed
 	dead := character.NewCharacter("old_npc_1", "Bandit Leader")
 	dead.Fate = &character.TakenOutFate{Description: "killed", Permanent: true}
-	sm.npcRegistry[normalizeNPCName(dead.Name)] = dead
+	sm.npcRegistry.Register(dead, "hostile")
 
 	newScene, err := sm.generateNextScene(context.Background(), "moving on")
 	require.NoError(t, err)
@@ -750,11 +745,11 @@ func TestScenarioManager_UpdateNPCAttitudes(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	// Register an NPC so the attitude update recognizes it
 	npc := character.NewCharacter("npc1", "Greta Ironheart")
-	sm.npcRegistry[normalizeNPCName(npc.Name)] = npc
+	sm.npcRegistry.Register(npc, "neutral")
 
 	summary := &prompt.SceneSummary{
 		NPCsEncountered: []prompt.NPCSummary{
@@ -762,8 +757,9 @@ func TestScenarioManager_UpdateNPCAttitudes(t *testing.T) {
 		},
 	}
 
-	sm.updateNPCAttitudes(summary)
-	assert.Equal(t, "hostile", sm.npcAttitudes[normalizeNPCName("Greta Ironheart")])
+	sm.npcRegistry.UpdateAttitudesFromSummary(summary)
+	_, attitudes := sm.npcRegistry.Snapshot()
+	assert.Equal(t, "hostile", attitudes[normalizeNPCName("Greta Ironheart")])
 }
 
 func TestScenarioManager_UpdateNPCAttitudes_NilSummary(t *testing.T) {
@@ -771,10 +767,10 @@ func TestScenarioManager_UpdateNPCAttitudes_NilSummary(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	// Should not panic
-	sm.updateNPCAttitudes(nil)
+	sm.npcRegistry.UpdateAttitudesFromSummary(nil)
 }
 
 func TestScenarioManager_BestRecoverySkill(t *testing.T) {
@@ -785,7 +781,7 @@ func TestScenarioManager_BestRecoverySkill(t *testing.T) {
 	player.SetSkill("Physique", 3)
 	player.SetSkill("Will", 2)
 	player.SetSkill("Athletics", 1)
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	// Physical consequence should prefer Physique
 	physConseq := character.Consequence{ID: "c1", Type: character.MildConsequence, Aspect: "Bruised Ribs"}
@@ -800,7 +796,7 @@ func TestScenarioManager_HandleBetweenSceneRecovery_NoConsequences(t *testing.T)
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	events := sm.handleBetweenSceneRecovery(context.Background())
 
@@ -823,7 +819,7 @@ func TestScenarioManager_HandleBetweenSceneRecovery_HealedConsequence(t *testing
 			RecoveryStartScenario: 0,
 		},
 	}
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 	sm.sceneCount = 2 // Mild consequences heal after 1 scene
 
 	events := sm.handleBetweenSceneRecovery(context.Background())
@@ -852,7 +848,7 @@ func TestScenarioManager_HandleBetweenSceneRecovery_RollEvents(t *testing.T) {
 			Recovering: false,
 		},
 	}
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 	sm.sceneCount = 1
 
 	events := sm.handleBetweenSceneRecovery(context.Background())
@@ -873,7 +869,7 @@ func TestScenarioManager_BuildRecoveryNarrativeEvents_Empty(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	events := sm.buildRecoveryNarrativeEvents(context.Background(), nil)
 
@@ -885,7 +881,7 @@ func TestScenarioManager_BuildRecoveryNarrativeEvents_ReturnsRollEvents(t *testi
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	attempts := []prompt.RecoveryAttempt{
 		{
@@ -942,7 +938,7 @@ func TestScenarioManager_Start_RequiresLLM(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	_, err = sm.Start(context.Background())
 	assert.Error(t, err)
@@ -965,7 +961,7 @@ func TestScenarioManager_Start_WithInitialScene(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	testScene := scene.NewScene("scene1", "The Dusty Trail", "A winding desert path")
 	sm.SetInitialScene(testScene, nil)
@@ -988,7 +984,7 @@ func TestScenarioManager_Start_WithPurposeAndHook(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	// Set up a mock LLM that returns scene generation with purpose and hook
 	sm.SetScenario(&scene.Scenario{Title: "Test", Genre: "Fantasy"})
@@ -1018,7 +1014,7 @@ func TestScenarioManager_Start_Resume(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	// Set up a scene in the SceneManager and mark as resumed
 	testScene := scene.NewScene("scene1", "The Vault", "A bank vault")
@@ -1047,7 +1043,7 @@ func TestScenarioManager_HandleInput_BeforeStart(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	_, err = sm.HandleInput(context.Background(), "hello")
 	assert.Error(t, err)
@@ -1059,7 +1055,7 @@ func TestScenarioManager_ProvideInvokeResponse_BeforeStart(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	_, err = sm.ProvideInvokeResponse(context.Background(), InvokeResponse{})
 	assert.Error(t, err)
@@ -1071,7 +1067,7 @@ func TestScenarioManager_ProvideMidFlowResponse_BeforeStart(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	_, err = sm.ProvideMidFlowResponse(context.Background(), MidFlowResponse{})
 	assert.Error(t, err)
@@ -1083,7 +1079,7 @@ func TestScenarioManager_HandleSceneEnd_Quit(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 	sm.scenario = &scene.Scenario{Title: "Test"}
 
 	sceneManager := engine.GetSceneManager()
@@ -1105,7 +1101,7 @@ func TestScenarioManager_HandleSceneEnd_PlayerTakenOut(t *testing.T) {
 	require.NoError(t, err)
 
 	player := character.NewCharacter("player1", "Test Hero")
-	sm := NewScenarioManager(engine, player, session.NullLogger{})
+	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 	sm.scenario = &scene.Scenario{Title: "Test"}
 
 	sceneManager := engine.GetSceneManager()
