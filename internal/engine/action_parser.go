@@ -27,16 +27,16 @@ type ActionParseRequest struct {
 
 // ActionParseResponse represents the LLM's response for action parsing
 type ActionParseResponse struct {
-	ActionType     string `json:"action_type"`     // "Overcome", "Create an Advantage", "Attack", "Defend"
-	Skill          string `json:"skill"`           // The Fate Core skill to use
-	Description    string `json:"description"`     // Clean description of what they're trying to do
-	Target         string `json:"target"`          // The target of the action (if any)
-	Difficulty     int    `json:"difficulty"`      // Passive opposition rating on the Fate ladder (-2 to +8)
-	OppositionType string `json:"opposition_type"` // "passive" or "active" (default: passive)
-	OpposingNPCID  string `json:"opposing_npc_id"` // NPC ID providing active opposition (empty if passive)
-	OpposingSkill  string `json:"opposing_skill"`  // NPC skill used for active opposition (empty if passive)
-	Reasoning      string `json:"reasoning"`       // Explanation of the choice
-	Confidence     int    `json:"confidence"`      // 1-10 scale of how confident the LLM is
+	ActionType     string  `json:"action_type"`     // "Overcome", "Create an Advantage", "Attack", "Defend"
+	Skill          string  `json:"skill"`           // The Fate Core skill to use
+	Description    string  `json:"description"`     // Clean description of what they're trying to do
+	Target         string  `json:"target"`          // The target of the action (if any)
+	Difficulty     FlexInt `json:"difficulty"`      // Passive opposition rating on the Fate ladder (-2 to +8)
+	OppositionType string  `json:"opposition_type"` // "passive" or "active" (default: passive)
+	OpposingNPCID  string  `json:"opposing_npc_id"` // NPC ID providing active opposition (empty if passive)
+	OpposingSkill  string  `json:"opposing_skill"`  // NPC skill used for active opposition (empty if passive)
+	Reasoning      string  `json:"reasoning"`       // Explanation of the choice
+	Confidence     FlexInt `json:"confidence"`      // 1-10 scale of how confident the LLM is
 }
 
 // ActionParser is the interface for parsing user input into structured actions.
@@ -137,7 +137,7 @@ func (ap *LLMActionParser) ParseAction(ctx context.Context, req ActionParseReque
 	parsedAction.RawInput = req.RawInput
 
 	// Set difficulty from LLM response (attacks will override with active defense later)
-	parsedAction.Difficulty = dice.Ladder(parseResp.Difficulty)
+	parsedAction.Difficulty = dice.Ladder(parseResp.Difficulty.Int())
 
 	// Propagate active opposition fields for Overcome/Create Advantage.
 	// The resolver will roll the NPC's skill instead of using static difficulty.
