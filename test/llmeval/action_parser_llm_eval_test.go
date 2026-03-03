@@ -224,7 +224,7 @@ func getOvercomeVsCaAEdgeCases() []ActionParserTestCase {
 			Context:            "A packed market square during a public announcement, people blocking the way",
 			ExpectedType:       action.Overcome,
 			ExpectedSkills:     []string{"Physique", "Athletics"},
-			ExpectedDifficulty: 1, // Average - crowd is obstacle
+			ExpectedDifficulty: 2, // Fair - dense crowd is a real obstacle
 			Description:        "Pushing through a crowd is immediate obstacle — Overcome, not CaA",
 		},
 		{
