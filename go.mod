@@ -1,6 +1,6 @@
 module github.com/C-Ross/LlamaOfFate
 
-go 1.24.5
+go 1.24.13
 
 require (
 	github.com/cenkalti/backoff/v5 v5.0.3
