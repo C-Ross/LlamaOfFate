@@ -241,8 +241,8 @@ func TestBuildPrompts(t *testing.T) {
 		Context:   "In the castle hallway with patrolling guards",
 	}
 
-	// Test system prompt
-	systemPrompt, err := parser.buildSystemPrompt()
+	// Test system prompt (no OtherCharacters → passive-only opposition)
+	systemPrompt, err := parser.buildSystemPrompt(req)
 	require.NoError(t, err)
 	assert.Contains(t, systemPrompt, "Fate Core")
 	assert.Contains(t, systemPrompt, "Overcome")
@@ -250,6 +250,7 @@ func TestBuildPrompts(t *testing.T) {
 	assert.Contains(t, systemPrompt, "Athletics")
 	assert.Contains(t, systemPrompt, "Stealth")
 	assert.Contains(t, systemPrompt, "JSON")
+	assert.Contains(t, systemPrompt, "All opposition is PASSIVE")
 
 	// Test user prompt
 	userPrompt, err := parser.buildUserPrompt(req)
@@ -552,11 +553,33 @@ func TestBuildPrompts_IncludesNPCSkills(t *testing.T) {
 func TestBuildPrompts_IncludesOppositionInstructions(t *testing.T) {
 	parser := NewActionParser(newTestLLMClient())
 
-	systemPrompt, err := parser.buildSystemPrompt()
-	require.NoError(t, err)
-	assert.Contains(t, systemPrompt, "opposition_type")
-	assert.Contains(t, systemPrompt, "opposing_npc_id")
-	assert.Contains(t, systemPrompt, "opposing_skill")
-	assert.Contains(t, systemPrompt, "active")
-	assert.Contains(t, systemPrompt, "passive")
+	t.Run("with OtherCharacters shows active opposition", func(t *testing.T) {
+		guard := character.NewCharacter("guard-1", "Stern Guard")
+		guard.SetSkill("Notice", dice.Good)
+		req := ActionParseRequest{
+			Character:       character.NewCharacter("player-1", "Test"),
+			RawInput:        "test",
+			OtherCharacters: []*character.Character{guard},
+		}
+		systemPrompt, err := parser.buildSystemPrompt(req)
+		require.NoError(t, err)
+		assert.Contains(t, systemPrompt, "opposition_type")
+		assert.Contains(t, systemPrompt, "opposing_npc_id")
+		assert.Contains(t, systemPrompt, "opposing_skill")
+		assert.Contains(t, systemPrompt, "active")
+		assert.Contains(t, systemPrompt, "passive")
+		assert.Contains(t, systemPrompt, "Exact NPC ID from OTHER CHARACTERS IN SCENE")
+	})
+
+	t.Run("without OtherCharacters shows passive-only", func(t *testing.T) {
+		req := ActionParseRequest{
+			Character: character.NewCharacter("player-1", "Test"),
+			RawInput:  "test",
+		}
+		systemPrompt, err := parser.buildSystemPrompt(req)
+		require.NoError(t, err)
+		assert.Contains(t, systemPrompt, "All opposition is PASSIVE")
+		assert.Contains(t, systemPrompt, "Always empty string")
+		assert.NotContains(t, systemPrompt, "Exact NPC ID from OTHER CHARACTERS IN SCENE")
+	})
 }

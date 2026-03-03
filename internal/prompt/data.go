@@ -314,6 +314,12 @@ type ActionParseTemplateData struct {
 	ChallengeContext   *ChallengeContext // Non-nil when an active challenge is in progress
 }
 
+// ActionParseSystemData holds the data for the action parse system prompt template.
+// It controls conditional sections like active vs passive opposition guidance.
+type ActionParseSystemData struct {
+	HasOtherCharacters bool // When false, the prompt presents passive opposition as the only option
+}
+
 // FateNarrationData holds the data for the fate narration template.
 // After a conflict victory, the player narrates what happens to each taken-out NPC.
 // This prompt asks the LLM to parse that narration into per-NPC fates.

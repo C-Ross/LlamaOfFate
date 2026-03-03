@@ -63,7 +63,7 @@ func NewActionParser(llmClient llm.LLMClient) *LLMActionParser {
 // ParseAction analyzes user input and returns a structured action using LLM
 func (ap *LLMActionParser) ParseAction(ctx context.Context, req ActionParseRequest) (*action.Action, error) {
 	// Build the LLM prompt using templates
-	systemPrompt, err := ap.buildSystemPrompt()
+	systemPrompt, err := ap.buildSystemPrompt(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build system prompt: %w", err)
 	}
@@ -150,8 +150,10 @@ func (ap *LLMActionParser) ParseAction(ctx context.Context, req ActionParseReque
 }
 
 // buildSystemPrompt creates the system prompt using templates
-func (ap *LLMActionParser) buildSystemPrompt() (string, error) {
-	return prompt.RenderActionParseSystem()
+func (ap *LLMActionParser) buildSystemPrompt(req ActionParseRequest) (string, error) {
+	return prompt.RenderActionParseSystem(prompt.ActionParseSystemData{
+		HasOtherCharacters: len(req.OtherCharacters) > 0,
+	})
 }
 
 // buildUserPrompt creates the user prompt using templates with pre-computed difficulty guidance

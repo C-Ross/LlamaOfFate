@@ -49,13 +49,13 @@ SKILL SELECTION — COMMON CONFUSIONS:
 TARGETS: Identify if the action has a specific target (person, object, area). Leave empty if none.
 When targeting a character listed in OTHER CHARACTERS IN SCENE, copy their EXACT ID from that list. IDs have no fixed pattern — they may look like "bandit-3", "corp-agent", "drone-1", "npc_42", or anything else. Do NOT guess or invent an ID. If the player names a character, find that character in OTHER CHARACTERS IN SCENE and use the ID shown in parentheses.
 
+{{- if .HasOtherCharacters}}
 OPPOSITION TYPE (Fate Core: Active vs Passive Opposition):
 - "passive": A flat difficulty rating. Use for environmental obstacles, abstract challenges, narrative-only threats (drones, traps, weather described in the scene but not listed as NPCs), or when no specific NPC is the one being acted against.
 - "active": A specific NPC rolls their skill as opposition instead of a flat difficulty. Use ONLY when ALL of the following are true:
   1. The player's action is directed against a specific NPC
   2. That NPC appears in the OTHER CHARACTERS IN SCENE list (with an ID in parentheses)
   3. That NPC would directly and deliberately resist the action
-  If the OTHER CHARACTERS IN SCENE section is absent or empty, active opposition is IMPOSSIBLE — always use passive.
 
 CRITICAL: Characters described only in CURRENT SITUATION text (guards, merchants, servants, bouncers, etc.) but NOT listed in OTHER CHARACTERS IN SCENE are treated as part of the environment. They are NOT valid targets for active opposition. Use PASSIVE opposition with an appropriate difficulty instead.
 
@@ -65,6 +65,11 @@ For active opposition:
 - STILL set "difficulty" to your best estimate of the passive difficulty (used as fallback if the NPC cannot be resolved)
 For passive opposition: leave "opposing_npc_id" and "opposing_skill" as empty strings.
 Attack and Defend ALWAYS use "passive" (active defense is handled separately by the system).
+{{- else}}
+OPPOSITION TYPE:
+All opposition is PASSIVE in this scene. Use a flat difficulty rating based on the obstacle. Characters mentioned in the scene description (guards, merchants, creatures, etc.) are part of the environment and provide passive difficulty, not active opposition.
+Always set "opposition_type" to "passive" and leave "opposing_npc_id" and "opposing_skill" as empty strings.
+{{- end}}
 
 Your response must be valid JSON with no additional text:
 {
@@ -74,8 +79,8 @@ Your response must be valid JSON with no additional text:
   "target": "Exact character ID copied from OTHER CHARACTERS IN SCENE, or object name, or empty string",
   "opposition_type": "passive or active",
   "difficulty": "Integer from DIFFICULTY RANGE (use 0 for Attack and Defend only; always set a meaningful value for Overcome and Create an Advantage even with active opposition)",
-  "opposing_npc_id": "Exact NPC ID from OTHER CHARACTERS IN SCENE, or empty string",
-  "opposing_skill": "NPC skill name, or empty string",
+  "opposing_npc_id": "{{- if .HasOtherCharacters}}Exact NPC ID from OTHER CHARACTERS IN SCENE, or empty string{{- else}}Always empty string{{- end}}",
+  "opposing_skill": "{{- if .HasOtherCharacters}}NPC skill name, or empty string{{- else}}Always empty string{{- end}}",
   "reasoning": "Brief explanation including difficulty or opposition justification",
   "confidence": 1-10
 }

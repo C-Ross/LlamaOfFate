@@ -525,9 +525,22 @@ func TestRenderActionParse(t *testing.T) {
 }
 
 func TestRenderActionParseSystem(t *testing.T) {
-	result, err := RenderActionParseSystem()
-	require.NoError(t, err)
-	assert.NotEmpty(t, result)
+	t.Run("with other characters", func(t *testing.T) {
+		result, err := RenderActionParseSystem(ActionParseSystemData{HasOtherCharacters: true})
+		require.NoError(t, err)
+		assert.NotEmpty(t, result)
+		assert.Contains(t, result, "active")
+		assert.Contains(t, result, "Exact NPC ID from OTHER CHARACTERS IN SCENE")
+	})
+
+	t.Run("without other characters", func(t *testing.T) {
+		result, err := RenderActionParseSystem(ActionParseSystemData{HasOtherCharacters: false})
+		require.NoError(t, err)
+		assert.NotEmpty(t, result)
+		assert.Contains(t, result, "All opposition is PASSIVE")
+		assert.Contains(t, result, "Always empty string")
+		assert.NotContains(t, result, "Exact NPC ID from OTHER CHARACTERS IN SCENE")
+	})
 }
 
 func TestRenderAspectGeneration(t *testing.T) {

@@ -276,9 +276,10 @@ func RenderActionParse(data ActionParseTemplateData) (string, error) {
 	return executeTemplate(ActionParsePrompt, data)
 }
 
-// RenderActionParseSystem renders the action parse system prompt
-func RenderActionParseSystem() (string, error) {
-	return executeTemplate(ActionParseSystemPrompt, nil)
+// RenderActionParseSystem renders the action parse system prompt.
+// The data parameter controls conditional sections (e.g. active vs passive opposition).
+func RenderActionParseSystem(data ActionParseSystemData) (string, error) {
+	return executeTemplate(ActionParseSystemPrompt, data)
 }
 
 // RenderAspectGeneration renders the aspect generation prompt
