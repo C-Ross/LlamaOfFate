@@ -27,5 +27,5 @@
     "containerEnv": {
         "GOTOOLCHAIN": "auto"
     },
-    "postCreateCommand": "go mod download && curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash"
+    "postCreateCommand": "bash .devcontainer/post-create.sh"
 }
