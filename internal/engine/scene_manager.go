@@ -447,6 +447,11 @@ func (sm *SceneManager) handleAction(ctx context.Context, input string) ([]GameE
 			return events, false
 		}
 
+		// Use stored challenge task difficulty when applicable.
+		if sm.challenge != nil {
+			sm.challenge.EnforceTaskDifficulty(action)
+		}
+
 		// Log the parsed action
 		sm.sessionLogger.Log("action_parse", action)
 

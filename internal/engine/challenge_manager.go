@@ -1,6 +1,9 @@
 package engine
 
 import (
+	"log/slog"
+
+	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
@@ -54,6 +57,35 @@ func (chm *ChallengeManager) setSceneState(s *scene.Scene, player *character.Cha
 // resetState clears per-scene challenge state.
 func (chm *ChallengeManager) resetState() {
 	// No mutable state to clear beyond what's on the Scene itself.
+}
+
+// EnforceTaskDifficulty replaces the action's LLM-provided difficulty with the
+// stored challenge task difficulty when the skill matches a pending task.
+// This keeps challenge resolution deterministic regardless of LLM variance.
+func (chm *ChallengeManager) EnforceTaskDifficulty(a *action.Action) {
+	if chm.currentScene == nil || chm.currentScene.ActiveSceneType() != scene.SceneTypeChallenge {
+		return
+	}
+	task := chm.currentScene.ChallengeState.FindTaskBySkill(a.Skill)
+	if task == nil {
+		return
+	}
+	storedDifficulty := dice.Ladder(task.Difficulty)
+	if a.Difficulty != storedDifficulty {
+		slog.Info("Using challenge task difficulty instead of LLM-provided value",
+			"component", componentSceneManager,
+			"skill", a.Skill,
+			"task_id", task.ID,
+			"llm_difficulty", int(a.Difficulty),
+			"task_difficulty", task.Difficulty)
+		chm.sessionLogger.Log("challenge_difficulty_override", map[string]any{
+			"task_id":         task.ID,
+			"skill":           a.Skill,
+			"llm_difficulty":  int(a.Difficulty),
+			"task_difficulty": task.Difficulty,
+		})
+	}
+	a.Difficulty = storedDifficulty
 }
 
 // buildChallengeTaskInfos converts ChallengeState tasks to UI-friendly infos.

@@ -212,3 +212,106 @@ func TestHandleInput_ChallengeOvercomeNotOverridden(t *testing.T) {
 
 	AssertHasEventIn[ActionResultEvent](t, result.Events)
 }
+
+func TestHandleInput_ChallengeDifficultyOverridesLLM(t *testing.T) {
+	// Issue #135: When a challenge task has a stored difficulty, the action
+	// resolution must use that difficulty — not the one returned by the LLM.
+	//
+	// Sequence:
+	//  1. classification → "action"
+	//  2. action parse   → Overcome with Stealth, difficulty 4 (LLM says Great)
+	//  3. narrative       → flavor text
+	//
+	// The challenge task has difficulty 3 (Good). The resolution must use 3.
+	client := newTestLLMClient(
+		"action",
+		`{"action_type":"Overcome","skill":"Stealth","description":"sneak past the traps","difficulty":4}`,
+		"You carefully creep along the shelves...",
+	)
+
+	engine, err := NewWithLLM(client, session.NullLogger{})
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
+	sm.actions.roller = dice.NewSeededRoller(42)
+
+	testScene := scene.NewScene("tower", "The Wizard's Tower", "A dark tower full of magical traps")
+	player := character.NewCharacter("player-1", "Lyra")
+	player.SetSkill("Stealth", dice.Fair) // +2
+	engine.AddCharacter(player)
+	testScene.AddCharacter(player.ID)
+
+	// Start a challenge where the Stealth task has difficulty 3 (Good)
+	tasks := []scene.ChallengeTask{
+		{ID: "task-1", Skill: "Stealth", Difficulty: 3, Status: scene.TaskPending, Description: "Avoid magical traps on the shelves"},
+		{ID: "task-2", Skill: "Lore", Difficulty: 2, Status: scene.TaskPending, Description: "Decipher the runes"},
+	}
+	err = testScene.StartChallenge("Uncover the truth", tasks)
+	require.NoError(t, err)
+
+	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
+	sm.challenge.setSceneState(testScene, player)
+	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
+
+	result, err := sm.HandleInput(context.Background(), "I sneak past the traps on the shelves")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// The ActionResultEvent must use the task's stored difficulty (3 / Good),
+	// NOT the LLM-provided difficulty (4 / Great).
+	actionResult := RequireFirstFrom[ActionResultEvent](t, result.Events)
+	assert.Equal(t, 3, actionResult.Difficulty, "difficulty should match the challenge task (Good +3), not the LLM response (Great +4)")
+	assert.Equal(t, "Good", actionResult.DiffRank)
+
+	// The challenge task should also be resolved
+	taskResult := RequireFirstFrom[ChallengeTaskResultEvent](t, result.Events)
+	assert.Equal(t, "task-1", taskResult.TaskID)
+	assert.Equal(t, "Stealth", taskResult.Skill)
+}
+
+func TestHandleInput_ChallengeDifficultyMatchesLLM(t *testing.T) {
+	// When the LLM happens to return the same difficulty as the stored task,
+	// the override still applies (no-op) and the result is correct.
+	client := newTestLLMClient(
+		"action",
+		`{"action_type":"Overcome","skill":"Athletics","description":"dodge the rocks","difficulty":3}`,
+		"You dodge the falling debris!",
+	)
+
+	engine, err := NewWithLLM(client, session.NullLogger{})
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
+	sm.actions.roller = dice.NewSeededRoller(42)
+
+	testScene := scene.NewScene("mine", "Collapsing Mine", "A mine with crumbling walls")
+	player := character.NewCharacter("player-1", "Hero")
+	player.SetSkill("Athletics", dice.Good) // +3
+	engine.AddCharacter(player)
+	testScene.AddCharacter(player.ID)
+
+	tasks := []scene.ChallengeTask{
+		{ID: "task-1", Skill: "Athletics", Difficulty: 3, Status: scene.TaskPending, Description: "Dodge falling rocks"},
+	}
+	err = testScene.StartChallenge("Escape the mine", tasks)
+	require.NoError(t, err)
+
+	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
+	sm.challenge.setSceneState(testScene, player)
+	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
+
+	result, err := sm.HandleInput(context.Background(), "I dodge the rocks")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	actionResult := RequireFirstFrom[ActionResultEvent](t, result.Events)
+	assert.Equal(t, 3, actionResult.Difficulty, "difficulty should match the stored task difficulty")
+}
