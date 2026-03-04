@@ -1,0 +1,18 @@
+# Ollama Configuration for LlamaOfFate
+#
+# Requires a running Ollama instance on localhost:11434.
+# Pull a model first:  ./scripts/ollama-pull.sh
+#
+# Uses Ollama's OpenAI-compatible endpoint so we can reuse the Azure client.
+
+# Ollama's OpenAI-compatible chat completions endpoint
+api_endpoint: "http://localhost:11434/v1/chat/completions"
+
+# Ollama doesn't require an API key, but the client expects one
+api_key: "ollama"
+
+# Must match a model you've pulled (e.g. llama3.2:3b)
+model_name: "llama3.2:3b"
+
+# Ollama can be slow on CPU — generous timeout
+timeout: 300

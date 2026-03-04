@@ -19,16 +19,27 @@ import (
 // Client setup
 // ---------------------------------------------------------------------------
 
-// RequireLLMClient skips the test when Azure credentials are not set, otherwise
-// loads the shared config and returns a ready-to-use LLM client.
+// RequireLLMClient returns a ready-to-use LLM client, using either Ollama or
+// Azure depending on configuration. Set LLM_PROVIDER=ollama to use a local
+// Ollama instance; otherwise Azure credentials are required.
 func RequireLLMClient(tb testing.TB) llm.LLMClient {
 	tb.Helper()
-	if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-		tb.Skip("Skipping: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
+
+	provider := os.Getenv("LLM_PROVIDER")
+
+	switch strings.ToLower(provider) {
+	case "ollama":
+		config, err := azure.LoadConfig("../../configs/ollama-llm.yaml")
+		require.NoError(tb, err, "Failed to load Ollama config")
+		return azure.NewClient(*config)
+	default:
+		if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
+			tb.Skip("Skipping: set LLM_PROVIDER=ollama or AZURE_API_ENDPOINT and AZURE_API_KEY")
+		}
+		config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
+		require.NoError(tb, err, "Failed to load Azure config")
+		return azure.NewClient(*config)
 	}
-	config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-	require.NoError(tb, err, "Failed to load Azure config")
-	return azure.NewClient(*config)
 }
 
 // VerboseLoggingEnabled returns true when VERBOSE=1 is set.
