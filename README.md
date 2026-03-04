@@ -51,7 +51,9 @@ Fate™ is a trademark of Evil Hat Productions, LLC.
 
 ## Configuration
 
-### Azure ML Setup
+### LLM Configuration
+
+#### Azure ML (Primary)
 
 LlamaOfFate uses Azure ML for LLM integration. Configuration is stored in `configs/azure-llm.yaml`.
 
@@ -80,6 +82,22 @@ model_name: "Llama-4-Maverick-17B-128E-Instruct-FP8"
 # Request timeout in seconds
 timeout: 300
 ```
+
+#### Ollama (Local Testing)
+
+Ollama is supported for running LLM evaluation tests locally without Azure credentials. Configuration is in `configs/ollama-llm.yaml`.
+
+**Setup:**
+
+```bash
+# Pull a model (run once)
+./scripts/ollama-pull.sh llama3.2:3b
+
+# Run tests with Ollama
+LLM_PROVIDER=ollama just test-llm
+```
+
+**Note:** Ollama support is currently limited to llmeval tests. Full game support is planned.
 
 ## Development Automation
 
@@ -276,7 +294,8 @@ LlamaOfFate/
 
 ### Planned Features
 - 📋 Contest system (competitive opposed exchanges)
-- 📋 Additional LLM backends (Ollama, OpenAI direct)
+- 📋 Ollama support for full game (currently test-only)
+- 📋 Additional LLM backends (OpenAI direct, etc.)
 - 📋 WebSocket integration connecting web UI to game engine
 - 📋 Public API packages for external integrations
 - 📋 Database backends for long-term storage
