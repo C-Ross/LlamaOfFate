@@ -131,11 +131,13 @@ Multi-task challenges with skill-based overcome actions and outcome tallying. Ma
 
 ```
 initiateChallenge(type) → ChallengeGenerator.Generate() → builds tasks
-  → player acts against task → resolveAction() → mark success/failure
+  → player acts against task → EnforceTaskDifficulty() → resolveAction() → mark success/failure
   → all tasks resolved → tallyChallengeOutcome() → Victory/Partial/Defeat
 ```
 
 Challenge data stored in `scene.Challenge`. Each task has skill, difficulty, status (pending/success/failure).
+
+**Difficulty Enforcement**: `EnforceTaskDifficulty(action)` replaces the LLM-provided difficulty with the stored challenge task difficulty when the action's skill matches a pending task. This ensures deterministic resolution regardless of LLM variance. Called by `SceneManager.handleAction()` after parsing, before dice rolling.
 
 ## Conflict System (`conflict.go`)
 
