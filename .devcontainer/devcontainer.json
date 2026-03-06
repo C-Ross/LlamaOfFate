@@ -25,7 +25,8 @@
         }
     },
     "containerEnv": {
-        "GOTOOLCHAIN": "auto"
+        "GOTOOLCHAIN": "auto",
+        "GOROOT": ""
     },
     "postCreateCommand": "bash .devcontainer/post-create.sh"
 }
