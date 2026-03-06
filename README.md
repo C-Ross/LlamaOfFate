@@ -51,9 +51,11 @@ Fate™ is a trademark of Evil Hat Productions, LLC.
 
 ## Configuration
 
-### Azure ML Setup
+LlamaOfFate supports multiple LLM backends for maximum flexibility. Choose the one that works best for your needs.
 
-LlamaOfFate uses Azure ML for LLM integration. Configuration is stored in `configs/azure-llm.yaml`.
+### Azure ML Setup (Cloud)
+
+LlamaOfFate can use Azure ML for LLM integration. Configuration is stored in `configs/azure-llm.yaml`.
 
 **Recommended Setup (Environment Variables):**
 
@@ -79,6 +81,48 @@ model_name: "Llama-4-Maverick-17B-128E-Instruct-FP8"
 
 # Request timeout in seconds
 timeout: 300
+```
+
+### Ollama Setup (Local)
+
+For a completely local experience without cloud dependencies, use [Ollama](https://ollama.ai/):
+
+**Installation:**
+
+```bash
+# Install Ollama (see https://ollama.ai/ for your platform)
+# macOS/Linux:
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Pull a model
+./scripts/ollama-pull.sh
+# Or manually: ollama pull llama3.2:3b
+```
+
+**Configuration:**
+
+Edit `configs/ollama-llm.yaml` (default configuration provided):
+
+```yaml
+# Ollama's OpenAI-compatible endpoint
+api_endpoint: "http://localhost:11434/v1/chat/completions"
+api_key: "ollama"  # Ollama doesn't require a real key
+
+# Must match a pulled model
+model_name: "llama3.2:3b"
+
+timeout: 300
+```
+
+**Running with Ollama:**
+
+```bash
+# Ensure Ollama is running
+ollama serve  # or ollama is running as a service
+
+# Use the Ollama config
+export LLM_CONFIG=configs/ollama-llm.yaml
+just run
 ```
 
 ## Development Automation
@@ -273,10 +317,11 @@ LlamaOfFate/
 - ✅ Web UI scaffold (React + Vite + Tailwind + shadcn/ui)
 - ✅ WebSocket server backend
 - ✅ MCP (Model Context Protocol) server for programmatic game interaction
+- ✅ Ollama support for local LLM backend (no cloud dependencies required)
 
 ### Planned Features
 - 📋 Contest system (competitive opposed exchanges)
-- 📋 Additional LLM backends (Ollama, OpenAI direct)
+- 📋 Additional LLM backends (OpenAI direct, other providers)
 - 📋 WebSocket integration connecting web UI to game engine
 - 📋 Public API packages for external integrations
 - 📋 Database backends for long-term storage
