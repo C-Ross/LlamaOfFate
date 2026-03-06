@@ -131,9 +131,11 @@ Multi-task challenges with skill-based overcome actions and outcome tallying. Ma
 
 ```
 initiateChallenge(type) → ChallengeGenerator.Generate() → builds tasks
-  → player acts against task → resolveAction() → mark success/failure
+  → player acts against task → EnforceTaskDifficulty() → resolveAction() → mark success/failure
   → all tasks resolved → tallyChallengeOutcome() → Victory/Partial/Defeat
 ```
+
+**`EnforceTaskDifficulty(action)`**: Replaces the LLM-provided difficulty with the stored task difficulty to ensure fairness. Called from `handleAction()` after parsing, before resolution.
 
 Challenge data stored in `scene.Challenge`. Each task has skill, difficulty, status (pending/success/failure).
 

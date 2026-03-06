@@ -60,16 +60,22 @@ package llmeval_test
 ```
 
 ### Config and Client Setup
+
+**Use `RequireLLMClient()` helper** (in `evaltest_helpers_test.go`):
 ```go
-if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-    t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-}
-
-config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-require.NoError(t, err, "Failed to load Azure config")
-
-client := azure.NewClient(*config)
+client := RequireLLMClient(t)
 ctx := context.Background()
+```
+
+This supports both Azure and Ollama backends:
+- **Azure** (default): Requires `AZURE_API_ENDPOINT` and `AZURE_API_KEY` env vars, uses `configs/azure-llm.yaml`
+- **Ollama** (local): Set `LLM_PROVIDER=ollama`, uses `configs/ollama-llm.yaml`
+
+Manual setup (if needed):
+```go
+config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
+require.NoError(t, err)
+client := azure.NewClient(*config)
 ```
 
 ### Template Rendering
@@ -117,8 +123,11 @@ for _, r := range results {
 ## Running Tests
 
 ```bash
-# Run all tests (requires AZURE_API_ENDPOINT and AZURE_API_KEY)
+# Run with Azure (requires AZURE_API_ENDPOINT and AZURE_API_KEY)
 just test-llm
+
+# Run with Ollama local backend
+LLM_PROVIDER=ollama just test-llm
 
 # Run tests and track results for flakiness analysis
 just test-llm-track
