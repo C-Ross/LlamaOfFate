@@ -60,17 +60,23 @@ package llmeval_test
 ```
 
 ### Config and Client Setup
+Use `RequireLLMClient()` from `evaltest_helpers_test.go` to get an LLM client. Supports both Ollama (local) and Azure:
 ```go
-if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
-    t.Skip("Skipping LLM evaluation test: AZURE_API_ENDPOINT and AZURE_API_KEY must be set")
-}
+// In test/llmeval/evaltest_helpers_test.go:
+// RequireLLMClient returns a ready-to-use LLM client, using either Ollama or
+// Azure depending on configuration. Set LLM_PROVIDER=ollama to use a local
+// Ollama instance; otherwise Azure credentials are required.
+func RequireLLMClient(tb testing.TB) llm.LLMClient
 
-config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-require.NoError(t, err, "Failed to load Azure config")
-
-client := azure.NewClient(*config)
+// In your test:
+client := RequireLLMClient(t)
 ctx := context.Background()
 ```
+
+The helper automatically:
+- Uses Ollama if `LLM_PROVIDER=ollama` is set (loads `configs/ollama-llm.yaml`)
+- Falls back to Azure (requires `AZURE_API_ENDPOINT` and `AZURE_API_KEY`)
+- Skips the test if no provider is configured
 
 ### Template Rendering
 Use `promptpkg.Render*()` functions (imported as `promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"`):
