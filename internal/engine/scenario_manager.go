@@ -7,7 +7,6 @@ import (
 	"log/slog"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
@@ -22,11 +21,11 @@ const (
 // ScenarioManager orchestrates multi-scene gameplay within a scenario
 type ScenarioManager struct {
 	engine               *Engine
-	player               *character.Character
+	player               *core.Character
 	sessionLogger        session.SessionLogger
 	scenario             *scene.Scenario        // The current scenario with problem and story questions
 	initialScene         *scene.Scene           // Optional pre-configured starting scene
-	initialNPCs          []*character.Character // NPCs for initial scene
+	initialNPCs          []*core.Character // NPCs for initial scene
 	sceneSummaries       []prompt.SceneSummary  // Summaries of recent scenes (sliding window of last 3)
 	lastGeneratedPurpose string                 // Purpose from the most recently generated scene
 	lastGeneratedHook    string                 // Opening hook from the most recently generated scene
@@ -43,7 +42,7 @@ type ScenarioManager struct {
 
 // NewScenarioManager creates a new scenario manager.
 // sessionLogger must not be nil; use session.NullLogger{} when logging is not needed.
-func NewScenarioManager(engine *Engine, player *character.Character, sessionLogger session.SessionLogger, npcRegistry NPCRegistry) *ScenarioManager {
+func NewScenarioManager(engine *Engine, player *core.Character, sessionLogger session.SessionLogger, npcRegistry NPCRegistry) *ScenarioManager {
 	return &ScenarioManager{
 		engine:        engine,
 		player:        player,
@@ -63,7 +62,7 @@ func (m *ScenarioManager) SetScenarioCount(count int) {
 }
 
 // SetInitialScene sets a pre-configured starting scene
-func (m *ScenarioManager) SetInitialScene(s *scene.Scene, npcs []*character.Character) {
+func (m *ScenarioManager) SetInitialScene(s *scene.Scene, npcs []*core.Character) {
 	m.initialScene = s
 	m.initialNPCs = npcs
 }
@@ -557,17 +556,17 @@ func (m *ScenarioManager) generateNextScene(ctx context.Context, transitionHint 
 
 		// Create new NPC
 		npcID := fmt.Sprintf("%s_npc_%d", sceneID, i)
-		npc := character.NewCharacter(npcID, npcData.Name)
+		npc := core.NewCharacter(npcID, npcData.Name)
 		npc.Aspects.HighConcept = npcData.HighConcept
 
 		// Set NPC type based on disposition
 		switch npcData.Disposition {
 		case "hostile":
-			npc.CharacterType = character.CharacterTypeNamelessGood
+			npc.CharacterType = core.CharacterTypeNamelessGood
 		case "friendly", "neutral":
-			npc.CharacterType = character.CharacterTypeSupportingNPC
+			npc.CharacterType = core.CharacterTypeSupportingNPC
 		default:
-			npc.CharacterType = character.CharacterTypeSupportingNPC
+			npc.CharacterType = core.CharacterTypeSupportingNPC
 		}
 
 		m.engine.AddCharacter(npc)
@@ -721,7 +720,7 @@ func (m *ScenarioManager) handleBetweenSceneRecovery(ctx context.Context) []Game
 
 // bestRecoverySkill determines the best skill and its level for recovery.
 // Physical consequences use Lore (or Will as fallback), mental use Empathy (or Rapport).
-func (m *ScenarioManager) bestRecoverySkill(conseq character.Consequence) (string, dice.Ladder) {
+func (m *ScenarioManager) bestRecoverySkill(conseq core.Consequence) (string, dice.Ladder) {
 	// Determine which skills could help based on consequence aspect context
 	// Physical keywords suggest physical recovery, otherwise mental
 	physicalSkills := []string{core.SkillLore, core.SkillCrafts, core.SkillWill}

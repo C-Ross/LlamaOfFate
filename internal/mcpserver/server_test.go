@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/config"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
@@ -83,7 +83,7 @@ func TestClonePlayer_NilSource(t *testing.T) {
 }
 
 func TestClonePlayer_DeepCopies(t *testing.T) {
-	src := character.NewCharacter("p1", "Hero")
+	src := core.NewCharacter("p1", "Hero")
 	src.Aspects.HighConcept = "Brave Warrior"
 	src.Aspects.Trouble = "Quick to Anger"
 	src.Aspects.OtherAspects = []string{"Well Connected"}
@@ -504,7 +504,7 @@ func TestGetGameState_WithGameManager(t *testing.T) {
 	require.NoError(t, err)
 
 	gm := engine.NewGameManager(eng, session.NullLogger{})
-	player := character.NewCharacter("player1", "Test Hero")
+	player := core.NewCharacter("player1", "Test Hero")
 	player.Aspects.HighConcept = "Courageous Fighter"
 	gm.SetPlayer(player)
 
@@ -636,7 +636,7 @@ func TestCreateSessionLogger_Success(t *testing.T) {
 		},
 		Scenario: &scene.Scenario{Title: "Test Scenario"},
 	}
-	player := character.NewCharacter("p1", "Test Hero")
+	player := core.NewCharacter("p1", "Test Hero")
 
 	logger, err := gs.createSessionLogger(ls, player)
 	if err != nil {
@@ -658,7 +658,7 @@ func TestCreateSessionLogger_FallsBackToID(t *testing.T) {
 		},
 		Scenario: &scene.Scenario{Title: "My Scenario"},
 	}
-	player := character.NewCharacter("p1", "Adventurer")
+	player := core.NewCharacter("p1", "Adventurer")
 
 	logger, err := gs.createSessionLogger(ls, player)
 	if err != nil {
@@ -702,7 +702,7 @@ func TestHandleStartGame_PlayerOverrides(t *testing.T) {
 			Genre: "sci-fi",
 		},
 		Scenario: &scene.Scenario{Title: "Hero Scenario"},
-		Player:   character.NewCharacter("p1", "Default Hero"),
+		Player:   core.NewCharacter("p1", "Default Hero"),
 	}
 
 	result := callTool(t, gs, makeRequest("start_game", map[string]any{

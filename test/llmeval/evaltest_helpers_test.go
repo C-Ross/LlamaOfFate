@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
@@ -53,7 +53,7 @@ func VerboseLoggingEnabled() bool {
 // ---------------------------------------------------------------------------
 
 // BuildCharacterContext creates a character context string for prompt templates.
-func BuildCharacterContext(player *character.Character) string {
+func BuildCharacterContext(player *core.Character) string {
 	var sb strings.Builder
 	sb.WriteString("Name: ")
 	sb.WriteString(player.Name)
@@ -72,7 +72,7 @@ func BuildCharacterContext(player *character.Character) string {
 }
 
 // BuildAspectsContext creates an aspects context string for prompt templates.
-func BuildAspectsContext(s *scene.Scene, player *character.Character, others []*character.Character) string {
+func BuildAspectsContext(s *scene.Scene, player *core.Character, others []*core.Character) string {
 	var sb strings.Builder
 	sb.WriteString("Scene Aspects:\n")
 	for _, aspect := range s.SituationAspects {
@@ -119,23 +119,23 @@ func TruncateResponse(s string, maxLen int) string {
 // ---------------------------------------------------------------------------
 
 // NewBlackJack creates the Black Jack McCoy NPC used across multiple test files.
-func NewBlackJack() *character.Character {
-	blackJack := character.NewCharacter("blackjack", "Black Jack McCoy")
+func NewBlackJack() *core.Character {
+	blackJack := core.NewCharacter("blackjack", "Black Jack McCoy")
 	blackJack.Aspects.HighConcept = "Dangerous Outlaw with a Quick Draw"
 	blackJack.Aspects.Trouble = "Wanted Dead or Alive"
 	return blackJack
 }
 
 // NewBartender creates the Maggie Two-Rivers bartender NPC used across multiple test files.
-func NewBartender() *character.Character {
-	bartender := character.NewCharacter("bartender", "Maggie Two-Rivers")
+func NewBartender() *core.Character {
+	bartender := core.NewCharacter("bartender", "Maggie Two-Rivers")
 	bartender.Aspects.HighConcept = "Weathered Saloon Owner"
 	return bartender
 }
 
 // NewHeistNPCs creates NPCs matching the heist scenario (Agent Chen + Security Drone).
-func NewHeistNPCs() []*character.Character {
-	chen := character.NewCharacter("corp-agent", "Agent Chen")
+func NewHeistNPCs() []*core.Character {
+	chen := core.NewCharacter("corp-agent", "Agent Chen")
 	chen.Aspects.HighConcept = "Nexus Industries Troubleshooter"
 	chen.Aspects.AddAspect("Augmented Combat Implants")
 	chen.SetSkill("Fight", dice.Good)
@@ -145,17 +145,17 @@ func NewHeistNPCs() []*character.Character {
 	chen.SetSkill("Will", dice.Average)
 	chen.SetSkill("Physique", dice.Average)
 
-	drone := character.NewCharacter("drone-1", "Security Drone Alpha")
+	drone := core.NewCharacter("drone-1", "Security Drone Alpha")
 	drone.Aspects.HighConcept = "Automated Threat Response Unit"
 	drone.SetSkill("Shoot", dice.Fair)
 	drone.SetSkill("Notice", dice.Average)
 
-	return []*character.Character{chen, drone}
+	return []*core.Character{chen, drone}
 }
 
 // NewHeistPlayer creates the Zero / Ghost character from the heist preset.
-func NewHeistPlayer() *character.Character {
-	char := character.NewCharacter("zero", "Ghost")
+func NewHeistPlayer() *core.Character {
+	char := core.NewCharacter("zero", "Ghost")
 	char.Aspects.HighConcept = "Ex-Corporate Netrunner Gone Rogue"
 	char.Aspects.Trouble = "Every Megacorp Wants Me Dead"
 	char.Aspects.AddAspect("Military-Grade Cybernetic Reflexes")
@@ -185,8 +185,8 @@ func NewHeistPlayer() *character.Character {
 // ---------------------------------------------------------------------------
 
 // NewEvalCharacter creates a well-rounded test character with a range of skills.
-func NewEvalCharacter() *character.Character {
-	char := character.NewCharacter("eval-char", "Magnus the Versatile")
+func NewEvalCharacter() *core.Character {
+	char := core.NewCharacter("eval-char", "Magnus the Versatile")
 	char.Aspects.HighConcept = "Resourceful Problem Solver"
 	char.Aspects.Trouble = "Curiosity Killed the Cat"
 	char.Aspects.AddAspect("Former Street Urchin")

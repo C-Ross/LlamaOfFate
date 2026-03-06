@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
@@ -71,7 +71,7 @@ func TestSceneManager_Snapshot_WithState(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	testScene := scene.NewScene("scene1", "Saloon", "A dusty saloon")
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	require.NoError(t, sm.StartScene(testScene, player))
 
 	sm.SetScenePurpose("Find the informant")
@@ -112,7 +112,7 @@ func TestScenarioManager_Snapshot(t *testing.T) {
 	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	player.Aspects.HighConcept = "Gunslinger"
 	player.SetSkill("shoot", dice.Great)
 
@@ -128,7 +128,7 @@ func TestScenarioManager_Snapshot(t *testing.T) {
 	sm.sceneCount = 3
 	sm.lastGeneratedPurpose = "Infiltrate the train"
 	sm.lastGeneratedHook = "You hear the whistle in the distance"
-	sm.npcRegistry.Register(character.NewCharacter("npc1", "Marshal Dan"), "hostile")
+	sm.npcRegistry.Register(core.NewCharacter("npc1", "Marshal Dan"), "hostile")
 	sm.sceneSummaries = []prompt.SceneSummary{
 		{SceneDescription: "The saloon", KeyEvents: []string{"Met the Marshal"}},
 	}
@@ -163,9 +163,9 @@ func TestScenarioManager_Snapshot_CopiesMaps(t *testing.T) {
 	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
-	sm.npcRegistry.Register(character.NewCharacter("npc1", "Bandit"), "neutral")
+	sm.npcRegistry.Register(core.NewCharacter("npc1", "Bandit"), "neutral")
 	sm.sceneSummaries = []prompt.SceneSummary{
 		{SceneDescription: "Scene one"},
 	}
@@ -173,7 +173,7 @@ func TestScenarioManager_Snapshot_CopiesMaps(t *testing.T) {
 	scenarioState, _ := sm.Snapshot()
 
 	// Mutate originals — snapshot should be unaffected
-	sm.npcRegistry.Register(character.NewCharacter("npc2", "New NPC"), "friendly")
+	sm.npcRegistry.Register(core.NewCharacter("npc2", "New NPC"), "friendly")
 	sm.sceneSummaries = append(sm.sceneSummaries, prompt.SceneSummary{SceneDescription: "Scene two"})
 
 	assert.Len(t, scenarioState.NPCRegistry, 1)
@@ -185,7 +185,7 @@ func TestScenarioManager_SetSaveFunc(t *testing.T) {
 	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	called := false
@@ -246,7 +246,7 @@ func TestGameManager_Save_CascadesSnapshot(t *testing.T) {
 	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	player.Aspects.HighConcept = "Gunslinger"
 
 	gm := NewGameManager(engine, session.NullLogger{})
@@ -306,7 +306,7 @@ func TestSceneManager_Restore_Empty(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 
 	sm.Restore(SceneState{}, player)
 
@@ -321,7 +321,7 @@ func TestSceneManager_Restore_WithState(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 
 	testScene := scene.NewScene("scene1", "Saloon", "A dusty saloon")
 	history := []prompt.ConversationEntry{
@@ -347,7 +347,7 @@ func TestSceneManager_Restore_AddsPlayerToScene(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 
 	testScene := scene.NewScene("scene1", "Saloon", "A dusty saloon")
 	// Scene starts with no characters
@@ -364,7 +364,7 @@ func TestSceneManager_Restore_RoundTrip(t *testing.T) {
 
 	// Create and populate a scene manager
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	testScene := scene.NewScene("scene1", "Saloon", "A dusty saloon")
 	require.NoError(t, sm.StartScene(testScene, player))
 	sm.SetScenePurpose("Find the informant")
@@ -391,14 +391,14 @@ func TestScenarioManager_Restore(t *testing.T) {
 	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	player.Aspects.HighConcept = "Gunslinger"
 	player.SetSkill("Shoot", dice.Great)
 	player.FatePoints = 5
 
 	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
-	bartender := character.NewCharacter("npc_bartender", "Old Pete")
+	bartender := core.NewCharacter("npc_bartender", "Old Pete")
 	bartender.Aspects.HighConcept = "Grizzled Barkeep"
 
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
@@ -415,7 +415,7 @@ func TestScenarioManager_Restore(t *testing.T) {
 		SceneSummaries: []prompt.SceneSummary{
 			{SceneDescription: "The dusty saloon"},
 		},
-		NPCRegistry:  map[string]*character.Character{"old pete": bartender},
+		NPCRegistry:  map[string]*core.Character{"old pete": bartender},
 		NPCAttitudes: map[string]string{"old pete": "friendly"},
 		LastPurpose:  "Confront the marshal",
 		LastHook:     "The doors swing open...",
@@ -448,11 +448,11 @@ func TestScenarioManager_Restore_RegistersNPCsWithEngine(t *testing.T) {
 	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
-	bartender := character.NewCharacter("npc_bartender", "Old Pete")
-	marshal := character.NewCharacter("npc_marshal", "Marshal Dan")
+	bartender := core.NewCharacter("npc_bartender", "Old Pete")
+	marshal := core.NewCharacter("npc_marshal", "Marshal Dan")
 
 	// Engine should not have these NPCs yet
 	assert.Nil(t, engine.GetCharacter("npc_bartender"))
@@ -460,7 +460,7 @@ func TestScenarioManager_Restore_RegistersNPCsWithEngine(t *testing.T) {
 
 	scenarioState := ScenarioState{
 		Player: player,
-		NPCRegistry: map[string]*character.Character{
+		NPCRegistry: map[string]*core.Character{
 			"old pete":    bartender,
 			"marshal dan": marshal,
 		},
@@ -478,7 +478,7 @@ func TestScenarioManager_Restore_NilMaps(t *testing.T) {
 	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	// Restore with nil maps — should not panic
@@ -497,7 +497,7 @@ func TestScenarioManager_Restore_CascadesToSceneManager(t *testing.T) {
 	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
@@ -520,14 +520,14 @@ func TestScenarioManager_Restore_RoundTrip(t *testing.T) {
 	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	player.Aspects.HighConcept = "Gunslinger"
 
 	sm := NewScenarioManager(engine, player, session.NullLogger{}, NewNPCRegistry())
 	sm.SetScenario(&scene.Scenario{Title: "Train Heist", Genre: "Western"})
 	sm.SetScenarioCount(1)
 	sm.sceneCount = 2
-	sm.npcRegistry.Register(character.NewCharacter("npc1", "Bandit"), "hostile")
+	sm.npcRegistry.Register(core.NewCharacter("npc1", "Bandit"), "hostile")
 	sm.lastGeneratedPurpose = "Board the train"
 	sm.lastGeneratedHook = "All aboard!"
 
@@ -568,7 +568,7 @@ func TestGameManager_Start_LoadsOnStartup(t *testing.T) {
 	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	player.Aspects.HighConcept = "Gunslinger"
 
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
@@ -594,7 +594,7 @@ func TestGameManager_Start_LoadsOnStartup(t *testing.T) {
 	recorder := &recordingSaver{loadResult: savedState}
 
 	gm := NewGameManager(engine, session.NullLogger{})
-	gm.SetPlayer(character.NewCharacter("different", "Different Player"))
+	gm.SetPlayer(core.NewCharacter("different", "Different Player"))
 	gm.SetSaver(recorder)
 	gm.SetScenario(&scene.Scenario{Title: "Different Scenario"})
 
@@ -618,7 +618,7 @@ func TestGameManager_Start_CompletedScenario_StartsFresh(t *testing.T) {
 	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 
 	// Save has a completed scenario
 	savedState := &GameState{
@@ -662,7 +662,7 @@ func TestGameManager_Start_NoSave_FreshStart(t *testing.T) {
 	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
 	recorder := &recordingSaver{loadResult: nil} // No saved state
 
@@ -690,7 +690,7 @@ func TestGameManager_Start_NoSave_FreshStart(t *testing.T) {
 // --- GameState.Validate tests ---
 
 func TestGameState_Validate_ValidState(t *testing.T) {
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	player.Aspects.HighConcept = "Gunslinger"
 	player.Aspects.Trouble = "Wanted Dead or Alive"
 
@@ -721,7 +721,7 @@ func TestGameState_Validate_MissingPlayer(t *testing.T) {
 }
 
 func TestGameState_Validate_MissingHighConcept(t *testing.T) {
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	player.Aspects.Trouble = "Wanted Dead or Alive"
 	// HighConcept left empty
 
@@ -740,7 +740,7 @@ func TestGameState_Validate_MissingHighConcept(t *testing.T) {
 }
 
 func TestGameState_Validate_MissingTrouble(t *testing.T) {
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	player.Aspects.HighConcept = "Gunslinger"
 	// Trouble left empty
 
@@ -759,7 +759,7 @@ func TestGameState_Validate_MissingTrouble(t *testing.T) {
 }
 
 func TestGameState_Validate_MissingStressTracks(t *testing.T) {
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	player.Aspects.HighConcept = "Gunslinger"
 	player.Aspects.Trouble = "Wanted Dead or Alive"
 	player.StressTracks = nil // Simulate deserialization from old format
@@ -779,7 +779,7 @@ func TestGameState_Validate_MissingStressTracks(t *testing.T) {
 }
 
 func TestGameState_Validate_MissingScenario(t *testing.T) {
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	player.Aspects.HighConcept = "Gunslinger"
 	player.Aspects.Trouble = "Wanted Dead or Alive"
 
@@ -797,7 +797,7 @@ func TestGameState_Validate_MissingScenario(t *testing.T) {
 }
 
 func TestGameState_Validate_MissingScene(t *testing.T) {
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	player.Aspects.HighConcept = "Gunslinger"
 	player.Aspects.Trouble = "Wanted Dead or Alive"
 
@@ -814,7 +814,7 @@ func TestGameState_Validate_MissingScene(t *testing.T) {
 }
 
 func TestGameState_Validate_MultipleProblems(t *testing.T) {
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	// Both high concept and stress tracks missing
 	player.StressTracks = nil
 

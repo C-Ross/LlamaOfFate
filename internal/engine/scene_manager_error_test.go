@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
@@ -149,7 +149,7 @@ func TestGenerateSceneResponse_LLMError(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
-	player := character.NewCharacter("p1", "Player")
+	player := core.NewCharacter("p1", "Player")
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.player = player
 	sm.conflict.player = player
@@ -171,7 +171,7 @@ func TestGenerateSceneResponse_EmptyResponse(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
-	player := character.NewCharacter("p1", "Player")
+	player := core.NewCharacter("p1", "Player")
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.player = player
 	sm.conflict.player = player
@@ -207,7 +207,7 @@ func TestGenerateActionNarrative_LLMError(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
-	player := character.NewCharacter("p1", "Player")
+	player := core.NewCharacter("p1", "Player")
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.player = player
 	sm.conflict.player = player
@@ -305,7 +305,7 @@ func TestProcessInput_ClassificationFallback(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
-	player := character.NewCharacter("p1", "Player")
+	player := core.NewCharacter("p1", "Player")
 	testScene := scene.NewScene("test", "Test", "Test scene")
 	sm.player = player
 	sm.conflict.player = player

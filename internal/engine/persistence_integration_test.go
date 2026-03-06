@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
@@ -23,7 +23,7 @@ func TestIntegration_SaveCascade_ThroughGameManagerStart(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a player with real state
-	player := character.NewCharacter("player1", "Jesse Calhoun")
+	player := core.NewCharacter("player1", "Jesse Calhoun")
 	player.Aspects.HighConcept = "Gunslinger With a Past"
 	player.Aspects.Trouble = "Wanted Dead or Alive"
 	player.Aspects.AddAspect("Quick Draw")
@@ -36,9 +36,9 @@ func TestIntegration_SaveCascade_ThroughGameManagerStart(t *testing.T) {
 	testScene.AddSituationAspect(scene.SituationAspect{ID: "aspect_1", Aspect: "Smoky Atmosphere", Duration: "scene"})
 	testScene.AddSituationAspect(scene.SituationAspect{ID: "aspect_2", Aspect: "Swinging Doors", Duration: "scene"})
 
-	bartender := character.NewCharacter("npc_bartender", "Old Pete")
+	bartender := core.NewCharacter("npc_bartender", "Old Pete")
 	bartender.Aspects.HighConcept = "Grizzled Barkeep"
-	bartender.CharacterType = character.CharacterTypeSupportingNPC
+	bartender.CharacterType = core.CharacterTypeSupportingNPC
 
 	// Recording saver to capture save calls
 	recorder := &recordingSaver{}
@@ -61,7 +61,7 @@ func TestIntegration_SaveCascade_ThroughGameManagerStart(t *testing.T) {
 	// Set initial scene and start — game initializes but doesn't loop
 	gm.SetInitialScene(&InitialSceneConfig{
 		Scene: testScene,
-		NPCs:  []*character.Character{bartender},
+		NPCs:  []*core.Character{bartender},
 	})
 	events, err := gm.Start(context.Background())
 	require.NoError(t, err)
@@ -109,7 +109,7 @@ func TestIntegration_SaveFunc_WiredThroughStart(t *testing.T) {
 	engine, err := NewWithLLM(mockLLM, session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Test Hero")
+	player := core.NewCharacter("player1", "Test Hero")
 	player.Aspects.HighConcept = "Reluctant Champion"
 
 	testScene := scene.NewScene("scene1", "Test Arena", "A testing ground")
@@ -157,18 +157,18 @@ func TestIntegration_SaveCascade_NPCRegistry(t *testing.T) {
 	engine, err := NewWithLLM(mockLLM, session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	player.Aspects.HighConcept = "Gunslinger"
 
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
 
-	marshal := character.NewCharacter("npc_marshal", "Marshal Dan")
+	marshal := core.NewCharacter("npc_marshal", "Marshal Dan")
 	marshal.Aspects.HighConcept = "Stern Lawman"
-	marshal.CharacterType = character.CharacterTypeMainNPC
+	marshal.CharacterType = core.CharacterTypeMainNPC
 
-	bartender := character.NewCharacter("npc_bartender", "Old Pete")
+	bartender := core.NewCharacter("npc_bartender", "Old Pete")
 	bartender.Aspects.HighConcept = "Grizzled Barkeep"
-	bartender.CharacterType = character.CharacterTypeSupportingNPC
+	bartender.CharacterType = core.CharacterTypeSupportingNPC
 
 	recorder := &recordingSaver{}
 
@@ -181,7 +181,7 @@ func TestIntegration_SaveCascade_NPCRegistry(t *testing.T) {
 
 	gm.SetInitialScene(&InitialSceneConfig{
 		Scene: testScene,
-		NPCs:  []*character.Character{marshal, bartender},
+		NPCs:  []*core.Character{marshal, bartender},
 	})
 	events, err := gm.Start(context.Background())
 	require.NoError(t, err)
@@ -205,7 +205,7 @@ func TestIntegration_SaveCascade_MultipleSaves(t *testing.T) {
 	engine, err := NewWithLLM(mockLLM, session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	player.Aspects.HighConcept = "Gunslinger"
 	player.FatePoints = 3
 
@@ -254,7 +254,7 @@ func TestIntegration_SaveCascade_NoopSaverByDefault(t *testing.T) {
 	engine, err := NewWithLLM(mockLLM, session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
 
 	gm := NewGameManager(engine, session.NullLogger{})
@@ -281,7 +281,7 @@ func TestIntegration_SaveCascade_ConversationHistory(t *testing.T) {
 	engine, err := NewWithLLM(mockLLM, session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
 	recorder := &recordingSaver{}
 
@@ -325,7 +325,7 @@ func TestIntegration_SaveCascade_SceneSummaries(t *testing.T) {
 	engine, err := NewWithLLM(mockLLM, session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
 	recorder := &recordingSaver{}
 
@@ -382,7 +382,7 @@ func TestIntegration_AutomaticSaveTriggers(t *testing.T) {
 	engine, err := NewWithLLM(mockLLM, session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	player.Aspects.HighConcept = "Gunslinger"
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
 	recorder := &recordingSaver{}
@@ -418,7 +418,7 @@ func TestIntegration_SaveThenResume(t *testing.T) {
 	engine1, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse Calhoun")
+	player := core.NewCharacter("player1", "Jesse Calhoun")
 	player.Aspects.HighConcept = "Gunslinger With a Past"
 	player.Aspects.Trouble = "Wanted Dead or Alive"
 	player.FatePoints = 5
@@ -427,9 +427,9 @@ func TestIntegration_SaveThenResume(t *testing.T) {
 	testScene := scene.NewScene("saloon_1", "The Dusty Saloon", "A dimly lit saloon.")
 	testScene.AddSituationAspect(scene.SituationAspect{ID: "a1", Aspect: "Smoky Atmosphere", Duration: "scene"})
 
-	bartender := character.NewCharacter("npc_bartender", "Old Pete")
+	bartender := core.NewCharacter("npc_bartender", "Old Pete")
 	bartender.Aspects.HighConcept = "Grizzled Barkeep"
-	bartender.CharacterType = character.CharacterTypeSupportingNPC
+	bartender.CharacterType = core.CharacterTypeSupportingNPC
 
 	recorder1 := &recordingSaver{}
 
@@ -447,7 +447,7 @@ func TestIntegration_SaveThenResume(t *testing.T) {
 
 	gm1.SetInitialScene(&InitialSceneConfig{
 		Scene: testScene,
-		NPCs:  []*character.Character{bartender},
+		NPCs:  []*core.Character{bartender},
 	})
 	events, err := gm1.Start(context.Background())
 	require.NoError(t, err)
@@ -468,7 +468,7 @@ func TestIntegration_SaveThenResume(t *testing.T) {
 	recorder2 := &recordingSaver{loadResult: &lastSave}
 
 	gm2 := NewGameManager(engine2, session.NullLogger{})
-	gm2.SetPlayer(character.NewCharacter("dummy", "Should Be Overridden"))
+	gm2.SetPlayer(core.NewCharacter("dummy", "Should Be Overridden"))
 	gm2.SetSaver(recorder2)
 	gm2.SetScenario(&scene.Scenario{Title: "Should Be Overridden"})
 
@@ -500,14 +500,14 @@ func TestIntegration_Resume_PreservesNPCRegistry(t *testing.T) {
 	engine1, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	player.Aspects.HighConcept = "Gunslinger"
 
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
 
-	marshal := character.NewCharacter("npc_marshal", "Marshal Dan")
+	marshal := core.NewCharacter("npc_marshal", "Marshal Dan")
 	marshal.Aspects.HighConcept = "Stern Lawman"
-	marshal.CharacterType = character.CharacterTypeMainNPC
+	marshal.CharacterType = core.CharacterTypeMainNPC
 
 	recorder := &recordingSaver{}
 
@@ -518,7 +518,7 @@ func TestIntegration_Resume_PreservesNPCRegistry(t *testing.T) {
 
 	gm1.SetInitialScene(&InitialSceneConfig{
 		Scene: testScene,
-		NPCs:  []*character.Character{marshal},
+		NPCs:  []*core.Character{marshal},
 	})
 	events, err := gm1.Start(context.Background())
 	require.NoError(t, err)
@@ -565,7 +565,7 @@ func TestIntegration_Resume_SkipsSceneStartSave(t *testing.T) {
 	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	testScene := scene.NewScene("scene1", "Saloon", "The saloon")
 
 	savedState := &GameState{
@@ -598,7 +598,7 @@ func TestIntegration_Resume_MidConflict(t *testing.T) {
 	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	player.Aspects.HighConcept = "Gunslinger"
 
 	// Create a scene with an active conflict
@@ -619,7 +619,7 @@ func TestIntegration_Resume_MidConflict(t *testing.T) {
 		Scenario: ScenarioState{
 			Player:   player,
 			Scenario: &scene.Scenario{Title: "Test", Problem: "Test", Genre: "Western"},
-			NPCRegistry: map[string]*character.Character{
+			NPCRegistry: map[string]*core.Character{
 				"bandit": {ID: "npc_bandit", Name: "Bandit"},
 			},
 		},
@@ -663,7 +663,7 @@ func TestIntegration_Resume_MidChallenge(t *testing.T) {
 	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	player.Aspects.HighConcept = "Gunslinger"
 
 	// Create a scene with an active challenge (mid-progress)
@@ -733,7 +733,7 @@ func TestIntegration_ChallengeState_SnapshotRoundTrip(t *testing.T) {
 
 	// Build first scene manager with active challenge
 	sm1 := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
-	player := character.NewCharacter("player1", "Jesse")
+	player := core.NewCharacter("player1", "Jesse")
 	testScene := scene.NewScene("vault", "Vault", "A massive vault")
 	require.NoError(t, sm1.StartScene(testScene, player))
 	sm1.SetScenePurpose("Obtain the diamond")

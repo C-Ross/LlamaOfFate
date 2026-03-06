@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
@@ -133,7 +133,7 @@ func newGameSession(ctx context.Context, llmClient llm.LLMClient, gameID string,
 
 	// Setup provided — create fresh game with chosen scenario + player.
 	var scenario *scene.Scenario
-	var player *character.Character
+	var player *core.Character
 
 	if setup.PresetID != "" {
 		var err error

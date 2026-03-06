@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
@@ -26,7 +26,7 @@ func buildInvokeTestSM(t *testing.T, fatePoints int) (*SceneManager, *MockUI) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	sm.actions.roller = dice.NewSeededRoller(42)
 
-	player := character.NewCharacter("player-1", "Test Hero")
+	player := core.NewCharacter("player-1", "Test Hero")
 	player.Aspects.HighConcept = "Mighty Warrior"
 	player.Aspects.Trouble = "Hot-Headed"
 	player.FatePoints = fatePoints
@@ -420,7 +420,7 @@ func TestApplyInvokeChoice_Boost_RemovedAfterFreeInvokeUsed(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	player.FatePoints = 3
 	engine.AddCharacter(player)
 
@@ -476,7 +476,7 @@ func TestApplyInvokeChoice_RegularAspect_NotRemovedAfterFreeInvoke(t *testing.T)
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	player.FatePoints = 3
 	engine.AddCharacter(player)
 

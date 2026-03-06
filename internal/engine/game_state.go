@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 )
@@ -58,12 +58,12 @@ func (gs *GameState) Validate() error {
 // ScenarioState holds state managed by ScenarioManager and GameManager:
 // the player character, scenario progress, NPC registry, and scene summaries.
 type ScenarioState struct {
-	Player         *character.Character            `yaml:"player"`
+	Player         *core.Character            `yaml:"player"`
 	Scenario       *scene.Scenario                 `yaml:"scenario"`
 	ScenarioCount  int                             `yaml:"scenario_count"`
 	SceneCount     int                             `yaml:"scene_count"`
 	SceneSummaries []prompt.SceneSummary           `yaml:"scene_summaries"`
-	NPCRegistry    map[string]*character.Character `yaml:"npc_registry"`
+	NPCRegistry    map[string]*core.Character `yaml:"npc_registry"`
 	NPCAttitudes   map[string]string               `yaml:"npc_attitudes"`
 	LastPurpose    string                          `yaml:"last_generated_purpose,omitempty"`
 	LastHook       string                          `yaml:"last_generated_hook,omitempty"`

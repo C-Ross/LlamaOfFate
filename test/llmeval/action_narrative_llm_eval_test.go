@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
@@ -224,8 +224,8 @@ func buildNarrativeTestAction(tc ActionNarrativeTestCase) *action.Action {
 	return act
 }
 
-func buildNarrativeTestCharacter() *character.Character {
-	char := character.NewCharacter("eval-player", "Kael the Wanderer")
+func buildNarrativeTestCharacter() *core.Character {
+	char := core.NewCharacter("eval-player", "Kael the Wanderer")
 	char.Aspects.HighConcept = "Resourceful Wanderer"
 	char.Aspects.Trouble = "Can't Leave Well Enough Alone"
 	char.Aspects.AddAspect("Eyes of the Hawk")

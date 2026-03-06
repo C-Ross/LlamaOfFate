@@ -6,7 +6,6 @@ package core
 import (
 	"fmt"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 )
@@ -80,11 +79,11 @@ func DefenseSkillForAttack(attackSkill string) string {
 // Per Fate Core rules:
 // - Physical attacks target physical stress
 // - Mental/social attacks target mental stress
-func StressTypeForAttack(attackSkill string) character.StressTrackType {
+func StressTypeForAttack(attackSkill string) StressTrackType {
 	if mentalAttackSkills[attackSkill] {
-		return character.MentalStress
+		return MentalStress
 	}
-	return character.PhysicalStress
+	return PhysicalStress
 }
 
 // ConflictTypeForSkill determines the conflict type based on the skill used.

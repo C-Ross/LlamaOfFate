@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
@@ -23,7 +23,7 @@ type SceneResponseTestCase struct {
 	PlayerInput          string
 	SceneName            string
 	SceneDescription     string
-	OtherCharacters      []*character.Character
+	OtherCharacters      []*core.Character
 	ConversationContext  string
 	Description          string
 	CheckNoOptions       bool   // Verify response doesn't contain options
@@ -43,7 +43,7 @@ func getNoOptionsTestCases() []SceneResponseTestCase {
 			PlayerInput:         `Jesse cooly eyes Black Jack "Howdy there partner. Was looking to talk, thought we might have some similar interests."`,
 			SceneName:           "Windmill on the Outskirts",
 			SceneDescription:    "An old abandoned windmill on the outskirts of town. The creaking blades announce any arrival. Black Jack McCoy stands near the entrance, hand near his gun.",
-			OtherCharacters:     []*character.Character{blackJack},
+			OtherCharacters:     []*core.Character{blackJack},
 			ConversationContext: `GM: As Jesse approaches the old windmill, the creaking of its weathered blades echoes through the stillness. Black Jack McCoy stands near the windmill's entrance, eyeing Jesse with a mixture of curiosity and wariness.`,
 			Description:         "Tense NPC confrontation should describe reaction without presenting player options",
 			CheckNoOptions:      true,
@@ -53,7 +53,7 @@ func getNoOptionsTestCases() []SceneResponseTestCase {
 			PlayerInput:         `Jesse nods "I'm looking for the Cortez gang, I have some unfriendly business with them. I hear you might know where I can find them."`,
 			SceneName:           "Windmill on the Outskirts",
 			SceneDescription:    "An old abandoned windmill on the outskirts of town. Black Jack McCoy stands with his hand on his gun.",
-			OtherCharacters:     []*character.Character{blackJack},
+			OtherCharacters:     []*core.Character{blackJack},
 			ConversationContext: `GM: Black Jack's eyes narrow as he takes a step forward. "Talk's free, but I'm listening with one ear open and my hand on my gun."`,
 			Description:         "Information request to hostile NPC should get NPC response, not player options",
 			CheckNoOptions:      true,
@@ -63,7 +63,7 @@ func getNoOptionsTestCases() []SceneResponseTestCase {
 			PlayerInput:         `Jesse sips his drink and looks at Maggie. "I bet you know everything that goes on around here."`,
 			SceneName:           "The Dusty Spur Saloon",
 			SceneDescription:    "A dimly lit saloon with swinging doors, a long bar, and the smell of whiskey",
-			OtherCharacters:     []*character.Character{bartender},
+			OtherCharacters:     []*core.Character{bartender},
 			ConversationContext: `GM: Maggie slides the whiskey down the bar to Jesse, her gaze lingering on his face.`,
 			Description:         "Normal bar conversation should continue naturally without options",
 			CheckNoOptions:      true,
@@ -73,7 +73,7 @@ func getNoOptionsTestCases() []SceneResponseTestCase {
 			PlayerInput:         `Jesse laughs wryly. "I may be both, but I'll take my chances. So you going to help me?" He meets Jack's eyes and stands his ground.`,
 			SceneName:           "Windmill on the Outskirts",
 			SceneDescription:    "An old abandoned windmill. Tension fills the air as Black Jack's hand rests on his pistol.",
-			OtherCharacters:     []*character.Character{blackJack},
+			OtherCharacters:     []*core.Character{blackJack},
 			ConversationContext: `GM: Black Jack's eyes flicker. "Cortez gang, huh? You're either very brave or very stupid."`,
 			Description:         "Negotiation with dangerous NPC should continue dialog without presenting choices",
 			CheckNoOptions:      true,
@@ -83,7 +83,7 @@ func getNoOptionsTestCases() []SceneResponseTestCase {
 			PlayerInput:         `Jesse nods. "A man don't live forever. So, gonna point me in the right direction?"`,
 			SceneName:           "Windmill on the Outskirts",
 			SceneDescription:    "An old abandoned windmill on the outskirts of Redemption Gulch.",
-			OtherCharacters:     []*character.Character{blackJack},
+			OtherCharacters:     []*core.Character{blackJack},
 			ConversationContext: `GM: Black Jack says, "I might know a thing or two about the Cortez gang, but I'm not doing it out of the kindness of my heart."`,
 			Description:         "Final question before potential departure should get direct answer",
 			CheckNoOptions:      true,
@@ -101,7 +101,7 @@ func getTransitionAfterLeaveTestCases() []SceneResponseTestCase {
 			PlayerInput:      "Jesse shakes his head and walks to his horse, mounts and rides off towards the mine.",
 			SceneName:        "Windmill on the Outskirts",
 			SceneDescription: "An old abandoned windmill on the outskirts of Redemption Gulch.",
-			OtherCharacters:  []*character.Character{blackJack},
+			OtherCharacters:  []*core.Character{blackJack},
 			ConversationContext: `GM: Black Jack glares at Jesse. "Alright, I'll give you a direction. They're holed up in the old abandoned mine on the other side of Redemption Gulch."
 Player: Jesse tips his hat. "Thank you."`,
 			Description:          "Player leaving after conversation should trigger scene transition",
@@ -113,7 +113,7 @@ Player: Jesse tips his hat. "Thank you."`,
 			PlayerInput:          "Jesse rides directly to the mine.",
 			SceneName:            "Windmill on the Outskirts",
 			SceneDescription:     "An old abandoned windmill. Black Jack watches from the entrance.",
-			OtherCharacters:      []*character.Character{blackJack},
+			OtherCharacters:      []*core.Character{blackJack},
 			ConversationContext:  `GM: Black Jack watches as Jesse turns toward his horse. "Reckon we'll see how long you last."`,
 			Description:          "Explicit destination statement should trigger transition to that location",
 			CheckTransition:      true,
@@ -124,7 +124,7 @@ Player: Jesse tips his hat. "Thank you."`,
 			PlayerInput:          "Jesse rides away from the windmill, heading straight to the mine.",
 			SceneName:            "Windmill on the Outskirts",
 			SceneDescription:     "An old abandoned windmill on the outskirts of town.",
-			OtherCharacters:      []*character.Character{blackJack},
+			OtherCharacters:      []*core.Character{blackJack},
 			ConversationContext:  `GM: Black Jack just told Jesse the Cortez gang is at the abandoned mine.`,
 			Description:          "Riding away should trigger transition",
 			CheckTransition:      true,
@@ -275,7 +275,7 @@ func TestSceneResponse_TransitionOnLeave_LLMEvaluation(t *testing.T) {
 // and should NOT trigger a scene transition. Extracted from session_western_jesse_calhoun_20260208_190311.yaml
 // where "steps into the eaves" falsely triggered [SCENE_TRANSITION:the eaves outside the saloon].
 func getNoFalseTransitionTestCases() []SceneResponseTestCase {
-	dustyCowboy := character.NewCharacter("scene_1_npc_1", "The Dusty Cowboy")
+	dustyCowboy := core.NewCharacter("scene_1_npc_1", "The Dusty Cowboy")
 	dustyCowboy.Aspects.HighConcept = "Mysterious Drifter with a Watchful Eye"
 
 	bartender := NewBartender()
@@ -288,7 +288,7 @@ func getNoFalseTransitionTestCases() []SceneResponseTestCase {
 			PlayerInput:         `Jesse tips his hat to the stranger "Howdy partner, mind if I join you for a smoke?"  He steps into the eaves and pulls out a matchbook and a hand rolled cigar.`,
 			SceneName:           "Roping a Plan",
 			SceneDescription:    "The moon casts long shadows across the dusty main street of Redemption Gulch as Jesse walks away from the saloon. The sound of crickets and distant laughter from the saloon's patrons fill the night air, punctuated by the creaking of wooden signs and the occasional bark of a dog.",
-			OtherCharacters:     []*character.Character{dustyCowboy},
+			OtherCharacters:     []*core.Character{dustyCowboy},
 			ConversationContext: `GM: As Jesse turns a corner, he notices a figure watching him from the shadows near the local livery stable, the faint glow of a cigar illuminating their features.`,
 			Description:         "Walking to a nearby person under the eaves is movement WITHIN the scene, not leaving. Reproduced from session_western_jesse_calhoun_20260208_190311.yaml",
 			CheckNoOptions:      false,
@@ -299,7 +299,7 @@ func getNoFalseTransitionTestCases() []SceneResponseTestCase {
 			PlayerInput:         `Jesse walks over to the bar and sits down on a stool. "What'll it be tonight?"`,
 			SceneName:           "The Dusty Spur Saloon",
 			SceneDescription:    "A dimly lit saloon with swinging doors, a long bar, and the smell of whiskey and tobacco. Miners and cowboys crowd the tables.",
-			OtherCharacters:     []*character.Character{bartender},
+			OtherCharacters:     []*core.Character{bartender},
 			ConversationContext: `GM: Jesse pushes through the swinging doors and surveys the room. The piano player pauses briefly, then continues.`,
 			Description:         "Walking to the bar inside a saloon is not leaving the saloon",
 			CheckNoOptions:      false,
@@ -310,7 +310,7 @@ func getNoFalseTransitionTestCases() []SceneResponseTestCase {
 			PlayerInput:         `Jesse takes his drink and moves to the corner table where the card game is happening.`,
 			SceneName:           "The Dusty Spur Saloon",
 			SceneDescription:    "A dimly lit saloon with swinging doors, a long bar, poker tables, and a stage for entertainment.",
-			OtherCharacters:     []*character.Character{bartender},
+			OtherCharacters:     []*core.Character{bartender},
 			ConversationContext: `GM: Maggie slides the whiskey down the bar. "Careful with that crowd in the corner, stranger."`,
 			Description:         "Moving to a different spot within the same room is not leaving",
 			CheckNoOptions:      false,
@@ -321,7 +321,7 @@ func getNoFalseTransitionTestCases() []SceneResponseTestCase {
 			PlayerInput:         `Jesse steps behind the windmill wall, keeping his hand near his holster. "Let's talk where we can't be seen from the road."`,
 			SceneName:           "Windmill on the Outskirts",
 			SceneDescription:    "An old abandoned windmill on the outskirts of town. The creaking blades announce any arrival. Black Jack McCoy stands near the entrance.",
-			OtherCharacters:     []*character.Character{blackJack},
+			OtherCharacters:     []*core.Character{blackJack},
 			ConversationContext: `GM: Black Jack eyes Jesse warily. "I don't much like being out in the open neither."`,
 			Description:         "Moving behind cover at the same location is not departing the scene",
 			CheckNoOptions:      false,
@@ -413,7 +413,7 @@ func evaluateSceneResponseBehavior(ctx context.Context, client llm.LLMClient, tc
 	testScene := scene.NewScene("test-scene", tc.SceneName, tc.SceneDescription)
 
 	// Create player character
-	player := character.NewCharacter("player1", "Jesse Calhoun")
+	player := core.NewCharacter("player1", "Jesse Calhoun")
 	player.Aspects.HighConcept = "Vengeful Rancher with Nothing Left to Lose"
 	player.Aspects.Trouble = "The Cortez Gang Burned My Life"
 

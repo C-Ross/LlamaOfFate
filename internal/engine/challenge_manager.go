@@ -4,7 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
@@ -26,7 +26,7 @@ type ChallengeManager struct {
 	actions *ActionResolver
 
 	// Per-scene state — wired by SceneManager.StartScene.
-	player       *character.Character
+	player       *core.Character
 	currentScene *scene.Scene
 }
 
@@ -49,7 +49,7 @@ func newChallengeManager(
 }
 
 // setSceneState wires per-scene references. Called by SceneManager.StartScene.
-func (chm *ChallengeManager) setSceneState(s *scene.Scene, player *character.Character) {
+func (chm *ChallengeManager) setSceneState(s *scene.Scene, player *core.Character) {
 	chm.currentScene = s
 	chm.player = player
 }

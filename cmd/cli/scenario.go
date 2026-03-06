@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"github.com/C-Ross/LlamaOfFate/internal/config"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 )
 
@@ -29,6 +29,6 @@ func defaultScenario() *scene.Scenario {
 }
 
 // defaultPlayer returns the default player character for the saloon scenario.
-func defaultPlayer() *character.Character {
+func defaultPlayer() *core.Character {
 	return loadedScenarios[defaultScenarioID].Player
 }

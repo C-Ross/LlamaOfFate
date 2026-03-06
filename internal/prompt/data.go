@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
@@ -83,8 +83,8 @@ type SceneResponseData struct {
 	ConversationContext string
 	PlayerInput         string
 	InteractionType     string
-	OtherCharacters     []*character.Character
-	TakenOutCharacters  []*character.Character // Characters defeated earlier in this scene
+	OtherCharacters     []*core.Character
+	TakenOutCharacters  []*core.Character // Characters defeated earlier in this scene
 	ScenePurpose        string                 // Dramatic question driving this scene
 }
 
@@ -95,11 +95,11 @@ type ConflictResponseData struct {
 	AspectsContext       string
 	ConversationContext  string
 	PlayerInput          string
-	OtherCharacters      []*character.Character
-	TakenOutCharacters   []*character.Character // Characters defeated earlier in this scene
+	OtherCharacters      []*core.Character
+	TakenOutCharacters   []*core.Character // Characters defeated earlier in this scene
 	CurrentCharacterName string
 	ParticipantMap       map[string]*scene.ConflictParticipant
-	CharacterMap         map[string]*character.Character
+	CharacterMap         map[string]*core.Character
 	ScenePurpose         string // Dramatic question driving this scene
 }
 
@@ -110,7 +110,7 @@ type ActionNarrativeData struct {
 	AspectsContext       string
 	ConversationContext  string
 	Action               *action.Action
-	OtherCharacters      []*character.Character
+	OtherCharacters      []*core.Character
 	ChallengeDescription string // Overall challenge description, if active
 	ChallengeTaskDesc    string // Specific task being resolved, if any
 }
@@ -305,11 +305,11 @@ type ChallengeContext struct {
 
 // ActionParseTemplateData holds the data for action parse template
 type ActionParseTemplateData struct {
-	Character          *character.Character
+	Character          *core.Character
 	RawInput           string
 	Context            string
 	Scene              interface{}
-	OtherCharacters    []*character.Character
+	OtherCharacters    []*core.Character
 	DifficultyGuidance                   // Embedded difficulty thresholds
 	ChallengeContext   *ChallengeContext // Non-nil when an active challenge is in progress
 }
@@ -354,7 +354,7 @@ type FateNarrationResult struct {
 
 // AspectGenerationRequest holds the data for aspect generation template
 type AspectGenerationRequest struct {
-	Character       *character.Character `json:"character"`
+	Character       *core.Character `json:"character"`
 	Action          *action.Action       `json:"action"`
 	Outcome         *dice.Outcome        `json:"outcome"`
 	Context         string               `json:"context"`                    // Scene description or situational context

@@ -3,7 +3,6 @@ package core
 import (
 	"testing"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/stretchr/testify/assert"
 )
@@ -42,22 +41,22 @@ func TestStressTypeForAttack(t *testing.T) {
 	tests := []struct {
 		name        string
 		attackSkill string
-		want        character.StressTrackType
+		want        StressTrackType
 	}{
 		// Physical attacks -> Physical stress
-		{"Fight targets physical", "Fight", character.PhysicalStress},
-		{"Shoot targets physical", "Shoot", character.PhysicalStress},
-		{"Physique targets physical", "Physique", character.PhysicalStress},
+		{"Fight targets physical", "Fight", PhysicalStress},
+		{"Shoot targets physical", "Shoot", PhysicalStress},
+		{"Physique targets physical", "Physique", PhysicalStress},
 
 		// Mental attacks -> Mental stress
-		{"Provoke targets mental", "Provoke", character.MentalStress},
-		{"Deceive targets mental", "Deceive", character.MentalStress},
-		{"Rapport targets mental", "Rapport", character.MentalStress},
-		{"Lore targets mental", "Lore", character.MentalStress},
+		{"Provoke targets mental", "Provoke", MentalStress},
+		{"Deceive targets mental", "Deceive", MentalStress},
+		{"Rapport targets mental", "Rapport", MentalStress},
+		{"Lore targets mental", "Lore", MentalStress},
 
 		// Unknown defaults to Physical
-		{"Unknown skill defaults to physical", "Crafts", character.PhysicalStress},
-		{"Empty string defaults to physical", "", character.PhysicalStress},
+		{"Unknown skill defaults to physical", "Crafts", PhysicalStress},
+		{"Empty string defaults to physical", "", PhysicalStress},
 	}
 
 	for _, tt := range tests {
@@ -139,29 +138,29 @@ func TestDefaultAttackSkillForConflict(t *testing.T) {
 
 func TestCalculateInitiative(t *testing.T) {
 	// Physical conflict - uses Notice primarily
-	char := character.NewCharacter("test-1", "Test Character")
+	char := NewCharacter("test-1", "Test Character")
 	char.SetSkill("Notice", 3)
 	char.SetSkill("Athletics", 2)
 	assert.Equal(t, 3, CalculateInitiative(char, scene.PhysicalConflict))
 
 	// Physical conflict - falls back to Athletics when Notice is 0
-	char2 := character.NewCharacter("test-2", "Test Character 2")
+	char2 := NewCharacter("test-2", "Test Character 2")
 	char2.SetSkill("Athletics", 4)
 	assert.Equal(t, 4, CalculateInitiative(char2, scene.PhysicalConflict))
 
 	// Mental conflict - uses Empathy primarily
-	char3 := character.NewCharacter("test-3", "Test Character 3")
+	char3 := NewCharacter("test-3", "Test Character 3")
 	char3.SetSkill("Empathy", 5)
 	char3.SetSkill("Rapport", 2)
 	assert.Equal(t, 5, CalculateInitiative(char3, scene.MentalConflict))
 
 	// Mental conflict - falls back to Rapport when Empathy is 0
-	char4 := character.NewCharacter("test-4", "Test Character 4")
+	char4 := NewCharacter("test-4", "Test Character 4")
 	char4.SetSkill("Rapport", 3)
 	assert.Equal(t, 3, CalculateInitiative(char4, scene.MentalConflict))
 
 	// Returns 0 when no relevant skills
-	char5 := character.NewCharacter("test-5", "Test Character 5")
+	char5 := NewCharacter("test-5", "Test Character 5")
 	assert.Equal(t, 0, CalculateInitiative(char5, scene.PhysicalConflict))
 }
 

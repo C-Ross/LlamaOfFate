@@ -10,7 +10,6 @@ import (
 
 	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
@@ -18,7 +17,7 @@ import (
 )
 
 // getNPCActionDecision uses the LLM to decide what action an NPC should take
-func (cm *ConflictManager) getNPCActionDecision(ctx context.Context, npc *character.Character) (*prompt.NPCActionDecision, error) {
+func (cm *ConflictManager) getNPCActionDecision(ctx context.Context, npc *core.Character) (*prompt.NPCActionDecision, error) {
 	if cm.llmClient == nil {
 		return nil, fmt.Errorf("LLM client required for NPC decisions")
 	}
@@ -166,7 +165,7 @@ func (cm *ConflictManager) getDefaultAttackSkill() string {
 }
 
 // processNPCDefend handles an NPC choosing full defense
-func (cm *ConflictManager) processNPCDefend(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) []GameEvent {
+func (cm *ConflictManager) processNPCDefend(ctx context.Context, npc *core.Character, decision *prompt.NPCActionDecision) []GameEvent {
 	// Set full defense flag
 	cm.currentScene.ConflictState.SetFullDefense(npc.ID)
 
@@ -187,7 +186,7 @@ func (cm *ConflictManager) processNPCDefend(ctx context.Context, npc *character.
 }
 
 // processNPCCreateAdvantage handles an NPC creating an advantage
-func (cm *ConflictManager) processNPCCreateAdvantage(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) []GameEvent {
+func (cm *ConflictManager) processNPCCreateAdvantage(ctx context.Context, npc *core.Character, decision *prompt.NPCActionDecision) []GameEvent {
 	skill := decision.Skill
 	if skill == "" {
 		skill = core.SkillNotice // Default
@@ -269,7 +268,7 @@ func (cm *ConflictManager) processNPCCreateAdvantage(ctx context.Context, npc *c
 }
 
 // processNPCOvercome handles an NPC attempting to overcome an obstacle
-func (cm *ConflictManager) processNPCOvercome(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) []GameEvent {
+func (cm *ConflictManager) processNPCOvercome(ctx context.Context, npc *core.Character, decision *prompt.NPCActionDecision) []GameEvent {
 	skill := decision.Skill
 	if skill == "" {
 		skill = core.SkillAthletics // Default
@@ -328,7 +327,7 @@ func (cm *ConflictManager) processNPCOvercome(ctx context.Context, npc *characte
 // invokes are available, cm.actions.pendingInvoke is set and awaitingInvoke is true.
 // The invoke continuation finishes the attack (narrative, damage) and resumes
 // processing remaining NPC turns via advanceConflictTurns.
-func (cm *ConflictManager) processNPCAttack(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) ([]GameEvent, bool) {
+func (cm *ConflictManager) processNPCAttack(ctx context.Context, npc *core.Character, decision *prompt.NPCActionDecision) ([]GameEvent, bool) {
 	// Determine target
 	target := cm.player // Default to player
 	targetID := decision.TargetID
@@ -455,7 +454,7 @@ func (cm *ConflictManager) finishNPCAttackOnPlayer(
 	ctx context.Context,
 	defenseResult *dice.CheckResult,
 	accEvents []GameEvent,
-	npc *character.Character,
+	npc *core.Character,
 	attackSkill string,
 	npcRoll *dice.CheckResult,
 	initialOutcome *dice.Outcome,
@@ -497,7 +496,7 @@ func (cm *ConflictManager) finishNPCAttackOnPlayer(
 }
 
 // generateNPCAttackNarrative generates narrative for an NPC's attack
-func (cm *ConflictManager) generateNPCAttackNarrative(ctx context.Context, npc *character.Character, skill string, outcome *dice.Outcome) (string, error) {
+func (cm *ConflictManager) generateNPCAttackNarrative(ctx context.Context, npc *core.Character, skill string, outcome *dice.Outcome) (string, error) {
 	if cm.llmClient == nil {
 		return "", fmt.Errorf("LLM client required for NPC narratives")
 	}

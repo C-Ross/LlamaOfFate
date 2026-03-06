@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
@@ -103,7 +103,7 @@ type smTestOpts struct {
 // setupTestSM builds a SceneManager with a player (and optional NPC) for testing.
 // When conflictType is set, the NPC is enrolled in a conflict.
 // The second return is always the player; the third is the NPC (nil if none).
-func setupTestSM(t *testing.T, opts smTestOpts) (*SceneManager, *character.Character, *character.Character) {
+func setupTestSM(t *testing.T, opts smTestOpts) (*SceneManager, *core.Character, *core.Character) {
 	t.Helper()
 
 	var client *testLLMClient
@@ -121,7 +121,7 @@ func setupTestSM(t *testing.T, opts smTestOpts) (*SceneManager, *character.Chara
 	require.NoError(t, err)
 
 	// Player
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	player.Aspects.HighConcept = opts.highConcept
 	player.Aspects.Trouble = opts.trouble
 	player.FatePoints = opts.fatePoints
@@ -135,9 +135,9 @@ func setupTestSM(t *testing.T, opts smTestOpts) (*SceneManager, *character.Chara
 	testScene.AddCharacter(player.ID)
 
 	// NPC
-	var npc *character.Character
+	var npc *core.Character
 	if opts.npc != nil {
-		npc = character.NewCharacter(opts.npc.id, opts.npc.name)
+		npc = core.NewCharacter(opts.npc.id, opts.npc.name)
 		npc.Aspects.HighConcept = opts.npc.highConcept
 		for skill, level := range opts.npc.skills {
 			npc.SetSkill(skill, level)

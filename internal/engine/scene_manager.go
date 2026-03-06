@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
@@ -37,7 +37,7 @@ type SceneManager struct {
 	characters          CharacterResolver
 	actionParser        ActionParser
 	currentScene        *scene.Scene
-	player              *character.Character
+	player              *core.Character
 	conversationHistory []prompt.ConversationEntry
 	lastTransition      *prompt.SceneTransition // Captured transition hint when scene ends
 	sessionLogger       session.SessionLogger
@@ -99,7 +99,7 @@ func (sm *SceneManager) SetExitOnSceneTransition(exit bool) {
 }
 
 // StartScene begins a new scene with the given pre-configured scene
-func (sm *SceneManager) StartScene(scene *scene.Scene, player *character.Character) error {
+func (sm *SceneManager) StartScene(scene *scene.Scene, player *core.Character) error {
 	sm.currentScene = scene
 	sm.player = player
 	sm.actions.setSceneState(scene, player)
@@ -498,7 +498,7 @@ func (sm *SceneManager) generateSceneResponse(ctx context.Context, input string,
 
 // buildConflictPrompt assembles the data for the conflict-specific response
 // template and renders it. Extracted from generateSceneResponse for clarity.
-func (sm *SceneManager) buildConflictPrompt(input string, otherCharacters, takenOutCharacters []*character.Character) (string, error) {
+func (sm *SceneManager) buildConflictPrompt(input string, otherCharacters, takenOutCharacters []*core.Character) (string, error) {
 	// Build participant and character maps for conflict template
 	participantMap := make(map[string]*scene.ConflictParticipant)
 	for i := range sm.currentScene.ConflictState.Participants {
@@ -506,7 +506,7 @@ func (sm *SceneManager) buildConflictPrompt(input string, otherCharacters, taken
 		participantMap[p.CharacterID] = p
 	}
 
-	characterMap := make(map[string]*character.Character)
+	characterMap := make(map[string]*core.Character)
 	characterMap[sm.player.ID] = sm.player
 	for _, char := range otherCharacters {
 		characterMap[char.ID] = char
@@ -543,7 +543,7 @@ func (sm *SceneManager) buildConflictPrompt(input string, otherCharacters, taken
 
 // buildScenePrompt assembles the data for the standard scene response template
 // and renders it. Extracted from generateSceneResponse for clarity.
-func (sm *SceneManager) buildScenePrompt(input, interactionType string, otherCharacters, takenOutCharacters []*character.Character) (string, error) {
+func (sm *SceneManager) buildScenePrompt(input, interactionType string, otherCharacters, takenOutCharacters []*core.Character) (string, error) {
 	data := prompt.SceneResponseData{
 		Scene:               sm.currentScene,
 		CharacterContext:    sm.buildCharacterContext(),
@@ -612,7 +612,7 @@ func (sm *SceneManager) GetCurrentScene() *scene.Scene {
 // sceneCharacters returns non-player characters in the current scene, partitioned
 // into active and taken-out slices. Callers that only need active characters can
 // ignore the second return value.
-func (sm *SceneManager) sceneCharacters() (active, takenOut []*character.Character) {
+func (sm *SceneManager) sceneCharacters() (active, takenOut []*core.Character) {
 	others := sm.characters.GetCharactersByScene(sm.currentScene)
 	delete(others, sm.player.ID)
 	for _, c := range others {
@@ -626,7 +626,7 @@ func (sm *SceneManager) sceneCharacters() (active, takenOut []*character.Charact
 }
 
 // GetPlayer returns the current player character
-func (sm *SceneManager) GetPlayer() *character.Character {
+func (sm *SceneManager) GetPlayer() *core.Character {
 	return sm.player
 }
 
@@ -686,7 +686,7 @@ func (sm *SceneManager) Snapshot() SceneState {
 // Restore sets the scene manager's state from a previously saved SceneState,
 // enabling mid-scene (and mid-conflict) resume. The player must be provided
 // separately since it lives in ScenarioState, not SceneState.
-func (sm *SceneManager) Restore(state SceneState, player *character.Character) {
+func (sm *SceneManager) Restore(state SceneState, player *core.Character) {
 	sm.currentScene = state.CurrentScene
 	sm.player = player
 	sm.conversationHistory = state.ConversationHistory

@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 )
 
@@ -166,7 +166,7 @@ story_questions: []
 default_player: nonexistent
 `)
 
-	_, err := LoadScenario(path, map[string]*character.Character{})
+	_, err := LoadScenario(path, map[string]*core.Character{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown player")
 }
@@ -216,7 +216,7 @@ npcs:
 	// Supporting NPC
 	bart := ls.NPCs[0]
 	assert.Equal(t, "Bartender", bart.Name)
-	assert.Equal(t, character.CharacterTypeSupportingNPC, bart.CharacterType)
+	assert.Equal(t, core.CharacterTypeSupportingNPC, bart.CharacterType)
 	assert.Equal(t, "Friendly Barkeep", bart.Aspects.HighConcept)
 	assert.Equal(t, []string{"Knows Everyone"}, bart.Aspects.OtherAspects)
 	assert.Equal(t, dice.Good, bart.Skills["Rapport"])
@@ -224,18 +224,18 @@ npcs:
 
 	// Nameless Fair
 	guard := ls.NPCs[1]
-	assert.Equal(t, character.CharacterTypeNamelessFair, guard.CharacterType)
+	assert.Equal(t, core.CharacterTypeNamelessFair, guard.CharacterType)
 	assert.Equal(t, dice.Fair, guard.Skills["Notice"])
 	assert.Equal(t, dice.Average, guard.Skills["Shoot"])
 
 	// Nameless Good
 	goblin := ls.NPCs[2]
-	assert.Equal(t, character.CharacterTypeNamelessGood, goblin.CharacterType)
+	assert.Equal(t, core.CharacterTypeNamelessGood, goblin.CharacterType)
 	assert.Equal(t, dice.Good, goblin.Skills["Fight"])
 
 	// Nameless Average
 	peasant := ls.NPCs[3]
-	assert.Equal(t, character.CharacterTypeNamelessAverage, peasant.CharacterType)
+	assert.Equal(t, core.CharacterTypeNamelessAverage, peasant.CharacterType)
 }
 
 func TestLoadScenario_WithScene(t *testing.T) {

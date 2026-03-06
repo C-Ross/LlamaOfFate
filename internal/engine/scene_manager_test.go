@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
@@ -36,7 +36,7 @@ func TestSceneManager_StartScene(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
-	player := character.NewCharacter("player1", "Test Character")
+	player := core.NewCharacter("player1", "Test Character")
 
 	testScene := scene.NewScene("scene1", "Test Scene", "A test scene description")
 	err = sm.StartScene(testScene, player)
@@ -75,7 +75,7 @@ func TestSceneManager_BuildContexts(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
-	player := character.NewCharacter("player1", "Test Character")
+	player := core.NewCharacter("player1", "Test Character")
 	player.Aspects.HighConcept = "Brave Warrior"
 	player.Aspects.Trouble = "Quick to Anger"
 
@@ -107,7 +107,7 @@ func TestSceneManager_BuildContexts(t *testing.T) {
 
 func TestBuildCharacterContext_OtherAspects(t *testing.T) {
 	sm := NewSceneManager(nil, nil, nil, session.NullLogger{})
-	player := character.NewCharacter("p1", "Lyra")
+	player := core.NewCharacter("p1", "Lyra")
 	player.Aspects.HighConcept = "Wandering Wizard"
 	player.Aspects.Trouble = "Haunted Past"
 	player.Aspects.AddAspect("Well Connected")
@@ -124,7 +124,7 @@ func TestBuildCharacterContext_OtherAspects(t *testing.T) {
 
 func TestBuildAspectsContext_FreeInvokes(t *testing.T) {
 	sm := NewSceneManager(nil, nil, nil, session.NullLogger{})
-	player := character.NewCharacter("p1", "Hero")
+	player := core.NewCharacter("p1", "Hero")
 	player.Aspects.HighConcept = "Bold Knight"
 	testScene := scene.NewScene("s1", "Hall", "A great hall")
 	testScene.SituationAspects = append(testScene.SituationAspects, scene.SituationAspect{
@@ -191,7 +191,7 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player1", "Test Character")
+	player := core.NewCharacter("player1", "Test Character")
 	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
 	err = sm.StartScene(testScene, player)
 	require.NoError(t, err)
@@ -236,7 +236,7 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage_WithLLM(t *testing.T) {
 
 	sm := engine.GetSceneManager()
 
-	player := character.NewCharacter("player1", "Test Character")
+	player := core.NewCharacter("player1", "Test Character")
 	player.SetSkill("Athletics", dice.Good)
 	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
 	err = sm.StartScene(testScene, player)
@@ -276,7 +276,7 @@ func TestActionResolver_ApplyActionEffects_Overcome_NoMechanicalEffect(t *testin
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player1", "Test Character")
+	player := core.NewCharacter("player1", "Test Character")
 	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
 	err = sm.StartScene(testScene, player)
 	require.NoError(t, err)
@@ -296,7 +296,7 @@ func TestActionResolver_ApplyActionEffects_NilOutcome_ReturnsNil(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player1", "Test Character")
+	player := core.NewCharacter("player1", "Test Character")
 	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
 	err = sm.StartScene(testScene, player)
 	require.NoError(t, err)
@@ -336,11 +336,11 @@ func TestActionResolver_ResolveAction_ActiveOpposition_Overcome(t *testing.T) {
 	sm := NewSceneManager(engine, mockLLM, engine.actionParser, session.NullLogger{})
 	sm.actions.roller = dice.NewSeededRoller(42) // Predictable rolls
 
-	player := character.NewCharacter("player1", "Sneaky Rogue")
+	player := core.NewCharacter("player1", "Sneaky Rogue")
 	player.SetSkill("Stealth", dice.Good)
 	engine.AddCharacter(player)
 
-	guard := character.NewCharacter("guard-1", "Stern Guard")
+	guard := core.NewCharacter("guard-1", "Stern Guard")
 	guard.SetSkill("Notice", dice.Fair) // +2
 	engine.AddCharacter(guard)
 
@@ -383,11 +383,11 @@ func TestActionResolver_ResolveAction_ActiveOpposition_CreateAdvantage(t *testin
 	sm := NewSceneManager(engine, mockLLM, engine.actionParser, session.NullLogger{})
 	sm.actions.roller = dice.NewSeededRoller(99)
 
-	player := character.NewCharacter("player1", "Observant Detective")
+	player := core.NewCharacter("player1", "Observant Detective")
 	player.SetSkill("Empathy", dice.Good)
 	engine.AddCharacter(player)
 
-	merchant := character.NewCharacter("merchant-1", "Cagey Merchant")
+	merchant := core.NewCharacter("merchant-1", "Cagey Merchant")
 	merchant.SetSkill("Deceive", dice.Good) // +3
 	engine.AddCharacter(merchant)
 
@@ -418,7 +418,7 @@ func TestActionResolver_ResolveAction_ActiveOpposition_NPCNotFound(t *testing.T)
 	sm := NewSceneManager(engine, mockLLM, engine.actionParser, session.NullLogger{})
 	sm.actions.roller = dice.NewSeededRoller(42)
 
-	player := character.NewCharacter("player1", "Test Hero")
+	player := core.NewCharacter("player1", "Test Hero")
 	player.SetSkill("Stealth", dice.Good)
 	engine.AddCharacter(player)
 
@@ -454,12 +454,12 @@ func TestActionResolver_ResolveAction_PassiveOpposition_NoNPCRoll(t *testing.T) 
 	sm := NewSceneManager(engine, mockLLM, engine.actionParser, session.NullLogger{})
 	sm.actions.roller = dice.NewSeededRoller(42)
 
-	player := character.NewCharacter("player1", "Test Hero")
+	player := core.NewCharacter("player1", "Test Hero")
 	player.SetSkill("Athletics", dice.Good)
 	engine.AddCharacter(player)
 
 	// NPC present but not opposing
-	guard := character.NewCharacter("guard-1", "Guard")
+	guard := core.NewCharacter("guard-1", "Guard")
 	guard.SetSkill("Notice", dice.Fair)
 	engine.AddCharacter(guard)
 
@@ -491,7 +491,7 @@ func TestActionResolver_GenerateAspectName_Fallback(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player1", "Test Character")
+	player := core.NewCharacter("player1", "Test Character")
 	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
 	err = sm.StartScene(testScene, player)
 	require.NoError(t, err)
@@ -511,7 +511,7 @@ func TestActionResolver_GenerateAspectName_SuccessWithStyle_TwoFreeInvokes(t *te
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player1", "Test Character")
+	player := core.NewCharacter("player1", "Test Character")
 	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
 	err = sm.StartScene(testScene, player)
 	require.NoError(t, err)
@@ -532,7 +532,7 @@ func TestSceneManager_GetCurrentScene(t *testing.T) {
 
 	assert.Nil(t, sm.GetCurrentScene())
 
-	player := character.NewCharacter("player1", "Test Character")
+	player := core.NewCharacter("player1", "Test Character")
 	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
 	err = sm.StartScene(testScene, player)
 	require.NoError(t, err)
@@ -550,7 +550,7 @@ func TestSceneManager_GetPlayer(t *testing.T) {
 
 	assert.Nil(t, sm.GetPlayer())
 
-	player := character.NewCharacter("player1", "Test Character")
+	player := core.NewCharacter("player1", "Test Character")
 	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
 	err = sm.StartScene(testScene, player)
 	require.NoError(t, err)
@@ -578,13 +578,13 @@ func TestSceneManager_OtherCharactersInTemplateData(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	// Create test characters
-	player := character.NewCharacter("player1", "Player Character")
+	player := core.NewCharacter("player1", "Player Character")
 	player.Aspects.HighConcept = "Brave Hero"
 
-	npc1 := character.NewCharacter("npc1", "Guard Captain")
+	npc1 := core.NewCharacter("npc1", "Guard Captain")
 	npc1.Aspects.HighConcept = "Experienced Soldier"
 
-	npc2 := character.NewCharacter("npc2", "Merchant")
+	npc2 := core.NewCharacter("npc2", "Merchant")
 	npc2.Aspects.HighConcept = "Shrewd Trader"
 
 	// Add characters to engine
@@ -624,10 +624,10 @@ func TestSceneManager_GenerateActionNarrativeWithTarget(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	// Create test characters
-	player := character.NewCharacter("player1", "Player Character")
+	player := core.NewCharacter("player1", "Player Character")
 	player.Aspects.HighConcept = "Brave Hero"
 
-	enemy := character.NewCharacter("enemy1", "Orc Warrior")
+	enemy := core.NewCharacter("enemy1", "Orc Warrior")
 	enemy.Aspects.HighConcept = "Brutal Fighter"
 
 	// Add characters to engine
@@ -675,7 +675,7 @@ func TestSceneManager_GenerateActionNarrativeWithoutTarget(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	// Create test character
-	player := character.NewCharacter("player1", "Player Character")
+	player := core.NewCharacter("player1", "Player Character")
 	player.Aspects.HighConcept = "Brave Hero"
 
 	// Add character to engine
@@ -716,7 +716,7 @@ func TestEngine_GetCharacterByName_ExactMatch(t *testing.T) {
 	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	npc := character.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
+	npc := core.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
 	engine.AddCharacter(npc)
 
 	result := engine.GetCharacterByName("Bart the Outlaw")
@@ -729,7 +729,7 @@ func TestEngine_GetCharacterByName_CaseInsensitive(t *testing.T) {
 	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	npc := character.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
+	npc := core.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
 	engine.AddCharacter(npc)
 
 	result := engine.GetCharacterByName("bart the outlaw")
@@ -745,7 +745,7 @@ func TestEngine_GetCharacterByName_Trimmed(t *testing.T) {
 	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	npc := character.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
+	npc := core.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
 	engine.AddCharacter(npc)
 
 	result := engine.GetCharacterByName("  Bart the Outlaw  ")
@@ -757,7 +757,7 @@ func TestEngine_GetCharacterByName_NoMatch(t *testing.T) {
 	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	npc := character.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
+	npc := core.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
 	engine.AddCharacter(npc)
 
 	result := engine.GetCharacterByName("Nobody")
@@ -769,7 +769,7 @@ func TestEngine_GetCharacterByName_IDDoesNotMatch(t *testing.T) {
 	engine, err := New(session.NullLogger{})
 	require.NoError(t, err)
 
-	npc := character.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
+	npc := core.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
 	engine.AddCharacter(npc)
 
 	// ID-based lookup fails with a name
@@ -833,7 +833,7 @@ func TestProcessInput_NarrativeRoutesToDialog(t *testing.T) {
 	sm.conflict.currentScene = testScene
 	sm.actions.currentScene = testScene
 
-	player := character.NewCharacter("player-1", "Test Player")
+	player := core.NewCharacter("player-1", "Test Player")
 	sm.player = player
 	sm.conflict.player = player
 	sm.actions.player = player
@@ -850,7 +850,7 @@ func TestSceneManager_StartScene_ClearsConversationHistory(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(gameEngine, gameEngine.llmClient, gameEngine.actionParser, session.NullLogger{})
-	player := character.NewCharacter("player1", "Test Character")
+	player := core.NewCharacter("player1", "Test Character")
 
 	// Restore with conversation history (simulating a previous scene)
 	firstScene := scene.NewScene("scene1", "First Scene", "First scene desc")
@@ -883,9 +883,9 @@ func TestHandleInput_DialogReturnsDialogEvent(t *testing.T) {
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
 	sm.actions.currentScene = testScene
-	sm.player = character.NewCharacter("player-1", "Hero")
-	sm.conflict.player = character.NewCharacter("player-1", "Hero")
-	sm.actions.player = character.NewCharacter("player-1", "Hero")
+	sm.player = core.NewCharacter("player-1", "Hero")
+	sm.conflict.player = core.NewCharacter("player-1", "Hero")
+	sm.actions.player = core.NewCharacter("player-1", "Hero")
 
 	result, err := sm.HandleInput(context.Background(), "I greet the bartender")
 	require.NoError(t, err)
@@ -915,9 +915,9 @@ func TestHandleInput_DialogWithSceneTransition(t *testing.T) {
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
 	sm.actions.currentScene = testScene
-	sm.player = character.NewCharacter("player-1", "Hero")
-	sm.conflict.player = character.NewCharacter("player-1", "Hero")
-	sm.actions.player = character.NewCharacter("player-1", "Hero")
+	sm.player = core.NewCharacter("player-1", "Hero")
+	sm.conflict.player = core.NewCharacter("player-1", "Hero")
+	sm.actions.player = core.NewCharacter("player-1", "Hero")
 
 	result, err := sm.HandleInput(context.Background(), "I leave the tavern")
 	require.NoError(t, err)
@@ -955,9 +955,9 @@ func TestHandleInput_ActionPath_ReturnsEvents(t *testing.T) {
 	sm.actions.roller = dice.NewSeededRoller(12345)
 	testScene := scene.NewScene("arena", "Arena", "A fighting arena")
 
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	player.SetSkill("Fight", 2)
-	enemy := character.NewCharacter("goblin-1", "Goblin")
+	enemy := core.NewCharacter("goblin-1", "Goblin")
 	enemy.SetSkill("Fight", 1)
 
 	engine.AddCharacter(player)
@@ -991,9 +991,9 @@ func TestHandleInput_ClassificationFallbackToDialog(t *testing.T) {
 	sm.currentScene = testScene
 	sm.conflict.currentScene = testScene
 	sm.actions.currentScene = testScene
-	sm.player = character.NewCharacter("player-1", "Hero")
-	sm.conflict.player = character.NewCharacter("player-1", "Hero")
-	sm.actions.player = character.NewCharacter("player-1", "Hero")
+	sm.player = core.NewCharacter("player-1", "Hero")
+	sm.conflict.player = core.NewCharacter("player-1", "Hero")
+	sm.actions.player = core.NewCharacter("player-1", "Hero")
 
 	result, err := sm.HandleInput(context.Background(), "I look around")
 	require.NoError(t, err)
@@ -1027,7 +1027,7 @@ func TestHandleInput_DialogWithChallengeMarker_InitiatesChallenge(t *testing.T) 
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	testScene := scene.NewScene("vault", "Vault", "A massive vault")
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	player.SetSkill("Athletics", dice.Good)
 	player.SetSkill("Stealth", dice.Fair)
 	player.SetSkill("Burglary", dice.Great)
@@ -1080,7 +1080,7 @@ func TestHandleInput_ActionDuringChallenge_ResolvesTask(t *testing.T) {
 	sm.actions.roller = dice.NewSeededRoller(42)
 
 	testScene := scene.NewScene("vault", "Vault", "A massive vault")
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	player.SetSkill("Athletics", dice.Good) // +3
 	engine.AddCharacter(player)
 	testScene.AddCharacter(player.ID)
@@ -1132,7 +1132,7 @@ func TestHandleInput_ActionDuringChallenge_CompletesChallenge(t *testing.T) {
 	sm.actions.roller = dice.NewSeededRoller(42)
 
 	testScene := scene.NewScene("vault", "Vault", "A massive vault")
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	player.SetSkill("Stealth", dice.Fair) // +2
 	engine.AddCharacter(player)
 	testScene.AddCharacter(player.ID)

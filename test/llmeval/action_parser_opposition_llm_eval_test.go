@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/stretchr/testify/assert"
@@ -19,7 +19,7 @@ type OppositionTestCase struct {
 	Name               string
 	RawInput           string
 	Context            string
-	OtherCharacters    []*character.Character
+	OtherCharacters    []*core.Character
 	ExpectedOpposition string   // "active" or "passive"
 	ValidOpposingNPCs  []string // Acceptable NPC IDs if active (empty for passive)
 	ValidOpposingSkill []string // Acceptable opposing skills if active (empty for passive)
@@ -41,8 +41,8 @@ type OppositionEvalResult struct {
 }
 
 // getOppositionNPCs creates NPCs with distinct skills for opposition testing
-func getOppositionNPCs() []*character.Character {
-	guard := character.NewCharacter("tavern-guard", "Tavern Guard")
+func getOppositionNPCs() []*core.Character {
+	guard := core.NewCharacter("tavern-guard", "Tavern Guard")
 	guard.Aspects.HighConcept = "Alert Doorman"
 	guard.Aspects.Trouble = "Easily Bribed"
 	guard.SetSkill("Notice", dice.Good)
@@ -50,7 +50,7 @@ func getOppositionNPCs() []*character.Character {
 	guard.SetSkill("Physique", dice.Fair)
 	guard.SetSkill("Will", dice.Average)
 
-	merchant := character.NewCharacter("scene_1_npc_0", "Grizzled Merchant")
+	merchant := core.NewCharacter("scene_1_npc_0", "Grizzled Merchant")
 	merchant.Aspects.HighConcept = "Shrewd Trader With a Sharp Eye"
 	merchant.Aspects.Trouble = "Trusts No One"
 	merchant.SetSkill("Empathy", dice.Good)
@@ -59,14 +59,14 @@ func getOppositionNPCs() []*character.Character {
 	merchant.SetSkill("Notice", dice.Fair)
 	merchant.SetSkill("Deceive", dice.Average)
 
-	librarian := character.NewCharacter("old-librarian", "Elder Librarian")
+	librarian := core.NewCharacter("old-librarian", "Elder Librarian")
 	librarian.Aspects.HighConcept = "Keeper of Forbidden Knowledge"
 	librarian.Aspects.Trouble = "Fiercely Protective of the Collection"
 	librarian.SetSkill("Lore", dice.Great)
 	librarian.SetSkill("Will", dice.Good)
 	librarian.SetSkill("Notice", dice.Fair)
 
-	return []*character.Character{guard, merchant, librarian}
+	return []*core.Character{guard, merchant, librarian}
 }
 
 // getActiveOppositionTestCases returns test cases where an NPC should actively oppose
@@ -211,11 +211,11 @@ func getPassiveOppositionTestCases() []OppositionTestCase {
 // but the LLM picked Raven (an info broker NPC) as active opposition.
 func getNarrativeHazardTestCases() []OppositionTestCase {
 	// Only NPC is an info broker — unrelated to the hazard
-	raven := character.NewCharacter("scene_1_npc_0", "Raven")
+	raven := core.NewCharacter("scene_1_npc_0", "Raven")
 	raven.Aspects.HighConcept = "Street-Savvy Information Broker"
 	// intentionally no skills set — skills: {}
 
-	npcs := []*character.Character{raven}
+	npcs := []*core.Character{raven}
 
 	return []OppositionTestCase{
 		{
@@ -255,7 +255,7 @@ func getNarrativeHazardTestCases() []OppositionTestCase {
 }
 
 // evaluateOppositionTestCase runs a single opposition test case
-func evaluateOppositionTestCase(ctx context.Context, parser engine.ActionParser, char *character.Character, tc OppositionTestCase) OppositionEvalResult {
+func evaluateOppositionTestCase(ctx context.Context, parser engine.ActionParser, char *core.Character, tc OppositionTestCase) OppositionEvalResult {
 	req := engine.ActionParseRequest{
 		Character:       char,
 		RawInput:        tc.RawInput,
