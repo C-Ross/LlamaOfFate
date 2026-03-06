@@ -116,6 +116,28 @@ for _, r := range results {
 
 ## Running Tests
 
+```bash
+# Run all tests (requires AZURE_API_ENDPOINT and AZURE_API_KEY)
+just test-llm
+
+# Run tests and track results for flakiness analysis
+just test-llm-track
+
+# Run specific test N times and track each run
+just test-llm-track-n TestName 5
+
+# View stability report
+just test-llm-report
+
+# View only flaky tests
+just test-llm-flaky
+
+# Fetch results from CI and combine with local results
+just test-llm-fetch
+```
+
+### Direct go test commands
+
 All commands tee output to a temp file for review and tail the last lines to
 keep terminal output manageable:
 
@@ -131,6 +153,9 @@ VERBOSE=1 go test -tags=llmeval -run TestName ./test/llmeval/ \
 # Run all llmeval tests
 go test -v -tags=llmeval ./test/llmeval/ -timeout 10m \
   2>&1 | tee /tmp/llmeval_results.txt | tail -3
+
+# Run tests with JSON output for tracking
+go test -v -json -tags=llmeval ./test/llmeval/ | go run ./cmd/llmeval-tracker record
 ```
 
 ### Reviewing Results
