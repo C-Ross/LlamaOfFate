@@ -330,6 +330,11 @@ func (c *Character) GetSkill(skillName string) dice.Ladder {
 
 // SetSkill sets a character's skill level and recalculates stress tracks when
 // Physique or Will changes, keeping them in sync with the new skill rating.
+//
+// NOTE: String literals are used here instead of core.SkillPhysique / core.SkillWill
+// because importing core from the character package would create a circular
+// dependency (core already imports character). The init() validation in
+// core/skills.go guarantees these names stay consistent with the canonical list.
 func (c *Character) SetSkill(skillName string, level dice.Ladder) {
 	c.Skills[skillName] = level
 	c.UpdatedAt = time.Now()

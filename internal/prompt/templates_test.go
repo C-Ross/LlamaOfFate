@@ -2,8 +2,11 @@ package prompt
 
 import (
 	"bytes"
+	"regexp"
+	"sort"
 	"testing"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
@@ -649,4 +652,27 @@ func TestRenderScenarioResolution(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, result, "The Conspiracy")
 	assert.Contains(t, result, "A secret society controls the city government")
+}
+
+// TestActionParseSystemPrompt_SkillsMatchCanonicalList verifies that the skill
+// names listed in the action parse system prompt exactly match the canonical
+// FateCoreSkills list. This catches drift between the prompt template and the
+// authoritative skill list in internal/core/skills_list.go.
+func TestActionParseSystemPrompt_SkillsMatchCanonicalList(t *testing.T) {
+	result, err := RenderActionParseSystem(ActionParseSystemData{HasOtherCharacters: true})
+	require.NoError(t, err)
+
+	// The template lists skills as "- SkillName: description"
+	re := regexp.MustCompile(`(?m)^- ([A-Z][a-z]+): `)
+	matches := re.FindAllStringSubmatch(result, -1)
+	require.NotEmpty(t, matches, "no skills found in rendered prompt — regex may need updating")
+
+	var templateSkills []string
+	for _, m := range matches {
+		templateSkills = append(templateSkills, m[1])
+	}
+	sort.Strings(templateSkills)
+
+	assert.Equal(t, core.FateCoreSkills, templateSkills,
+		"skills in action_parse_system_prompt.tmpl must match core.FateCoreSkills")
 }

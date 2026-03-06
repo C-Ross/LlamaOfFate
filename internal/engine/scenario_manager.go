@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
@@ -723,8 +724,8 @@ func (m *ScenarioManager) handleBetweenSceneRecovery(ctx context.Context) []Game
 func (m *ScenarioManager) bestRecoverySkill(conseq character.Consequence) (string, dice.Ladder) {
 	// Determine which skills could help based on consequence aspect context
 	// Physical keywords suggest physical recovery, otherwise mental
-	physicalSkills := []string{"Lore", "Crafts", "Will"}
-	mentalSkills := []string{"Empathy", "Rapport", "Will"}
+	physicalSkills := []string{core.SkillLore, core.SkillCrafts, core.SkillWill}
+	mentalSkills := []string{core.SkillEmpathy, core.SkillRapport, core.SkillWill}
 
 	var candidates []string
 	switch conseq.Duration {
@@ -739,8 +740,8 @@ func (m *ScenarioManager) bestRecoverySkill(conseq character.Consequence) (strin
 	// Also try mental skills
 	candidates = append(candidates, mentalSkills...)
 
-	bestSkill := "Will"
-	bestLevel := m.player.GetSkill("Will")
+	bestSkill := core.SkillWill
+	bestLevel := m.player.GetSkill(core.SkillWill)
 
 	for _, skill := range candidates {
 		level := m.player.GetSkill(skill)

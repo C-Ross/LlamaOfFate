@@ -190,7 +190,7 @@ func (cm *ConflictManager) processNPCDefend(ctx context.Context, npc *character.
 func (cm *ConflictManager) processNPCCreateAdvantage(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) []GameEvent {
 	skill := decision.Skill
 	if skill == "" {
-		skill = "Notice" // Default
+		skill = core.SkillNotice // Default
 	}
 
 	// Get NPC's skill level
@@ -272,7 +272,7 @@ func (cm *ConflictManager) processNPCCreateAdvantage(ctx context.Context, npc *c
 func (cm *ConflictManager) processNPCOvercome(ctx context.Context, npc *character.Character, decision *prompt.NPCActionDecision) []GameEvent {
 	skill := decision.Skill
 	if skill == "" {
-		skill = "Athletics" // Default
+		skill = core.SkillAthletics // Default
 	}
 
 	// Get NPC's skill level

@@ -4,41 +4,61 @@
 package core
 
 import (
+	"fmt"
+
 	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 )
 
+func init() {
+	// Verify that every skill referenced in classification maps is a valid
+	// Fate Core skill. This catches typos and drift at startup.
+	maps := []map[string]bool{
+		physicalAttackSkills,
+		mentalAttackSkills,
+		physicalConflictSkills,
+		mentalConflictSkills,
+	}
+	for _, m := range maps {
+		for skill := range m {
+			if !IsValidSkill(skill) {
+				panic(fmt.Sprintf("core: skill classification references unknown skill %q", skill))
+			}
+		}
+	}
+}
+
 // physicalAttackSkills are skills that deal physical stress when used to attack
 var physicalAttackSkills = map[string]bool{
-	"Fight":    true,
-	"Shoot":    true,
-	"Physique": true,
+	SkillFight:    true,
+	SkillShoot:    true,
+	SkillPhysique: true,
 }
 
 // mentalAttackSkills are skills that deal mental stress when used to attack
 var mentalAttackSkills = map[string]bool{
-	"Provoke": true,
-	"Deceive": true,
-	"Rapport": true,
-	"Lore":    true, // Supernatural/magic attacks target mental stress
+	SkillProvoke: true,
+	SkillDeceive: true,
+	SkillRapport: true,
+	SkillLore:    true, // Supernatural/magic attacks target mental stress
 }
 
 // physicalConflictSkills trigger or indicate physical conflicts
 var physicalConflictSkills = map[string]bool{
-	"Fight":     true,
-	"Shoot":     true,
-	"Athletics": true,
-	"Physique":  true,
+	SkillFight:     true,
+	SkillShoot:     true,
+	SkillAthletics: true,
+	SkillPhysique:  true,
 }
 
 // mentalConflictSkills trigger or indicate mental conflicts
 var mentalConflictSkills = map[string]bool{
-	"Provoke": true,
-	"Deceive": true,
-	"Rapport": true,
-	"Will":    true,
-	"Empathy": true,
+	SkillProvoke: true,
+	SkillDeceive: true,
+	SkillRapport: true,
+	SkillWill:    true,
+	SkillEmpathy: true,
 }
 
 // DefenseSkillForAttack returns the appropriate defense skill for an attack skill.
@@ -47,13 +67,13 @@ var mentalConflictSkills = map[string]bool{
 // - Mental/social attacks (Provoke, Deceive, Rapport, Lore) are defended with Will
 func DefenseSkillForAttack(attackSkill string) string {
 	if physicalAttackSkills[attackSkill] {
-		return "Athletics"
+		return SkillAthletics
 	}
 	if mentalAttackSkills[attackSkill] {
-		return "Will"
+		return SkillWill
 	}
 	// Default to Athletics for unknown attack types
-	return "Athletics"
+	return SkillAthletics
 }
 
 // StressTypeForAttack determines which stress track an attack skill targets.
@@ -98,9 +118,9 @@ func IsMentalAttackSkill(skill string) bool {
 // - Mental conflicts: Empathy, then Rapport as fallback
 func InitiativeSkillsForConflict(conflictType scene.ConflictType) []string {
 	if conflictType == scene.PhysicalConflict {
-		return []string{"Notice", "Athletics"}
+		return []string{SkillNotice, SkillAthletics}
 	}
-	return []string{"Empathy", "Rapport"}
+	return []string{SkillEmpathy, SkillRapport}
 }
 
 // SkillGetter is an interface for types that can retrieve skill values.
@@ -126,9 +146,9 @@ func CalculateInitiative(char SkillGetter, conflictType scene.ConflictType) int 
 // - Mental conflicts default to Provoke
 func DefaultAttackSkillForConflict(conflictType scene.ConflictType) string {
 	if conflictType == scene.MentalConflict {
-		return "Provoke"
+		return SkillProvoke
 	}
-	return "Fight"
+	return SkillFight
 }
 
 // ConcessionFatePoints returns the number of fate points awarded for conceding a conflict.
