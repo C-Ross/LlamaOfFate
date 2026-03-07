@@ -60,16 +60,23 @@ package llmeval_test
 ```
 
 ### Config and Client Setup
-
-**Use `RequireLLMClient()` helper** (in `evaltest_helpers_test.go`):
+Use `RequireLLMClient()` from `evaltest_helpers_test.go` to get an LLM client. Supports both Ollama (local) and Azure:
 ```go
+// In test/llmeval/evaltest_helpers_test.go:
+// RequireLLMClient returns a ready-to-use LLM client, using either Ollama or
+// Azure depending on configuration. Set LLM_PROVIDER=ollama to use a local
+// Ollama instance; otherwise Azure credentials are required.
+func RequireLLMClient(tb testing.TB) llm.LLMClient
+
+// In your test:
 client := RequireLLMClient(t)
 ctx := context.Background()
 ```
 
-This supports both Azure and Ollama backends:
-- **Azure** (default): Requires `AZURE_API_ENDPOINT` and `AZURE_API_KEY` env vars, uses `configs/azure-llm.yaml`
-- **Ollama** (local): Set `LLM_PROVIDER=ollama`, uses `configs/ollama-llm.yaml`
+The helper automatically:
+- Uses Ollama if `LLM_PROVIDER=ollama` is set (loads `configs/ollama-llm.yaml`)
+- Falls back to Azure (requires `AZURE_API_ENDPOINT` and `AZURE_API_KEY`)
+- Skips the test if no provider is configured
 
 Manual setup (if needed):
 ```go

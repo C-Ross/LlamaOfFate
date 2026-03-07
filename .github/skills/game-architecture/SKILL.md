@@ -139,6 +139,8 @@ initiateChallenge(type) → ChallengeGenerator.Generate() → builds tasks
 
 Challenge data stored in `scene.Challenge`. Each task has skill, difficulty, status (pending/success/failure).
 
+**Difficulty Enforcement**: `EnforceTaskDifficulty(action)` replaces the LLM-provided difficulty with the stored challenge task difficulty when the action's skill matches a pending task. This ensures deterministic resolution regardless of LLM variance. Called by `SceneManager.handleAction()` after parsing, before dice rolling.
+
 ## Conflict System (`conflict.go`)
 
 Methods on `SceneManager`. Triggered by `[CONFLICT_START:]` markers or player Attack actions.
