@@ -400,6 +400,7 @@ export interface ChallengeCompleteEventData {
   Failures: number
   Ties: number
   Overall: string
+  Narrative: string
 }
 
 // ---------------------------------------------------------------------------
@@ -472,8 +473,6 @@ export type GameEventType =
   | "challenge_complete"
   | "session_init"
   | "result_meta"
-  | "setup_request"
-  | "setup_generating"
 
 /** A parsed game event with its type tag and data. */
 export interface GameEvent {

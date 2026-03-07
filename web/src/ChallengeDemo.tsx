@@ -228,6 +228,7 @@ const challengeCompleteEvent: GameEvent = {
     Failures: 1,
     Ties: 1,
     Overall: "partial",
+    Narrative: "The tower shudders as the ward partially unravels — enough to weaken the barrier, but not enough to break it cleanly.",
   } satisfies ChallengeCompleteEventData,
 }
 
