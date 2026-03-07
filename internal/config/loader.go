@@ -1,10 +1,10 @@
 // Package config loads scenario and character definitions from YAML files.
 //
 // YAML files live under configs/scenarios/ and configs/characters/. The loader
-// converts them into the core domain types (scene.Scenario, character.Character,
+// converts them into the core domain types (scene.Scenario, core.Character,
 // etc.) used by the rest of the codebase.
 //
-// Character YAML files unmarshal directly into character.Character (which carries
+// Character YAML files unmarshal directly into core.Character (which carries
 // yaml struct tags). The loader then calls InitDefaults() to set up runtime
 // fields (stress tracks, timestamps, etc.) that are not stored on disk.
 package config
@@ -17,14 +17,14 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 )
 
 // ---------- YAML data shapes -------------------------------------------------
 //
-// Character YAML unmarshals directly into character.Character — no wrapper needed.
+// Character YAML unmarshals directly into core.Character — no wrapper needed.
 // The types below cover scenario-level structures that have no direct domain equivalent.
 
 // ScenarioFile is the on-disk YAML shape for a scenario.
@@ -64,8 +64,8 @@ type LoadedScenario struct {
 
 	// Converted domain objects.
 	Scenario *scene.Scenario
-	Player   *character.Character // nil when DefaultPlayer is empty
-	NPCs     []*character.Character
+	Player   *core.Character // nil when DefaultPlayer is empty
+	NPCs     []*core.Character
 	Scene    *scene.Scene // nil when InitialScene is absent
 	Farewell string       // scenario-level farewell message
 }
@@ -73,14 +73,14 @@ type LoadedScenario struct {
 // ---------- Public loader functions -------------------------------------------
 
 // LoadCharacter reads a single character YAML file and returns a Character.
-// The YAML is unmarshaled directly into character.Character, then InitDefaults
+// The YAML is unmarshaled directly into core.Character, then InitDefaults
 // is called to set up stress tracks and other runtime fields.
-func LoadCharacter(path string) (*character.Character, error) {
+func LoadCharacter(path string) (*core.Character, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read character file %s: %w", path, err)
 	}
-	var c character.Character
+	var c core.Character
 	if err := yaml.Unmarshal(data, &c); err != nil {
 		return nil, fmt.Errorf("parse character file %s: %w", path, err)
 	}
@@ -90,12 +90,12 @@ func LoadCharacter(path string) (*character.Character, error) {
 
 // LoadCharacters reads all .yaml files in a directory and returns a map keyed
 // by character ID.
-func LoadCharacters(dir string) (map[string]*character.Character, error) {
+func LoadCharacters(dir string) (map[string]*core.Character, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("read characters directory %s: %w", dir, err)
 	}
-	chars := make(map[string]*character.Character)
+	chars := make(map[string]*core.Character)
 	for _, e := range entries {
 		if e.IsDir() || !isYAML(e.Name()) {
 			continue
@@ -125,7 +125,7 @@ func LoadScenarioFile(path string) (*ScenarioFile, error) {
 // LoadScenario reads a scenario YAML and resolves its DefaultPlayer from the
 // provided character map. Pass nil for characters if you don't need player
 // resolution.
-func LoadScenario(path string, characters map[string]*character.Character) (*LoadedScenario, error) {
+func LoadScenario(path string, characters map[string]*core.Character) (*LoadedScenario, error) {
 	sf, err := LoadScenarioFile(path)
 	if err != nil {
 		return nil, err
@@ -165,7 +165,7 @@ func LoadAll(configRoot string) (map[string]*LoadedScenario, error) {
 
 // ---------- Internal helpers --------------------------------------------------
 
-func resolveScenario(sf *ScenarioFile, characters map[string]*character.Character) (*LoadedScenario, error) {
+func resolveScenario(sf *ScenarioFile, characters map[string]*core.Character) (*LoadedScenario, error) {
 	ls := &LoadedScenario{Raw: *sf}
 
 	// Build core Scenario
@@ -208,32 +208,32 @@ func resolveScenario(sf *ScenarioFile, characters map[string]*character.Characte
 	return ls, nil
 }
 
-func buildNPC(nd NPCDef) (*character.Character, error) {
-	var npc *character.Character
+func buildNPC(nd NPCDef) (*core.Character, error) {
+	var npc *core.Character
 
 	switch nd.Type {
 	case "supporting":
-		npc = character.NewSupportingNPC(nd.ID, nd.Name, nd.HighConcept)
+		npc = core.NewSupportingNPC(nd.ID, nd.Name, nd.HighConcept)
 	case "nameless_good":
 		if nd.PrimarySkill == "" {
 			return nil, fmt.Errorf("nameless NPC requires primary_skill")
 		}
-		npc = character.NewNamelessNPC(nd.ID, nd.Name, character.CharacterTypeNamelessGood, nd.PrimarySkill)
+		npc = core.NewNamelessNPC(nd.ID, nd.Name, core.CharacterTypeNamelessGood, nd.PrimarySkill)
 		npc.Aspects.HighConcept = nd.HighConcept
 	case "nameless_fair":
 		if nd.PrimarySkill == "" {
 			return nil, fmt.Errorf("nameless NPC requires primary_skill")
 		}
-		npc = character.NewNamelessNPC(nd.ID, nd.Name, character.CharacterTypeNamelessFair, nd.PrimarySkill)
+		npc = core.NewNamelessNPC(nd.ID, nd.Name, core.CharacterTypeNamelessFair, nd.PrimarySkill)
 		npc.Aspects.HighConcept = nd.HighConcept
 	case "nameless_average":
 		if nd.PrimarySkill == "" {
 			return nil, fmt.Errorf("nameless NPC requires primary_skill")
 		}
-		npc = character.NewNamelessNPC(nd.ID, nd.Name, character.CharacterTypeNamelessAverage, nd.PrimarySkill)
+		npc = core.NewNamelessNPC(nd.ID, nd.Name, core.CharacterTypeNamelessAverage, nd.PrimarySkill)
 		npc.Aspects.HighConcept = nd.HighConcept
 	case "main":
-		npc = character.NewMainNPC(nd.ID, nd.Name)
+		npc = core.NewMainNPC(nd.ID, nd.Name)
 		npc.Aspects.HighConcept = nd.HighConcept
 	default:
 		return nil, fmt.Errorf("unknown NPC type %q", nd.Type)

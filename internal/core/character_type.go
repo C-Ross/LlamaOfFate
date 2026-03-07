@@ -1,4 +1,4 @@
-package character
+package core
 
 import "github.com/C-Ross/LlamaOfFate/internal/core/dice"
 

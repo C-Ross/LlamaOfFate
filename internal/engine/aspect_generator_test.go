@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/stretchr/testify/assert"
@@ -33,7 +33,7 @@ func TestGenerateAspect_Success(t *testing.T) {
 	generator := NewAspectGenerator(mockClient)
 
 	// Create test data
-	char := character.NewCharacter("test-char", "Test Hero")
+	char := core.NewCharacter("test-char", "Test Hero")
 	char.Aspects.HighConcept = "Agile Fighter"
 	char.Aspects.Trouble = "Reckless in Combat"
 	char.SetSkill("Athletics", dice.Good)
@@ -78,7 +78,7 @@ func TestGenerateAspect_SuccessWithStyle(t *testing.T) {
 
 	generator := NewAspectGenerator(mockClient)
 
-	char := character.NewCharacter("test-char", "Test Hero")
+	char := core.NewCharacter("test-char", "Test Hero")
 	char.SetSkill("Athletics", dice.Great)
 
 	testAction := action.NewAction("test-action", "test-char", action.CreateAdvantage, "Athletics", "Parkour to perfect position")
@@ -121,7 +121,7 @@ func TestGenerateAspect_Tie(t *testing.T) {
 
 	generator := NewAspectGenerator(mockClient)
 
-	char := character.NewCharacter("test-char", "Test Hero")
+	char := core.NewCharacter("test-char", "Test Hero")
 	char.SetSkill("Deceive", dice.Fair)
 
 	testAction := action.NewAction("test-action", "test-char", action.CreateAdvantage, "Deceive", "Create a distraction")
@@ -157,7 +157,7 @@ func TestGenerateAspect_Failure(t *testing.T) {
 
 	generator := NewAspectGenerator(mockClient)
 
-	char := character.NewCharacter("test-char", "Test Hero")
+	char := core.NewCharacter("test-char", "Test Hero")
 	char.SetSkill("Athletics", dice.Average)
 
 	testAction := action.NewAction("test-action", "test-char", action.CreateAdvantage, "Athletics", "Attempt to scale wall")
@@ -194,7 +194,7 @@ func TestGenerateAspect_WrongActionType(t *testing.T) {
 	mockClient := newTestLLMClient()
 	generator := NewAspectGenerator(mockClient)
 
-	char := character.NewCharacter("test-char", "Test Hero")
+	char := core.NewCharacter("test-char", "Test Hero")
 	testAction := action.NewAction("test-action", "test-char", action.Attack, "Fight", "Punch the orc")
 
 	result := &dice.CheckResult{FinalValue: dice.Good}
@@ -216,7 +216,7 @@ func TestGenerateAspect_NilOutcome(t *testing.T) {
 	mockClient := newTestLLMClient()
 	generator := NewAspectGenerator(mockClient)
 
-	char := character.NewCharacter("test-char", "Test Hero")
+	char := core.NewCharacter("test-char", "Test Hero")
 	testAction := action.NewAction("test-action", "test-char", action.CreateAdvantage, "Athletics", "Climb")
 
 	req := prompt.AspectGenerationRequest{
@@ -234,7 +234,7 @@ func TestGenerateAspect_NilOutcome(t *testing.T) {
 func TestBuildPrompt(t *testing.T) {
 	generator := NewAspectGenerator(newTestLLMClient())
 
-	char := character.NewCharacter("test-char", "Zara the Swift")
+	char := core.NewCharacter("test-char", "Zara the Swift")
 	char.Aspects.HighConcept = "Acrobatic Thief"
 	char.Aspects.Trouble = "Can't Resist a Challenge"
 	char.Aspects.AddAspect("Friends in Low Places")

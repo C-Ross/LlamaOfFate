@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/stretchr/testify/assert"
 )
@@ -19,11 +19,11 @@ type ActionParserTestCase struct {
 	RawInput           string
 	Context            string
 	ExpectedType       action.ActionType
-	ExpectedSkills     []string               // Any of these skills would be acceptable
-	ExpectedDifficulty int                    // Expected difficulty (ignored for Attack actions)
-	Description        string                 // Human-readable description of why this should be classified this way
-	OtherCharacters    []*character.Character // NPCs in the scene (optional)
-	ExpectedOpposition string                 // "passive" or "active"; empty means skip check
+	ExpectedSkills     []string          // Any of these skills would be acceptable
+	ExpectedDifficulty int               // Expected difficulty (ignored for Attack actions)
+	Description        string            // Human-readable description of why this should be classified this way
+	OtherCharacters    []*core.Character // NPCs in the scene (optional)
+	ExpectedOpposition string            // "passive" or "active"; empty means skip check
 }
 
 // getTestCharacter returns the shared eval character.
@@ -734,7 +734,7 @@ func TestActionParser_LLMEvaluation(t *testing.T) {
 	allTestCases := []struct {
 		category string
 		cases    []ActionParserTestCase
-		char     *character.Character // nil = use default test character
+		char     *core.Character // nil = use default test character
 	}{
 		{"Overcome", getOvercomeTestCases(), nil},
 		{"Attack", getAttackTestCases(), nil},
@@ -899,7 +899,7 @@ func TestActionParser_LLMEvaluation(t *testing.T) {
 }
 
 // evaluateTestCase runs a single test case and returns the result
-func evaluateTestCase(ctx context.Context, parser engine.ActionParser, char *character.Character, tc ActionParserTestCase) EvaluationResult {
+func evaluateTestCase(ctx context.Context, parser engine.ActionParser, char *core.Character, tc ActionParserTestCase) EvaluationResult {
 	req := engine.ActionParseRequest{
 		Character:       char,
 		RawInput:        tc.RawInput,

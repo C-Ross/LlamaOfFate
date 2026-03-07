@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,7 +34,7 @@ func TestActionParser_ParseAction_Overcome(t *testing.T) {
 	parser := NewActionParser(mockClient)
 
 	// Create test character
-	char := character.NewCharacter("test-char", "Test Hero")
+	char := core.NewCharacter("test-char", "Test Hero")
 	char.Aspects.HighConcept = "Daring Adventurer"
 	char.SetSkill("Athletics", dice.Good)
 
@@ -73,7 +73,7 @@ func TestActionParser_ParseAction_CreateAdvantage(t *testing.T) {
 	parser := NewActionParser(mockClient)
 
 	// Create test character
-	char := character.NewCharacter("test-char", "Sneaky Rogue")
+	char := core.NewCharacter("test-char", "Sneaky Rogue")
 	char.Aspects.HighConcept = "Master Thief"
 	char.SetSkill("Stealth", dice.Great)
 
@@ -111,7 +111,7 @@ func TestActionParser_ParseAction_Attack(t *testing.T) {
 	parser := NewActionParser(mockClient)
 
 	// Create test character
-	char := character.NewCharacter("test-char", "Brave Warrior")
+	char := core.NewCharacter("test-char", "Brave Warrior")
 	char.Aspects.HighConcept = "Skilled Swordsman"
 	char.SetSkill("Fight", dice.Superb)
 
@@ -148,7 +148,7 @@ func TestActionParser_ParseAction_Defend(t *testing.T) {
 	parser := NewActionParser(mockClient)
 
 	// Create test character
-	char := character.NewCharacter("test-char", "Agile Scout")
+	char := core.NewCharacter("test-char", "Agile Scout")
 	char.SetSkill("Athletics", dice.Good)
 
 	// Test request
@@ -177,7 +177,7 @@ func TestActionParser_ParseAction_InvalidJSON(t *testing.T) {
 	parser := NewActionParser(mockClient)
 
 	// Create test character
-	char := character.NewCharacter("test-char", "Test Hero")
+	char := core.NewCharacter("test-char", "Test Hero")
 
 	// Test request
 	req := ActionParseRequest{
@@ -209,7 +209,7 @@ func TestActionParser_ParseAction_InvalidActionType(t *testing.T) {
 	parser := NewActionParser(mockClient)
 
 	// Create test character
-	char := character.NewCharacter("test-char", "Test Hero")
+	char := core.NewCharacter("test-char", "Test Hero")
 
 	// Test request
 	req := ActionParseRequest{
@@ -228,7 +228,7 @@ func TestBuildPrompts(t *testing.T) {
 	parser := NewActionParser(newTestLLMClient())
 
 	// Create test character with various attributes
-	char := character.NewCharacter("test-char", "Zara the Swift")
+	char := core.NewCharacter("test-char", "Zara the Swift")
 	char.Aspects.HighConcept = "Acrobatic Cat Burglar"
 	char.Aspects.Trouble = "Can't Resist a Shiny Challenge"
 	char.Aspects.AddAspect("Friends in Low Places")
@@ -313,15 +313,15 @@ func TestActionParser_ParseAction_WithOtherCharacters(t *testing.T) {
 	parser := NewActionParser(mockClient)
 
 	// Create test character
-	char := character.NewCharacter("test-char", "Test Hero")
+	char := core.NewCharacter("test-char", "Test Hero")
 	char.Aspects.HighConcept = "Brave Fighter"
 	char.SetSkill("Fight", dice.Good)
 
 	// Create other characters in scene
-	orc := character.NewCharacter("orc-warrior", "Orc Warrior")
+	orc := core.NewCharacter("orc-warrior", "Orc Warrior")
 	orc.Aspects.HighConcept = "Brutal Fighter"
 
-	goblin := character.NewCharacter("goblin-scout", "Goblin Scout")
+	goblin := core.NewCharacter("goblin-scout", "Goblin Scout")
 	goblin.Aspects.HighConcept = "Sneaky Archer"
 
 	// Test request with other characters - this should trigger the template error
@@ -329,7 +329,7 @@ func TestActionParser_ParseAction_WithOtherCharacters(t *testing.T) {
 		Character:       char,
 		RawInput:        "I attack the orc warrior with my sword",
 		Context:         "In combat with multiple enemies",
-		OtherCharacters: []*character.Character{orc, goblin},
+		OtherCharacters: []*core.Character{orc, goblin},
 	}
 
 	// This should now work successfully with the fixed template
@@ -350,7 +350,7 @@ func TestActionParser_TemplateErrorRegression(t *testing.T) {
 	// executing "action_parse" at <ne $id $.Character.ID>: error calling ne: incompatible types for comparison"
 
 	// The error occurred because the template was trying to range over OtherCharacters
-	// as if it was a map[string]*character.Character when it's actually []*character.Character
+	// as if it was a map[string]*core.Character when it's actually []*core.Character
 
 	mockResponse := `{
 		"action_type": "Attack",
@@ -364,15 +364,15 @@ func TestActionParser_TemplateErrorRegression(t *testing.T) {
 	mockClient := newTestLLMClient(mockResponse)
 	parser := NewActionParser(mockClient)
 
-	char := character.NewCharacter("hero", "Hero")
-	enemy := character.NewCharacter("enemy", "Enemy")
+	char := core.NewCharacter("hero", "Hero")
+	enemy := core.NewCharacter("enemy", "Enemy")
 
 	// This used to cause the template error when OtherCharacters was populated
 	req := ActionParseRequest{
 		Character:       char,
 		RawInput:        "attack enemy",
 		Context:         "combat",
-		OtherCharacters: []*character.Character{enemy}, // This triggers the template section that was broken
+		OtherCharacters: []*core.Character{enemy}, // This triggers the template section that was broken
 	}
 
 	// This should work now (would have failed before the fix)
@@ -398,17 +398,17 @@ func TestActionParser_ParseAction_ActiveOpposition(t *testing.T) {
 	mockClient := newTestLLMClient(mockResponse)
 	parser := NewActionParser(mockClient)
 
-	char := character.NewCharacter("test-char", "Sneaky Rogue")
+	char := core.NewCharacter("test-char", "Sneaky Rogue")
 	char.SetSkill("Stealth", dice.Good)
 
-	guard := character.NewCharacter("guard-1", "Stern Guard")
+	guard := core.NewCharacter("guard-1", "Stern Guard")
 	guard.SetSkill("Notice", dice.Fair)
 
 	req := ActionParseRequest{
 		Character:       char,
 		RawInput:        "I sneak past the guard",
 		Context:         "A stern guard watches the corridor",
-		OtherCharacters: []*character.Character{guard},
+		OtherCharacters: []*core.Character{guard},
 	}
 
 	parsedAction, err := parser.ParseAction(context.Background(), req)
@@ -438,7 +438,7 @@ func TestActionParser_ParseAction_PassiveOpposition(t *testing.T) {
 	mockClient := newTestLLMClient(mockResponse)
 	parser := NewActionParser(mockClient)
 
-	char := character.NewCharacter("test-char", "Test Hero")
+	char := core.NewCharacter("test-char", "Test Hero")
 	char.SetSkill("Athletics", dice.Good)
 
 	req := ActionParseRequest{
@@ -475,7 +475,7 @@ func TestActionParser_ParseAction_ActiveOpposition_MissingNPCID(t *testing.T) {
 	mockClient := newTestLLMClient(mockResponse)
 	parser := NewActionParser(mockClient)
 
-	char := character.NewCharacter("test-char", "Test Hero")
+	char := core.NewCharacter("test-char", "Test Hero")
 	char.SetSkill("Deceive", dice.Fair)
 
 	req := ActionParseRequest{
@@ -507,7 +507,7 @@ func TestActionParser_ParseAction_OldFormatBackCompat(t *testing.T) {
 	mockClient := newTestLLMClient(mockResponse)
 	parser := NewActionParser(mockClient)
 
-	char := character.NewCharacter("test-char", "Test Hero")
+	char := core.NewCharacter("test-char", "Test Hero")
 	char.SetSkill("Athletics", dice.Good)
 
 	req := ActionParseRequest{
@@ -528,10 +528,10 @@ func TestActionParser_ParseAction_OldFormatBackCompat(t *testing.T) {
 func TestBuildPrompts_IncludesNPCSkills(t *testing.T) {
 	parser := NewActionParser(newTestLLMClient())
 
-	char := character.NewCharacter("test-char", "Test Hero")
+	char := core.NewCharacter("test-char", "Test Hero")
 	char.SetSkill("Stealth", dice.Good)
 
-	guard := character.NewCharacter("guard-1", "Stern Guard")
+	guard := core.NewCharacter("guard-1", "Stern Guard")
 	guard.Aspects.HighConcept = "Vigilant Watchman"
 	guard.SetSkill("Notice", dice.Fair)
 	guard.SetSkill("Fight", dice.Good)
@@ -540,7 +540,7 @@ func TestBuildPrompts_IncludesNPCSkills(t *testing.T) {
 		Character:       char,
 		RawInput:        "I sneak past the guard",
 		Context:         "A guard patrols the hallway",
-		OtherCharacters: []*character.Character{guard},
+		OtherCharacters: []*core.Character{guard},
 	}
 
 	userPrompt, err := parser.buildUserPrompt(req)
@@ -554,12 +554,12 @@ func TestBuildPrompts_IncludesOppositionInstructions(t *testing.T) {
 	parser := NewActionParser(newTestLLMClient())
 
 	t.Run("with OtherCharacters shows active opposition", func(t *testing.T) {
-		guard := character.NewCharacter("guard-1", "Stern Guard")
+		guard := core.NewCharacter("guard-1", "Stern Guard")
 		guard.SetSkill("Notice", dice.Good)
 		req := ActionParseRequest{
-			Character:       character.NewCharacter("player-1", "Test"),
+			Character:       core.NewCharacter("player-1", "Test"),
 			RawInput:        "test",
-			OtherCharacters: []*character.Character{guard},
+			OtherCharacters: []*core.Character{guard},
 		}
 		systemPrompt, err := parser.buildSystemPrompt(req)
 		require.NoError(t, err)
@@ -573,7 +573,7 @@ func TestBuildPrompts_IncludesOppositionInstructions(t *testing.T) {
 
 	t.Run("without OtherCharacters shows passive-only", func(t *testing.T) {
 		req := ActionParseRequest{
-			Character: character.NewCharacter("player-1", "Test"),
+			Character: core.NewCharacter("player-1", "Test"),
 			RawInput:  "test",
 		}
 		systemPrompt, err := parser.buildSystemPrompt(req)

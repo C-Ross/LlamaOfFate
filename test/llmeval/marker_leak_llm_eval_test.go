@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
@@ -36,7 +36,7 @@ type MarkerLeakTestCase struct {
 	PlayerInput         string
 	SceneName           string
 	SceneDescription    string
-	OtherCharacters     []*character.Character
+	OtherCharacters     []*core.Character
 	ConversationContext string
 	Description         string
 }
@@ -61,7 +61,7 @@ func getMarkerLeakTestCases() []MarkerLeakTestCase {
 	bartender := NewBartender()
 	blackJack := NewBlackJack()
 
-	guard := character.NewCharacter("guard", "Gate Guard")
+	guard := core.NewCharacter("guard", "Gate Guard")
 	guard.Aspects.HighConcept = "Dutiful Town Watchman"
 
 	return []MarkerLeakTestCase{
@@ -84,7 +84,7 @@ func getMarkerLeakTestCases() []MarkerLeakTestCase {
 			PlayerInput:         "Jesse heads toward the door but stops to look back at Maggie.",
 			SceneName:           "The Dusty Spur Saloon",
 			SceneDescription:    "A dimly lit saloon with swinging doors, a long bar, and the smell of whiskey",
-			OtherCharacters:     []*character.Character{bartender},
+			OtherCharacters:     []*core.Character{bartender},
 			ConversationContext: "GM: Maggie slides the whiskey across the bar. \"Something on your mind, stranger?\"",
 			Description:         "Ambiguous departure intent - the LLM might explain its marker decision",
 		},
@@ -93,7 +93,7 @@ func getMarkerLeakTestCases() []MarkerLeakTestCase {
 			PlayerInput:         "Jesse puts his hand on his holster and stares Black Jack down. \"I'd choose my next words carefully if I were you.\"",
 			SceneName:           "Windmill on the Outskirts",
 			SceneDescription:    "An old abandoned windmill on the outskirts of town. Tension fills the air.",
-			OtherCharacters:     []*character.Character{blackJack},
+			OtherCharacters:     []*core.Character{blackJack},
 			ConversationContext: "GM: Black Jack sneers. \"You think you can just waltz in here and make demands?\"",
 			Description:         "Tense but not violent — LLM might explain why no CONFLICT marker was added",
 		},
@@ -110,7 +110,7 @@ func getMarkerLeakTestCases() []MarkerLeakTestCase {
 			PlayerInput:         "Jesse tries to push past the guard and leave.",
 			SceneName:           "Town Gate",
 			SceneDescription:    "The wooden gate at the edge of town, manned by a bored-looking guard.",
-			OtherCharacters:     []*character.Character{guard},
+			OtherCharacters:     []*core.Character{guard},
 			ConversationContext: "GM: The guard steps in front of Jesse, blocking his path. \"No one leaves town after dark. Sheriff's orders.\"",
 			Description:         "Player wants to leave but can't — LLM might discuss transition or conflict marker logic",
 		},
@@ -119,7 +119,7 @@ func getMarkerLeakTestCases() []MarkerLeakTestCase {
 			PlayerInput:         "\"Alright, alright. Let's all calm down here. Nobody needs to get hurt.\" Jesse slowly raises his hands.",
 			SceneName:           "Windmill on the Outskirts",
 			SceneDescription:    "An old abandoned windmill. The air crackles with tension.",
-			OtherCharacters:     []*character.Character{blackJack},
+			OtherCharacters:     []*core.Character{blackJack},
 			ConversationContext: "GM: Black Jack has his hand on his gun, eyes narrowed. \"Give me one good reason not to draw.\"",
 			Description:         "De-escalation might cause the LLM to narrate about conflict markers",
 		},
@@ -143,7 +143,7 @@ func getMarkerLeakTestCases() []MarkerLeakTestCase {
 			PlayerInput:         "Jesse finishes his drink and weighs his options. Should he stay or go?",
 			SceneName:           "The Dusty Spur Saloon",
 			SceneDescription:    "A dimly lit saloon with the buzz of conversation.",
-			OtherCharacters:     []*character.Character{bartender},
+			OtherCharacters:     []*core.Character{bartender},
 			ConversationContext: "GM: Maggie watches Jesse from behind the bar, polishing the same glass she's held for five minutes.",
 			Description:         "Internal deliberation about leaving — LLM might reason about whether to add transition",
 		},
@@ -232,7 +232,7 @@ func TestMarkerLeak_LLMEvaluation(t *testing.T) {
 func evaluateMarkerLeak(ctx context.Context, client llm.LLMClient, tc MarkerLeakTestCase) MarkerLeakResult {
 	testScene := scene.NewScene("test-scene", tc.SceneName, tc.SceneDescription)
 
-	player := character.NewCharacter("player1", "Zero")
+	player := core.NewCharacter("player1", "Zero")
 	player.Aspects.HighConcept = "Shadow Operative with a Hidden Past"
 	player.Aspects.Trouble = "Trust No One — Not Even Yourself"
 
@@ -329,14 +329,14 @@ func TestMarkerLeak_NeoTechEntrance_LLMEvaluation(t *testing.T) {
 	verboseLogging := VerboseLoggingEnabled()
 
 	// Reproduce the exact save state from a9d335d8115517ec
-	player := character.NewCharacter("zero", "Zero")
+	player := core.NewCharacter("zero", "Zero")
 	player.Aspects.HighConcept = "Ghost in the Machine Netrunner"
 	player.Aspects.Trouble = "Wanted by Three Megacorps"
 	player.Aspects.AddAspect("Military-Grade Cybernetic Reflexes")
 	player.Aspects.AddAspect("Nobody Gets Left Behind")
 	player.Aspects.AddAspect("I Know a Guy for Everything")
 
-	raven := character.NewCharacter("scene_1_npc_0", "Raven")
+	raven := core.NewCharacter("scene_1_npc_0", "Raven")
 	raven.Aspects.HighConcept = "Street-Savvy Information Broker"
 
 	testScene := scene.NewScene("scene_2", "Outside NeoTech Tower",
@@ -349,7 +349,7 @@ func TestMarkerLeak_NeoTechEntrance_LLMEvaluation(t *testing.T) {
 	testScene.AddSituationAspect(scene.SituationAspect{Aspect: "Blended with the Crowd", FreeInvokes: 1, IsBoost: true, Duration: "scene", CreatedBy: "zero"})
 
 	charContext := BuildCharacterContext(player)
-	aspectsContext := BuildAspectsContext(testScene, player, []*character.Character{raven})
+	aspectsContext := BuildAspectsContext(testScene, player, []*core.Character{raven})
 
 	conversationHistory := `GM: As Zero weaves through the crowd with an ease that belies their bulky cybernetic enhancements, they expertly evade the probing spotlight of a security drone, its hum receding into the distance as they slip into the shadows cast by NeoTech's warehouses. The rain-soaked air is filled with the scent of wet pavement and ozone as Zero disappears into the darkness, the thrum of the city's underbelly growing louder. With their newfound position at the warehouse's rear, the soft glow of a service entrance beckons, a potential backdoor into the heart of NeoTech's operations.`
 
@@ -362,7 +362,7 @@ func TestMarkerLeak_NeoTechEntrance_LLMEvaluation(t *testing.T) {
 		ConversationContext: conversationHistory,
 		PlayerInput:         playerInput,
 		InteractionType:     "dialog",
-		OtherCharacters:     []*character.Character{raven},
+		OtherCharacters:     []*core.Character{raven},
 		ScenePurpose:        "Can Zero breach the NeoTech facility's outer security perimeter undetected?",
 	}
 

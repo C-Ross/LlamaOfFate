@@ -1,4 +1,4 @@
-package character
+package core
 
 import (
 	"testing"

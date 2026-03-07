@@ -1,4 +1,4 @@
-package character
+package core
 
 import (
 	"fmt"
@@ -330,15 +330,10 @@ func (c *Character) GetSkill(skillName string) dice.Ladder {
 
 // SetSkill sets a character's skill level and recalculates stress tracks when
 // Physique or Will changes, keeping them in sync with the new skill rating.
-//
-// NOTE: String literals are used here instead of core.SkillPhysique / core.SkillWill
-// because importing core from the character package would create a circular
-// dependency (core already imports character). The init() validation in
-// core/skills.go guarantees these names stay consistent with the canonical list.
 func (c *Character) SetSkill(skillName string, level dice.Ladder) {
 	c.Skills[skillName] = level
 	c.UpdatedAt = time.Now()
-	if skillName == "Physique" || skillName == "Will" {
+	if skillName == SkillPhysique || skillName == SkillWill {
 		c.RecalculateStressTracks()
 	}
 }
@@ -367,8 +362,8 @@ func (c *Character) RecalculateStressTracks() {
 	if c.StressTracks == nil {
 		c.StressTracks = make(map[string]*StressTrack)
 	}
-	c.recalculateTrack(PhysicalStress, c.GetSkill("Physique"))
-	c.recalculateTrack(MentalStress, c.GetSkill("Will"))
+	c.recalculateTrack(PhysicalStress, c.GetSkill(SkillPhysique))
+	c.recalculateTrack(MentalStress, c.GetSkill(SkillWill))
 }
 
 // recalculateTrack resizes a single stress track to match the size dictated by
@@ -394,10 +389,10 @@ func (c *Character) recalculateTrack(trackType StressTrackType, skillLevel dice.
 // per the Fate Core SRD.
 func (c *Character) extraMildConsequences() int {
 	extra := 0
-	if c.GetSkill("Physique") >= dice.Superb {
+	if c.GetSkill(SkillPhysique) >= dice.Superb {
 		extra++
 	}
-	if c.GetSkill("Will") >= dice.Superb {
+	if c.GetSkill(SkillWill) >= dice.Superb {
 		extra++
 	}
 	return extra

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
@@ -18,7 +18,7 @@ import (
 // setupNPCConflictSM creates a SceneManager with a player and NPC in an active
 // physical conflict. The roller is left as default; callers should replace it
 // with a PlannedRoller before calling NPC action functions.
-func setupNPCConflictSM(t *testing.T) (*SceneManager, *character.Character, *character.Character) {
+func setupNPCConflictSM(t *testing.T) (*SceneManager, *core.Character, *core.Character) {
 	t.Helper()
 	return setupTestSM(t, smTestOpts{
 		npc: &smTestNPC{
@@ -311,8 +311,8 @@ func TestProcessNPCTurn_DispatchDefend(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	npc := character.NewCharacter("npc-1", "Goblin Scout")
+	player := core.NewCharacter("player-1", "Hero")
+	npc := core.NewCharacter("npc-1", "Goblin Scout")
 	npc.Aspects.HighConcept = "Sneaky Goblin"
 
 	engine.AddCharacter(player)
@@ -418,10 +418,10 @@ func TestProcessNPCAttack_NonPlayerTarget_Tie_CreatesBoost(t *testing.T) {
 
 	sm := NewSceneManager(eng, eng.llmClient, eng.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	npc := character.NewCharacter("npc-1", "Goblin Scout")
+	player := core.NewCharacter("player-1", "Hero")
+	npc := core.NewCharacter("npc-1", "Goblin Scout")
 	npc.SetSkill("Fight", 2)
-	target := character.NewCharacter("npc-target", "Orc Warrior")
+	target := core.NewCharacter("npc-target", "Orc Warrior")
 	target.SetSkill("Athletics", dice.Fair)
 
 	eng.AddCharacter(player)
@@ -480,10 +480,10 @@ func TestProcessNPCAttack_NonPlayerTarget_DefendWithStyle_GrantsTargetBoost(t *t
 
 	sm := NewSceneManager(eng, eng.llmClient, eng.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	npc := character.NewCharacter("npc-1", "Goblin Scout")
+	player := core.NewCharacter("player-1", "Hero")
+	npc := core.NewCharacter("npc-1", "Goblin Scout")
 	npc.SetSkill("Fight", 2)
-	target := character.NewCharacter("npc-target", "Orc Warrior")
+	target := core.NewCharacter("npc-target", "Orc Warrior")
 	target.SetSkill("Athletics", dice.Fair)
 
 	eng.AddCharacter(player)

@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,7 +23,7 @@ import (
 //	[3] player defense dice (against NPC counter-attack)
 //
 // Provide at least 4 planned rolls. Extra 0s are safe padding.
-func setupAttackSM(t *testing.T, fatePoints int) (*SceneManager, *character.Character) {
+func setupAttackSM(t *testing.T, fatePoints int) (*SceneManager, *core.Character) {
 	t.Helper()
 	sm, _, npc := setupTestSM(t, smTestOpts{
 		llmResponses: []string{`{"action":"attack","skill":"Fight","target":"player-1","description":"counter-attack","reasoning":"test"}`},

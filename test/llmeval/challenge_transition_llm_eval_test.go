@@ -6,7 +6,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
@@ -96,7 +96,7 @@ func evaluateChallengeTransition(ctx context.Context, client llm.LLMClient, tc C
 		return ChallengeTransitionResult{TestCase: tc, Error: err}
 	}
 
-	player := character.NewCharacter("player-1", "Test Character")
+	player := core.NewCharacter("player-1", "Test Character")
 	player.Aspects.HighConcept = "Wandering Stranger"
 
 	charContext := BuildCharacterContext(player)

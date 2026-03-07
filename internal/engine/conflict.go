@@ -12,7 +12,6 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
@@ -155,7 +154,7 @@ func (cm *ConflictManager) clearConflictStress() {
 }
 
 // calculateInitiative returns the initiative value for a character based on conflict type
-func (cm *ConflictManager) calculateInitiative(char *character.Character, conflictType scene.ConflictType) int {
+func (cm *ConflictManager) calculateInitiative(char *core.Character, conflictType scene.ConflictType) int {
 	return core.CalculateInitiative(char, conflictType)
 }
 
@@ -275,7 +274,7 @@ func (cm *ConflictManager) getParticipantInfo() []ConflictParticipantInfo {
 
 // applyDamageToTarget applies shifts as stress/consequences to a target
 // and returns a DamageResolutionEvent describing everything that happened.
-func (cm *ConflictManager) applyDamageToTarget(ctx context.Context, target *character.Character, shifts int, stressType character.StressTrackType) DamageResolutionEvent {
+func (cm *ConflictManager) applyDamageToTarget(ctx context.Context, target *core.Character, shifts int, stressType core.StressTrackType) DamageResolutionEvent {
 	dmgEvent := DamageResolutionEvent{
 		TargetName: target.Name,
 	}
@@ -298,7 +297,7 @@ func (cm *ConflictManager) applyDamageToTarget(ctx context.Context, target *char
 
 // fillTargetStressOverflow handles when a target can't absorb stress, filling
 // in the DamageResolutionEvent with consequence/taken-out information.
-func (cm *ConflictManager) fillTargetStressOverflow(ctx context.Context, target *character.Character, shifts int, stressType character.StressTrackType, dmgEvent *DamageResolutionEvent) {
+func (cm *ConflictManager) fillTargetStressOverflow(ctx context.Context, target *core.Character, shifts int, stressType core.StressTrackType, dmgEvent *DamageResolutionEvent) {
 	// Check if target has available consequences
 	availableConseq := target.AvailableConsequenceSlots()
 
@@ -309,10 +308,10 @@ func (cm *ConflictManager) fillTargetStressOverflow(ctx context.Context, target 
 	}
 
 	// NPC takes the most appropriate consequence automatically.
-	bestConseq, _ := character.BestConsequenceFor(availableConseq, shifts)
+	bestConseq, _ := core.BestConsequenceFor(availableConseq, shifts)
 
 	// Apply consequence to target
-	consequence := character.Consequence{
+	consequence := core.Consequence{
 		ID:        fmt.Sprintf("conseq-%d", time.Now().UnixNano()),
 		Type:      bestConseq.Type,
 		Aspect:    fmt.Sprintf("Wounded by %s", cm.player.Name),
@@ -347,13 +346,13 @@ func (cm *ConflictManager) fillTargetStressOverflow(ctx context.Context, target 
 // applyTargetTakenOut marks a target as taken out and updates the damage event.
 // Side-effects: updates takenOutChars, scene participant status, checks victory,
 // potentially sets pendingMidFlow for fate narration.
-func (cm *ConflictManager) applyTargetTakenOut(ctx context.Context, target *character.Character, dmgEvent *DamageResolutionEvent) {
+func (cm *ConflictManager) applyTargetTakenOut(ctx context.Context, target *core.Character, dmgEvent *DamageResolutionEvent) {
 	dmgEvent.TakenOut = true
 
 	// Mark the character as taken out immediately so IsTakenOut() returns true.
 	// processFateNarration will later overwrite Fate with the player's narration.
 	if target.Fate == nil {
-		target.Fate = &character.TakenOutFate{
+		target.Fate = &core.TakenOutFate{
 			Description: "taken out",
 		}
 	}
@@ -515,7 +514,7 @@ func (cm *ConflictManager) processFateNarration(ctx context.Context, input strin
 				"name", fate.Name)
 			continue
 		}
-		char.Fate = &character.TakenOutFate{
+		char.Fate = &core.TakenOutFate{
 			Description: fate.Description,
 			Permanent:   fate.Permanent,
 		}
@@ -538,7 +537,7 @@ func (cm *ConflictManager) processFateNarration(ctx context.Context, input strin
 }
 
 // applyAttackDamageToPlayer applies attack damage to the player and returns events.
-func (cm *ConflictManager) applyAttackDamageToPlayer(ctx context.Context, outcome *dice.Outcome, attacker *character.Character, attackCtx prompt.AttackContext) []GameEvent {
+func (cm *ConflictManager) applyAttackDamageToPlayer(ctx context.Context, outcome *dice.Outcome, attacker *core.Character, attackCtx prompt.AttackContext) []GameEvent {
 	var events []GameEvent
 
 	// Apply stress if the attack hit
@@ -548,9 +547,9 @@ func (cm *ConflictManager) applyAttackDamageToPlayer(ctx context.Context, outcom
 		if shifts < 1 {
 			shifts = 1
 		}
-		stressType := character.PhysicalStress
+		stressType := core.PhysicalStress
 		if cm.currentScene.ConflictState.Type == scene.MentalConflict {
-			stressType = character.MentalStress
+			stressType = core.MentalStress
 		}
 
 		// Try to absorb with stress track
@@ -587,7 +586,7 @@ func (cm *ConflictManager) applyAttackDamageToPlayer(ctx context.Context, outcom
 
 // handleStressOverflow handles when the player cannot absorb stress with their stress track.
 // Returns events emitted immediately; may set pendingMidFlow for consequence choice.
-func (cm *ConflictManager) handleStressOverflow(ctx context.Context, shifts int, stressType character.StressTrackType, attacker *character.Character, attackCtx prompt.AttackContext) []GameEvent {
+func (cm *ConflictManager) handleStressOverflow(ctx context.Context, shifts int, stressType core.StressTrackType, attacker *core.Character, attackCtx prompt.AttackContext) []GameEvent {
 	var events []GameEvent
 	events = append(events, StressOverflowEvent{
 		Shifts: shifts,
@@ -656,7 +655,7 @@ func (cm *ConflictManager) handleStressOverflow(ctx context.Context, shifts int,
 }
 
 // applyConsequence applies a consequence to the player character and returns events.
-func (cm *ConflictManager) applyConsequence(ctx context.Context, conseqType character.ConsequenceType, shifts int, attacker *character.Character, attackCtx prompt.AttackContext) []GameEvent {
+func (cm *ConflictManager) applyConsequence(ctx context.Context, conseqType core.ConsequenceType, shifts int, attacker *core.Character, attackCtx prompt.AttackContext) []GameEvent {
 	// Generate a consequence aspect via LLM
 	aspectName, err := cm.generateConsequenceAspect(ctx, conseqType, attacker, attackCtx)
 	if err != nil {
@@ -665,7 +664,7 @@ func (cm *ConflictManager) applyConsequence(ctx context.Context, conseqType char
 		aspectName = fmt.Sprintf("%s Wound", caser.String(string(conseqType)))
 	}
 
-	consequence := character.Consequence{
+	consequence := core.Consequence{
 		ID:        fmt.Sprintf("conseq-%d", time.Now().UnixNano()),
 		Type:      conseqType,
 		Aspect:    aspectName,
@@ -688,9 +687,9 @@ func (cm *ConflictManager) applyConsequence(ctx context.Context, conseqType char
 
 	// If there are remaining shifts, try to absorb with stress
 	if remaining > 0 {
-		stressType := character.PhysicalStress
+		stressType := core.PhysicalStress
 		if cm.currentScene.ConflictState != nil && cm.currentScene.ConflictState.Type == scene.MentalConflict {
-			stressType = character.MentalStress
+			stressType = core.MentalStress
 		}
 
 		if cm.player.TakeStress(stressType, remaining) {
@@ -718,7 +717,7 @@ func (cm *ConflictManager) applyConsequence(ctx context.Context, conseqType char
 }
 
 // generateConsequenceAspect uses LLM to generate a consequence aspect
-func (cm *ConflictManager) generateConsequenceAspect(ctx context.Context, conseqType character.ConsequenceType, attacker *character.Character, attackCtx prompt.AttackContext) (string, error) {
+func (cm *ConflictManager) generateConsequenceAspect(ctx context.Context, conseqType core.ConsequenceType, attacker *core.Character, attackCtx prompt.AttackContext) (string, error) {
 	if cm.llmClient == nil {
 		return "", fmt.Errorf("LLM client required")
 	}
@@ -818,7 +817,7 @@ func (cm *ConflictManager) handleConcession(ctx context.Context) []GameEvent {
 }
 
 // handleTakenOut handles when the player is taken out and returns events.
-func (cm *ConflictManager) handleTakenOut(ctx context.Context, attacker *character.Character, attackCtx prompt.AttackContext) []GameEvent {
+func (cm *ConflictManager) handleTakenOut(ctx context.Context, attacker *core.Character, attackCtx prompt.AttackContext) []GameEvent {
 	// Generate narrative and outcome classification for being taken out
 	narrative, outcome, newSceneHint, err := cm.generateTakenOutNarrativeAndOutcome(ctx, attacker, attackCtx)
 	if err != nil {
@@ -872,7 +871,7 @@ func (cm *ConflictManager) handleTakenOut(ctx context.Context, attacker *charact
 }
 
 // generateTakenOutNarrativeAndOutcome generates narrative and classifies the outcome
-func (cm *ConflictManager) generateTakenOutNarrativeAndOutcome(ctx context.Context, attacker *character.Character, attackCtx prompt.AttackContext) (narrative string, outcome TakenOutResult, newSceneHint string, err error) {
+func (cm *ConflictManager) generateTakenOutNarrativeAndOutcome(ctx context.Context, attacker *core.Character, attackCtx prompt.AttackContext) (narrative string, outcome TakenOutResult, newSceneHint string, err error) {
 	if cm.llmClient == nil {
 		return "", TakenOutTransition, "", fmt.Errorf("LLM client required")
 	}

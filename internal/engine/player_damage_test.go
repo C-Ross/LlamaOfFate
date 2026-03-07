@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
@@ -17,7 +17,7 @@ import (
 
 // setupConflictSM creates a SceneManager with a player and attacker in an
 // active physical conflict. The engine optionally has an LLM client.
-func setupConflictSM(t *testing.T, llmClient *testLLMClient) (*SceneManager, *character.Character, *character.Character) {
+func setupConflictSM(t *testing.T, llmClient *testLLMClient) (*SceneManager, *core.Character, *core.Character) {
 	t.Helper()
 	opts := smTestOpts{
 		npc: &smTestNPC{
@@ -242,8 +242,8 @@ func TestApplyAttackDamageToPlayer_MentalConflict_UsesMentalStress(t *testing.T)
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	attacker := character.NewCharacter("npc-1", "Illusionist")
+	player := core.NewCharacter("player-1", "Hero")
+	attacker := core.NewCharacter("npc-1", "Illusionist")
 
 	engine.AddCharacter(player)
 	engine.AddCharacter(attacker)
@@ -291,11 +291,11 @@ func TestHandleStressOverflow_NoConsequencesAvailable_TakenOut(t *testing.T) {
 	sm, player, attacker := setupConflictSM(t, mockLLM)
 
 	// Fill all consequence slots so none are available.
-	player.AddConsequence(character.Consequence{ID: "c1", Type: character.MildConsequence, Aspect: "Bruised"})
-	player.AddConsequence(character.Consequence{ID: "c2", Type: character.ModerateConsequence, Aspect: "Broken Arm"})
-	player.AddConsequence(character.Consequence{ID: "c3", Type: character.SevereConsequence, Aspect: "Shattered"})
+	player.AddConsequence(core.Consequence{ID: "c1", Type: core.MildConsequence, Aspect: "Bruised"})
+	player.AddConsequence(core.Consequence{ID: "c2", Type: core.ModerateConsequence, Aspect: "Broken Arm"})
+	player.AddConsequence(core.Consequence{ID: "c3", Type: core.SevereConsequence, Aspect: "Shattered"})
 
-	events := sm.conflict.handleStressOverflow(context.Background(), 3, character.PhysicalStress, attacker, testAttackCtx())
+	events := sm.conflict.handleStressOverflow(context.Background(), 3, core.PhysicalStress, attacker, testAttackCtx())
 
 	// Should include StressOverflowEvent with NoConsequences=true and PlayerTakenOutEvent.
 	var hasNoConseq, hasTakenOut bool
@@ -318,7 +318,7 @@ func TestHandleStressOverflow_NoConsequencesAvailable_TakenOut(t *testing.T) {
 func TestHandleStressOverflow_ConsequencesAvailable_SetsMidFlow(t *testing.T) {
 	sm, _, attacker := setupConflictSM(t, nil)
 
-	events := sm.conflict.handleStressOverflow(context.Background(), 3, character.PhysicalStress, attacker, testAttackCtx())
+	events := sm.conflict.handleStressOverflow(context.Background(), 3, core.PhysicalStress, attacker, testAttackCtx())
 
 	// First event is StressOverflowEvent.
 	require.NotEmpty(t, events)
@@ -341,7 +341,7 @@ func TestApplyConsequence_MildAbsorbsAll(t *testing.T) {
 	sm, player, attacker := setupConflictSM(t, mockLLM)
 
 	// 2-shift hit → mild (value=2) absorbs all.
-	events := sm.conflict.applyConsequence(context.Background(), character.MildConsequence, 2, attacker, testAttackCtx())
+	events := sm.conflict.applyConsequence(context.Background(), core.MildConsequence, 2, attacker, testAttackCtx())
 
 	require.NotEmpty(t, events)
 	pce, ok := events[0].(PlayerConsequenceEvent)
@@ -353,7 +353,7 @@ func TestApplyConsequence_MildAbsorbsAll(t *testing.T) {
 
 	// Verify consequence was added to the player.
 	require.Len(t, player.Consequences, 1)
-	assert.Equal(t, character.MildConsequence, player.Consequences[0].Type)
+	assert.Equal(t, core.MildConsequence, player.Consequences[0].Type)
 }
 
 // SRD: A moderate consequence absorbs 4 shifts. If hit was 5 shifts,
@@ -363,7 +363,7 @@ func TestApplyConsequence_ModerateWithRemainingStress(t *testing.T) {
 	sm, player, attacker := setupConflictSM(t, mockLLM)
 
 	// 5-shift hit → moderate (value=4) absorbs 4, remaining 1 goes to stress.
-	events := sm.conflict.applyConsequence(context.Background(), character.ModerateConsequence, 5, attacker, testAttackCtx())
+	events := sm.conflict.applyConsequence(context.Background(), core.ModerateConsequence, 5, attacker, testAttackCtx())
 
 	require.NotEmpty(t, events)
 	pce, ok := events[0].(PlayerConsequenceEvent)
@@ -385,7 +385,7 @@ func TestApplyConsequence_LLMFallbackNaming(t *testing.T) {
 	// No LLM client → generateConsequenceAspect returns error → fallback.
 	sm, _, attacker := setupConflictSM(t, nil)
 
-	events := sm.conflict.applyConsequence(context.Background(), character.MildConsequence, 2, attacker, testAttackCtx())
+	events := sm.conflict.applyConsequence(context.Background(), core.MildConsequence, 2, attacker, testAttackCtx())
 
 	require.NotEmpty(t, events)
 	pce, ok := events[0].(PlayerConsequenceEvent)
@@ -400,12 +400,12 @@ func TestApplyConsequence_RecursiveOverflow(t *testing.T) {
 	sm, player, attacker := setupConflictSM(t, nil)
 
 	// Fill both physical stress boxes so remaining can't be absorbed.
-	player.TakeStress(character.PhysicalStress, 1)
-	player.TakeStress(character.PhysicalStress, 2)
+	player.TakeStress(core.PhysicalStress, 1)
+	player.TakeStress(core.PhysicalStress, 2)
 
 	// 4-shift hit with mild consequence (absorbs 2), remaining 2 can't go to
 	// stress (both boxes full) → recursive overflow → pendingMidFlow.
-	events := sm.conflict.applyConsequence(context.Background(), character.MildConsequence, 4, attacker, testAttackCtx())
+	events := sm.conflict.applyConsequence(context.Background(), core.MildConsequence, 4, attacker, testAttackCtx())
 
 	var hasOverflow bool
 	for _, e := range events {
@@ -512,7 +512,7 @@ func TestHandleTakenOut_EndsConflictAndClearsStress(t *testing.T) {
 	sm, player, attacker := setupConflictSM(t, mockLLM)
 
 	// Give player some stress first.
-	player.TakeStress(character.PhysicalStress, 1)
+	player.TakeStress(core.PhysicalStress, 1)
 	assert.True(t, player.StressTracks["physical"].Boxes[0])
 
 	sm.conflict.handleTakenOut(context.Background(), attacker, testAttackCtx())
@@ -535,7 +535,7 @@ func TestStressOverflow_MidFlowContinuation_SelectConsequence(t *testing.T) {
 	sm, player, attacker := setupConflictSM(t, mockLLM)
 
 	// Trigger overflow.
-	sm.conflict.handleStressOverflow(context.Background(), 3, character.PhysicalStress, attacker, testAttackCtx())
+	sm.conflict.handleStressOverflow(context.Background(), 3, core.PhysicalStress, attacker, testAttackCtx())
 	require.NotNil(t, sm.actions.pendingMidFlow)
 
 	// Player picks choice 0 (mild consequence).
@@ -559,7 +559,7 @@ func TestStressOverflow_MidFlowContinuation_SelectTakenOut(t *testing.T) {
 	mockLLM := newTestLLMClient(`{"narrative":"You choose to yield.","outcome":"game_over","new_scene_hint":""}`)
 	sm, _, _ := setupConflictSM(t, mockLLM)
 
-	sm.conflict.handleStressOverflow(context.Background(), 3, character.PhysicalStress,
+	sm.conflict.handleStressOverflow(context.Background(), 3, core.PhysicalStress,
 		sm.characters.GetCharacter("npc-1"), testAttackCtx())
 	require.NotNil(t, sm.actions.pendingMidFlow)
 

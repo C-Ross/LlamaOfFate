@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
 	"github.com/stretchr/testify/assert"
@@ -15,12 +15,12 @@ import (
 // mockSceneInfo implements uicontract.SceneInfo for testing.
 type mockSceneInfo struct {
 	scene               *scene.Scene
-	player              *character.Character
+	player              *core.Character
 	conversationHistory []uicontract.ConversationEntry
 }
 
-func (m *mockSceneInfo) GetCurrentScene() *scene.Scene   { return m.scene }
-func (m *mockSceneInfo) GetPlayer() *character.Character { return m.player }
+func (m *mockSceneInfo) GetCurrentScene() *scene.Scene { return m.scene }
+func (m *mockSceneInfo) GetPlayer() *core.Character    { return m.player }
 func (m *mockSceneInfo) GetConversationHistory() []uicontract.ConversationEntry {
 	return m.conversationHistory
 }
@@ -138,7 +138,7 @@ func TestTerminalUI_EmitMethods(t *testing.T) {
 
 func TestHandleSpecialCommands_Recognized(t *testing.T) {
 	ui := NewTerminalUI()
-	player := character.NewCharacter("player1", "Test Hero")
+	player := core.NewCharacter("player1", "Test Hero")
 	player.Aspects.HighConcept = "Brave Warrior"
 	player.Aspects.Trouble = "Quick to Anger"
 
@@ -171,7 +171,7 @@ func TestHandleSpecialCommands_Recognized(t *testing.T) {
 
 func TestHandleSpecialCommands_NotRecognized(t *testing.T) {
 	ui := NewTerminalUI()
-	player := character.NewCharacter("player1", "Test Hero")
+	player := core.NewCharacter("player1", "Test Hero")
 
 	ui.SetSceneInfo(&mockSceneInfo{
 		scene:  scene.NewScene("s1", "S", "D"),
@@ -197,7 +197,7 @@ func TestHandleSpecialCommands_CaseInsensitive(t *testing.T) {
 	ui := NewTerminalUI()
 	ui.SetSceneInfo(&mockSceneInfo{
 		scene:  scene.NewScene("s1", "S", "D"),
-		player: character.NewCharacter("p1", "P"),
+		player: core.NewCharacter("p1", "P"),
 	})
 
 	assert.True(t, ui.handleSpecialCommands("HELP"))

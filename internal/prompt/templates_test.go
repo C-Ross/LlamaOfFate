@@ -8,7 +8,6 @@ import (
 
 	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/stretchr/testify/assert"
@@ -367,7 +366,7 @@ func TestRenderConflictResponse(t *testing.T) {
 		PlayerInput:          "I attack the goblin",
 		CurrentCharacterName: "Hero",
 		ParticipantMap:       map[string]*scene.ConflictParticipant{},
-		CharacterMap:         map[string]*character.Character{},
+		CharacterMap:         map[string]*core.Character{},
 	}
 
 	result, err := RenderConflictResponse(data)
@@ -506,7 +505,7 @@ func TestRenderNPCAttack(t *testing.T) {
 }
 
 func TestRenderActionParse(t *testing.T) {
-	char := character.NewCharacter("player-1", "Aria Swift")
+	char := core.NewCharacter("player-1", "Aria Swift")
 	char.Skills["Athletics"] = dice.Great
 	char.Skills["Fight"] = dice.Good
 	data := ActionParseTemplateData{
@@ -547,7 +546,7 @@ func TestRenderActionParseSystem(t *testing.T) {
 }
 
 func TestRenderAspectGeneration(t *testing.T) {
-	char := character.NewCharacter("player-1", "Rex Bold")
+	char := core.NewCharacter("player-1", "Rex Bold")
 	act := action.NewAction("act-1", "player-1", action.CreateAdvantage, "Notice", "Search the crime scene")
 	act.Outcome = &dice.Outcome{Type: dice.Success, Shifts: 1}
 	outcome := &dice.Outcome{Type: dice.Success, Shifts: 1}

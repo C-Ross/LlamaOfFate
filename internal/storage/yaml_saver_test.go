@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
@@ -42,7 +42,7 @@ func TestYAMLSaver_Load_NoFile(t *testing.T) {
 // pass Validate(). Tests that don't care about specific field values should
 // start from this and override what they need.
 func validMinimalState() engine.GameState {
-	player := character.NewCharacter("player1", "Test Hero")
+	player := core.NewCharacter("player1", "Test Hero")
 	player.Aspects.HighConcept = "Test Concept"
 	player.Aspects.Trouble = "Test Trouble"
 	return engine.GameState{
@@ -82,7 +82,7 @@ func TestYAMLSaver_RoundTrip_FullState(t *testing.T) {
 	dir := t.TempDir()
 	saver := NewYAMLSaver(dir)
 
-	player := character.NewCharacter("player1", "Jesse Calhoun")
+	player := core.NewCharacter("player1", "Jesse Calhoun")
 	player.Aspects.HighConcept = "Gunslinger With a Past"
 	player.Aspects.Trouble = "Wanted Dead or Alive"
 	player.Aspects.AddAspect("Quick Draw")
@@ -90,9 +90,9 @@ func TestYAMLSaver_RoundTrip_FullState(t *testing.T) {
 	player.SetSkill("Notice", dice.Fair)
 	player.FatePoints = 5
 
-	bartender := character.NewCharacter("npc_bartender", "Old Pete")
+	bartender := core.NewCharacter("npc_bartender", "Old Pete")
 	bartender.Aspects.HighConcept = "Grizzled Barkeep"
-	bartender.CharacterType = character.CharacterTypeSupportingNPC
+	bartender.CharacterType = core.CharacterTypeSupportingNPC
 
 	testScene := scene.NewScene("saloon_1", "The Dusty Saloon", "A dimly lit saloon at the edge of town.")
 	testScene.AddSituationAspect(scene.SituationAspect{
@@ -122,7 +122,7 @@ func TestYAMLSaver_RoundTrip_FullState(t *testing.T) {
 					NarrativeProse:    "Jesse pushed through the swinging doors...",
 				},
 			},
-			NPCRegistry:  map[string]*character.Character{"old pete": bartender},
+			NPCRegistry:  map[string]*core.Character{"old pete": bartender},
 			NPCAttitudes: map[string]string{"old pete": "friendly"},
 			LastPurpose:  "Find the informant",
 			LastHook:     "The bartender gestures you over",
@@ -306,7 +306,7 @@ func TestYAMLSaver_RoundTrip_StressTracksAndConsequences(t *testing.T) {
 	dir := t.TempDir()
 	saver := NewYAMLSaver(dir)
 
-	player := character.NewCharacter("player1", "Zero")
+	player := core.NewCharacter("player1", "Zero")
 	player.Aspects.HighConcept = "Ghost in the Machine Netrunner"
 	player.Aspects.Trouble = "Wanted by Three Megacorps"
 	player.Aspects.AddAspect("Military-Grade Cybernetic Reflexes")
@@ -316,16 +316,16 @@ func TestYAMLSaver_RoundTrip_StressTracksAndConsequences(t *testing.T) {
 	player.Refresh = 3
 
 	// Mark a stress box as used
-	player.StressTracks[string(character.PhysicalStress)].Boxes[0] = true
+	player.StressTracks[string(core.PhysicalStress)].Boxes[0] = true
 
 	// Give the player a consequence
-	player.Consequences = append(player.Consequences, character.Consequence{
+	player.Consequences = append(player.Consequences, core.Consequence{
 		ID:     "c1",
-		Type:   character.MildConsequence,
+		Type:   core.MildConsequence,
 		Aspect: "Bruised Ribs",
 	})
 
-	npc := character.NewSupportingNPC("npc_nova", "Nova", "Slick Info Broker")
+	npc := core.NewSupportingNPC("npc_nova", "Nova", "Slick Info Broker")
 
 	testScene := scene.NewScene("scene_2", "Rainy Street", "Rain-soaked neon street.")
 	testScene.AddSituationAspect(scene.SituationAspect{
@@ -346,7 +346,7 @@ func TestYAMLSaver_RoundTrip_StressTracksAndConsequences(t *testing.T) {
 				Genre:   "Cyberpunk",
 				Setting: "Dark near-future city",
 			},
-			NPCRegistry:  map[string]*character.Character{"nova": npc},
+			NPCRegistry:  map[string]*core.Character{"nova": npc},
 			NPCAttitudes: map[string]string{"nova": "friendly"},
 		},
 		Scene: engine.SceneState{
@@ -375,24 +375,24 @@ func TestYAMLSaver_RoundTrip_StressTracksAndConsequences(t *testing.T) {
 
 	// --- Stress tracks must survive ---
 	require.NotNil(t, lp.StressTracks, "stress tracks must not be nil after load")
-	require.Contains(t, lp.StressTracks, string(character.PhysicalStress), "physical stress track missing")
-	require.Contains(t, lp.StressTracks, string(character.MentalStress), "mental stress track missing")
+	require.Contains(t, lp.StressTracks, string(core.PhysicalStress), "physical stress track missing")
+	require.Contains(t, lp.StressTracks, string(core.MentalStress), "mental stress track missing")
 
-	physical := lp.StressTracks[string(character.PhysicalStress)]
-	assert.Equal(t, character.PhysicalStress, physical.Type)
+	physical := lp.StressTracks[string(core.PhysicalStress)]
+	assert.Equal(t, core.PhysicalStress, physical.Type)
 	assert.Equal(t, 2, physical.MaxBoxes, "physical max boxes")
 	require.Len(t, physical.Boxes, 2, "physical boxes length")
 	assert.True(t, physical.Boxes[0], "first physical box should still be checked")
 	assert.False(t, physical.Boxes[1], "second physical box should be unchecked")
 
-	mental := lp.StressTracks[string(character.MentalStress)]
-	assert.Equal(t, character.MentalStress, mental.Type)
+	mental := lp.StressTracks[string(core.MentalStress)]
+	assert.Equal(t, core.MentalStress, mental.Type)
 	assert.Equal(t, 2, mental.MaxBoxes, "mental max boxes")
 	require.Len(t, mental.Boxes, 2, "mental boxes length")
 
 	// --- Consequences must survive ---
 	require.Len(t, lp.Consequences, 1, "consequences must round-trip")
-	assert.Equal(t, character.MildConsequence, lp.Consequences[0].Type)
+	assert.Equal(t, core.MildConsequence, lp.Consequences[0].Type)
 	assert.Equal(t, "Bruised Ribs", lp.Consequences[0].Aspect)
 
 	// --- NPC registry ---
@@ -401,7 +401,7 @@ func TestYAMLSaver_RoundTrip_StressTracksAndConsequences(t *testing.T) {
 	assert.Equal(t, "Nova", loadedNPC.Name)
 	assert.Equal(t, "Slick Info Broker", loadedNPC.Aspects.HighConcept)
 	require.NotNil(t, loadedNPC.StressTracks, "NPC stress tracks must not be nil")
-	require.Contains(t, loadedNPC.StressTracks, string(character.PhysicalStress))
+	require.Contains(t, loadedNPC.StressTracks, string(core.PhysicalStress))
 
 	// --- Scene ---
 	require.NotNil(t, loaded.Scene.CurrentScene)

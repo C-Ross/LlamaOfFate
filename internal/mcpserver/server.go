@@ -11,7 +11,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 
 	"github.com/C-Ross/LlamaOfFate/internal/config"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
@@ -468,7 +468,7 @@ func (gs *GameServer) newEngine(sessionLogger session.SessionLogger) (*engine.En
 // createSessionLogger builds a session logger for this game, mirroring the CLI's
 // setupSessionLogger. The log file is written to the sessions/ directory.
 // Caller must hold gs.mu.
-func (gs *GameServer) createSessionLogger(ls *config.LoadedScenario, player *character.Character) (*session.Logger, error) {
+func (gs *GameServer) createSessionLogger(ls *config.LoadedScenario, player *core.Character) (*session.Logger, error) {
 	label := ls.Raw.Genre
 	if label == "" {
 		label = ls.Raw.ID
@@ -489,19 +489,19 @@ func (gs *GameServer) createSessionLogger(ls *config.LoadedScenario, player *cha
 
 // clonePlayer creates a shallow copy of the player character so that
 // modifications (name/aspect overrides) don't mutate the preset.
-func clonePlayer(src *character.Character) *character.Character {
+func clonePlayer(src *core.Character) *core.Character {
 	if src == nil {
-		p := character.NewCharacter("player1", "Player")
+		p := core.NewCharacter("player1", "Player")
 		return p
 	}
 	cp := *src
-	cp.Aspects = character.Aspects{
+	cp.Aspects = core.Aspects{
 		HighConcept:  src.Aspects.HighConcept,
 		Trouble:      src.Aspects.Trouble,
 		OtherAspects: append([]string(nil), src.Aspects.OtherAspects...),
 	}
 	// Deep copy stress tracks
-	cp.StressTracks = make(map[string]*character.StressTrack, len(src.StressTracks))
+	cp.StressTracks = make(map[string]*core.StressTrack, len(src.StressTracks))
 	for k, v := range src.StressTracks {
 		track := *v
 		track.Boxes = append([]bool(nil), v.Boxes...)

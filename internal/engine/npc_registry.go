@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 )
 
@@ -12,10 +12,10 @@ import (
 // It tracks characters by normalized name and their last-known attitudes.
 type NPCRegistry interface {
 	// Register adds a named NPC with the given attitude. The name is normalized internally.
-	Register(npc *character.Character, attitude string)
+	Register(npc *core.Character, attitude string)
 
 	// Lookup returns the NPC for the given name and true, or nil and false if not found.
-	Lookup(name string) (*character.Character, bool)
+	Lookup(name string) (*core.Character, bool)
 
 	// UpdateAttitude sets the attitude for the given NPC name.
 	UpdateAttitude(name, attitude string)
@@ -28,37 +28,37 @@ type NPCRegistry interface {
 	KnownSummaries() []prompt.NPCSummary
 
 	// Snapshot returns deep copies of the registry and attitude maps for persistence.
-	Snapshot() (registry map[string]*character.Character, attitudes map[string]string)
+	Snapshot() (registry map[string]*core.Character, attitudes map[string]string)
 
 	// Restore replaces the registry contents from previously saved maps.
 	// Nil maps are treated as empty.
-	Restore(registry map[string]*character.Character, attitudes map[string]string)
+	Restore(registry map[string]*core.Character, attitudes map[string]string)
 
 	// All returns all registered NPCs (including taken-out ones).
-	All() map[string]*character.Character
+	All() map[string]*core.Character
 }
 
 // npcRegistryImpl is the concrete implementation of NPCRegistry.
 type npcRegistryImpl struct {
-	registry  map[string]*character.Character
+	registry  map[string]*core.Character
 	attitudes map[string]string
 }
 
 // NewNPCRegistry creates a new, empty NPCRegistry.
 func NewNPCRegistry() NPCRegistry {
 	return &npcRegistryImpl{
-		registry:  make(map[string]*character.Character),
+		registry:  make(map[string]*core.Character),
 		attitudes: make(map[string]string),
 	}
 }
 
-func (r *npcRegistryImpl) Register(npc *character.Character, attitude string) {
+func (r *npcRegistryImpl) Register(npc *core.Character, attitude string) {
 	key := normalizeNPCName(npc.Name)
 	r.registry[key] = npc
 	r.attitudes[key] = attitude
 }
 
-func (r *npcRegistryImpl) Lookup(name string) (*character.Character, bool) {
+func (r *npcRegistryImpl) Lookup(name string) (*core.Character, bool) {
 	npc, found := r.registry[normalizeNPCName(name)]
 	return npc, found
 }
@@ -100,8 +100,8 @@ func (r *npcRegistryImpl) KnownSummaries() []prompt.NPCSummary {
 	return summaries
 }
 
-func (r *npcRegistryImpl) Snapshot() (map[string]*character.Character, map[string]string) {
-	registry := make(map[string]*character.Character, len(r.registry))
+func (r *npcRegistryImpl) Snapshot() (map[string]*core.Character, map[string]string) {
+	registry := make(map[string]*core.Character, len(r.registry))
 	for k, v := range r.registry {
 		registry[k] = v
 	}
@@ -114,9 +114,9 @@ func (r *npcRegistryImpl) Snapshot() (map[string]*character.Character, map[strin
 	return registry, attitudes
 }
 
-func (r *npcRegistryImpl) Restore(registry map[string]*character.Character, attitudes map[string]string) {
+func (r *npcRegistryImpl) Restore(registry map[string]*core.Character, attitudes map[string]string) {
 	if registry == nil {
-		registry = make(map[string]*character.Character)
+		registry = make(map[string]*core.Character)
 	}
 	if attitudes == nil {
 		attitudes = make(map[string]string)
@@ -125,7 +125,7 @@ func (r *npcRegistryImpl) Restore(registry map[string]*character.Character, atti
 	r.attitudes = attitudes
 }
 
-func (r *npcRegistryImpl) All() map[string]*character.Character {
+func (r *npcRegistryImpl) All() map[string]*core.Character {
 	return r.registry
 }
 

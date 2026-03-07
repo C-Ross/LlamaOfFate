@@ -242,9 +242,8 @@ LlamaOfFate/
 │   ├── mcpserver/              # MCP (Model Context Protocol) server
 │   └── llmeval-tracker/        # LLM test flakiness tracking tool
 ├── internal/
-│   ├── core/                   # Core game mechanics
+│   ├── core/                   # Core game mechanics (character, aspects, stress, consequences, skills)
 │   │   ├── action/             # Action resolution system
-│   │   ├── character/          # Character management
 │   │   ├── dice/               # Dice rolling and probability
 │   │   └── scene/              # Scene and conflict management
 │   ├── engine/                 # Game engine (scene/scenario managers, action parsing, conflict resolution)

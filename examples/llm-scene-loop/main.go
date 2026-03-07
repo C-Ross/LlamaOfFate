@@ -9,7 +9,7 @@ import (
 	"os"
 
 	gameconfig "github.com/C-Ross/LlamaOfFate/internal/config"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
@@ -24,8 +24,8 @@ type SceneConfig struct {
 	Name        string
 	Description string
 	Scenario    *scene.Scenario
-	Player      *character.Character
-	NPCs        []*character.Character
+	Player      *core.Character
+	NPCs        []*core.Character
 	Scene       *scene.Scene
 	Farewell    string
 }

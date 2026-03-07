@@ -6,7 +6,6 @@ import (
 
 	"github.com/C-Ross/LlamaOfFate/internal/config"
 	"github.com/C-Ross/LlamaOfFate/internal/core"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/ui/web"
@@ -15,7 +14,7 @@ import (
 // presetEntry bundles a scenario with its matching default player character.
 type presetEntry struct {
 	Scenario *scene.Scenario
-	Player   *character.Character
+	Player   *core.Character
 	Meta     web.ScenarioPreset // Wire-format metadata for the setup screen
 }
 
@@ -67,7 +66,7 @@ func allPresetMeta() []web.ScenarioPreset {
 
 // lookupPreset returns the scenario and player for a given preset ID,
 // or an error if the ID is not recognized.
-func lookupPreset(id string) (*scene.Scenario, *character.Character, error) {
+func lookupPreset(id string) (*scene.Scenario, *core.Character, error) {
 	p, ok := getPreset(id)
 	if !ok {
 		return nil, nil, fmt.Errorf("unknown preset: %q", id)
@@ -77,8 +76,8 @@ func lookupPreset(id string) (*scene.Scenario, *character.Character, error) {
 
 // buildCustomPlayer creates a player character from custom setup data with
 // a default skill pyramid. The genre determines which skills are selected.
-func buildCustomPlayer(name, highConcept, trouble, genre string) *character.Character {
-	player := character.NewCharacter("player1", name)
+func buildCustomPlayer(name, highConcept, trouble, genre string) *core.Character {
+	player := core.NewCharacter("player1", name)
 	player.Aspects.HighConcept = highConcept
 	player.Aspects.Trouble = trouble
 	applyDefaultSkillPyramid(player, genre)
@@ -86,7 +85,7 @@ func buildCustomPlayer(name, highConcept, trouble, genre string) *character.Char
 }
 
 // applyDefaultSkillPyramid assigns a genre-appropriate default skill pyramid.
-func applyDefaultSkillPyramid(player *character.Character, genre string) {
+func applyDefaultSkillPyramid(player *core.Character, genre string) {
 	switch genre {
 	case "Cyberpunk":
 		player.SetSkill(core.SkillBurglary, dice.Great)
