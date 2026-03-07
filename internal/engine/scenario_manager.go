@@ -23,21 +23,21 @@ type ScenarioManager struct {
 	engine               *Engine
 	player               *core.Character
 	sessionLogger        session.SessionLogger
-	scenario             *scene.Scenario        // The current scenario with problem and story questions
-	initialScene         *scene.Scene           // Optional pre-configured starting scene
-	initialNPCs          []*core.Character // NPCs for initial scene
-	sceneSummaries       []prompt.SceneSummary  // Summaries of recent scenes (sliding window of last 3)
-	lastGeneratedPurpose string                 // Purpose from the most recently generated scene
-	lastGeneratedHook    string                 // Opening hook from the most recently generated scene
-	sceneCount           int                    // Total scenes completed in this scenario
-	scenarioCount        int                    // Current scenario number (set by GameManager)
-	npcRegistry          NPCRegistry            // Named NPCs persisted across scenes
-	saveFunc             func() error           // Optional callback to trigger a save via GameManager
-	resumed              bool                   // True when restoring from a saved game
-	started              bool                   // True after Start has been called
-	currentScene         *scene.Scene           // The active scene (set by Start, updated by HandleInput)
-	lastTransitionHint   string                 // Transition hint from the last scene end
-	exitAfterScene       bool                   // Exit after the first scene ends instead of generating next scenes
+	scenario             *scene.Scenario       // The current scenario with problem and story questions
+	initialScene         *scene.Scene          // Optional pre-configured starting scene
+	initialNPCs          []*core.Character     // NPCs for initial scene
+	sceneSummaries       []prompt.SceneSummary // Summaries of recent scenes (sliding window of last 3)
+	lastGeneratedPurpose string                // Purpose from the most recently generated scene
+	lastGeneratedHook    string                // Opening hook from the most recently generated scene
+	sceneCount           int                   // Total scenes completed in this scenario
+	scenarioCount        int                   // Current scenario number (set by GameManager)
+	npcRegistry          NPCRegistry           // Named NPCs persisted across scenes
+	saveFunc             func() error          // Optional callback to trigger a save via GameManager
+	resumed              bool                  // True when restoring from a saved game
+	started              bool                  // True after Start has been called
+	currentScene         *scene.Scene          // The active scene (set by Start, updated by HandleInput)
+	lastTransitionHint   string                // Transition hint from the last scene end
+	exitAfterScene       bool                  // Exit after the first scene ends instead of generating next scenes
 }
 
 // NewScenarioManager creates a new scenario manager.

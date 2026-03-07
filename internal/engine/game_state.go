@@ -59,14 +59,14 @@ func (gs *GameState) Validate() error {
 // the player character, scenario progress, NPC registry, and scene summaries.
 type ScenarioState struct {
 	Player         *core.Character            `yaml:"player"`
-	Scenario       *scene.Scenario                 `yaml:"scenario"`
-	ScenarioCount  int                             `yaml:"scenario_count"`
-	SceneCount     int                             `yaml:"scene_count"`
-	SceneSummaries []prompt.SceneSummary           `yaml:"scene_summaries"`
+	Scenario       *scene.Scenario            `yaml:"scenario"`
+	ScenarioCount  int                        `yaml:"scenario_count"`
+	SceneCount     int                        `yaml:"scene_count"`
+	SceneSummaries []prompt.SceneSummary      `yaml:"scene_summaries"`
 	NPCRegistry    map[string]*core.Character `yaml:"npc_registry"`
-	NPCAttitudes   map[string]string               `yaml:"npc_attitudes"`
-	LastPurpose    string                          `yaml:"last_generated_purpose,omitempty"`
-	LastHook       string                          `yaml:"last_generated_hook,omitempty"`
+	NPCAttitudes   map[string]string          `yaml:"npc_attitudes"`
+	LastPurpose    string                     `yaml:"last_generated_purpose,omitempty"`
+	LastHook       string                     `yaml:"last_generated_hook,omitempty"`
 }
 
 // SceneState holds state managed by SceneManager:

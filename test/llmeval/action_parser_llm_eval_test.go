@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core"
+	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/stretchr/testify/assert"
 )
@@ -19,11 +19,11 @@ type ActionParserTestCase struct {
 	RawInput           string
 	Context            string
 	ExpectedType       action.ActionType
-	ExpectedSkills     []string               // Any of these skills would be acceptable
-	ExpectedDifficulty int                    // Expected difficulty (ignored for Attack actions)
-	Description        string                 // Human-readable description of why this should be classified this way
+	ExpectedSkills     []string          // Any of these skills would be acceptable
+	ExpectedDifficulty int               // Expected difficulty (ignored for Attack actions)
+	Description        string            // Human-readable description of why this should be classified this way
 	OtherCharacters    []*core.Character // NPCs in the scene (optional)
-	ExpectedOpposition string                 // "passive" or "active"; empty means skip check
+	ExpectedOpposition string            // "passive" or "active"; empty means skip check
 }
 
 // getTestCharacter returns the shared eval character.

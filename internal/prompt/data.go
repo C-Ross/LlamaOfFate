@@ -3,8 +3,8 @@ package prompt
 import (
 	"fmt"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core"
+	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
@@ -85,7 +85,7 @@ type SceneResponseData struct {
 	InteractionType     string
 	OtherCharacters     []*core.Character
 	TakenOutCharacters  []*core.Character // Characters defeated earlier in this scene
-	ScenePurpose        string                 // Dramatic question driving this scene
+	ScenePurpose        string            // Dramatic question driving this scene
 }
 
 // ConflictResponseData holds the data for conflict response template
@@ -355,9 +355,9 @@ type FateNarrationResult struct {
 // AspectGenerationRequest holds the data for aspect generation template
 type AspectGenerationRequest struct {
 	Character       *core.Character `json:"character"`
-	Action          *action.Action       `json:"action"`
-	Outcome         *dice.Outcome        `json:"outcome"`
-	Context         string               `json:"context"`                    // Scene description or situational context
-	TargetType      string               `json:"target_type"`                // "character", "scene", "object", "situation"
-	ExistingAspects []string             `json:"existing_aspects,omitempty"` // Aspects already in play
+	Action          *action.Action  `json:"action"`
+	Outcome         *dice.Outcome   `json:"outcome"`
+	Context         string          `json:"context"`                    // Scene description or situational context
+	TargetType      string          `json:"target_type"`                // "character", "scene", "object", "situation"
+	ExistingAspects []string        `json:"existing_aspects,omitempty"` // Aspects already in play
 }

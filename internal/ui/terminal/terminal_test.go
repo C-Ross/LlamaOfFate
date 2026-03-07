@@ -19,8 +19,8 @@ type mockSceneInfo struct {
 	conversationHistory []uicontract.ConversationEntry
 }
 
-func (m *mockSceneInfo) GetCurrentScene() *scene.Scene   { return m.scene }
-func (m *mockSceneInfo) GetPlayer() *core.Character { return m.player }
+func (m *mockSceneInfo) GetCurrentScene() *scene.Scene { return m.scene }
+func (m *mockSceneInfo) GetPlayer() *core.Character    { return m.player }
 func (m *mockSceneInfo) GetConversationHistory() []uicontract.ConversationEntry {
 	return m.conversationHistory
 }

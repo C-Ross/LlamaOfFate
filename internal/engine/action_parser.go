@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core"
+	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
@@ -19,9 +19,9 @@ import (
 // ActionParseRequest represents a request to parse user input into an action
 type ActionParseRequest struct {
 	Character       *core.Character   `json:"character"`
-	RawInput        string                 `json:"raw_input"`
-	Context         string                 `json:"context,omitempty"`          // Scene description, recent events, etc.
-	Scene           interface{}            `json:"scene,omitempty"`            // Current scene object
+	RawInput        string            `json:"raw_input"`
+	Context         string            `json:"context,omitempty"`          // Scene description, recent events, etc.
+	Scene           interface{}       `json:"scene,omitempty"`            // Current scene object
 	OtherCharacters []*core.Character `json:"other_characters,omitempty"` // Other characters in the scene
 }
 
