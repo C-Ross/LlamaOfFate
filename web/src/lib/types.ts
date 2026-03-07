@@ -52,6 +52,8 @@ export interface CustomSetup {
   highConcept: string
   trouble: string
   genre: string
+  aspects?: string[]
+  skills?: Record<string, number>
 }
 
 export interface ClientSetupCustomMessage {
