@@ -39,6 +39,7 @@ Fate™ is a trademark of Evil Hat Productions, LLC.
 ### Fate Core Mechanics
 - **Aspect System**: Full support for character, situation, and consequence aspects
 - **Complete Skill System**: All 18 default Fate Core skills with proper action mappings
+- **Custom Character Creation**: Support for custom aspects and skill pyramids during game setup
 - **Stress and Consequences**: Proper implementation of physical and mental damage
 - **Fate Point Economy**: Track and manage fate point spending and gaining
 - **Challenge System**: Multi-task challenges with skill-based overcome actions and outcome tallying
@@ -224,7 +225,20 @@ just run
 just web-dev
 ```
 
-## Saving and Loading Games
+## Game Features
+
+### Character Creation
+
+LlamaOfFate supports flexible character creation with custom aspects and skill pyramids:
+
+- **Custom Aspects**: Define your character's High Concept, Trouble, and additional aspects during setup
+- **Custom Skill Pyramid**: Provide your own skill ratings following Fate Core pyramid rules (e.g., one +4, two +3, three +2, four +1)
+- **Genre Defaults**: If custom skills aren't provided, the system applies genre-appropriate defaults based on your scenario
+- **Validation**: The system validates custom skill pyramids to ensure they follow Fate Core rules
+
+When using the web UI or programmatic setup (via WebSocket or MCP server), you can supply custom character data during game initialization.
+
+### Saving and Loading Games
 
 LlamaOfFate automatically saves your game progress at key points during play. When you restart the application, it will automatically resume from your last save.
 
@@ -317,6 +331,7 @@ LlamaOfFate/
 - ✅ WebSocket server backend
 - ✅ MCP (Model Context Protocol) server for programmatic game interaction
 - ✅ Ollama support for local LLM backend (no cloud dependencies required)
+- ✅ Custom character creation with aspects and skill pyramids
 
 ### Planned Features
 - 📋 Contest system (competitive opposed exchanges)
