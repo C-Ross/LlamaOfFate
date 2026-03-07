@@ -132,6 +132,7 @@ LlamaOfFate uses **GitHub Agentic Workflows** ([gh-aw](https://github.com/github
 - **readme-updater**: Automatically updates README.md when significant changes are pushed to main
 - **skills-updater**: Updates `.github/skills/` documentation when relevant code changes
 - **coverage-improver**: Analyzes test coverage and suggests improvements
+- **issue-implemented-checker**: Weekly scan of open issues to detect and close ones that have been implemented
 
 These workflows [run automatically](https://github.github.com/gh-aw/introduction/overview/).
 
