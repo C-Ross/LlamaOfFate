@@ -74,8 +74,41 @@ func lookupPreset(id string) (*scene.Scenario, *core.Character, error) {
 	return p.Scenario, p.Player, nil
 }
 
+// buildCustomPlayerFromSetup creates a player character from the full custom
+// setup data. It applies additional aspects and custom skills when provided,
+// falling back to genre defaults for skills when setup.Skills is nil.
+func buildCustomPlayerFromSetup(setup *web.CustomSetup) (*core.Character, error) {
+	player := core.NewCharacter("player1", setup.Name)
+	player.Aspects.HighConcept = setup.HighConcept
+	player.Aspects.Trouble = setup.Trouble
+
+	for _, a := range setup.Aspects {
+		player.Aspects.AddAspect(a)
+	}
+
+	if len(setup.Skills) > 0 {
+		// Convert wire format (int) to dice.Ladder for validation.
+		ladderSkills := make(map[string]dice.Ladder, len(setup.Skills))
+		for name, level := range setup.Skills {
+			ladderSkills[name] = dice.Ladder(level)
+		}
+		if err := core.ValidateStandardSkillPyramid(ladderSkills); err != nil {
+			return nil, fmt.Errorf("invalid skill pyramid: %w", err)
+		}
+		for name, level := range ladderSkills {
+			player.SetSkill(name, level)
+		}
+	} else {
+		applyDefaultSkillPyramid(player, setup.Genre)
+	}
+
+	return player, nil
+}
+
 // buildCustomPlayer creates a player character from custom setup data with
 // a default skill pyramid. The genre determines which skills are selected.
+//
+// Deprecated: Use buildCustomPlayerFromSetup for new code.
 func buildCustomPlayer(name, highConcept, trouble, genre string) *core.Character {
 	player := core.NewCharacter("player1", name)
 	player.Aspects.HighConcept = highConcept

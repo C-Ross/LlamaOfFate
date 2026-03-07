@@ -15,24 +15,9 @@ OVERCOME examples: picking a lock to get through, talking past a guard, shoulder
 CREATE AN ADVANTAGE examples: scouting an enemy camp, studying a duelist's fighting style, setting a tripwire trap, spreading rumors to damage reputation, finding cover before a fight
 
 FATE CORE SKILLS (use exact names):
-- Athletics: Physical movement, jumping, running, climbing
-- Burglary: Breaking and entering, lockpicking, security systems
-- Contacts: Social networks, finding people, gathering information
-- Crafts: Making, breaking, or fixing things
-- Deceive: Lying, disguises, creating false impressions. ONLY for deliberately dishonest actions — never for routine honest interactions
-- Drive: Operating vehicles and handling chases
-- Empathy: Reading people's emotions and motivations
-- Fight: Hand-to-hand combat, melee weapons, and close-range takedowns
-- Investigate: Careful examination, research, following clues
-- Lore: Education, knowledge, specialized information
-- Notice: Awareness, perception, spotting things
-- Physique: Raw strength, endurance, health
-- Provoke: Getting reactions, intimidation, social pressure
-- Rapport: Honest social interaction, genuine requests, charm, building trust. Use for any straightforward social exchange: ordering, buying, asking, persuading honestly
-- Resources: Money, equipment, lifestyle
-- Shoot: Ranged combat and thrown weapons
-- Stealth: Avoiding detection, moving unseen
-- Will: Mental fortitude, resisting mental attacks
+{{- range .Skills}}
+- {{.Name}}: {{.Description}}
+{{- end}}
 
 ATTACK SKILL SELECTION:
 For attacks, pick the skill for HOW harm is dealt, not how they got into position:

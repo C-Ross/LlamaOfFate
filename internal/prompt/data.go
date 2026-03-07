@@ -317,7 +317,39 @@ type ActionParseTemplateData struct {
 // ActionParseSystemData holds the data for the action parse system prompt template.
 // It controls conditional sections like active vs passive opposition guidance.
 type ActionParseSystemData struct {
-	HasOtherCharacters bool // When false, the prompt presents passive opposition as the only option
+	HasOtherCharacters bool               // When false, the prompt presents passive opposition as the only option
+	Skills             []SkillDescription // Skill list for the prompt; if nil, defaults to FateCoreSkillDescriptions
+}
+
+// SkillDescription pairs a skill name with its LLM-facing description for
+// the action parse system prompt.
+type SkillDescription struct {
+	Name        string
+	Description string
+}
+
+// FateCoreSkillDescriptions provides the canonical 18 Fate Core skills with
+// descriptions suitable for the LLM action-parse prompt. The slice is in
+// alphabetical order matching core.FateCoreSkills.
+var FateCoreSkillDescriptions = []SkillDescription{
+	{core.SkillAthletics, "Physical movement, jumping, running, climbing"},
+	{core.SkillBurglary, "Breaking and entering, lockpicking, security systems"},
+	{core.SkillContacts, "Social networks, finding people, gathering information"},
+	{core.SkillCrafts, "Making, breaking, or fixing things"},
+	{core.SkillDeceive, "Lying, disguises, creating false impressions. ONLY for deliberately dishonest actions \u2014 never for routine honest interactions"},
+	{core.SkillDrive, "Operating vehicles and handling chases"},
+	{core.SkillEmpathy, "Reading people's emotions and motivations"},
+	{core.SkillFight, "Hand-to-hand combat, melee weapons, and close-range takedowns"},
+	{core.SkillInvestigate, "Careful examination, research, following clues"},
+	{core.SkillLore, "Education, knowledge, specialized information"},
+	{core.SkillNotice, "Awareness, perception, spotting things"},
+	{core.SkillPhysique, "Raw strength, endurance, health"},
+	{core.SkillProvoke, "Getting reactions, intimidation, social pressure"},
+	{core.SkillRapport, "Honest social interaction, genuine requests, charm, building trust. Use for any straightforward social exchange: ordering, buying, asking, persuading honestly"},
+	{core.SkillResources, "Money, equipment, lifestyle"},
+	{core.SkillShoot, "Ranged combat and thrown weapons"},
+	{core.SkillStealth, "Avoiding detection, moving unseen"},
+	{core.SkillWill, "Mental fortitude, resisting mental attacks"},
 }
 
 // FateNarrationData holds the data for the fate narration template.

@@ -278,7 +278,11 @@ func RenderActionParse(data ActionParseTemplateData) (string, error) {
 
 // RenderActionParseSystem renders the action parse system prompt.
 // The data parameter controls conditional sections (e.g. active vs passive opposition).
+// If data.Skills is nil, the standard Fate Core skill descriptions are used.
 func RenderActionParseSystem(data ActionParseSystemData) (string, error) {
+	if data.Skills == nil {
+		data.Skills = FateCoreSkillDescriptions
+	}
 	return executeTemplate(ActionParseSystemPrompt, data)
 }
 

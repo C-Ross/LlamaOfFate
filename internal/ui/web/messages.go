@@ -56,10 +56,12 @@ type ClientMessage struct {
 
 // CustomSetup holds the character data for LLM-generated custom scenarios.
 type CustomSetup struct {
-	Name        string `json:"name"`
-	HighConcept string `json:"highConcept"`
-	Trouble     string `json:"trouble"`
-	Genre       string `json:"genre"`
+	Name        string         `json:"name"`
+	HighConcept string         `json:"highConcept"`
+	Trouble     string         `json:"trouble"`
+	Genre       string         `json:"genre"`
+	Aspects     []string       `json:"aspects,omitempty"` // Additional character aspects (beyond high concept and trouble)
+	Skills      map[string]int `json:"skills,omitempty"`  // Skill name → ladder int value; nil = use genre defaults
 }
 
 // ParseClientMessage deserializes a JSON byte slice into a ClientMessage.

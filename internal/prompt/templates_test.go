@@ -654,9 +654,9 @@ func TestRenderScenarioResolution(t *testing.T) {
 }
 
 // TestActionParseSystemPrompt_SkillsMatchCanonicalList verifies that the skill
-// names listed in the action parse system prompt exactly match the canonical
-// FateCoreSkills list. This catches drift between the prompt template and the
-// authoritative skill list in internal/core/skills_list.go.
+// names in the rendered prompt exactly match the canonical FateCoreSkills list.
+// Since skills are now data-driven via FateCoreSkillDescriptions, this test
+// confirms the rendering pipeline produces the expected skill lines.
 func TestActionParseSystemPrompt_SkillsMatchCanonicalList(t *testing.T) {
 	result, err := RenderActionParseSystem(ActionParseSystemData{HasOtherCharacters: true})
 	require.NoError(t, err)
@@ -673,5 +673,14 @@ func TestActionParseSystemPrompt_SkillsMatchCanonicalList(t *testing.T) {
 	sort.Strings(templateSkills)
 
 	assert.Equal(t, core.FateCoreSkills, templateSkills,
-		"skills in action_parse_system_prompt.tmpl must match core.FateCoreSkills")
+		"skills in rendered action_parse_system_prompt must match core.FateCoreSkills")
+
+	// Verify FateCoreSkillDescriptions covers exactly the canonical list.
+	var descNames []string
+	for _, sd := range FateCoreSkillDescriptions {
+		descNames = append(descNames, sd.Name)
+	}
+	sort.Strings(descNames)
+	assert.Equal(t, core.FateCoreSkills, descNames,
+		"FateCoreSkillDescriptions must cover exactly core.FateCoreSkills")
 }

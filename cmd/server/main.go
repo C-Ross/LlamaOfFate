@@ -142,13 +142,11 @@ func newGameSession(ctx context.Context, llmClient llm.LLMClient, gameID string,
 			return nil, err
 		}
 	} else if setup.Custom != nil {
-		player = buildCustomPlayer(
-			setup.Custom.Name,
-			setup.Custom.HighConcept,
-			setup.Custom.Trouble,
-			setup.Custom.Genre,
-		)
 		var err error
+		player, err = buildCustomPlayerFromSetup(setup.Custom)
+		if err != nil {
+			return nil, fmt.Errorf("custom player: %w", err)
+		}
 		scenario, err = generateScenario(ctx, llmClient, setup.Custom)
 		if err != nil {
 			return nil, fmt.Errorf("scenario generation: %w", err)
@@ -201,6 +199,7 @@ func generateScenario(ctx context.Context, client llm.LLMClient, custom *web.Cus
 		PlayerName:        custom.Name,
 		PlayerHighConcept: custom.HighConcept,
 		PlayerTrouble:     custom.Trouble,
+		PlayerAspects:     custom.Aspects,
 		Genre:             custom.Genre,
 	}
 
