@@ -145,3 +145,24 @@ func (a *Action) IsSuccessWithStyle() bool {
 	}
 	return a.Outcome.Type == dice.SuccessWithStyle
 }
+
+// FreeInvokesForOutcome returns the number of free invokes and whether the
+// result is a boost for a Create an Advantage action, based on the outcome.
+//
+// Per Fate Core SRD (Create an Advantage):
+//   - Success with Style → 2 free invokes, not a boost
+//   - Success           → 1 free invoke, not a boost
+//   - Tie               → 1 free invoke on a boost aspect
+//   - Failure           → 0 free invokes
+func FreeInvokesForOutcome(outcome dice.OutcomeType) (freeInvokes int, isBoost bool) {
+	switch outcome {
+	case dice.SuccessWithStyle:
+		return 2, false
+	case dice.Success:
+		return 1, false
+	case dice.Tie:
+		return 1, true
+	default: // dice.Failure
+		return 0, false
+	}
+}
