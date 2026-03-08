@@ -202,20 +202,18 @@ func parseActionType(actionTypeStr string) (action.ActionType, error) {
 		return action.Defend, nil
 	}
 
-	// Check if LLM returned a skill name instead of action type
-	// Map aggressive/confrontational skills to Attack
-	attackSkills := map[string]bool{
-		"fight": true, "shoot": true, "provoke": true,
-	}
-	if attackSkills[normalized] {
-		return action.Attack, nil
+	// Check if LLM returned a skill name instead of action type.
+	// Title-case the first letter to match core skill constants (e.g. "fight" → "Fight").
+	if len(normalized) > 0 {
+		titled := strings.ToUpper(normalized[:1]) + normalized[1:]
+		if core.IsPhysicalAttackSkill(titled) || core.IsMentalAttackSkill(titled) {
+			return action.Attack, nil
+		}
 	}
 
-	// Map defensive skills to Defend
-	defendSkills := map[string]bool{
-		"athletics": true, "will": true, "physique": true,
-	}
-	if defendSkills[normalized] {
+	// Map well-known defensive skills to Defend.
+	// Athletics (physical defense) and Will (mental defense) are the Fate Core defaults.
+	if normalized == "athletics" || normalized == "will" {
 		return action.Defend, nil
 	}
 

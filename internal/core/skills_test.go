@@ -164,6 +164,11 @@ func TestCalculateInitiative(t *testing.T) {
 	assert.Equal(t, 0, CalculateInitiative(char5, scene.PhysicalConflict))
 }
 
+func TestStressTypeForConflict(t *testing.T) {
+	assert.Equal(t, PhysicalStress, StressTypeForConflict(scene.PhysicalConflict))
+	assert.Equal(t, MentalStress, StressTypeForConflict(scene.MentalConflict))
+}
+
 func TestConcessionFatePoints(t *testing.T) {
 	tests := []struct {
 		name             string

@@ -547,10 +547,7 @@ func (cm *ConflictManager) applyAttackDamageToPlayer(ctx context.Context, outcom
 		if shifts < 1 {
 			shifts = 1
 		}
-		stressType := core.PhysicalStress
-		if cm.currentScene.ConflictState.Type == scene.MentalConflict {
-			stressType = core.MentalStress
-		}
+		stressType := core.StressTypeForConflict(cm.currentScene.ConflictState.Type)
 
 		// Try to absorb with stress track
 		absorbed := cm.player.TakeStress(stressType, shifts)

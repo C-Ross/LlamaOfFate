@@ -150,6 +150,17 @@ func DefaultAttackSkillForConflict(conflictType scene.ConflictType) string {
 	return SkillFight
 }
 
+// StressTypeForConflict returns the stress track type for a given conflict type.
+// Per Fate Core rules:
+// - Physical conflicts deal physical stress
+// - Mental conflicts deal mental stress
+func StressTypeForConflict(conflictType scene.ConflictType) StressTrackType {
+	if conflictType == scene.MentalConflict {
+		return MentalStress
+	}
+	return PhysicalStress
+}
+
 // ConcessionFatePoints returns the number of fate points awarded for conceding a conflict.
 // Per Fate Core: "you get a fate point for choosing to concede. On top of that,
 // if you've sustained any consequences in this conflict, you get an additional

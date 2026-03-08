@@ -1,6 +1,10 @@
 package scene
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
+)
 
 // TaskStatus tracks the resolution state of a single challenge task.
 type TaskStatus string
@@ -12,6 +16,22 @@ const (
 	TaskFailed             TaskStatus = "failed"
 	TaskTied               TaskStatus = "tied"
 )
+
+// TaskStatusForOutcome maps a dice OutcomeType to the corresponding TaskStatus.
+// Per Fate Core rules: succeed with style beats a plain success, a tie means
+// partial success at a cost, and anything else is a failure.
+func TaskStatusForOutcome(outcome dice.OutcomeType) TaskStatus {
+	switch outcome {
+	case dice.SuccessWithStyle:
+		return TaskSucceededWithStyle
+	case dice.Success:
+		return TaskSucceeded
+	case dice.Tie:
+		return TaskTied
+	default:
+		return TaskFailed
+	}
+}
 
 // ChallengeResult describes the overall outcome of a completed challenge.
 type ChallengeResult string

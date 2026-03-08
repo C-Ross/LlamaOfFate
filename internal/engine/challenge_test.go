@@ -183,10 +183,10 @@ func TestChallengeManager_PlayerSkillNames(t *testing.T) {
 }
 
 func TestOutcomeToTaskStatus(t *testing.T) {
-	assert.Equal(t, scene.TaskSucceededWithStyle, outcomeToTaskStatus(dice.SuccessWithStyle))
-	assert.Equal(t, scene.TaskSucceeded, outcomeToTaskStatus(dice.Success))
-	assert.Equal(t, scene.TaskTied, outcomeToTaskStatus(dice.Tie))
-	assert.Equal(t, scene.TaskFailed, outcomeToTaskStatus(dice.Failure))
+	assert.Equal(t, scene.TaskSucceededWithStyle, scene.TaskStatusForOutcome(dice.SuccessWithStyle))
+	assert.Equal(t, scene.TaskSucceeded, scene.TaskStatusForOutcome(dice.Success))
+	assert.Equal(t, scene.TaskTied, scene.TaskStatusForOutcome(dice.Tie))
+	assert.Equal(t, scene.TaskFailed, scene.TaskStatusForOutcome(dice.Failure))
 }
 
 func TestBuildChallengeTaskInfos(t *testing.T) {
