@@ -69,9 +69,9 @@ func TestApplyAttackDamageToPlayer_SuccessStressAbsorbed(t *testing.T) {
 	assert.True(t, track.Boxes[0], "box 1 should be checked")
 }
 
-// Fate Core SRD: Success with Style on an attack still deals shifts of stress
-// (which will be >= 3) — there is no special bonus on attack SWS beyond high shifts.
-func TestApplyAttackDamageToPlayer_SuccessWithStyle_HighShiftsAbsorbed(t *testing.T) {
+// Fate Core SRD (Attack, SWS): Default behavior deals full shifts (optional
+// boost trade is not taken). A 2-shift SWS hit applies 2 stress.
+func TestApplyAttackDamageToPlayer_SuccessWithStyle_DealsFullShifts(t *testing.T) {
 	sm, player, attacker := setupConflictSM(t, nil)
 
 	// Default character has 2 stress boxes, so a 2-shift hit uses box 2.

@@ -12,6 +12,7 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core"
+	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
@@ -536,19 +537,66 @@ func (cm *ConflictManager) processFateNarration(ctx context.Context, input strin
 	return []GameEvent{NarrativeEvent{Text: result.Narrative}}
 }
 
+// resolvePlayerAttack handles all mechanical effects of a player attack action
+// (shifts, damage, tie/defend-with-style boosts). This is the single point of
+// truth for player→NPC attack resolution in a conflict.
+func (cm *ConflictManager) resolvePlayerAttack(ctx context.Context, parsedAction *action.Action, target *core.Character) []GameEvent {
+	if target == nil {
+		slog.Warn("Attack has no valid target, cannot apply damage",
+			"component", componentSceneManager,
+			"action_id", parsedAction.ID,
+			"target", parsedAction.Target)
+		return []GameEvent{PlayerAttackResultEvent{
+			TargetMissing: true,
+			TargetHint:    parsedAction.Target,
+		}}
+	}
+
+	shifts, side := action.ResolveAttackOutcome(parsedAction.Outcome)
+
+	var events []GameEvent
+
+	switch {
+	case shifts > 0:
+		stressType := core.StressTypeForAttack(parsedAction.Skill)
+
+		events = append(events, PlayerAttackResultEvent{
+			TargetName: target.Name,
+			Shifts:     shifts,
+		})
+
+		dmgEvent := cm.applyDamageToTarget(ctx, target, shifts, stressType)
+		events = append(events, dmgEvent)
+	case side == action.AttackerBoost:
+		// Tie: attacker gets a boost (no damage dealt) — Fate Core SRD Attack.
+		events = append(events, PlayerAttackResultEvent{
+			TargetName: target.Name,
+			IsTie:      true,
+		})
+		boostName := cm.actions.generateBoostName(ctx, cm.player, parsedAction.Skill, parsedAction.Description, "Fleeting Opening")
+		events = append(events, cm.actions.createBoost(boostName, cm.player.ID))
+	case side == action.DefenderBoost:
+		// Defend with style — defender gets a boost (Fate Core SRD Defend).
+		defDesc := fmt.Sprintf("defending against %s's attack", cm.player.Name)
+		defSkill := core.DefenseSkillForAttack(parsedAction.Skill)
+		boostName := cm.actions.generateBoostName(ctx, target, defSkill, defDesc, "Deflected with Ease")
+		events = append(events, cm.actions.createBoost(boostName, target.ID))
+	}
+
+	return events
+}
+
 // applyAttackDamageToPlayer applies attack damage to the player and returns events.
 func (cm *ConflictManager) applyAttackDamageToPlayer(ctx context.Context, outcome *dice.Outcome, attacker *core.Character, attackCtx prompt.AttackContext) []GameEvent {
 	var events []GameEvent
 
-	// Apply stress if the attack hit
-	switch outcome.Type {
-	case dice.Success, dice.SuccessWithStyle:
-		shifts := outcome.Shifts
-		if shifts < 1 {
-			shifts = 1
-		}
-		stressType := core.StressTypeForConflict(cm.currentScene.ConflictState.Type)
+	// Resolve attack shifts and side effects via core rules.
+	shifts, side := action.ResolveAttackOutcome(outcome)
 
+	switch {
+	case shifts > 0:
+		stressType := core.StressTypeForConflict(cm.currentScene.ConflictState.Type)
+    
 		// Try to absorb with stress track
 		absorbed := cm.player.TakeStress(stressType, shifts)
 		if absorbed {
@@ -562,20 +610,21 @@ func (cm *ConflictManager) applyAttackDamageToPlayer(ctx context.Context, outcom
 			overflowEvents := cm.handleStressOverflow(ctx, shifts, stressType, attacker, attackCtx)
 			events = append(events, overflowEvents...)
 		}
-	case dice.Tie:
-		// Attacker gets a boost on a tie (no damage to player).
+	case side == action.AttackerBoost:
+		// Tie: attacker gets a boost (no damage to player).
 		events = append(events, PlayerDefendedEvent{IsTie: true})
 		boostName := cm.actions.generateBoostName(ctx, attacker, attackCtx.Skill, attackCtx.Description, "Fleeting Opening")
 		events = append(events, cm.actions.createBoost(boostName, attacker.ID))
-	default:
-		// Attack failed — check if player defended with style (3+ margin).
+	case side == action.DefenderBoost:
+		// Defend with style — player gets a boost.
 		events = append(events, PlayerDefendedEvent{IsTie: false})
-		if outcome.Shifts <= -3 {
-			defDesc := fmt.Sprintf("defending against %s's attack", attacker.Name)
-			defSkill := core.DefenseSkillForAttack(attackCtx.Skill)
-			boostName := cm.actions.generateBoostName(ctx, cm.player, defSkill, defDesc, "Deflected with Ease")
-			events = append(events, cm.actions.createBoost(boostName, cm.player.ID))
-		}
+		defDesc := fmt.Sprintf("defending against %s's attack", attacker.Name)
+		defSkill := core.DefenseSkillForAttack(attackCtx.Skill)
+		boostName := cm.actions.generateBoostName(ctx, cm.player, defSkill, defDesc, "Deflected with Ease")
+		events = append(events, cm.actions.createBoost(boostName, cm.player.ID))
+	default:
+		// Plain failure — no boost.
+		events = append(events, PlayerDefendedEvent{IsTie: false})
 	}
 
 	return events

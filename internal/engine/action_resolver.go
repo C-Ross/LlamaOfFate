@@ -464,50 +464,7 @@ func (ar *ActionResolver) applyActionEffects(ctx context.Context, parsedAction *
 		}
 
 	case action.Attack:
-		if target == nil {
-			slog.Warn("Attack has no valid target, cannot apply damage",
-				"component", componentSceneManager,
-				"action_id", parsedAction.ID,
-				"target", parsedAction.Target)
-			events = append(events, PlayerAttackResultEvent{
-				TargetMissing: true,
-				TargetHint:    parsedAction.Target,
-			})
-			return events
-		}
-
-		if parsedAction.IsSuccess() {
-			shifts := parsedAction.Outcome.Shifts
-			if shifts < 1 {
-				shifts = 1 // Minimum 1 shift on success
-			}
-
-			// Determine stress type based on attack skill
-			stressType := core.StressTypeForAttack(parsedAction.Skill)
-
-			events = append(events, PlayerAttackResultEvent{
-				TargetName: target.Name,
-				Shifts:     shifts,
-			})
-
-			// Delegate damage application to ConflictManager (conflict-specific state)
-			dmgEvent := ar.conflict.applyDamageToTarget(ctx, target, shifts, stressType)
-			events = append(events, dmgEvent)
-		} else if parsedAction.Outcome.Type == dice.Tie {
-			// On a tie, attacker gets a boost (no damage dealt) — Fate Core SRD Attack.
-			events = append(events, PlayerAttackResultEvent{
-				TargetName: target.Name,
-				IsTie:      true,
-			})
-			boostName := ar.generateBoostName(ctx, ar.player, parsedAction.Skill, parsedAction.Description, "Fleeting Opening")
-			events = append(events, ar.createBoost(boostName, ar.player.ID))
-		} else if parsedAction.Outcome.Type == dice.Failure && parsedAction.Outcome.Shifts <= -3 {
-			// Target defended with style — defender gets a boost (Fate Core SRD Defend).
-			defDesc := fmt.Sprintf("defending against %s's attack", ar.player.Name)
-			defSkill := core.DefenseSkillForAttack(parsedAction.Skill)
-			boostName := ar.generateBoostName(ctx, target, defSkill, defDesc, "Deflected with Ease")
-			events = append(events, ar.createBoost(boostName, target.ID))
-		}
+		events = append(events, ar.conflict.resolvePlayerAttack(ctx, parsedAction, target)...)
 
 	case action.Overcome:
 		if parsedAction.IsSuccessWithStyle() {
@@ -577,10 +534,7 @@ func (ar *ActionResolver) generateBoostName(ctx context.Context, char *core.Char
 // Falls back to a simple description-based name if the LLM is unavailable or fails.
 func (ar *ActionResolver) generateAspectName(ctx context.Context, parsedAction *action.Action) (string, int) {
 	// Determine free invokes based on outcome
-	freeInvokes := 1
-	if parsedAction.IsSuccessWithStyle() {
-		freeInvokes = 2
-	}
+	freeInvokes, _ := action.FreeInvokesForOutcome(parsedAction.Outcome.Type)
 
 	// Fallback name if LLM generation fails
 	fallbackName := fmt.Sprintf("Advantage from %s", parsedAction.Description)
