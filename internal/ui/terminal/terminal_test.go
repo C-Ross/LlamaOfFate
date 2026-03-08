@@ -986,7 +986,7 @@ func TestReadInput_MetaCommand_ReturnsEmpty(t *testing.T) {
 	ui := newUIWithInput("help\n")
 	ui.SetSceneInfo(&mockSceneInfo{
 		scene:  scene.NewScene("s1", "Scene", "Desc"),
-		player: character.NewCharacter("p1", "Hero"),
+		player: core.NewCharacter("p1", "Hero"),
 	})
 
 	input, isExit, err := ui.ReadInput()
@@ -999,7 +999,7 @@ func TestReadInput_NormalInput_Returned(t *testing.T) {
 	ui := newUIWithInput("attack the goblin\n")
 	ui.SetSceneInfo(&mockSceneInfo{
 		scene:  scene.NewScene("s1", "Scene", "Desc"),
-		player: character.NewCharacter("p1", "Hero"),
+		player: core.NewCharacter("p1", "Hero"),
 	})
 
 	input, isExit, err := ui.ReadInput()
@@ -1054,7 +1054,7 @@ func TestDisplayCharacter_NoPlayer(t *testing.T) {
 
 func TestDisplayCharacter_WithAspects(t *testing.T) {
 	ui := NewTerminalUI()
-	player := character.NewCharacter("p1", "Hero")
+	player := core.NewCharacter("p1", "Hero")
 	player.Aspects.HighConcept = "Brave Warrior"
 	player.Aspects.Trouble = "Quick to Anger"
 	player.Aspects.AddAspect("Well Connected")
