@@ -537,6 +537,55 @@ func (cm *ConflictManager) processFateNarration(ctx context.Context, input strin
 	return []GameEvent{NarrativeEvent{Text: result.Narrative}}
 }
 
+// resolvePlayerAttack handles all mechanical effects of a player attack action
+// (shifts, damage, tie/defend-with-style boosts). This is the single point of
+// truth for player→NPC attack resolution in a conflict.
+func (cm *ConflictManager) resolvePlayerAttack(ctx context.Context, parsedAction *action.Action, target *core.Character) []GameEvent {
+	if target == nil {
+		slog.Warn("Attack has no valid target, cannot apply damage",
+			"component", componentSceneManager,
+			"action_id", parsedAction.ID,
+			"target", parsedAction.Target)
+		return []GameEvent{PlayerAttackResultEvent{
+			TargetMissing: true,
+			TargetHint:    parsedAction.Target,
+		}}
+	}
+
+	shifts, side := action.ResolveAttackOutcome(parsedAction.Outcome)
+
+	var events []GameEvent
+
+	switch {
+	case shifts > 0:
+		stressType := core.StressTypeForAttack(parsedAction.Skill)
+
+		events = append(events, PlayerAttackResultEvent{
+			TargetName: target.Name,
+			Shifts:     shifts,
+		})
+
+		dmgEvent := cm.applyDamageToTarget(ctx, target, shifts, stressType)
+		events = append(events, dmgEvent)
+	case side == action.AttackerBoost:
+		// Tie: attacker gets a boost (no damage dealt) — Fate Core SRD Attack.
+		events = append(events, PlayerAttackResultEvent{
+			TargetName: target.Name,
+			IsTie:      true,
+		})
+		boostName := cm.actions.generateBoostName(ctx, cm.player, parsedAction.Skill, parsedAction.Description, "Fleeting Opening")
+		events = append(events, cm.actions.createBoost(boostName, cm.player.ID))
+	case side == action.DefenderBoost:
+		// Defend with style — defender gets a boost (Fate Core SRD Defend).
+		defDesc := fmt.Sprintf("defending against %s's attack", cm.player.Name)
+		defSkill := core.DefenseSkillForAttack(parsedAction.Skill)
+		boostName := cm.actions.generateBoostName(ctx, target, defSkill, defDesc, "Deflected with Ease")
+		events = append(events, cm.actions.createBoost(boostName, target.ID))
+	}
+
+	return events
+}
+
 // applyAttackDamageToPlayer applies attack damage to the player and returns events.
 func (cm *ConflictManager) applyAttackDamageToPlayer(ctx context.Context, outcome *dice.Outcome, attacker *core.Character, attackCtx prompt.AttackContext) []GameEvent {
 	var events []GameEvent

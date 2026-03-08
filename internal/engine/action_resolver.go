@@ -464,48 +464,7 @@ func (ar *ActionResolver) applyActionEffects(ctx context.Context, parsedAction *
 		}
 
 	case action.Attack:
-		if target == nil {
-			slog.Warn("Attack has no valid target, cannot apply damage",
-				"component", componentSceneManager,
-				"action_id", parsedAction.ID,
-				"target", parsedAction.Target)
-			events = append(events, PlayerAttackResultEvent{
-				TargetMissing: true,
-				TargetHint:    parsedAction.Target,
-			})
-			return events
-		}
-
-		shifts, side := action.ResolveAttackOutcome(parsedAction.Outcome)
-
-		switch {
-		case shifts > 0:
-			// Determine stress type based on attack skill
-			stressType := core.StressTypeForAttack(parsedAction.Skill)
-
-			events = append(events, PlayerAttackResultEvent{
-				TargetName: target.Name,
-				Shifts:     shifts,
-			})
-
-			// Delegate damage application to ConflictManager (conflict-specific state)
-			dmgEvent := ar.conflict.applyDamageToTarget(ctx, target, shifts, stressType)
-			events = append(events, dmgEvent)
-		case side == action.AttackerBoost:
-			// Tie: attacker gets a boost (no damage dealt) — Fate Core SRD Attack.
-			events = append(events, PlayerAttackResultEvent{
-				TargetName: target.Name,
-				IsTie:      true,
-			})
-			boostName := ar.generateBoostName(ctx, ar.player, parsedAction.Skill, parsedAction.Description, "Fleeting Opening")
-			events = append(events, ar.createBoost(boostName, ar.player.ID))
-		case side == action.DefenderBoost:
-			// Defend with style — defender gets a boost (Fate Core SRD Defend).
-			defDesc := fmt.Sprintf("defending against %s's attack", ar.player.Name)
-			defSkill := core.DefenseSkillForAttack(parsedAction.Skill)
-			boostName := ar.generateBoostName(ctx, target, defSkill, defDesc, "Deflected with Ease")
-			events = append(events, ar.createBoost(boostName, target.ID))
-		}
+		events = append(events, ar.conflict.resolvePlayerAttack(ctx, parsedAction, target)...)
 
 	case action.Overcome:
 		if parsedAction.IsSuccessWithStyle() {
