@@ -28,19 +28,21 @@ func init() {
 	}
 }
 
-// physicalAttackSkills are skills that deal physical stress when used to attack
+// physicalAttackSkills are skills that deal physical stress when used to attack.
+// Per Fate Core SRD: only Fight (melee) and Shoot (ranged) have the Attack action.
+// Physique is Overcome/Create Advantage only.
+// See: https://fate-srd.com/fate-core/default-skill-list
 var physicalAttackSkills = map[string]bool{
-	SkillFight:    true,
-	SkillShoot:    true,
-	SkillPhysique: true,
+	SkillFight: true,
+	SkillShoot: true,
 }
 
-// mentalAttackSkills are skills that deal mental stress when used to attack
+// mentalAttackSkills are skills that deal mental stress when used to attack.
+// Per Fate Core SRD: only Provoke has the Attack action for mental conflicts.
+// Deceive, Rapport, and Lore are Overcome/Create Advantage/Defend only.
+// See: https://fate-srd.com/fate-core/default-skill-list
 var mentalAttackSkills = map[string]bool{
 	SkillProvoke: true,
-	SkillDeceive: true,
-	SkillRapport: true,
-	SkillLore:    true, // Supernatural/magic attacks target mental stress
 }
 
 // physicalConflictSkills trigger or indicate physical conflicts
@@ -62,8 +64,8 @@ var mentalConflictSkills = map[string]bool{
 
 // DefenseSkillForAttack returns the appropriate defense skill for an attack skill.
 // Per Fate Core rules:
-// - Physical attacks (Fight, Shoot, Physique) are defended with Athletics
-// - Mental/social attacks (Provoke, Deceive, Rapport, Lore) are defended with Will
+// - Physical attacks (Fight, Shoot) are defended with Athletics
+// - Mental/social attacks (Provoke) are defended with Will
 func DefenseSkillForAttack(attackSkill string) string {
 	if physicalAttackSkills[attackSkill] {
 		return SkillAthletics

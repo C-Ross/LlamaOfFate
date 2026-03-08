@@ -16,13 +16,9 @@ func TestDefenseSkillForAttack(t *testing.T) {
 		// Physical attacks -> Athletics defense
 		{"Fight uses Athletics", "Fight", "Athletics"},
 		{"Shoot uses Athletics", "Shoot", "Athletics"},
-		{"Physique uses Athletics", "Physique", "Athletics"},
 
 		// Mental attacks -> Will defense
 		{"Provoke uses Will", "Provoke", "Will"},
-		{"Deceive uses Will", "Deceive", "Will"},
-		{"Rapport uses Will", "Rapport", "Will"},
-		{"Lore uses Will", "Lore", "Will"},
 
 		// Unknown defaults to Athletics
 		{"Unknown skill defaults to Athletics", "Crafts", "Athletics"},
@@ -46,13 +42,9 @@ func TestStressTypeForAttack(t *testing.T) {
 		// Physical attacks -> Physical stress
 		{"Fight targets physical", "Fight", PhysicalStress},
 		{"Shoot targets physical", "Shoot", PhysicalStress},
-		{"Physique targets physical", "Physique", PhysicalStress},
 
 		// Mental attacks -> Mental stress
 		{"Provoke targets mental", "Provoke", MentalStress},
-		{"Deceive targets mental", "Deceive", MentalStress},
-		{"Rapport targets mental", "Rapport", MentalStress},
-		{"Lore targets mental", "Lore", MentalStress},
 
 		// Unknown defaults to Physical
 		{"Unknown skill defaults to physical", "Crafts", PhysicalStress},
@@ -102,7 +94,7 @@ func TestConflictTypeForSkill(t *testing.T) {
 func TestIsPhysicalAttackSkill(t *testing.T) {
 	assert.True(t, IsPhysicalAttackSkill("Fight"))
 	assert.True(t, IsPhysicalAttackSkill("Shoot"))
-	assert.True(t, IsPhysicalAttackSkill("Physique"))
+	assert.False(t, IsPhysicalAttackSkill("Physique"))
 	assert.False(t, IsPhysicalAttackSkill("Provoke"))
 	assert.False(t, IsPhysicalAttackSkill("Lore"))
 	assert.False(t, IsPhysicalAttackSkill("Unknown"))
@@ -110,9 +102,9 @@ func TestIsPhysicalAttackSkill(t *testing.T) {
 
 func TestIsMentalAttackSkill(t *testing.T) {
 	assert.True(t, IsMentalAttackSkill("Provoke"))
-	assert.True(t, IsMentalAttackSkill("Deceive"))
-	assert.True(t, IsMentalAttackSkill("Rapport"))
-	assert.True(t, IsMentalAttackSkill("Lore"))
+	assert.False(t, IsMentalAttackSkill("Deceive"))
+	assert.False(t, IsMentalAttackSkill("Rapport"))
+	assert.False(t, IsMentalAttackSkill("Lore"))
 	assert.False(t, IsMentalAttackSkill("Fight"))
 	assert.False(t, IsMentalAttackSkill("Shoot"))
 	assert.False(t, IsMentalAttackSkill("Unknown"))
