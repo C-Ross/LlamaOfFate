@@ -430,6 +430,9 @@ func (cm *ConflictManager) processNPCAttack(ctx context.Context, npc *core.Chara
 		onDamage: func(shifts int) []GameEvent {
 			return []GameEvent{NarrativeEvent{Text: fmt.Sprintf("%s takes %d shifts of stress!", target.Name, shifts)}}
 		},
+		onTie:             func() []GameEvent { return nil },
+		onDefendWithStyle: func() []GameEvent { return nil },
+		onFailure:         func() []GameEvent { return nil },
 	})
 	events = append(events, boostEvents...)
 

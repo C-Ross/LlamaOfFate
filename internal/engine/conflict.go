@@ -563,12 +563,14 @@ func (cm *ConflictManager) resolvePlayerAttack(ctx context.Context, parsedAction
 		onTie: func() []GameEvent {
 			return []GameEvent{PlayerAttackResultEvent{TargetName: target.Name, IsTie: true}}
 		},
+		onDefendWithStyle: func() []GameEvent { return nil },
+		onFailure:         func() []GameEvent { return nil },
 	})
 }
 
 // attackCallbacks contains per-path event callbacks for resolveAttackOutcome.
 // Each callback returns events specific to that attack direction (e.g. UI events).
-// Nil callbacks are treated as no-ops that return no events.
+// All callbacks must be non-nil; this is a private method so callers are controlled.
 type attackCallbacks struct {
 	// onDamage is called when the attack deals shifts > 0.
 	onDamage func(shifts int) []GameEvent
@@ -597,27 +599,19 @@ func (cm *ConflictManager) resolveAttackOutcome(
 
 	switch {
 	case shifts > 0:
-		if cb.onDamage != nil {
-			events = append(events, cb.onDamage(shifts)...)
-		}
+		events = append(events, cb.onDamage(shifts)...)
 	case side == action.AttackerBoost:
-		if cb.onTie != nil {
-			events = append(events, cb.onTie()...)
-		}
+		events = append(events, cb.onTie()...)
 		boostName := cm.actions.generateBoostName(ctx, attacker, attackSkill, attackDesc, "Fleeting Opening")
 		events = append(events, cm.actions.createBoost(boostName, attacker.ID))
 	case side == action.DefenderBoost:
-		if cb.onDefendWithStyle != nil {
-			events = append(events, cb.onDefendWithStyle()...)
-		}
+		events = append(events, cb.onDefendWithStyle()...)
 		defDesc := fmt.Sprintf("defending against %s's attack", attacker.Name)
 		defSkill := core.DefenseSkillForAttack(attackSkill)
 		boostName := cm.actions.generateBoostName(ctx, defender, defSkill, defDesc, "Deflected with Ease")
 		events = append(events, cm.actions.createBoost(boostName, defender.ID))
 	default:
-		if cb.onFailure != nil {
-			events = append(events, cb.onFailure()...)
-		}
+		events = append(events, cb.onFailure()...)
 	}
 
 	return events
