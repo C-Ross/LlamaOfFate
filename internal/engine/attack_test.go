@@ -95,8 +95,8 @@ func TestResolveAction_Attack_Success_DealsDamage(t *testing.T) {
 
 // Fate Core SRD (Attack, SWS): "You deal a hit just like a success, but you
 // also have the option to reduce ... shifts by one and create a boost."
-// Full pipeline test — verifies extra shifts are dealt.
-func TestResolveAction_Attack_SWS_DealsExtraDamage(t *testing.T) {
+// Default behavior: full shifts are dealt (optional boost is not taken).
+func TestResolveAction_Attack_SWS_DealsFullShifts(t *testing.T) {
 	sm, npc := setupAttackSM(t, 0)
 
 	// [0] Attack dice 2 → Good(+3)+2 = +5.

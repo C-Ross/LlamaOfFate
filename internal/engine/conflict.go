@@ -12,6 +12,7 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core"
+	"github.com/C-Ross/LlamaOfFate/internal/core/action"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
@@ -540,13 +541,11 @@ func (cm *ConflictManager) processFateNarration(ctx context.Context, input strin
 func (cm *ConflictManager) applyAttackDamageToPlayer(ctx context.Context, outcome *dice.Outcome, attacker *core.Character, attackCtx prompt.AttackContext) []GameEvent {
 	var events []GameEvent
 
-	// Apply stress if the attack hit
-	switch outcome.Type {
-	case dice.Success, dice.SuccessWithStyle:
-		shifts := outcome.Shifts
-		if shifts < 1 {
-			shifts = 1
-		}
+	// Resolve attack shifts and side effects via core rules.
+	shifts, side := action.ResolveAttackOutcome(outcome)
+
+	switch {
+	case shifts > 0:
 		stressType := core.PhysicalStress
 		if cm.currentScene.ConflictState.Type == scene.MentalConflict {
 			stressType = core.MentalStress
@@ -565,20 +564,21 @@ func (cm *ConflictManager) applyAttackDamageToPlayer(ctx context.Context, outcom
 			overflowEvents := cm.handleStressOverflow(ctx, shifts, stressType, attacker, attackCtx)
 			events = append(events, overflowEvents...)
 		}
-	case dice.Tie:
-		// Attacker gets a boost on a tie (no damage to player).
+	case side == action.AttackerBoost:
+		// Tie: attacker gets a boost (no damage to player).
 		events = append(events, PlayerDefendedEvent{IsTie: true})
 		boostName := cm.actions.generateBoostName(ctx, attacker, attackCtx.Skill, attackCtx.Description, "Fleeting Opening")
 		events = append(events, cm.actions.createBoost(boostName, attacker.ID))
-	default:
-		// Attack failed — check if player defended with style (3+ margin).
+	case side == action.DefenderBoost:
+		// Defend with style — player gets a boost.
 		events = append(events, PlayerDefendedEvent{IsTie: false})
-		if outcome.Shifts <= -3 {
-			defDesc := fmt.Sprintf("defending against %s's attack", attacker.Name)
-			defSkill := core.DefenseSkillForAttack(attackCtx.Skill)
-			boostName := cm.actions.generateBoostName(ctx, cm.player, defSkill, defDesc, "Deflected with Ease")
-			events = append(events, cm.actions.createBoost(boostName, cm.player.ID))
-		}
+		defDesc := fmt.Sprintf("defending against %s's attack", attacker.Name)
+		defSkill := core.DefenseSkillForAttack(attackCtx.Skill)
+		boostName := cm.actions.generateBoostName(ctx, cm.player, defSkill, defDesc, "Deflected with Ease")
+		events = append(events, cm.actions.createBoost(boostName, cm.player.ID))
+	default:
+		// Plain failure — no boost.
+		events = append(events, PlayerDefendedEvent{IsTie: false})
 	}
 
 	return events

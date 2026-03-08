@@ -6,6 +6,55 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 )
 
+// AttackSideEffect describes the side effect of an attack outcome
+// beyond raw damage (boosts granted by ties or defend-with-style).
+type AttackSideEffect int
+
+const (
+	// NoSideEffect means no boost is generated.
+	NoSideEffect AttackSideEffect = iota
+	// AttackerBoost means the attacker receives a boost (Fate Core tie on attack).
+	AttackerBoost
+	// AttackerBoostOption means the attacker may optionally reduce shifts by 1
+	// to gain a boost (Fate Core success-with-style on attack).
+	AttackerBoostOption
+	// DefenderBoost means the defender receives a boost (Fate Core defend with style, failure by 3+).
+	DefenderBoost
+)
+
+// ResolveAttackOutcome applies Fate Core attack rules to an outcome:
+//   - On success: shifts are clamped to a minimum of 1, no side effect.
+//   - On success-with-style: shifts are clamped to a minimum of 1,
+//     attacker may optionally reduce by 1 for a boost (AttackerBoostOption).
+//   - On tie: shifts are 0, attacker gets a boost.
+//   - On failure by 3+: shifts are 0, defender gets a boost.
+//   - On other failure: shifts are 0, no side effect.
+//
+// Returns the effective damage shifts and any side effect.
+func ResolveAttackOutcome(outcome *dice.Outcome) (shifts int, side AttackSideEffect) {
+	switch outcome.Type {
+	case dice.SuccessWithStyle:
+		shifts = outcome.Shifts
+		if shifts < 1 {
+			shifts = 1
+		}
+		return shifts, AttackerBoostOption
+	case dice.Success:
+		shifts = outcome.Shifts
+		if shifts < 1 {
+			shifts = 1 // Minimum 1 shift on success — Fate Core SRD Attack
+		}
+		return shifts, NoSideEffect
+	case dice.Tie:
+		return 0, AttackerBoost
+	default: // Failure
+		if outcome.Shifts <= -3 {
+			return 0, DefenderBoost
+		}
+		return 0, NoSideEffect
+	}
+}
+
 // ActionType represents the four basic actions in Fate Core
 type ActionType int
 

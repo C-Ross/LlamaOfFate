@@ -476,12 +476,10 @@ func (ar *ActionResolver) applyActionEffects(ctx context.Context, parsedAction *
 			return events
 		}
 
-		if parsedAction.IsSuccess() {
-			shifts := parsedAction.Outcome.Shifts
-			if shifts < 1 {
-				shifts = 1 // Minimum 1 shift on success
-			}
+		shifts, side := action.ResolveAttackOutcome(parsedAction.Outcome)
 
+		switch {
+		case shifts > 0:
 			// Determine stress type based on attack skill
 			stressType := core.StressTypeForAttack(parsedAction.Skill)
 
@@ -493,16 +491,16 @@ func (ar *ActionResolver) applyActionEffects(ctx context.Context, parsedAction *
 			// Delegate damage application to ConflictManager (conflict-specific state)
 			dmgEvent := ar.conflict.applyDamageToTarget(ctx, target, shifts, stressType)
 			events = append(events, dmgEvent)
-		} else if parsedAction.Outcome.Type == dice.Tie {
-			// On a tie, attacker gets a boost (no damage dealt) — Fate Core SRD Attack.
+		case side == action.AttackerBoost:
+			// Tie: attacker gets a boost (no damage dealt) — Fate Core SRD Attack.
 			events = append(events, PlayerAttackResultEvent{
 				TargetName: target.Name,
 				IsTie:      true,
 			})
 			boostName := ar.generateBoostName(ctx, ar.player, parsedAction.Skill, parsedAction.Description, "Fleeting Opening")
 			events = append(events, ar.createBoost(boostName, ar.player.ID))
-		} else if parsedAction.Outcome.Type == dice.Failure && parsedAction.Outcome.Shifts <= -3 {
-			// Target defended with style — defender gets a boost (Fate Core SRD Defend).
+		case side == action.DefenderBoost:
+			// Defend with style — defender gets a boost (Fate Core SRD Defend).
 			defDesc := fmt.Sprintf("defending against %s's attack", ar.player.Name)
 			defSkill := core.DefenseSkillForAttack(parsedAction.Skill)
 			boostName := ar.generateBoostName(ctx, target, defSkill, defDesc, "Deflected with Ease")
