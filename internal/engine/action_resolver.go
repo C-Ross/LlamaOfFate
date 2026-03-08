@@ -534,10 +534,7 @@ func (ar *ActionResolver) generateBoostName(ctx context.Context, char *core.Char
 // Falls back to a simple description-based name if the LLM is unavailable or fails.
 func (ar *ActionResolver) generateAspectName(ctx context.Context, parsedAction *action.Action) (string, int) {
 	// Determine free invokes based on outcome
-	freeInvokes := 1
-	if parsedAction.IsSuccessWithStyle() {
-		freeInvokes = 2
-	}
+	freeInvokes, _ := action.FreeInvokesForOutcome(parsedAction.Outcome.Type)
 
 	// Fallback name if LLM generation fails
 	fallbackName := fmt.Sprintf("Advantage from %s", parsedAction.Description)

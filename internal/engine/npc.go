@@ -214,10 +214,7 @@ func (cm *ConflictManager) processNPCCreateAdvantage(ctx context.Context, npc *c
 			}
 		}
 
-		freeInvokes := 1
-		if outcome.Type == dice.SuccessWithStyle {
-			freeInvokes = 2
-		}
+		freeInvokes, _ := action.FreeInvokesForOutcome(outcome.Type)
 
 		aspectID := fmt.Sprintf("npc-advantage-%d", time.Now().UnixNano())
 		situationAspect := scene.NewSituationAspect(aspectID, aspectName, npc.ID, freeInvokes)
