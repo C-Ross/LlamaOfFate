@@ -1,5 +1,7 @@
 package core
 
+import "github.com/C-Ross/LlamaOfFate/internal/core/dice"
+
 // Named constants for the 18 default Fate Core skills.
 // See: https://fate-srd.com/fate-core/default-skill-list
 const (
@@ -44,6 +46,46 @@ var FateCoreSkills = []string{
 	SkillShoot,
 	SkillStealth,
 	SkillWill,
+}
+
+// DefaultSkillPriority lists the 10 most generally useful Fate Core skills,
+// ordered by versatility. Used by DefaultPyramid to fill a standard pyramid.
+// Mirrors web/src/lib/skills.ts DEFAULT_SKILL_PRIORITY.
+var DefaultSkillPriority = []string{
+	SkillNotice,
+	SkillAthletics,
+	SkillWill,
+	SkillInvestigate,
+	SkillRapport,
+	SkillFight,
+	SkillStealth,
+	SkillPhysique,
+	SkillEmpathy,
+	SkillShoot,
+}
+
+// DefaultPyramid returns a standard Fate Core skill pyramid (cap=Great)
+// using DefaultSkillPriority: 1×Great, 2×Good, 3×Fair, 4×Average.
+// Returns a fresh map each call so callers can mutate freely.
+func DefaultPyramid() map[string]dice.Ladder {
+	shape := []struct {
+		level dice.Ladder
+		count int
+	}{
+		{dice.Great, 1},
+		{dice.Good, 2},
+		{dice.Fair, 3},
+		{dice.Average, 4},
+	}
+	result := make(map[string]dice.Ladder, 10)
+	i := 0
+	for _, tier := range shape {
+		for range tier.count {
+			result[DefaultSkillPriority[i]] = tier.level
+			i++
+		}
+	}
+	return result
 }
 
 // fateCoreSkillSet is a precomputed set for O(1) lookups.

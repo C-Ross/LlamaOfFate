@@ -72,10 +72,17 @@ func main() {
 
 	// Use hardcoded scenario and player (see scenario.go)
 	scenario := defaultScenario()
-	player := defaultPlayer()
+	preset := defaultPlayer()
 
 	fmt.Printf("Scenario: %s (%s)\n", scenario.Title, scenario.Genre)
-	fmt.Printf("Player:   %s — \"%s\"\n", player.Name, player.Aspects.HighConcept)
+	fmt.Println()
+
+	// Character creation — prompt for customisation using preset as defaults
+	terminalUI := terminal.NewTerminalUI()
+	setup := terminalUI.PromptForCharacterSetup(preset)
+	player := applySetup(preset, setup)
+
+	fmt.Printf("\nPlaying as: %s — \"%s\"\n", player.Name, player.Aspects.HighConcept)
 	fmt.Println()
 
 	// Set up session logging
@@ -96,6 +103,7 @@ func main() {
 			"name":         player.Name,
 			"high_concept": player.Aspects.HighConcept,
 			"trouble":      player.Aspects.Trouble,
+			"aspects":      player.Aspects.OtherAspects,
 		})
 	} else {
 		sl = session.NullLogger{}
@@ -104,8 +112,6 @@ func main() {
 	gameEngine := initializeEngine(sl)
 
 	// Wire everything into the GameManager and run
-	terminalUI := terminal.NewTerminalUI()
-
 	gm := engine.NewGameManager(gameEngine, sl)
 	gm.SetPlayer(player)
 	gm.SetScenario(scenario)
