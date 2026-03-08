@@ -718,3 +718,110 @@ func TestHandleStartGame_PlayerOverrides(t *testing.T) {
 	assert.True(t, result.IsError)
 	assert.Contains(t, extractText(t, result), "start failed")
 }
+
+func TestHandleStartGame_PlayerAspects(t *testing.T) {
+	gs := newTestServer(t)
+	gs.presets["hero"] = &config.LoadedScenario{
+		Raw:      config.ScenarioFile{ID: "hero", Genre: "fantasy"},
+		Scenario: &scene.Scenario{Title: "Hero Scenario"},
+		Player:   core.NewCharacter("p1", "Default Hero"),
+	}
+
+	result := callTool(t, gs, makeRequest("start_game", map[string]any{
+		"preset_id":      "hero",
+		"player_aspects": []string{"Born Under a Bad Sign", "My Father's Sword"},
+	}))
+
+	// Engine fails without LLM, but player aspects were applied before that.
+	require.NotNil(t, result)
+	assert.True(t, result.IsError)
+	assert.Contains(t, extractText(t, result), "start failed")
+}
+
+func TestHandleStartGame_PlayerSkills_Valid(t *testing.T) {
+	gs := newTestServer(t)
+	player := core.NewCharacter("p1", "Default Hero")
+	player.SetSkill("Lore", dice.Great) // preset skill that should be replaced
+	gs.presets["hero"] = &config.LoadedScenario{
+		Raw:      config.ScenarioFile{ID: "hero", Genre: "fantasy"},
+		Scenario: &scene.Scenario{Title: "Hero Scenario"},
+		Player:   player,
+	}
+
+	result := callTool(t, gs, makeRequest("start_game", map[string]any{
+		"preset_id": "hero",
+		"player_skills": map[string]any{
+			"Notice":      float64(4),
+			"Athletics":   float64(3),
+			"Will":        float64(3),
+			"Investigate": float64(2),
+			"Rapport":     float64(2),
+			"Fight":       float64(2),
+			"Stealth":     float64(1),
+			"Physique":    float64(1),
+			"Empathy":     float64(1),
+			"Shoot":       float64(1),
+		},
+	}))
+
+	// Engine fails without LLM, but skill validation passed.
+	require.NotNil(t, result)
+	assert.True(t, result.IsError)
+	assert.Contains(t, extractText(t, result), "start failed")
+}
+
+func TestHandleStartGame_PlayerSkills_Invalid(t *testing.T) {
+	gs := newTestServer(t)
+	gs.presets["hero"] = &config.LoadedScenario{
+		Raw:      config.ScenarioFile{ID: "hero", Genre: "fantasy"},
+		Scenario: &scene.Scenario{Title: "Hero Scenario"},
+		Player:   core.NewCharacter("p1", "Default Hero"),
+	}
+
+	// Two Great skills — invalid pyramid
+	result := callTool(t, gs, makeRequest("start_game", map[string]any{
+		"preset_id": "hero",
+		"player_skills": map[string]any{
+			"Notice":    float64(4),
+			"Athletics": float64(4),
+		},
+	}))
+
+	require.NotNil(t, result)
+	assert.True(t, result.IsError)
+	text := extractText(t, result)
+	assert.Contains(t, text, "invalid skill pyramid")
+}
+
+func TestHandleStartGame_EmptySkillsUsesPreset(t *testing.T) {
+	gs := newTestServer(t)
+	gs.presets["hero"] = &config.LoadedScenario{
+		Raw:      config.ScenarioFile{ID: "hero", Genre: "fantasy"},
+		Scenario: &scene.Scenario{Title: "Hero Scenario"},
+		Player:   core.NewCharacter("p1", "Default Hero"),
+	}
+
+	// Empty object should be treated as "no override"
+	result := callTool(t, gs, makeRequest("start_game", map[string]any{
+		"preset_id":     "hero",
+		"player_skills": map[string]any{},
+	}))
+
+	// Should not fail on validation — passes through to engine start
+	require.NotNil(t, result)
+	assert.True(t, result.IsError)
+	assert.Contains(t, extractText(t, result), "start failed")
+}
+
+func TestApplySkillOverrides_BadType(t *testing.T) {
+	player := core.NewCharacter("p1", "Hero")
+	req := makeRequest("start_game", map[string]any{
+		"player_skills": map[string]any{
+			"Notice": "not-a-number",
+		},
+	})
+
+	err := applySkillOverrides(req, player)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "expected a number")
+}
