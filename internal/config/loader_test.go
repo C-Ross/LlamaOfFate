@@ -413,6 +413,167 @@ func TestLoadAll_RealConfigs(t *testing.T) {
 	assert.Equal(t, "Reactor Control Room", europa.Scene.Name)
 }
 
+// ---------- Error handling paths ---------------------------------------------
+
+func TestLoadCharacter_InvalidYAML(t *testing.T) {
+	path := writeTemp(t, "bad.yaml", ": this is not valid yaml: [{{")
+	_, err := LoadCharacter(path)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "parse character file")
+}
+
+func TestLoadCharacters_BadDirectory(t *testing.T) {
+	_, err := LoadCharacters("/nonexistent/dir/that/does/not/exist")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "read characters directory")
+}
+
+func TestLoadCharacters_InvalidYAMLFile(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "bad.yaml"), ": invalid: [{{")
+	_, err := LoadCharacters(dir)
+	require.Error(t, err)
+}
+
+func TestLoadScenarioFile_MissingFile(t *testing.T) {
+	_, err := LoadScenarioFile("/nonexistent/path/scenario.yaml")
+	require.Error(t, err)
+}
+
+func TestLoadScenarioFile_InvalidYAML(t *testing.T) {
+	path := writeTemp(t, "bad_scenario.yaml", ": not: valid: yaml: [{{")
+	_, err := LoadScenarioFile(path)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "parse scenario file")
+}
+
+func TestLoadScenario_MissingFile(t *testing.T) {
+	_, err := LoadScenario("/nonexistent/scenario.yaml", nil)
+	require.Error(t, err)
+}
+
+func TestLoadScenario_NilCharactersWithPlayer(t *testing.T) {
+	path := writeTemp(t, "scenario.yaml", `
+id: needs-player
+title: "Needs Player"
+genre: Fantasy
+problem: "p"
+setting: "s"
+story_questions: []
+default_player: some-hero
+`)
+	_, err := LoadScenario(path, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no characters were loaded")
+}
+
+func TestLoadAll_BadCharactersDir(t *testing.T) {
+	root := t.TempDir()
+	// No characters subdirectory — LoadCharacters should fail.
+	_, err := LoadAll(root)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "load characters")
+}
+
+func TestLoadAll_BadScenariosDir(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "characters"), 0o755))
+	// No scenarios subdirectory.
+	_, err := LoadAll(root)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "read scenarios directory")
+}
+
+func TestLoadAll_NonYAMLScenarioIgnored(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "characters"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "scenarios"), 0o755))
+	// Only a non-YAML file in scenarios — should load zero scenarios.
+	writeFile(t, filepath.Join(root, "scenarios", "readme.txt"), "not a scenario")
+	scenarios, err := LoadAll(root)
+	require.NoError(t, err)
+	assert.Empty(t, scenarios)
+}
+
+func TestLoadAll_BadScenario(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "characters"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "scenarios"), 0o755))
+	writeFile(t, filepath.Join(root, "scenarios", "bad.yaml"), ": invalid yaml: [{{")
+	_, err := LoadAll(root)
+	require.Error(t, err)
+}
+
+// ---------- NPC type coverage ------------------------------------------------
+
+func TestLoadScenario_NPC_MainType(t *testing.T) {
+	path := writeTemp(t, "scenario.yaml", `
+id: main-npc-test
+title: "Main NPC Test"
+genre: Fantasy
+problem: "p"
+setting: "s"
+story_questions: []
+npcs:
+  - id: villain
+    name: "The Villain"
+    type: main
+    high_concept: "Scheming Mastermind"
+    aspects:
+      - "Ruthless and Cunning"
+    skills:
+      Deceive: 4
+    fate_points: 3
+`)
+	ls, err := LoadScenario(path, nil)
+	require.NoError(t, err)
+	require.Len(t, ls.NPCs, 1)
+	villain := ls.NPCs[0]
+	assert.Equal(t, "The Villain", villain.Name)
+	assert.Equal(t, core.CharacterTypeMainNPC, villain.CharacterType)
+	assert.Equal(t, "Scheming Mastermind", villain.Aspects.HighConcept)
+	assert.Equal(t, []string{"Ruthless and Cunning"}, villain.Aspects.OtherAspects)
+	assert.Equal(t, 3, villain.FatePoints)
+}
+
+func TestLoadScenario_NPC_NamelessGood_MissingPrimarySkill(t *testing.T) {
+	path := writeTemp(t, "scenario.yaml", `
+id: bad-npc-good
+title: "Bad NPC"
+genre: Fantasy
+problem: "p"
+setting: "s"
+story_questions: []
+npcs:
+  - id: g
+    name: "G"
+    type: nameless_good
+    high_concept: "Tough"
+`)
+	_, err := LoadScenario(path, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "primary_skill")
+}
+
+func TestLoadScenario_NPC_NamelessAverage_MissingPrimarySkill(t *testing.T) {
+	path := writeTemp(t, "scenario.yaml", `
+id: bad-npc-avg
+title: "Bad NPC Avg"
+genre: Fantasy
+problem: "p"
+setting: "s"
+story_questions: []
+npcs:
+  - id: a
+    name: "A"
+    type: nameless_average
+    high_concept: "Weak"
+`)
+	_, err := LoadScenario(path, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "primary_skill")
+}
+
 // ---------- Helpers ----------------------------------------------------------
 
 func writeTemp(t *testing.T, name, content string) string {

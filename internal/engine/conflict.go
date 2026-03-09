@@ -552,35 +552,66 @@ func (cm *ConflictManager) resolvePlayerAttack(ctx context.Context, parsedAction
 		}}
 	}
 
-	shifts, side := action.ResolveAttackOutcome(parsedAction.Outcome)
+	return cm.resolveAttackOutcome(ctx, parsedAction.Outcome, cm.player, target, parsedAction.Skill, parsedAction.Description, attackCallbacks{
+		onDamage: func(shifts int) []GameEvent {
+			stressType := core.StressTypeForAttack(parsedAction.Skill)
+			return []GameEvent{
+				PlayerAttackResultEvent{TargetName: target.Name, Shifts: shifts},
+				cm.applyDamageToTarget(ctx, target, shifts, stressType),
+			}
+		},
+		onTie: func() []GameEvent {
+			return []GameEvent{PlayerAttackResultEvent{TargetName: target.Name, IsTie: true}}
+		},
+		onDefendWithStyle: func() []GameEvent { return nil },
+		onFailure:         func() []GameEvent { return nil },
+	})
+}
+
+// attackCallbacks contains per-path event callbacks for resolveAttackOutcome.
+// Each callback returns events specific to that attack direction (e.g. UI events).
+// All callbacks must be non-nil; this is a private method so callers are controlled.
+type attackCallbacks struct {
+	// onDamage is called when the attack deals shifts > 0.
+	onDamage func(shifts int) []GameEvent
+	// onTie is called on a tie (before the attacker boost is created).
+	onTie func() []GameEvent
+	// onDefendWithStyle is called when the defender succeeds with style (before the defender boost).
+	onDefendWithStyle func() []GameEvent
+	// onFailure is called on a plain failure (no boost).
+	onFailure func() []GameEvent
+}
+
+// resolveAttackOutcome is the single implementation of Fate Core attack outcome
+// resolution. It calls ResolveAttackOutcome for shift clamping and side effects,
+// delegates path-specific behavior to callbacks, and handles boost creation for
+// ties and defend-with-style uniformly.
+func (cm *ConflictManager) resolveAttackOutcome(
+	ctx context.Context,
+	outcome *dice.Outcome,
+	attacker, defender *core.Character,
+	attackSkill, attackDesc string,
+	cb attackCallbacks,
+) []GameEvent {
+	shifts, side := action.ResolveAttackOutcome(outcome)
 
 	var events []GameEvent
 
 	switch {
 	case shifts > 0:
-		stressType := core.StressTypeForAttack(parsedAction.Skill)
-
-		events = append(events, PlayerAttackResultEvent{
-			TargetName: target.Name,
-			Shifts:     shifts,
-		})
-
-		dmgEvent := cm.applyDamageToTarget(ctx, target, shifts, stressType)
-		events = append(events, dmgEvent)
+		events = append(events, cb.onDamage(shifts)...)
 	case side == action.AttackerBoost:
-		// Tie: attacker gets a boost (no damage dealt) — Fate Core SRD Attack.
-		events = append(events, PlayerAttackResultEvent{
-			TargetName: target.Name,
-			IsTie:      true,
-		})
-		boostName := cm.actions.generateBoostName(ctx, cm.player, parsedAction.Skill, parsedAction.Description, "Fleeting Opening")
-		events = append(events, cm.actions.createBoost(boostName, cm.player.ID))
+		events = append(events, cb.onTie()...)
+		boostName := cm.actions.generateBoostName(ctx, attacker, attackSkill, attackDesc, "Fleeting Opening")
+		events = append(events, cm.actions.createBoost(boostName, attacker.ID))
 	case side == action.DefenderBoost:
-		// Defend with style — defender gets a boost (Fate Core SRD Defend).
-		defDesc := fmt.Sprintf("defending against %s's attack", cm.player.Name)
-		defSkill := core.DefenseSkillForAttack(parsedAction.Skill)
-		boostName := cm.actions.generateBoostName(ctx, target, defSkill, defDesc, "Deflected with Ease")
-		events = append(events, cm.actions.createBoost(boostName, target.ID))
+		events = append(events, cb.onDefendWithStyle()...)
+		defDesc := fmt.Sprintf("defending against %s's attack", attacker.Name)
+		defSkill := core.DefenseSkillForAttack(attackSkill)
+		boostName := cm.actions.generateBoostName(ctx, defender, defSkill, defDesc, "Deflected with Ease")
+		events = append(events, cm.actions.createBoost(boostName, defender.ID))
+	default:
+		events = append(events, cb.onFailure()...)
 	}
 
 	return events
@@ -588,46 +619,29 @@ func (cm *ConflictManager) resolvePlayerAttack(ctx context.Context, parsedAction
 
 // applyAttackDamageToPlayer applies attack damage to the player and returns events.
 func (cm *ConflictManager) applyAttackDamageToPlayer(ctx context.Context, outcome *dice.Outcome, attacker *core.Character, attackCtx prompt.AttackContext) []GameEvent {
-	var events []GameEvent
-
-	// Resolve attack shifts and side effects via core rules.
-	shifts, side := action.ResolveAttackOutcome(outcome)
-
-	switch {
-	case shifts > 0:
-		stressType := core.StressTypeForConflict(cm.currentScene.ConflictState.Type)
-
-		// Try to absorb with stress track
-		absorbed := cm.player.TakeStress(stressType, shifts)
-		if absorbed {
-			events = append(events, PlayerStressEvent{
-				Shifts:     shifts,
-				StressType: string(stressType),
-				TrackState: cm.player.StressTracks[string(stressType)].String(),
-			})
-		} else {
-			// Cannot absorb - need consequence or taken out
-			overflowEvents := cm.handleStressOverflow(ctx, shifts, stressType, attacker, attackCtx)
-			events = append(events, overflowEvents...)
-		}
-	case side == action.AttackerBoost:
-		// Tie: attacker gets a boost (no damage to player).
-		events = append(events, PlayerDefendedEvent{IsTie: true})
-		boostName := cm.actions.generateBoostName(ctx, attacker, attackCtx.Skill, attackCtx.Description, "Fleeting Opening")
-		events = append(events, cm.actions.createBoost(boostName, attacker.ID))
-	case side == action.DefenderBoost:
-		// Defend with style — player gets a boost.
-		events = append(events, PlayerDefendedEvent{IsTie: false})
-		defDesc := fmt.Sprintf("defending against %s's attack", attacker.Name)
-		defSkill := core.DefenseSkillForAttack(attackCtx.Skill)
-		boostName := cm.actions.generateBoostName(ctx, cm.player, defSkill, defDesc, "Deflected with Ease")
-		events = append(events, cm.actions.createBoost(boostName, cm.player.ID))
-	default:
-		// Plain failure — no boost.
-		events = append(events, PlayerDefendedEvent{IsTie: false})
-	}
-
-	return events
+	return cm.resolveAttackOutcome(ctx, outcome, attacker, cm.player, attackCtx.Skill, attackCtx.Description, attackCallbacks{
+		onDamage: func(shifts int) []GameEvent {
+			stressType := core.StressTypeForConflict(cm.currentScene.ConflictState.Type)
+			absorbed := cm.player.TakeStress(stressType, shifts)
+			if absorbed {
+				return []GameEvent{PlayerStressEvent{
+					Shifts:     shifts,
+					StressType: string(stressType),
+					TrackState: cm.player.StressTracks[string(stressType)].String(),
+				}}
+			}
+			return cm.handleStressOverflow(ctx, shifts, stressType, attacker, attackCtx)
+		},
+		onTie: func() []GameEvent {
+			return []GameEvent{PlayerDefendedEvent{IsTie: true}}
+		},
+		onDefendWithStyle: func() []GameEvent {
+			return []GameEvent{PlayerDefendedEvent{IsTie: false}}
+		},
+		onFailure: func() []GameEvent {
+			return []GameEvent{PlayerDefendedEvent{IsTie: false}}
+		},
+	})
 }
 
 // handleStressOverflow handles when the player cannot absorb stress with their stress track.

@@ -425,23 +425,16 @@ func (cm *ConflictManager) processNPCAttack(ctx context.Context, npc *core.Chara
 		Narrative:      npcNarrative,
 	})
 
-	shifts, side := action.ResolveAttackOutcome(outcome)
-
-	switch {
-	case shifts > 0:
-		events = append(events, NarrativeEvent{Text: fmt.Sprintf("%s takes %d shifts of stress!", target.Name, shifts)})
-	case side == action.AttackerBoost:
-		// Tie: attacker (NPC) gets a boost (no damage to target).
-		tieDesc := fmt.Sprintf("%s attacks %s but is evenly matched", npc.Name, target.Name)
-		boostName := cm.actions.generateBoostName(ctx, npc, attackSkill, tieDesc, "Fleeting Opening")
-		events = append(events, cm.actions.createBoost(boostName, npc.ID))
-	case side == action.DefenderBoost:
-		// Defend with style — target gets a boost.
-		defDesc := fmt.Sprintf("defending against %s's attack", npc.Name)
-		defSkill := core.DefenseSkillForAttack(attackSkill)
-		boostName := cm.actions.generateBoostName(ctx, target, defSkill, defDesc, "Deflected with Ease")
-		events = append(events, cm.actions.createBoost(boostName, target.ID))
-	}
+	tieDesc := fmt.Sprintf("%s attacks %s but is evenly matched", npc.Name, target.Name)
+	boostEvents := cm.resolveAttackOutcome(ctx, outcome, npc, target, attackSkill, tieDesc, attackCallbacks{
+		onDamage: func(shifts int) []GameEvent {
+			return []GameEvent{NarrativeEvent{Text: fmt.Sprintf("%s takes %d shifts of stress!", target.Name, shifts)}}
+		},
+		onTie:             func() []GameEvent { return nil },
+		onDefendWithStyle: func() []GameEvent { return nil },
+		onFailure:         func() []GameEvent { return nil },
+	})
+	events = append(events, boostEvents...)
 
 	return events, false
 }
