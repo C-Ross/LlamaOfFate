@@ -98,6 +98,10 @@ func TestIsPhysicalAttackSkill(t *testing.T) {
 	assert.False(t, IsPhysicalAttackSkill("Provoke"))
 	assert.False(t, IsPhysicalAttackSkill("Lore"))
 	assert.False(t, IsPhysicalAttackSkill("Unknown"))
+	// Case-insensitive
+	assert.True(t, IsPhysicalAttackSkill("fight"))
+	assert.True(t, IsPhysicalAttackSkill("SHOOT"))
+	assert.False(t, IsPhysicalAttackSkill("physique"))
 }
 
 func TestIsMentalAttackSkill(t *testing.T) {
@@ -108,6 +112,10 @@ func TestIsMentalAttackSkill(t *testing.T) {
 	assert.False(t, IsMentalAttackSkill("Fight"))
 	assert.False(t, IsMentalAttackSkill("Shoot"))
 	assert.False(t, IsMentalAttackSkill("Unknown"))
+	// Case-insensitive
+	assert.True(t, IsMentalAttackSkill("provoke"))
+	assert.True(t, IsMentalAttackSkill("PROVOKE"))
+	assert.False(t, IsMentalAttackSkill("deceive"))
 }
 
 func TestInitiativeSkillsForConflict(t *testing.T) {

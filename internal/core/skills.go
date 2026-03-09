@@ -5,10 +5,21 @@ package core
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 )
+
+// normalizeSkill converts a skill name to the canonical title-case form used
+// by the skill constants (e.g. "fight" → "Fight", "SHOOT" → "Shoot").
+// Callers do not need to worry about casing before calling skill functions.
+func normalizeSkill(skill string) string {
+	if skill == "" {
+		return ""
+	}
+	return strings.ToUpper(skill[:1]) + strings.ToLower(skill[1:])
+}
 
 func init() {
 	// Verify that every skill referenced in classification maps is a valid
@@ -66,11 +77,13 @@ var mentalConflictSkills = map[string]bool{
 // Per Fate Core rules:
 // - Physical attacks (Fight, Shoot) are defended with Athletics
 // - Mental/social attacks (Provoke) are defended with Will
+// Input is case-insensitive; "fight", "Fight", and "FIGHT" are equivalent.
 func DefenseSkillForAttack(attackSkill string) string {
-	if physicalAttackSkills[attackSkill] {
+	s := normalizeSkill(attackSkill)
+	if physicalAttackSkills[s] {
 		return SkillAthletics
 	}
-	if mentalAttackSkills[attackSkill] {
+	if mentalAttackSkills[s] {
 		return SkillWill
 	}
 	// Default to Athletics for unknown attack types
@@ -81,8 +94,9 @@ func DefenseSkillForAttack(attackSkill string) string {
 // Per Fate Core rules:
 // - Physical attacks target physical stress
 // - Mental/social attacks target mental stress
+// Input is case-insensitive; "fight", "Fight", and "FIGHT" are equivalent.
 func StressTypeForAttack(attackSkill string) StressTrackType {
-	if mentalAttackSkills[attackSkill] {
+	if mentalAttackSkills[normalizeSkill(attackSkill)] {
 		return MentalStress
 	}
 	return PhysicalStress
@@ -92,25 +106,29 @@ func StressTypeForAttack(attackSkill string) StressTrackType {
 // Per Fate Core rules:
 // - Physical skills (Fight, Shoot, Athletics, Physique) indicate physical conflict
 // - Mental skills (Provoke, Deceive, Rapport, Will, Empathy) indicate mental conflict
+// Input is case-insensitive; "fight", "Fight", and "FIGHT" are equivalent.
 func ConflictTypeForSkill(skill string) scene.ConflictType {
-	if physicalConflictSkills[skill] {
+	s := normalizeSkill(skill)
+	if physicalConflictSkills[s] {
 		return scene.PhysicalConflict
 	}
-	if mentalConflictSkills[skill] {
+	if mentalConflictSkills[s] {
 		return scene.MentalConflict
 	}
 	// Default to physical for unknown skills
 	return scene.PhysicalConflict
 }
 
-// IsPhysicalAttackSkill returns true if the skill deals physical damage
+// IsPhysicalAttackSkill returns true if the skill deals physical damage.
+// Input is case-insensitive; "fight", "Fight", and "FIGHT" are equivalent.
 func IsPhysicalAttackSkill(skill string) bool {
-	return physicalAttackSkills[skill]
+	return physicalAttackSkills[normalizeSkill(skill)]
 }
 
-// IsMentalAttackSkill returns true if the skill deals mental damage
+// IsMentalAttackSkill returns true if the skill deals mental damage.
+// Input is case-insensitive; "fight", "Fight", and "FIGHT" are equivalent.
 func IsMentalAttackSkill(skill string) bool {
-	return mentalAttackSkills[skill]
+	return mentalAttackSkills[normalizeSkill(skill)]
 }
 
 // InitiativeSkillsForConflict returns the ordered list of skills to check for initiative.

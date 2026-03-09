@@ -203,12 +203,8 @@ func parseActionType(actionTypeStr string) (action.ActionType, error) {
 	}
 
 	// Check if LLM returned a skill name instead of action type.
-	// Title-case the first letter to match core skill constants (e.g. "fight" → "Fight").
-	if len(normalized) > 0 {
-		titled := strings.ToUpper(normalized[:1]) + normalized[1:]
-		if core.IsPhysicalAttackSkill(titled) || core.IsMentalAttackSkill(titled) {
-			return action.Attack, nil
-		}
+	if core.IsPhysicalAttackSkill(normalized) || core.IsMentalAttackSkill(normalized) {
+		return action.Attack, nil
 	}
 
 	// Map well-known defensive skills to Defend.
