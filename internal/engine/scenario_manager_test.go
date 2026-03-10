@@ -1118,3 +1118,42 @@ func TestScenarioManager_HandleSceneEnd_PlayerTakenOut(t *testing.T) {
 	assert.Equal(t, ScenarioEndPlayerTakenOut, result.Reason)
 	assert.Empty(t, events)
 }
+
+func TestNPCRegistry_UpdateAttitude(t *testing.T) {
+	reg := NewNPCRegistry()
+	npc := core.NewCharacter("npc1", "Bandit Chief")
+	reg.Register(npc, "hostile")
+
+	reg.UpdateAttitude("Bandit Chief", "neutral")
+
+	_, attitudes := reg.Snapshot()
+	assert.Equal(t, "neutral", attitudes["bandit chief"])
+}
+
+func TestNPCRegistry_UpdateAttitude_NormalizesName(t *testing.T) {
+	reg := NewNPCRegistry()
+	npc := core.NewCharacter("npc1", "Marshal Dan")
+	reg.Register(npc, "friendly")
+
+	reg.UpdateAttitude("MARSHAL DAN", "hostile")
+
+	_, attitudes := reg.Snapshot()
+	assert.Equal(t, "hostile", attitudes["marshal dan"])
+}
+
+func TestChallengeManager_ResetState(t *testing.T) {
+	eng, err := New(session.NullLogger{})
+	require.NoError(t, err)
+
+	chm := newChallengeManager(nil, eng, session.NullLogger{})
+	s := scene.NewScene("s1", "Hall", "A grand hall")
+	player := core.NewCharacter("p1", "Hero")
+	chm.setSceneState(s, player)
+
+	// resetState is a no-op, but call it to ensure it runs without error
+	chm.resetState()
+
+	// State should remain intact (resetState doesn't clear scene state)
+	assert.Equal(t, s, chm.currentScene)
+	assert.Equal(t, player, chm.player)
+}

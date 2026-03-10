@@ -13,6 +13,37 @@ func newTestNPC(id, name string) *core.Character {
 	return core.NewCharacter(id, name)
 }
 
+func TestEngine_Start(t *testing.T) {
+	eng, err := New(session.NullLogger{})
+	require.NoError(t, err)
+	assert.NoError(t, eng.Start())
+}
+
+func TestEngine_Stop(t *testing.T) {
+	eng, err := New(session.NullLogger{})
+	require.NoError(t, err)
+	assert.NoError(t, eng.Stop())
+}
+
+func TestEngine_GetVersion(t *testing.T) {
+	eng, err := New(session.NullLogger{})
+	require.NoError(t, err)
+	assert.Equal(t, "0.1.0", eng.GetVersion())
+}
+
+func TestEngine_GetActionParser_WithoutLLM(t *testing.T) {
+	eng, err := New(session.NullLogger{})
+	require.NoError(t, err)
+	assert.Nil(t, eng.GetActionParser())
+}
+
+func TestEngine_GetActionParser_WithLLM(t *testing.T) {
+	mockClient := newTestLLMClient()
+	eng, err := NewWithLLM(mockClient, session.NullLogger{})
+	require.NoError(t, err)
+	assert.NotNil(t, eng.GetActionParser())
+}
+
 func TestResolveCharacter(t *testing.T) {
 	t.Run("exact ID match", func(t *testing.T) {
 		eng, _ := New(session.NullLogger{})
