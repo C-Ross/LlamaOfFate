@@ -12,7 +12,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
-	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+	"github.com/C-Ross/LlamaOfFate/internal/llm/openai"
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/C-Ross/LlamaOfFate/internal/syncdriver"
@@ -63,23 +63,23 @@ func main() {
 	fmt.Println("=== LlamaOfFate Scene Demo ===")
 	fmt.Println()
 
-	// Check if Azure config exists
+	// Check if LLM config exists
 	configPath := "configs/azure-llm.yaml"
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		fmt.Printf("Azure LLM config not found at %s\n", configPath)
+		fmt.Printf("LLM config not found at %s\n", configPath)
 		fmt.Println("Please copy configs/azure-llm.yaml.example to configs/azure-llm.yaml")
-		fmt.Println("and configure your Azure OpenAI credentials.")
+		fmt.Println("and configure your LLM credentials.")
 		return
 	}
 
-	// Load Azure LLM configuration
-	config, err := azure.LoadConfig(configPath)
+	// Load LLM configuration
+	config, err := openai.LoadConfig(configPath)
 	if err != nil {
-		log.Fatalf("Failed to load Azure config: %v", err)
+		log.Fatalf("Failed to load LLM config: %v", err)
 	}
 
-	// Create Azure ML client
-	azureClient := azure.NewClient(*config)
+	// Create LLM client
+	llmClient := openai.NewClient(*config)
 
 	// Set up session logging (default: enabled with auto-generated filename)
 	logPath := *logFlag
@@ -110,7 +110,7 @@ func main() {
 	}
 
 	// Create the game engine with LLM
-	gameEngine, err := engine.NewWithLLM(azureClient, sl)
+	gameEngine, err := engine.NewWithLLM(llmClient, sl)
 	if err != nil {
 		log.Fatalf("Failed to create engine with LLM: %v", err)
 	}

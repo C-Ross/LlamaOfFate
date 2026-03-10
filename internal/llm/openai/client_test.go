@@ -1,4 +1,4 @@
-package azure
+package openai
 
 import (
 	"bytes"
@@ -16,7 +16,7 @@ import (
 
 func TestNewClient(t *testing.T) {
 	config := Config{
-		APIEndpoint: "https://test.endpoint.com",
+		APIEndpoint: "https://test.azure.endpoint.com",
 		APIKey:      "test-key",
 		ModelName:   "Meta-Llama-3.1-405B-Instruct",
 		Timeout:     60,
@@ -39,7 +39,7 @@ func TestNewClient(t *testing.T) {
 
 func TestNewClientWithDefaults(t *testing.T) {
 	config := Config{
-		APIEndpoint: "https://test.endpoint.com",
+		APIEndpoint: "https://test.azure.endpoint.com",
 		APIKey:      "test-key",
 	}
 
@@ -48,9 +48,8 @@ func TestNewClientWithDefaults(t *testing.T) {
 	assert.NotNil(t, client)
 	assert.NotNil(t, client.httpClient)
 
-	// Check defaults are applied
 	modelInfo := client.GetModelInfo()
-	assert.Contains(t, modelInfo.Description, "Azure ML hosted")
+	assert.Contains(t, modelInfo.Description, "hosted")
 }
 
 func TestGetMaxTokensForModel(t *testing.T) {
@@ -289,7 +288,7 @@ func TestLogTokenUsage_DebugLog(t *testing.T) {
 	defer slog.SetDefault(slog.Default())
 
 	client := NewClient(Config{
-		APIEndpoint: "https://test.endpoint.com",
+		APIEndpoint: "https://test.azure.endpoint.com",
 		APIKey:      "test-key",
 		ModelName:   "Meta-Llama-3.1-405B-Instruct",
 	})
@@ -317,7 +316,7 @@ func TestLogTokenUsage_WarningNearLimit(t *testing.T) {
 	defer slog.SetDefault(slog.Default())
 
 	client := NewClient(Config{
-		APIEndpoint: "https://test.endpoint.com",
+		APIEndpoint: "https://test.azure.endpoint.com",
 		APIKey:      "test-key",
 		ModelName:   "Meta-Llama-3.1-405B-Instruct",
 	})
@@ -344,7 +343,7 @@ func TestLogTokenUsage_NoLogOnZeroTokens(t *testing.T) {
 	defer slog.SetDefault(slog.Default())
 
 	client := NewClient(Config{
-		APIEndpoint: "https://test.endpoint.com",
+		APIEndpoint: "https://test.azure.endpoint.com",
 		APIKey:      "test-key",
 		ModelName:   "Meta-Llama-3.1-405B-Instruct",
 	})
@@ -363,7 +362,7 @@ func TestLogTokenUsage_NoWarningBelowThreshold(t *testing.T) {
 	defer slog.SetDefault(slog.Default())
 
 	client := NewClient(Config{
-		APIEndpoint: "https://test.endpoint.com",
+		APIEndpoint: "https://test.azure.endpoint.com",
 		APIKey:      "test-key",
 		ModelName:   "Meta-Llama-3.1-405B-Instruct",
 	})
@@ -380,4 +379,24 @@ func TestLogTokenUsage_NoWarningBelowThreshold(t *testing.T) {
 	output := buf.String()
 	assert.Contains(t, output, "Token usage")
 	assert.NotContains(t, output, "approaching context window limit")
+}
+
+func TestInferProvider(t *testing.T) {
+	tests := []struct {
+		endpoint string
+		expected string
+	}{
+		{"https://my-model.azure.inference.ai.azure.com", "Azure ML"},
+		{"http://localhost:11434/v1/chat/completions", "Ollama"},
+		{"http://127.0.0.1:11434/v1/chat/completions", "Ollama"},
+		{"https://api.openai.com/v1/chat/completions", "OpenAI"},
+		{"https://some-custom-api.example.com/v1/chat", "OpenAI-compatible"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			result := inferProvider(tt.endpoint)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }

@@ -14,7 +14,7 @@ internal/
   core/                     - Fate Core mechanics (action, character, dice, scene)
   engine/                   - Game loop, LLM orchestration (game_manager → scene_flow → scene_manager)
   prompt/                   - LLM prompt system (Go templates, data structs, marker parsing)
-  llm/                      - LLM client interface and retry logic (azure/ implementation)
+  llm/                      - LLM client interface and retry logic (openai/ implementation)
   logging/                  - Structured logging (slog)
   session/                  - Session logging for game transcripts (YAML)
   ui/terminal/              - Terminal UI implementation

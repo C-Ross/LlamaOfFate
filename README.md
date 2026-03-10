@@ -53,14 +53,14 @@ Fate™ is a trademark of Evil Hat Productions, LLC.
 
 LlamaOfFate supports multiple LLM backends for maximum flexibility. Choose the one that works best for your needs.
 
-### Azure ML Setup (Cloud)
+### Cloud LLM Setup (OpenAI-compatible)
 
-LlamaOfFate can use Azure ML for LLM integration. Configuration is stored in `configs/azure-llm.yaml`.
+LlamaOfFate uses any OpenAI-compatible endpoint for LLM integration. Configuration is stored in `configs/azure-llm.yaml`.
 
 **Recommended Setup (Environment Variables):**
 
 ```bash
-# Set your Azure ML credentials via environment variables
+# Set your LLM credentials via environment variables
 export AZURE_API_ENDPOINT="https://your-resource.cognitiveservices.azure.com/openai/deployments/your-deployment/chat/completions?api-version=2024-05-01-preview"
 export AZURE_API_KEY="your-api-key-here"
 ```
@@ -189,7 +189,7 @@ Run `just` without arguments to see all available commands. Common commands incl
 - **`just go-test`** - Run Go tests
 - **`just go-lint`** - Run golangci-lint
 - **`just go-validate`** - vet + fmtcheck + lint + test + build
-- **`just test-llm`** - Run LLM evaluation tests (requires Azure credentials)
+- **`just test-llm`** - Run LLM evaluation tests (requires LLM credentials or LLM_PROVIDER=ollama)
 - **`just test-llm-track`** - Run LLM tests and track results for flakiness analysis
 - **`just test-llm-report`** - Show LLM test stability report
 - **`just test-llm-flaky`** - Show only flaky LLM tests
@@ -249,7 +249,7 @@ LlamaOfFate/
 │   ├── engine/                 # Game engine (scene/scenario managers, action parsing, conflict resolution)
 │   ├── syncdriver/             # Synchronous blocking game loop (wraps async engine API)
 │   ├── llm/                    # LLM integration layer
-│   │   └── azure/              # Azure OpenAI implementation
+│   │   └── openai/             # OpenAI-compatible LLM implementation
 │   ├── prompt/                 # LLM prompt templates and response parsing
 │   ├── session/                # Session logging for game transcripts
 │   ├── storage/                # Game state persistence (YAML save/load)
@@ -283,7 +283,7 @@ LlamaOfFate/
 - **`internal/core/`**: Core Fate mechanics implementation (character, dice, scene, action, skills, challenges)
 - **`internal/engine/`**: Purely async/event-driven game engine (GameSessionManager interface: Start/HandleInput/ProvideInvokeResponse/ProvideMidFlowResponse/Save); emits GameEvents for UI rendering; includes conflict and challenge managers
 - **`internal/syncdriver/`**: Synchronous blocking game loop that wraps the engine's async API for terminal-style UIs (Run function drives: ReadInput → HandleInput → Emit events → drive prompts → repeat)
-- **`internal/llm/`**: LLM integration with Azure OpenAI backend, including retry logic and response handling
+- **`internal/llm/`**: LLM integration with OpenAI-compatible backends, including retry logic and response handling
 - **`internal/prompt/`**: LLM prompt template rendering and response parsing (template data types, render functions, marker extraction)
 - **`internal/session/`**: Session logging for game transcripts
 - **`internal/storage/`**: Game state persistence with YAML-based save/load
@@ -304,7 +304,7 @@ LlamaOfFate/
 - ✅ Complete Fate Core dice system (4dF) and skill ladder
 - ✅ All 18 default Fate Core skills with action mappings
 - ✅ Game engine with scene and scenario management
-- ✅ LLM integration with Azure OpenAI
+- ✅ LLM integration with OpenAI-compatible endpoints (Azure, Ollama, OpenAI)
 - ✅ Action parsing from natural language input
 - ✅ Conflict resolution system with stress and consequences
 - ✅ Challenge system with multi-task tracking and outcome tallying

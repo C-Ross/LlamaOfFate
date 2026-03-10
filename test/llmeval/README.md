@@ -20,7 +20,7 @@ Use these tests to:
 
 ### Connectivity
 
-These tests require a live connection to the Azure OpenAI API. You must set the following environment variables:
+These tests require a live connection to an OpenAI-compatible API. You must set the following environment variables:
 
 ```bash
 export AZURE_API_ENDPOINT="https://your-resource.openai.azure.com/"

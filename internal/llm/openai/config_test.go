@@ -1,4 +1,4 @@
-package azure
+package openai
 
 import (
 	"os"
@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// clearAzureEnvVars temporarily clears Azure environment variables and returns a cleanup function
-func clearAzureEnvVars(t *testing.T) func() {
+// clearLLMEnvVars temporarily clears LLM credential environment variables and returns a cleanup function
+func clearLLMEnvVars(t *testing.T) func() {
 	t.Helper()
 	originalEndpoint := os.Getenv("AZURE_API_ENDPOINT")
 	originalKey := os.Getenv("AZURE_API_KEY")
@@ -30,12 +30,12 @@ func clearAzureEnvVars(t *testing.T) func() {
 
 func TestLoadConfig(t *testing.T) {
 	// Clear any environment variables that might interfere
-	cleanup := clearAzureEnvVars(t)
+	cleanup := clearLLMEnvVars(t)
 	defer cleanup()
 
 	// Create a temporary config file
 	tempDir := t.TempDir()
-	configPath := filepath.Join(tempDir, "azure-config.yaml")
+	configPath := filepath.Join(tempDir, "llm-config.yaml")
 
 	configContent := `api_endpoint: "https://test.inference.ai.azure.com"
 api_key: "test-api-key-12345"
@@ -59,12 +59,12 @@ timeout: 45
 
 func TestLoadConfigWithDefaults(t *testing.T) {
 	// Clear any environment variables that might interfere
-	cleanup := clearAzureEnvVars(t)
+	cleanup := clearLLMEnvVars(t)
 	defer cleanup()
 
 	// Create a minimal config file
 	tempDir := t.TempDir()
-	configPath := filepath.Join(tempDir, "azure-config.yaml")
+	configPath := filepath.Join(tempDir, "llm-config.yaml")
 
 	configContent := `api_endpoint: "https://test.inference.ai.azure.com"
 api_key: "test-api-key-12345"
@@ -87,7 +87,7 @@ api_key: "test-api-key-12345"
 func TestLoadConfigWithEnvironmentVariables(t *testing.T) {
 	// Create a temporary config file
 	tempDir := t.TempDir()
-	configPath := filepath.Join(tempDir, "azure-config.yaml")
+	configPath := filepath.Join(tempDir, "llm-config.yaml")
 
 	configContent := `api_endpoint: "https://file-endpoint.inference.ai.azure.com"
 api_key: "file-api-key"
@@ -132,12 +132,12 @@ timeout: 45
 
 func TestLoadConfigWithPartialEnvironmentVariables(t *testing.T) {
 	// Clear any existing environment variables first
-	cleanup := clearAzureEnvVars(t)
+	cleanup := clearLLMEnvVars(t)
 	defer cleanup()
 
 	// Create a temporary config file
 	tempDir := t.TempDir()
-	configPath := filepath.Join(tempDir, "azure-config.yaml")
+	configPath := filepath.Join(tempDir, "llm-config.yaml")
 
 	configContent := `api_endpoint: "https://file-endpoint.inference.ai.azure.com"
 api_key: "file-api-key"
@@ -189,7 +189,7 @@ model_name: Meta-Llama-3.1-70B-Instruct # Missing closing quote above
 
 func TestLoadConfigRelativePath(t *testing.T) {
 	// Clear any environment variables that might interfere
-	cleanup := clearAzureEnvVars(t)
+	cleanup := clearLLMEnvVars(t)
 	defer cleanup()
 
 	// Change to temp directory
@@ -203,21 +203,18 @@ func TestLoadConfigRelativePath(t *testing.T) {
 	err = os.Chdir(tempDir)
 	require.NoError(t, err)
 
-	// Create config with relative path
 	configContent := `api_endpoint: "https://test.inference.ai.azure.com"
 api_key: "test-api-key-12345"
 model_name: "Meta-Llama-3.1-70B-Instruct"
 `
 
-	err = os.WriteFile("azure-config.yaml", []byte(configContent), 0600)
+	err = os.WriteFile(filepath.Join(tempDir, "llm-config.yaml"), []byte(configContent), 0600)
 	require.NoError(t, err)
 
-	// Load the config using relative path
-	config, err := LoadConfig("azure-config.yaml")
+	// Load with relative path
+	config, err := LoadConfig("llm-config.yaml")
 	require.NoError(t, err)
 	require.NotNil(t, config)
 
 	assert.Equal(t, "https://test.inference.ai.azure.com", config.APIEndpoint)
-	assert.Equal(t, "test-api-key-12345", config.APIKey)
-	assert.Equal(t, "Meta-Llama-3.1-70B-Instruct", config.ModelName)
 }

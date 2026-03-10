@@ -42,11 +42,11 @@ type AspectGeneratorEvaluationSummary struct {
 }
 
 func TestAspectGeneratorLLMEvaluation(t *testing.T) {
-	azureClient := RequireLLMClient(t)
+	llmClient := RequireLLMClient(t)
 	verboseLogging := VerboseLoggingEnabled()
 
 	// Create aspect generator
-	aspectGenerator := engine.NewAspectGenerator(azureClient)
+	aspectGenerator := engine.NewAspectGenerator(llmClient)
 
 	// Create a test character
 	char := createTestCharacter()
@@ -454,10 +454,10 @@ func getAspectGeneratorTestCases() []AspectGeneratorTestCase {
 }
 
 func TestAspectGeneratorEdgeCases(t *testing.T) {
-	azureClient := RequireLLMClient(t)
+	llmClient := RequireLLMClient(t)
 	verboseLogging := VerboseLoggingEnabled()
 
-	aspectGenerator := engine.NewAspectGenerator(azureClient)
+	aspectGenerator := engine.NewAspectGenerator(llmClient)
 	char := createTestCharacter()
 	ctx := context.Background()
 

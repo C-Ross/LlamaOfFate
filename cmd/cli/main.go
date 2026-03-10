@@ -11,7 +11,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
-	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+	"github.com/C-Ross/LlamaOfFate/internal/llm/openai"
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/C-Ross/LlamaOfFate/internal/storage"
@@ -31,13 +31,13 @@ func initializeEngine(sessionLogger session.SessionLogger) *engine.Engine {
 		log.Fatalf("LLM config not found at %s", configPath)
 	}
 
-	config, err := azure.LoadConfig(configPath)
+	config, err := openai.LoadConfig(configPath)
 	if err != nil {
 		log.Fatalf("Found LLM config but failed to load it: %v", err)
 	}
 
-	azureClient := azure.NewClient(*config)
-	retryClient := llm.NewRetryingClient(azureClient, llm.DefaultRetryConfig())
+	llmClient := openai.NewClient(*config)
+	retryClient := llm.NewRetryingClient(llmClient, llm.DefaultRetryConfig())
 
 	gameEngine, err := engine.NewWithLLM(retryClient, sessionLogger)
 	if err != nil {

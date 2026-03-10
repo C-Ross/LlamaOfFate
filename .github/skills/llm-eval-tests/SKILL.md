@@ -22,7 +22,7 @@ import (
     "github.com/C-Ross/LlamaOfFate/internal/core/character"
     "github.com/C-Ross/LlamaOfFate/internal/core/scene"
     "github.com/C-Ross/LlamaOfFate/internal/llm"
-    "github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+    "github.com/C-Ross/LlamaOfFate/internal/llm/openai"
     promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
     "github.com/stretchr/testify/assert"
     "github.com/stretchr/testify/require"
@@ -60,12 +60,12 @@ package llmeval_test
 ```
 
 ### Config and Client Setup
-Use `RequireLLMClient()` from `evaltest_helpers_test.go` to get an LLM client. Supports both Ollama (local) and Azure:
+Use `RequireLLMClient()` from `evaltest_helpers_test.go` to get an LLM client. Supports both Ollama (local) and Azure/OpenAI-compatible endpoints:
 ```go
 // In test/llmeval/evaltest_helpers_test.go:
 // RequireLLMClient returns a ready-to-use LLM client, using either Ollama or
-// Azure depending on configuration. Set LLM_PROVIDER=ollama to use a local
-// Ollama instance; otherwise Azure credentials are required.
+// an OpenAI-compatible endpoint depending on configuration. Set LLM_PROVIDER=ollama
+// to use a local Ollama instance; otherwise API credentials are required.
 func RequireLLMClient(tb testing.TB) llm.LLMClient
 
 // In your test:
@@ -75,7 +75,7 @@ ctx := context.Background()
 
 The helper automatically:
 - Uses Ollama if `LLM_PROVIDER=ollama` is set (loads `configs/ollama-llm.yaml`)
-- Falls back to Azure (requires `AZURE_API_ENDPOINT` and `AZURE_API_KEY`)
+- Falls back to OpenAI-compatible endpoint (requires `AZURE_API_ENDPOINT` and `AZURE_API_KEY`)
 - Skips the test if no provider is configured
 
 ### Template Rendering
@@ -123,7 +123,7 @@ for _, r := range results {
 ## Running Tests
 
 ```bash
-# Run all tests (requires AZURE_API_ENDPOINT and AZURE_API_KEY)
+# Run all tests (requires AZURE_API_ENDPOINT and AZURE_API_KEY, or LLM_PROVIDER=ollama)
 just test-llm
 
 # Run tests and track results for flakiness analysis

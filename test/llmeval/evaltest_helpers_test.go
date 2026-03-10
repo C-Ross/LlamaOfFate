@@ -11,7 +11,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
-	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+	"github.com/C-Ross/LlamaOfFate/internal/llm/openai"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,8 +20,8 @@ import (
 // ---------------------------------------------------------------------------
 
 // RequireLLMClient returns a ready-to-use LLM client, using either Ollama or
-// Azure depending on configuration. Set LLM_PROVIDER=ollama to use a local
-// Ollama instance; otherwise Azure credentials are required.
+// an OpenAI-compatible endpoint depending on configuration. Set LLM_PROVIDER=ollama
+// to use a local Ollama instance; otherwise API credentials are required.
 func RequireLLMClient(tb testing.TB) llm.LLMClient {
 	tb.Helper()
 
@@ -29,16 +29,16 @@ func RequireLLMClient(tb testing.TB) llm.LLMClient {
 
 	switch strings.ToLower(provider) {
 	case "ollama":
-		config, err := azure.LoadConfig("../../configs/ollama-llm.yaml")
+		config, err := openai.LoadConfig("../../configs/ollama-llm.yaml")
 		require.NoError(tb, err, "Failed to load Ollama config")
-		return azure.NewClient(*config)
+		return openai.NewClient(*config)
 	default:
 		if os.Getenv("AZURE_API_ENDPOINT") == "" || os.Getenv("AZURE_API_KEY") == "" {
 			tb.Skip("Skipping: set LLM_PROVIDER=ollama or AZURE_API_ENDPOINT and AZURE_API_KEY")
 		}
-		config, err := azure.LoadConfig("../../configs/azure-llm.yaml")
-		require.NoError(tb, err, "Failed to load Azure config")
-		return azure.NewClient(*config)
+		config, err := openai.LoadConfig("../../configs/azure-llm.yaml")
+		require.NoError(tb, err, "Failed to load LLM config")
+		return openai.NewClient(*config)
 	}
 }
 

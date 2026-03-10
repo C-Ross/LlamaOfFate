@@ -83,13 +83,13 @@ func TestCompletionResponse(t *testing.T) {
 func TestModelInfo(t *testing.T) {
 	info := ModelInfo{
 		Name:        "Meta-Llama-3.1-405B-Instruct",
-		Provider:    "Azure ML",
+		Provider:    "OpenAI-compatible",
 		MaxTokens:   4096,
-		Description: "Azure ML hosted Meta-Llama-3.1-405B-Instruct",
+		Description: "OpenAI-compatible hosted Meta-Llama-3.1-405B-Instruct",
 	}
 
 	assert.Equal(t, "Meta-Llama-3.1-405B-Instruct", info.Name)
-	assert.Equal(t, "Azure ML", info.Provider)
+	assert.Equal(t, "OpenAI-compatible", info.Provider)
 	assert.Equal(t, 4096, info.MaxTokens)
-	assert.Equal(t, "Azure ML hosted Meta-Llama-3.1-405B-Instruct", info.Description)
+	assert.Equal(t, "OpenAI-compatible hosted Meta-Llama-3.1-405B-Instruct", info.Description)
 }

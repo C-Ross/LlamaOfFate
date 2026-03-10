@@ -61,10 +61,10 @@ go-build-llmeval:
     @echo "Checking llmeval tests compile..."
     {{gocmd}} test -tags=llmeval -count=0 ./test/llmeval/...
 
-# Run LLM evaluation tests (requires AZURE_API_ENDPOINT and AZURE_API_KEY)
+# Run LLM evaluation tests (requires AZURE_API_ENDPOINT and AZURE_API_KEY, or LLM_PROVIDER=ollama)
 test-llm:
     @echo "Running LLM evaluation tests..."
-    @echo "Requires AZURE_API_ENDPOINT and AZURE_API_KEY environment variables"
+    @echo "Requires AZURE_API_ENDPOINT and AZURE_API_KEY, or LLM_PROVIDER=ollama"
     {{gocmd}} test -v -tags=llmeval ./test/llmeval/...
 
 # Run LLM eval tests and record results for flakiness tracking

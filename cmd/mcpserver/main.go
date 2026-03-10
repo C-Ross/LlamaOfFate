@@ -10,7 +10,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
-	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+	"github.com/C-Ross/LlamaOfFate/internal/llm/openai"
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
 	"github.com/C-Ross/LlamaOfFate/internal/mcpserver"
 )
@@ -62,12 +62,12 @@ func initLLMClient(configPath string) (llm.LLMClient, error) {
 	if _, err := os.Stat(configPath); err != nil {
 		return nil, fmt.Errorf("LLM config not found at %s", configPath)
 	}
-	config, err := azure.LoadConfig(configPath)
+	config, err := openai.LoadConfig(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("load LLM config: %w", err)
 	}
-	azureClient := azure.NewClient(*config)
-	retryClient := llm.NewRetryingClient(azureClient, llm.DefaultRetryConfig())
+	llmClient := openai.NewClient(*config)
+	retryClient := llm.NewRetryingClient(llmClient, llm.DefaultRetryConfig())
 	slog.Info("LLM integration enabled", "model", config.ModelName)
 	return retryClient, nil
 }

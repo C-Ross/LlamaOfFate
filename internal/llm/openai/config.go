@@ -1,4 +1,4 @@
-package azure
+package openai
 
 import (
 	"os"
@@ -7,7 +7,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// LoadConfig loads Azure ML configuration from a YAML file and applies environment variable overrides.
+// LoadConfig loads LLM configuration from a YAML file and applies environment variable overrides.
 // Environment variables take precedence over values in the YAML file:
 // - AZURE_API_ENDPOINT: Overrides api_endpoint
 // - AZURE_API_KEY: Overrides api_key

@@ -1,4 +1,4 @@
-package azure
+package openai
 
 import (
 	"bufio"
@@ -15,34 +15,37 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 )
 
-// Config holds the configuration for Azure ML LLM client
+// Config holds the configuration for an OpenAI-compatible LLM endpoint
+// (Azure ML, Ollama, OpenAI, etc.)
 type Config struct {
 	APIEndpoint string `yaml:"api_endpoint"` // e.g., "https://your-endpoint.inference.ai.azure.com"
-	APIKey      string `yaml:"api_key"`      // Your Azure ML API key
+	APIKey      string `yaml:"api_key"`      // API key or token
 	ModelName   string `yaml:"model_name"`   // e.g., "Meta-Llama-3.1-405B-Instruct"
 	Timeout     int    `yaml:"timeout"`      // Request timeout in seconds (default: 30)
 }
 
-// Client implements the LLMClient interface for Azure ML
+// Client implements the LLMClient interface for OpenAI-compatible APIs
 type Client struct {
 	config     Config
 	httpClient *http.Client
 	modelInfo  llm.ModelInfo
 }
 
-// NewClient creates a new Azure ML LLM client
+// NewClient creates a new OpenAI-compatible LLM client
 func NewClient(config Config) *Client {
 	timeout := time.Duration(config.Timeout) * time.Second
 	if config.Timeout == 0 {
 		timeout = 60 * time.Second // Increased default timeout
 	}
 
+	provider := inferProvider(config.APIEndpoint)
+
 	modelInfo := llm.ModelInfo{
 		Name:          config.ModelName,
-		Provider:      "Azure ML",
+		Provider:      provider,
 		MaxTokens:     getMaxTokensForModel(config.ModelName),
 		ContextWindow: getContextWindowForModel(config.ModelName),
-		Description:   fmt.Sprintf("Azure ML hosted %s", config.ModelName),
+		Description:   fmt.Sprintf("%s hosted %s", provider, config.ModelName),
 	}
 
 	return &Client{
@@ -51,6 +54,20 @@ func NewClient(config Config) *Client {
 			Timeout: timeout,
 		},
 		modelInfo: modelInfo,
+	}
+}
+
+// inferProvider derives a human-readable provider name from the endpoint URL.
+func inferProvider(endpoint string) string {
+	switch {
+	case strings.Contains(endpoint, "azure"):
+		return "Azure ML"
+	case strings.Contains(endpoint, "localhost"), strings.Contains(endpoint, "127.0.0.1"):
+		return "Ollama"
+	case strings.Contains(endpoint, "openai.com"):
+		return "OpenAI"
+	default:
+		return "OpenAI-compatible"
 	}
 }
 
@@ -71,8 +88,8 @@ func (c *Client) ChatCompletion(ctx context.Context, req llm.CompletionRequest) 
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	slog.Debug("Azure ChatCompletion request",
-		slog.String("component", "azure_llm"),
+	slog.Debug("ChatCompletion request",
+		slog.String("component", "openai_llm"),
 		slog.String("endpoint", url),
 		slog.String("model", req.Model),
 		slog.Bool("stream", req.Stream),
@@ -92,8 +109,8 @@ func (c *Client) ChatCompletion(ctx context.Context, req llm.CompletionRequest) 
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
-		slog.Error("Azure ChatCompletion request error",
-			slog.String("component", "azure_llm"),
+		slog.Error("ChatCompletion request error",
+			slog.String("component", "openai_llm"),
 			slog.String("endpoint", url),
 			slog.String("model", req.Model),
 			slog.Any("error", err))
@@ -103,8 +120,8 @@ func (c *Client) ChatCompletion(ctx context.Context, req llm.CompletionRequest) 
 
 	headers := resp.Header.Clone()
 
-	slog.Debug("Azure ChatCompletion headers",
-		slog.String("component", "azure_llm"),
+	slog.Debug("ChatCompletion headers",
+		slog.String("component", "openai_llm"),
 		slog.String("endpoint", url),
 		slog.String("model", req.Model),
 		slog.Int("status", resp.StatusCode),
@@ -114,8 +131,8 @@ func (c *Client) ChatCompletion(ctx context.Context, req llm.CompletionRequest) 
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		slog.Error("Azure ChatCompletion read error",
-			slog.String("component", "azure_llm"),
+		slog.Error("ChatCompletion read error",
+			slog.String("component", "openai_llm"),
 			slog.String("endpoint", url),
 			slog.String("model", req.Model),
 			slog.Duration("duration", duration),
@@ -125,8 +142,8 @@ func (c *Client) ChatCompletion(ctx context.Context, req llm.CompletionRequest) 
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		slog.Error("Azure ChatCompletion non-200 response",
-			slog.String("component", "azure_llm"),
+		slog.Error("ChatCompletion non-200 response",
+			slog.String("component", "openai_llm"),
 			slog.String("endpoint", url),
 			slog.String("model", req.Model),
 			slog.Int("status", resp.StatusCode),
@@ -142,8 +159,8 @@ func (c *Client) ChatCompletion(ctx context.Context, req llm.CompletionRequest) 
 
 	var response llm.CompletionResponse
 	if err := json.Unmarshal(bodyBytes, &response); err != nil {
-		slog.Error("Azure ChatCompletion decode error",
-			slog.String("component", "azure_llm"),
+		slog.Error("ChatCompletion decode error",
+			slog.String("component", "openai_llm"),
 			slog.String("endpoint", url),
 			slog.String("model", req.Model),
 			slog.Duration("duration", duration),
@@ -153,8 +170,8 @@ func (c *Client) ChatCompletion(ctx context.Context, req llm.CompletionRequest) 
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	slog.Debug("Azure ChatCompletion response",
-		slog.String("component", "azure_llm"),
+	slog.Debug("ChatCompletion response",
+		slog.String("component", "openai_llm"),
 		slog.String("endpoint", url),
 		slog.String("model", req.Model),
 		slog.Int("status", resp.StatusCode),
@@ -191,8 +208,8 @@ func (c *Client) ChatCompletionStream(ctx context.Context, req llm.CompletionReq
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	slog.Debug("Azure ChatCompletionStream request",
-		slog.String("component", "azure_llm"),
+	slog.Debug("ChatCompletionStream request",
+		slog.String("component", "openai_llm"),
 		slog.String("endpoint", url),
 		slog.String("model", req.Model),
 		slog.Bool("stream", req.Stream),
@@ -210,8 +227,8 @@ func (c *Client) ChatCompletionStream(ctx context.Context, req llm.CompletionReq
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
-		slog.Error("Azure ChatCompletionStream request error",
-			slog.String("component", "azure_llm"),
+		slog.Error("ChatCompletionStream request error",
+			slog.String("component", "openai_llm"),
 			slog.String("endpoint", url),
 			slog.String("model", req.Model),
 			slog.Any("error", err))
@@ -221,8 +238,8 @@ func (c *Client) ChatCompletionStream(ctx context.Context, req llm.CompletionReq
 
 	headers := resp.Header.Clone()
 
-	slog.Debug("Azure ChatCompletionStream headers",
-		slog.String("component", "azure_llm"),
+	slog.Debug("ChatCompletionStream headers",
+		slog.String("component", "openai_llm"),
 		slog.String("endpoint", url),
 		slog.String("model", req.Model),
 		slog.Int("status", resp.StatusCode),
@@ -230,8 +247,8 @@ func (c *Client) ChatCompletionStream(ctx context.Context, req llm.CompletionReq
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		slog.Error("Azure ChatCompletionStream non-200 response",
-			slog.String("component", "azure_llm"),
+		slog.Error("ChatCompletionStream non-200 response",
+			slog.String("component", "openai_llm"),
 			slog.String("endpoint", url),
 			slog.String("model", req.Model),
 			slog.Int("status", resp.StatusCode),
@@ -245,8 +262,8 @@ func (c *Client) ChatCompletionStream(ctx context.Context, req llm.CompletionReq
 		}
 	}
 
-	slog.Debug("Azure ChatCompletionStream response started",
-		slog.String("component", "azure_llm"),
+	slog.Debug("ChatCompletionStream response started",
+		slog.String("component", "openai_llm"),
 		slog.String("endpoint", url),
 		slog.String("model", req.Model),
 		slog.Duration("handshake_duration", time.Since(start)),
@@ -260,11 +277,11 @@ func (c *Client) GetModelInfo() llm.ModelInfo {
 	return c.modelInfo
 }
 
-// setHeaders sets the required headers for Azure ML API requests
+// setHeaders sets the required headers for OpenAI-compatible API requests
 func (c *Client) setHeaders(req *http.Request) {
 	req.Header.Set("Content-Type", "application/json")
 
-	// Handle different Azure authentication formats
+	// Handle different authentication formats (Azure api-key, Bearer token, etc.)
 	// If the key already starts with "Bearer " or "api-key ", use it as-is
 	// Otherwise, assume it's a raw key and add "Bearer " prefix
 	apiKey := c.config.APIKey
@@ -274,15 +291,15 @@ func (c *Client) setHeaders(req *http.Request) {
 	req.Header.Set("Authorization", apiKey)
 }
 
-// processStreamingResponse processes the streaming response from Azure ML
+// processStreamingResponse processes an SSE streaming response
 func (c *Client) processStreamingResponse(body io.Reader, handler llm.StreamHandler) error {
 	scanner := bufio.NewScanner(body)
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 
-		slog.Debug("Azure ChatCompletionStream line",
-			slog.String("component", "azure_llm"),
+		slog.Debug("ChatCompletionStream line",
+			slog.String("component", "openai_llm"),
 			slog.String("line", line))
 
 		// Skip empty lines
@@ -292,8 +309,8 @@ func (c *Client) processStreamingResponse(body io.Reader, handler llm.StreamHand
 
 		// Check for the end of stream
 		if line == "data: [DONE]" {
-			slog.Debug("Azure ChatCompletionStream complete",
-				slog.String("component", "azure_llm"))
+			slog.Debug("ChatCompletionStream complete",
+				slog.String("component", "openai_llm"))
 			break
 		}
 
@@ -303,22 +320,22 @@ func (c *Client) processStreamingResponse(body io.Reader, handler llm.StreamHand
 
 			var chunk llm.CompletionResponse
 			if err := json.Unmarshal([]byte(jsonData), &chunk); err != nil {
-				slog.Warn("Azure ChatCompletionStream decode failed",
-					slog.String("component", "azure_llm"),
+				slog.Warn("ChatCompletionStream decode failed",
+					slog.String("component", "openai_llm"),
 					slog.String("raw", jsonData),
 					slog.Any("error", err))
 				// Log the error but continue processing
 				continue
 			}
 
-			slog.Debug("Azure ChatCompletionStream chunk",
-				slog.String("component", "azure_llm"),
+			slog.Debug("ChatCompletionStream chunk",
+				slog.String("component", "openai_llm"),
 				slog.Int("choices", len(chunk.Choices)),
 				slog.Any("chunk", chunk))
 
 			if err := handler(chunk); err != nil {
-				slog.Error("Azure ChatCompletionStream handler error",
-					slog.String("component", "azure_llm"),
+				slog.Error("ChatCompletionStream handler error",
+					slog.String("component", "openai_llm"),
 					slog.Any("error", err))
 				return fmt.Errorf("handler error: %w", err)
 			}
@@ -326,8 +343,8 @@ func (c *Client) processStreamingResponse(body io.Reader, handler llm.StreamHand
 	}
 
 	if err := scanner.Err(); err != nil {
-		slog.Error("Azure ChatCompletionStream scanner error",
-			slog.String("component", "azure_llm"),
+		slog.Error("ChatCompletionStream scanner error",
+			slog.String("component", "openai_llm"),
 			slog.Any("error", err))
 		return fmt.Errorf("error reading stream: %w", err)
 	}
@@ -375,7 +392,7 @@ func (c *Client) logTokenUsage(usage llm.CompletionUsage, model string) {
 	}
 
 	slog.Debug("Token usage",
-		slog.String("component", "azure_llm"),
+		slog.String("component", "openai_llm"),
 		slog.String("model", model),
 		slog.Int("prompt_tokens", usage.PromptTokens),
 		slog.Int("completion_tokens", usage.CompletionTokens),
@@ -389,7 +406,7 @@ func (c *Client) logTokenUsage(usage llm.CompletionUsage, model string) {
 	usageRatio := float64(usage.TotalTokens) / float64(contextWindow)
 	if usageRatio >= tokenUsageWarningThreshold {
 		slog.Warn("Token usage approaching context window limit",
-			slog.String("component", "azure_llm"),
+			slog.String("component", "openai_llm"),
 			slog.String("model", model),
 			slog.Int("total_tokens", usage.TotalTokens),
 			slog.Int("context_window", contextWindow),
