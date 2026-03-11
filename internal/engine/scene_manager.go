@@ -26,6 +26,7 @@ const (
 	inputTypeAction        = "action"
 	inputTypeNarrative     = "narrative"
 	inputTypeConflict      = "conflict"
+	inputTypeUnreasonable  = "unreasonable"
 
 	// User-facing messages
 	msgLLMUnavailable = "[The mists of fate obscure my vision...]"
@@ -42,6 +43,7 @@ type SceneManager struct {
 	lastTransition      *prompt.SceneTransition // Captured transition hint when scene ends
 	sessionLogger       session.SessionLogger
 	scenePurpose        string            // Dramatic question driving the current scene
+	genre               string            // Setting genre for anachronism detection (e.g., "Western", "Sci-Fi")
 	actions             *ActionResolver   // Generic action resolution (dice, invokes, narrative)
 	conflict            *ConflictManager  // Conflict lifecycle (turns, NPC, damage, taken-out)
 	challenge           *ChallengeManager // Challenge lifecycle (initiation, task resolution)
@@ -56,6 +58,12 @@ type SceneManager struct {
 // used to give the response LLM awareness of the scene's goal.
 func (sm *SceneManager) SetScenePurpose(purpose string) {
 	sm.scenePurpose = purpose
+}
+
+// SetGenre sets the setting genre for the current game (e.g., "Western", "Sci-Fi").
+// Used by input classification to detect anachronistic actions.
+func (sm *SceneManager) SetGenre(genre string) {
+	sm.genre = genre
 }
 
 // NewSceneManager creates a new scene manager with injected dependencies.
@@ -190,6 +198,8 @@ func (sm *SceneManager) HandleInput(ctx context.Context, input string) (*InputRe
 		events, awaiting := sm.handleAction(ctx, input)
 		result.Events = events
 		result.AwaitingInvoke = awaiting
+	case inputTypeUnreasonable:
+		result.Events = sm.handleUnreasonable(ctx, input)
 	default:
 		result.Events = sm.handleDialog(ctx, input)
 	}
@@ -268,6 +278,10 @@ func (sm *SceneManager) classifyInput(ctx context.Context, input string) (string
 	data := prompt.InputClassificationData{
 		Scene:       sm.currentScene,
 		PlayerInput: input,
+		Genre:       sm.genre,
+	}
+	if sm.player != nil {
+		data.CharacterAspects = sm.player.Aspects.GetAll()
 	}
 	if sm.currentScene.IsChallenge && sm.currentScene.ChallengeState != nil {
 		for _, task := range sm.currentScene.ChallengeState.PendingTasks() {
@@ -296,7 +310,7 @@ func (sm *SceneManager) classifyInput(ctx context.Context, input string) (string
 
 	// Validate the response is one of our expected types
 	switch classification {
-	case inputTypeDialog, inputTypeClarification, inputTypeAction, inputTypeNarrative:
+	case inputTypeDialog, inputTypeClarification, inputTypeAction, inputTypeNarrative, inputTypeUnreasonable:
 		return classification, nil
 	default:
 		slog.Warn("Unexpected classification from LLM",
@@ -304,6 +318,48 @@ func (sm *SceneManager) classifyInput(ctx context.Context, input string) (string
 			"classification", classification)
 		return "", fmt.Errorf("unexpected classification: %s", classification)
 	}
+}
+
+// handleUnreasonable processes inputs classified as unreasonable — abilities, powers,
+// or technology that conflict with the character's aspects or the setting genre.
+// The GM redirects the player in-character without breaking immersion.
+func (sm *SceneManager) handleUnreasonable(ctx context.Context, input string) []GameEvent {
+	var events []GameEvent
+
+	// Generate LLM response using "unreasonable input" interaction type
+	// so the scene response template can instruct the GM to redirect
+	response, err := sm.generateSceneResponse(ctx, input, "unreasonable input")
+	if err != nil {
+		slog.Error("Unreasonable response generation failed",
+			"component", componentSceneManager,
+			"input", input,
+			"error", err)
+		return append(events, DialogEvent{PlayerInput: input, GMResponse: msgLLMUnavailable})
+	}
+
+	// Parse markers the same way as dialog (scene transitions, etc.)
+	_, cleanedResponse := sm.conflict.parseConflictMarker(response)
+	_, cleanedResponse = sm.conflict.parseConflictEndMarker(cleanedResponse)
+	_, cleanedResponse = prompt.ParseChallengeMarker(cleanedResponse)
+	sceneTransition, cleanedResponse := prompt.ParseSceneTransitionMarker(cleanedResponse)
+
+	events = append(events, DialogEvent{PlayerInput: input, GMResponse: cleanedResponse})
+
+	// Log as unreasonable (distinct from dialog for analytics)
+	sm.sessionLogger.Log("unreasonable_input", map[string]any{
+		"player_input": input,
+		"gm_response":  cleanedResponse,
+	})
+
+	// Record in conversation history so the LLM has context
+	sm.RecordConversationEntry(input, cleanedResponse, inputTypeUnreasonable)
+
+	// Handle scene transition if detected (unlikely during unreasonable, but be consistent)
+	if sceneTransition != nil && !sm.currentScene.IsChallenge {
+		events = append(events, sm.handleSceneTransition(sceneTransition)...)
+	}
+
+	return events
 }
 
 // handleDialog processes dialog and clarification requests
@@ -680,6 +736,7 @@ func (sm *SceneManager) Snapshot() SceneState {
 		CurrentScene:        sm.currentScene,
 		ConversationHistory: history,
 		ScenePurpose:        sm.scenePurpose,
+		Genre:               sm.genre,
 	}
 }
 
@@ -691,6 +748,7 @@ func (sm *SceneManager) Restore(state SceneState, player *core.Character) {
 	sm.player = player
 	sm.conversationHistory = state.ConversationHistory
 	sm.scenePurpose = state.ScenePurpose
+	sm.genre = state.Genre
 	sm.conflict.setSceneState(state.CurrentScene, player)
 	sm.challenge.setSceneState(state.CurrentScene, player)
 	sm.actions.setSceneState(state.CurrentScene, player)

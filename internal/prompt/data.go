@@ -73,6 +73,8 @@ type InputClassificationData struct {
 	Scene                 *scene.Scene
 	PlayerInput           string
 	ActiveChallengeSkills []string // Pending task skills from an active challenge (e.g., ["Notice", "Stealth"])
+	CharacterAspects      []string // All character aspects (high concept, trouble, other) for unreasonable-input detection
+	Genre                 string   // Setting genre (e.g., "Western", "Sci-Fi", "Fantasy") for anachronism detection
 }
 
 // SceneResponseData holds the data for scene response template

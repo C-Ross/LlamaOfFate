@@ -76,4 +76,5 @@ type SceneState struct {
 	CurrentScene        *scene.Scene               `yaml:"current_scene"`
 	ConversationHistory []prompt.ConversationEntry `yaml:"conversation_history"`
 	ScenePurpose        string                     `yaml:"scene_purpose,omitempty"`
+	Genre               string                     `yaml:"genre,omitempty"`
 }

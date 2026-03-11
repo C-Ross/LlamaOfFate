@@ -107,9 +107,11 @@ func TestClassifyInput_ValidTypes(t *testing.T) {
 		{"clarification type", "clarification", inputTypeClarification},
 		{"action type", "action", inputTypeAction},
 		{"narrative type", "narrative", inputTypeNarrative},
+		{"unreasonable type", "unreasonable", inputTypeUnreasonable},
 		{"uppercase dialog", "DIALOG", inputTypeDialog},
 		{"mixed case action", "AcTiOn", inputTypeAction},
 		{"mixed case narrative", "Narrative", inputTypeNarrative},
+		{"mixed case unreasonable", "Unreasonable", inputTypeUnreasonable},
 	}
 
 	for _, tt := range tests {
@@ -321,4 +323,88 @@ func TestProcessInput_ClassificationFallback(t *testing.T) {
 
 	// HandleInput should return a DialogEvent (fallback to dialog on classification failure)
 	assert.NotNil(t, result)
+}
+
+func TestHandleInput_UnreasonableRoutesToHandleUnreasonable(t *testing.T) {
+	// When classification returns "unreasonable", HandleInput should route to handleUnreasonable
+	// and produce a DialogEvent with the GM's redirection response.
+	client := newTestLLMClient(
+		"unreasonable",
+		"You reach out with your mind, but nothing happens. Perhaps you should try something more... practical.",
+	)
+
+	engine, err := NewWithLLM(client, session.NullLogger{})
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
+	player := core.NewCharacter("player-1", "Jesse")
+	player.Aspects.HighConcept = "Grizzled Rancher"
+	engine.AddCharacter(player)
+
+	testScene := scene.NewScene("saloon", "Dusty Saloon", "A Western saloon")
+	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
+	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
+
+	result, err := sm.HandleInput(context.Background(), "I use telekinesis")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// Should get a DialogEvent (not an ActionAttemptEvent)
+	AssertHasEventIn[DialogEvent](t, result.Events)
+	AssertNoEventIn[ActionAttemptEvent](t, result.Events)
+
+	// Should NOT trigger invoke or mid-flow
+	assert.False(t, result.AwaitingInvoke)
+	assert.False(t, result.AwaitingMidFlow)
+
+	// Verify conversation history recorded the exchange
+	history := sm.GetConversationHistory()
+	require.Len(t, history, 1)
+	assert.Equal(t, "I use telekinesis", history[0].PlayerInput)
+	assert.Equal(t, inputTypeUnreasonable, history[0].Type)
+}
+
+func TestSetGenre(t *testing.T) {
+	sm := &SceneManager{}
+	assert.Empty(t, sm.genre)
+
+	sm.SetGenre("Western")
+	assert.Equal(t, "Western", sm.genre)
+}
+
+func TestClassifyInput_IncludesCharacterAspectsAndGenre(t *testing.T) {
+	// Verify that classifyInput passes character aspects and genre to the template.
+	client := newTestLLMClient("action")
+
+	engine, err := NewWithLLM(client, session.NullLogger{})
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
+
+	player := core.NewCharacter("p1", "Hero")
+	player.Aspects.HighConcept = "Grizzled Rancher"
+	player.Aspects.Trouble = "Too Old For This"
+	player.Aspects.AddAspect("Quick Draw")
+	sm.player = player
+
+	sm.genre = "Western"
+
+	testScene := scene.NewScene("test", "Test", "A dusty town")
+	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
+
+	_, err = sm.classifyInput(context.Background(), "I draw my gun")
+	require.NoError(t, err)
+
+	// Check rendered prompt contains character aspects and genre
+	require.NotEmpty(t, client.capturedPrompts)
+	promptText := client.capturedPrompts[0]
+	assert.Contains(t, promptText, "Grizzled Rancher")
+	assert.Contains(t, promptText, "Quick Draw")
+	assert.Contains(t, promptText, "Western")
 }

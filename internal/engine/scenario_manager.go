@@ -246,8 +246,9 @@ func (m *ScenarioManager) Start(ctx context.Context) ([]GameEvent, error) {
 		if m.lastGeneratedPurpose != "" {
 			sceneManager.SetScenePurpose(m.lastGeneratedPurpose)
 		}
-
-		// Start the scene
+		if m.scenario != nil && m.scenario.Genre != "" {
+			sceneManager.SetGenre(m.scenario.Genre)
+		}
 		if err := sceneManager.StartScene(m.currentScene, m.player); err != nil {
 			return nil, fmt.Errorf("failed to start scene: %w", err)
 		}
@@ -439,6 +440,9 @@ func (m *ScenarioManager) handleSceneEnd(ctx context.Context, sceneManager *Scen
 
 	if m.lastGeneratedPurpose != "" {
 		newSceneManager.SetScenePurpose(m.lastGeneratedPurpose)
+	}
+	if m.scenario != nil && m.scenario.Genre != "" {
+		newSceneManager.SetGenre(m.scenario.Genre)
 	}
 
 	if err := newSceneManager.StartScene(m.currentScene, m.player); err != nil {

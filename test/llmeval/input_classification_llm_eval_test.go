@@ -344,8 +344,8 @@ func getThirdPersonClassificationTestCases() []InputClassificationTestCase {
 			RawInput:         "Magnus thinks about the old wizard's warning",
 			SceneName:        "Forest Path",
 			SceneDescription: "A quiet trail through peaceful woods",
-			ExpectedType:     "narrative",
-			Description:      "Third person internal reflection - narrative (no roll)",
+			ExpectedType:     "clarification",
+			Description:      "Third person internal reflection - clarification (processing info)",
 		},
 		// Action - third person
 		{
