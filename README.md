@@ -34,6 +34,7 @@ Fate™ is a trademark of Evil Hat Productions, LLC.
 ### Natural Language Processing
 - **Action Parsing**: Convert free-form text like "I sneak past the guards using the shadows" into structured game actions
 - **Context Awareness**: LLM maintains awareness of current scene, character capabilities, and recent events
+- **Unreasonable Input Detection**: Automatically detects and rejects impossible actions that conflict with character aspects or genre (e.g., claiming superpowers in a mundane setting)
 - **Fluid descriptions** The LLM narrates the outcome in fluid prose, incorporating aspects and outcomes.
 
 ### Fate Core Mechanics
@@ -283,7 +284,7 @@ LlamaOfFate/
 - **`internal/core/`**: Core Fate mechanics implementation (character, dice, scene, action, skills, challenges)
 - **`internal/engine/`**: Purely async/event-driven game engine (GameSessionManager interface: Start/HandleInput/ProvideInvokeResponse/ProvideMidFlowResponse/Save); emits GameEvents for UI rendering; includes conflict and challenge managers
 - **`internal/syncdriver/`**: Synchronous blocking game loop that wraps the engine's async API for terminal-style UIs (Run function drives: ReadInput → HandleInput → Emit events → drive prompts → repeat)
-- **`internal/llm/`**: LLM integration with OpenAI-compatible backends, including retry logic and response handling
+- **`internal/llm/`**: LLM integration with OpenAI-compatible backends (Azure, Ollama, OpenAI, and other compatible endpoints), including retry logic and response handling
 - **`internal/prompt/`**: LLM prompt template rendering and response parsing (template data types, render functions, marker extraction)
 - **`internal/session/`**: Session logging for game transcripts
 - **`internal/storage/`**: Game state persistence with YAML-based save/load
@@ -306,6 +307,7 @@ LlamaOfFate/
 - ✅ Game engine with scene and scenario management
 - ✅ LLM integration with OpenAI-compatible endpoints (Azure, Ollama, OpenAI)
 - ✅ Action parsing from natural language input
+- ✅ Unreasonable input detection to prevent impossible actions
 - ✅ Conflict resolution system with stress and consequences
 - ✅ Challenge system with multi-task tracking and outcome tallying
 - ✅ CLI interface for game interaction
