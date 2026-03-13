@@ -612,6 +612,103 @@ func TestSceneManager_ApplyDamageToTarget_StressAbsorbed(t *testing.T) {
 	assert.Equal(t, "physical", dmgEvent.Absorbed.TrackType)
 }
 
+// Issue #119: stress box + consequence combination must absorb a hit.
+func TestSceneManager_ApplyDamageToTarget_StressPlusConsequence_Survives(t *testing.T) {
+	engine, err := New(session.NullLogger{})
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
+	player := core.NewCharacter("player-1", "Hero")
+	sm.conflict.player = player
+
+	// NPC with 3 physical stress boxes, boxes 1 and 3 already checked.
+	target := core.NewCharacter("target-1", "Orc")
+	target.SetSkill("Physique", dice.Average) // Average → 3-box track
+	target.RecalculateStressTracks()
+	track := target.GetStressTrack(core.PhysicalStress)
+	require.Equal(t, 3, track.MaxBoxes)
+	track.Boxes[0] = true // box 1 checked
+	track.Boxes[2] = true // box 3 checked
+	// box 2 is free
+
+	// Hit for 3 shifts.
+	// Expected: mild consequence (absorbs 2) + box 2 (absorbs remaining 1) → survives.
+	dmgEvent := sm.conflict.applyDamageToTarget(context.Background(), target, 3, core.PhysicalStress)
+
+	assert.False(t, dmgEvent.TakenOut, "NPC should survive via consequence + stress combination")
+	require.NotNil(t, dmgEvent.Consequence, "Should have taken a consequence")
+	assert.Equal(t, "mild", dmgEvent.Consequence.Severity)
+	assert.Equal(t, 2, dmgEvent.Consequence.Absorbed)
+	require.NotNil(t, dmgEvent.RemainingAbsorbed, "Remaining 1 shift should be absorbed by stress")
+	assert.Equal(t, 1, dmgEvent.RemainingAbsorbed.Shifts)
+	assert.True(t, track.Boxes[1], "Box 2 should now be checked")
+}
+
+func TestSceneManager_ApplyDamageToTarget_HigherStressBoxAbsorbs(t *testing.T) {
+	engine, err := New(session.NullLogger{})
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
+
+	// NPC with 4-box physical track. Box 2 checked, box 3 free.
+	// A 2-shift hit should fall through to box 3.
+	target := core.NewCharacter("target-1", "Orc")
+	target.SetSkill("Physique", dice.Good) // Good → 4-box track
+	target.RecalculateStressTracks()
+	track := target.GetStressTrack(core.PhysicalStress)
+	require.Equal(t, 4, track.MaxBoxes)
+	track.Boxes[1] = true // box 2 checked
+
+	dmgEvent := sm.conflict.applyDamageToTarget(context.Background(), target, 2, core.PhysicalStress)
+
+	assert.False(t, dmgEvent.TakenOut)
+	require.NotNil(t, dmgEvent.Absorbed, "Should absorb via stress alone using higher box")
+	assert.Equal(t, 2, dmgEvent.Absorbed.Shifts)
+	assert.True(t, track.Boxes[2], "Box 3 should be checked (fallback from box 2)")
+	assert.False(t, track.Boxes[3], "Box 4 should remain free")
+}
+
+func TestSceneManager_ApplyDamageToTarget_NoBoxOrConsequence_TakenOut(t *testing.T) {
+	engine, err := New(session.NullLogger{})
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
+
+	player := core.NewCharacter("player-1", "Hero")
+	target := core.NewCharacter("target-1", "Orc")
+	otherEnemy := core.NewCharacter("enemy-2", "Troll")
+
+	engine.AddCharacter(player)
+	engine.AddCharacter(target)
+	engine.AddCharacter(otherEnemy)
+
+	testScene := scene.NewScene("test-scene", "Arena", "A gladiator arena.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(target.ID)
+	testScene.AddCharacter(otherEnemy.ID)
+	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
+	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, target.ID)
+	require.NoError(t, err)
+
+	// Fill all stress boxes AND all consequences so nothing can absorb.
+	track := target.GetStressTrack(core.PhysicalStress)
+	for i := range track.Boxes {
+		track.Boxes[i] = true
+	}
+	target.AddConsequence(core.Consequence{ID: "c1", Type: core.MildConsequence, Aspect: "Bruised"})
+	target.AddConsequence(core.Consequence{ID: "c2", Type: core.ModerateConsequence, Aspect: "Broken Arm"})
+	target.AddConsequence(core.Consequence{ID: "c3", Type: core.SevereConsequence, Aspect: "Shattered"})
+
+	dmgEvent := sm.conflict.applyDamageToTarget(context.Background(), target, 1, core.PhysicalStress)
+
+	assert.True(t, dmgEvent.TakenOut, "Should be taken out when nothing can absorb")
+}
+
 func TestHandleTargetStressOverflow_ConsequenceSelection(t *testing.T) {
 	tests := []struct {
 		name           string

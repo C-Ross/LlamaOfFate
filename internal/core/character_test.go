@@ -82,16 +82,19 @@ func TestCharacter_FatePoints(t *testing.T) {
 }
 
 func TestCharacter_TakeStress(t *testing.T) {
-	char := NewCharacter("test", "Test")
+	char := NewCharacter("test", "Test") // default 2-box physical track
 
-	// Test taking physical stress
+	// 1-shift hit → checks box 1
 	assert.True(t, char.TakeStress(PhysicalStress, 1))
-
 	track := char.GetStressTrack(PhysicalStress)
-	assert.True(t, track.Boxes[0], "Should mark the stress box")
+	assert.True(t, track.Boxes[0], "Should mark box 1")
 
-	// Test taking stress on already filled box
-	assert.False(t, char.TakeStress(PhysicalStress, 1), "Should fail for already filled box")
+	// Another 1-shift hit → box 1 taken, falls through to box 2
+	assert.True(t, char.TakeStress(PhysicalStress, 1), "Should use next higher box when exact box is taken")
+	assert.True(t, track.Boxes[1], "Should mark box 2")
+
+	// Track is full
+	assert.False(t, char.TakeStress(PhysicalStress, 1), "Should fail when all boxes >= amount are filled")
 
 	// Test taking stress beyond track capacity
 	assert.False(t, char.TakeStress(PhysicalStress, 5), "Should fail for stress beyond track capacity")
@@ -239,16 +242,58 @@ func TestNewStressTrack(t *testing.T) {
 func TestStressTrack_TakeStress(t *testing.T) {
 	track := NewStressTrack(PhysicalStress, 3)
 
-	// Test valid stress
+	// 2-shift hit → checks exact box 2
 	assert.True(t, track.TakeStress(2))
-	assert.True(t, track.Boxes[1], "Should mark box 2") // 2-stress box is index 1
+	assert.True(t, track.Boxes[1], "Should mark box 2")
 
-	// Test taking same stress again
-	assert.False(t, track.TakeStress(2), "Should fail when box already filled")
+	// Another 2-shift hit → box 2 taken, uses box 3 (next higher)
+	assert.True(t, track.TakeStress(2), "Should use next higher box when exact is taken")
+	assert.True(t, track.Boxes[2], "Should mark box 3")
+
+	// Another 2-shift hit → boxes 2 and 3 taken, no higher box → fail
+	assert.False(t, track.TakeStress(2), "Should fail when no box >= amount is available")
 
 	// Test invalid stress amounts
 	assert.False(t, track.TakeStress(0))
 	assert.False(t, track.TakeStress(4), "Should fail for track with only 3 boxes")
+}
+
+func TestStressTrack_TakeStress_HigherBoxFallback(t *testing.T) {
+	// Reproduce the exact scenario from issue #119:
+	// 3-box track, boxes 1 and 3 checked, box 2 free.
+	// A 1-shift remainder should fall through to box 2.
+	track := NewStressTrack(PhysicalStress, 3)
+	track.Boxes[0] = true // box 1 checked
+	track.Boxes[2] = true // box 3 checked
+
+	// 1-shift hit: box 1 is taken → falls through to box 2 (free)
+	assert.True(t, track.TakeStress(1), "Should use box 2 when box 1 is taken")
+	assert.True(t, track.Boxes[1], "Box 2 should now be checked")
+
+	// All boxes full
+	assert.True(t, track.IsFull())
+}
+
+func TestStressTrack_TakeStress_ExactBoxPreferred(t *testing.T) {
+	// When the exact box is free, it should be used (no waste).
+	track := NewStressTrack(PhysicalStress, 4)
+
+	assert.True(t, track.TakeStress(3))
+	assert.True(t, track.Boxes[2], "Should mark exact box 3")
+	assert.False(t, track.Boxes[3], "Box 4 should remain free")
+}
+
+func TestStressTrack_TakeStress_AllHigherBoxesTaken(t *testing.T) {
+	// 4-box track: boxes 2, 3, 4 checked, box 1 free.
+	// A 2-shift hit needs box >= 2, all taken → fail.
+	track := NewStressTrack(PhysicalStress, 4)
+	track.Boxes[1] = true // box 2
+	track.Boxes[2] = true // box 3
+	track.Boxes[3] = true // box 4
+
+	assert.False(t, track.TakeStress(2), "Should fail: no box >= 2 is available")
+	// box 1 should still be free
+	assert.False(t, track.Boxes[0])
 }
 
 func TestStressTrack_IsFull(t *testing.T) {

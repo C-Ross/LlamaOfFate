@@ -308,29 +308,45 @@ func (cm *ConflictManager) fillTargetStressOverflow(ctx context.Context, target 
 		return
 	}
 
-	// NPC takes the most appropriate consequence automatically.
-	bestConseq, _ := core.BestConsequenceFor(availableConseq, shifts)
+	// Try each consequence from lightest to heaviest, checking whether the
+	// remainder (if any) can be absorbed by a stress box. This ensures NPCs
+	// use the mildest consequence that, combined with stress, covers the hit.
+	var chosenSlot *core.ConsequenceSlot
+	for i := range availableConseq {
+		slot := &availableConseq[i]
+		remainder := shifts - slot.Value
+		if remainder <= 0 || target.CanTakeStress(stressType, remainder) {
+			chosenSlot = slot
+			break
+		}
+	}
 
-	// Apply consequence to target
+	if chosenSlot == nil {
+		// No consequence + stress combination can absorb the hit.
+		cm.applyTargetTakenOut(ctx, target, dmgEvent)
+		return
+	}
+
+	// Apply the chosen consequence to the target.
 	consequence := core.Consequence{
 		ID:        fmt.Sprintf("conseq-%d", time.Now().UnixNano()),
-		Type:      bestConseq.Type,
+		Type:      chosenSlot.Type,
 		Aspect:    fmt.Sprintf("Wounded by %s", cm.player.Name),
-		Duration:  string(bestConseq.Type),
+		Duration:  string(chosenSlot.Type),
 		CreatedAt: time.Now(),
 	}
 	target.AddConsequence(consequence)
 
-	absorbed := bestConseq.Value
+	absorbed := chosenSlot.Value
 	remaining := shifts - absorbed
 
 	dmgEvent.Consequence = &ConsequenceDetail{
-		Severity: string(bestConseq.Type),
+		Severity: string(chosenSlot.Type),
 		Aspect:   consequence.Aspect,
 		Absorbed: absorbed,
 	}
 
-	// If there's remaining damage, try stress again or take out
+	// If there's remaining damage after the consequence, absorb with stress.
 	if remaining > 0 {
 		if target.TakeStress(stressType, remaining) {
 			dmgEvent.RemainingAbsorbed = &StressAbsorptionDetail{
@@ -339,6 +355,7 @@ func (cm *ConflictManager) fillTargetStressOverflow(ctx context.Context, target 
 				TrackState: target.StressTracks[string(stressType)].String(),
 			}
 		} else {
+			// CanTakeStress was true, so this should not happen.
 			cm.applyTargetTakenOut(ctx, target, dmgEvent)
 		}
 	}

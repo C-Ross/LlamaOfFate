@@ -179,20 +179,38 @@ func (st *StressTrack) AvailableBoxes() int {
 	return count
 }
 
-// TakeStress marks stress boxes and returns true if successful
-func (st *StressTrack) TakeStress(amount int) bool {
+// TakeStress marks the lowest available stress box with value >= amount.
+// Per Fate Core SRD: "check off a stress box with value equal to or greater
+// than the shift value of the hit." If the exact box is taken, the next
+// higher free box is used instead.
+// findAvailableBox returns the index of the lowest available box that can
+// absorb amount shifts, or -1 if none exists. Tries the exact box first,
+// then falls through to higher boxes per Fate Core SRD.
+func (st *StressTrack) findAvailableBox(amount int) int {
 	if amount <= 0 || amount > len(st.Boxes) {
+		return -1
+	}
+	for i := amount - 1; i < len(st.Boxes); i++ {
+		if !st.Boxes[i] {
+			return i
+		}
+	}
+	return -1
+}
+
+func (st *StressTrack) TakeStress(amount int) bool {
+	i := st.findAvailableBox(amount)
+	if i < 0 {
 		return false
 	}
-
-	// Check if the specific box is available (1-indexed)
-	boxIndex := amount - 1
-	if boxIndex >= len(st.Boxes) || st.Boxes[boxIndex] {
-		return false
-	}
-
-	st.Boxes[boxIndex] = true
+	st.Boxes[i] = true
 	return true
+}
+
+// CanTakeStress reports whether TakeStress(amount) would succeed without
+// mutating the track. Used to probe stress capacity before committing.
+func (st *StressTrack) CanTakeStress(amount int) bool {
+	return st.findAvailableBox(amount) >= 0
 }
 
 // ClearStress clears a specific stress box (1-indexed)
@@ -439,6 +457,13 @@ func (c *Character) TakeStress(trackType StressTrackType, amount int) bool {
 		return true
 	}
 	return false
+}
+
+// CanTakeStress reports whether TakeStress would succeed for the given track
+// and amount, without mutating state.
+func (c *Character) CanTakeStress(trackType StressTrackType, amount int) bool {
+	track := c.GetStressTrack(trackType)
+	return track != nil && track.CanTakeStress(amount)
 }
 
 // ClearAllStress resets all stress tracks.
