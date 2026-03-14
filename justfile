@@ -157,6 +157,16 @@ web-lint:
     @echo "Linting web UI..."
     cd web && npm run lint
 
+# Start Storybook dev server
+web-storybook:
+    @echo "Starting Storybook..."
+    cd web && npm run storybook
+
+# Build Storybook static site
+web-storybook-build:
+    @echo "Building Storybook..."
+    cd web && npm run build-storybook
+
 # ─── Utilities ──────────────────────────────────────────────────────
 
 # Clean build artifacts
