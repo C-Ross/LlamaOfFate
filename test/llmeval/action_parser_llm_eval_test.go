@@ -9,6 +9,7 @@ import (
 
 	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
+	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/stretchr/testify/assert"
 )
@@ -606,6 +607,88 @@ var getHeistNPCs = NewHeistNPCs
 // Deprecated: use NewHeistPlayer() directly.
 var getHeistPlayer = NewHeistPlayer
 
+// getExploitAdvantageAttackTestCases returns cases where a player exploits
+// an existing advantage against an enemy. These should be Attack, not Overcome.
+//
+// Bug reproduction: issue #11 — "exploiting an advantage against an enemy should
+// be Attack, not Overcome." When a player uses a previously created advantage
+// (like "Security Vulnerability") to harm or disable an enemy, the LLM
+// misclassifies it as Overcome because the intent sounds like "getting past"
+// rather than "attacking."
+func getExploitAdvantageAttackTestCases() []ActionParserTestCase {
+	npcs := NewHeistNPCs()
+	heistContext := "Inside Nexus Industries' data vault — humming server racks, cold blue light. " +
+		"Security drones patrol the aisles. Agent Chen reviews a datapad near the central terminal. " +
+		"You previously discovered a Security Vulnerability in Security Drone Alpha's firmware."
+
+	return []ActionParserTestCase{
+		// The exact scenario from issue #11: exploiting a vulnerability on a drone
+		{
+			Name:            "Exploit vulnerability to disable drone (issue #11)",
+			RawInput:        "I use the security vulnerability to shut down the drone",
+			Context:         heistContext,
+			OtherCharacters: npcs,
+			ExpectedType:    action.Attack,
+			ExpectedSkills:  []string{"Crafts", "Burglary", "Shoot", "Lore"},
+			Description:     "Exploiting an advantage to disable an enemy is Attack — the intent is to take it out",
+		},
+		{
+			Name:            "Exploit weakness to destroy drone",
+			RawInput:        "I exploit the firmware vulnerability to overload the drone's systems and destroy it",
+			Context:         heistContext,
+			OtherCharacters: npcs,
+			ExpectedType:    action.Attack,
+			ExpectedSkills:  []string{"Crafts", "Burglary", "Shoot", "Lore"},
+			Description:     "Exploiting a weakness to destroy an opponent — clear Attack intent",
+		},
+		{
+			Name:            "Use advantage to take out guard",
+			RawInput:        "I take advantage of Agent Chen's distraction to strike him down",
+			Context:         "Inside Nexus Industries' data vault. Agent Chen is distracted by a false alarm you triggered earlier.",
+			OtherCharacters: npcs,
+			ExpectedType:    action.Attack,
+			ExpectedSkills:  []string{"Fight", "Shoot"},
+			Description:     "Using an advantage (distraction) to harm an NPC — Attack, not Overcome",
+		},
+		{
+			Name:            "Exploit exposed weakness in combat",
+			RawInput:        "I press my attack on the opening in Agent Chen's defense",
+			Context:         "In combat with Agent Chen. You've identified a gap in his fighting stance.",
+			OtherCharacters: npcs,
+			ExpectedType:    action.Attack,
+			ExpectedSkills:  []string{"Fight"},
+			Description:     "Pressing an attack using a discovered weakness — Attack",
+		},
+		// Fantasy variant of the same pattern
+		{
+			Name:            "Exploit creature weakness - fantasy",
+			RawInput:        "I use the troll's weakness to fire to burn it",
+			Context:         "In combat with a cave troll. You discovered it has a Weakness to Fire.",
+			OtherCharacters: []*core.Character{func() *core.Character {
+				troll := core.NewCharacter("troll-1", "Cave Troll")
+				troll.Aspects.HighConcept = "Massive Regenerating Brute"
+				troll.SetSkill("Fight", dice.Great)
+				troll.SetSkill("Physique", dice.Superb)
+				return troll
+			}()},
+			ExpectedType:   action.Attack,
+			ExpectedSkills: []string{"Shoot", "Lore", "Crafts"},
+			Description:    "Exploiting a discovered weakness (fire) to harm — Attack, not Overcome",
+		},
+		// Contrast: using an advantage to BYPASS (not harm) should still be Overcome
+		{
+			Name:               "Use advantage to bypass, not harm (contrast)",
+			RawInput:           "I use the security vulnerability to sneak past the drone undetected",
+			Context:            heistContext,
+			OtherCharacters:    npcs,
+			ExpectedType:       action.Overcome,
+			ExpectedSkills:     []string{"Stealth", "Burglary"},
+			ExpectedDifficulty: 2, // Fair — drone is still active, sneaking past one is moderate
+			Description:        "Using advantage to bypass (not harm) the drone — Overcome, not Attack",
+		},
+	}
+}
+
 // getStealthAttackTestCases returns cases where a player combines stealth
 // movement with an attack. The skill should be Fight/Shoot (how harm is dealt),
 // NOT Stealth (how they got into position).
@@ -742,6 +825,7 @@ func TestActionParser_LLMEvaluation(t *testing.T) {
 		{"OvercomeVsCaAEdgeCases", getOvercomeVsCaAEdgeCases(), nil},
 		{"ThirdPerson", getThirdPersonTestCases(), nil},
 		{"StealthAttack", getStealthAttackTestCases(), getHeistPlayer()},
+		{"ExploitAdvantageAttack", getExploitAdvantageAttackTestCases(), getHeistPlayer()},
 	}
 
 	var results []EvaluationResult
