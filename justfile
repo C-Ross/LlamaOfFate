@@ -137,10 +137,10 @@ web-install:
     @echo "Installing web dependencies..."
     cd web && npm install
 
-# Start web UI dev server (Vite) — demos enabled at /demo.html and /dice-demo.html
+# Start web UI dev server (Vite)
 web-dev:
     @echo "Starting web dev server..."
-    cd web && VITE_ENABLE_DEMOS=true npm run dev
+    cd web && npm run dev
 
 # Build web UI for production (set VITE_ENABLE_DEMOS=true to include demo pages)
 web-build:

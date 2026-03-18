@@ -94,6 +94,7 @@ export const WithBonuses: Story = {
 }
 
 export const AllOutcomes: Story = {
+  args: { data: successData },
   render: () => (
     <div className="space-y-3 max-w-lg">
       <RollResult data={styleData} />
