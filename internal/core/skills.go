@@ -29,6 +29,7 @@ func init() {
 		mentalAttackSkills,
 		physicalConflictSkills,
 		mentalConflictSkills,
+		defendSkills,
 	}
 	for _, m := range maps {
 		for skill := range m {
@@ -54,6 +55,16 @@ var physicalAttackSkills = map[string]bool{
 // See: https://fate-srd.com/fate-core/default-skill-list
 var mentalAttackSkills = map[string]bool{
 	SkillProvoke: true,
+}
+
+// defendSkills are skills that can be used for the Defend action in conflicts.
+// Per Fate Core SRD:
+// - Athletics is the primary physical defense skill (vs Fight/Shoot attacks).
+// - Will is the primary mental defense skill (vs Provoke attacks).
+// See: https://fate-srd.com/fate-core/default-skill-list
+var defendSkills = map[string]bool{
+	SkillAthletics: true,
+	SkillWill:      true,
 }
 
 // physicalConflictSkills trigger or indicate physical conflicts
@@ -129,6 +140,13 @@ func IsPhysicalAttackSkill(skill string) bool {
 // Input is case-insensitive; "fight", "Fight", and "FIGHT" are equivalent.
 func IsMentalAttackSkill(skill string) bool {
 	return mentalAttackSkills[normalizeSkill(skill)]
+}
+
+// IsDefendSkill returns true if the skill is a primary defense skill in Fate Core.
+// Per Fate Core SRD: Athletics (physical defense) and Will (mental defense).
+// Input is case-insensitive; "athletics", "Athletics", and "ATHLETICS" are equivalent.
+func IsDefendSkill(skill string) bool {
+	return defendSkills[normalizeSkill(skill)]
 }
 
 // InitiativeSkillsForConflict returns the ordered list of skills to check for initiative.

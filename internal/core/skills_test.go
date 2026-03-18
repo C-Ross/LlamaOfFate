@@ -118,8 +118,20 @@ func TestIsMentalAttackSkill(t *testing.T) {
 	assert.False(t, IsMentalAttackSkill("deceive"))
 }
 
+func TestIsDefendSkill(t *testing.T) {
+	assert.True(t, IsDefendSkill("Athletics"))
+	assert.True(t, IsDefendSkill("Will"))
+	assert.False(t, IsDefendSkill("Fight"))
+	assert.False(t, IsDefendSkill("Shoot"))
+	assert.False(t, IsDefendSkill("Provoke"))
+	assert.False(t, IsDefendSkill("Unknown"))
+	// Case-insensitive
+	assert.True(t, IsDefendSkill("athletics"))
+	assert.True(t, IsDefendSkill("WILL"))
+	assert.False(t, IsDefendSkill("fight"))
+}
+
 func TestInitiativeSkillsForConflict(t *testing.T) {
-	// Physical conflicts use Notice, then Athletics
 	physSkills := InitiativeSkillsForConflict(scene.PhysicalConflict)
 	assert.Equal(t, []string{"Notice", "Athletics"}, physSkills)
 

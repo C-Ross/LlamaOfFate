@@ -208,8 +208,7 @@ func parseActionType(actionTypeStr string) (action.ActionType, error) {
 	}
 
 	// Map well-known defensive skills to Defend.
-	// Athletics (physical defense) and Will (mental defense) are the Fate Core defaults.
-	if normalized == "athletics" || normalized == "will" {
+	if core.IsDefendSkill(normalized) {
 		return action.Defend, nil
 	}
 
