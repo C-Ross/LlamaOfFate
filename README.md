@@ -198,9 +198,11 @@ Run `just` without arguments to see all available commands. Common commands incl
 
 **Web:**
 - **`just web-dev`** - Start Vite dev server
+- **`just web-storybook`** - Start Storybook dev server
 - **`just web-test`** - Run Vitest
 - **`just web-lint`** - Run ESLint
 - **`just web-build`** - Production build
+- **`just web-storybook-build`** - Build Storybook static site
 - **`just web-validate`** - lint + test + build
 - **`just web-install`** - Install npm dependencies
 
@@ -222,7 +224,30 @@ just run
 
 # Start the web UI dev server
 just web-dev
+
+# Start Storybook for component development
+just web-storybook
 ```
+
+## Component Development with Storybook
+
+The web UI includes Storybook for isolated component development and visual testing:
+
+```bash
+# Start Storybook dev server (default: http://localhost:6006)
+just web-storybook
+
+# Build static Storybook site
+just web-storybook-build
+```
+
+Storybook provides:
+- **Isolated component development**: Build and test components in isolation
+- **Visual documentation**: Interactive component documentation with examples
+- **Accessibility testing**: Built-in a11y addon for accessibility checks
+- **Multiple states**: Test components in various states and configurations
+
+Story files are co-located with components in `web/src/components/`. See existing `.stories.tsx` files for examples.
 
 ## Saving and Loading Games
 
@@ -291,7 +316,7 @@ LlamaOfFate/
 - **`internal/ui/terminal/`**: Terminal UI implementation; handles meta-commands and renders GameEvents to console
 - **`internal/ui/web/`**: WebSocket UI implementation; bridges engine events to WebSocket clients
 - **`internal/mcpserver/`**: MCP server implementation; exposes game tools for programmatic interaction (start game, send input, inspect state)
-- **`web/`**: React frontend — Vite 7, React 19, TypeScript, Tailwind CSS v4, shadcn/ui, Vitest
+- **`web/`**: React frontend — Vite 7, React 19, TypeScript, Tailwind CSS v4, shadcn/ui, Vitest, Storybook 10
 - **`examples/`**: Example programs demonstrating LLM scene loops, scenario generation, and walkthroughs
 - **`scripts/`**: Utility scripts for development and testing workflows
 - **`configs/`**: YAML configuration files (azure-llm.yaml)
@@ -314,6 +339,7 @@ LlamaOfFate/
 - ✅ Event-driven UI architecture with async invoke/input support
 - ✅ Integration tests and LLM evaluation tests
 - ✅ Web UI scaffold (React + Vite + Tailwind + shadcn/ui)
+- ✅ Storybook for isolated component development and testing
 - ✅ WebSocket server backend
 - ✅ MCP (Model Context Protocol) server for programmatic game interaction
 - ✅ Ollama support for local LLM backend (no cloud dependencies required)
