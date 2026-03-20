@@ -1,9 +1,9 @@
 ---
 description: Detects significant repository changes on push to main and creates a PR to update existing Copilot skill files.
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
+# on:
+#   push:
+#     branches: [main]
+#   workflow_dispatch:
 permissions:
   contents: read
   issues: read

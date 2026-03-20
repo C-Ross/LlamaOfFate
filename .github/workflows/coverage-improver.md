@@ -1,8 +1,8 @@
 ---
 description: Daily code coverage analysis that identifies Go packages below 90% coverage, adds tests, and creates a PR.
-on:
-  schedule: daily on weekdays
-  skip-if-match: 'is:pr is:open label:automated-coverage'
+# on:
+#   schedule: daily on weekdays
+#   skip-if-match: 'is:pr is:open label:automated-coverage'
 permissions:
   contents: read
   issues: read
