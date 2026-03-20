@@ -661,9 +661,9 @@ func getExploitAdvantageAttackTestCases() []ActionParserTestCase {
 		},
 		// Fantasy variant of the same pattern
 		{
-			Name:            "Exploit creature weakness - fantasy",
-			RawInput:        "I use the troll's weakness to fire to burn it",
-			Context:         "In combat with a cave troll. You discovered it has a Weakness to Fire.",
+			Name:     "Exploit creature weakness - fantasy",
+			RawInput: "I use the troll's weakness to fire to burn it",
+			Context:  "In combat with a cave troll. You discovered it has a Weakness to Fire.",
 			OtherCharacters: []*core.Character{func() *core.Character {
 				troll := core.NewCharacter("troll-1", "Cave Troll")
 				troll.Aspects.HighConcept = "Massive Regenerating Brute"

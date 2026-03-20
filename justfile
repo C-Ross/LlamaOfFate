@@ -32,8 +32,8 @@ build:
     {{gocmd}} build -o {{binary_path}} {{main_path}}
     @echo "Build complete: {{binary_path}}"
 
-# Build the web server
-build-server:
+# Build the web server (includes embedded frontend from web/dist)
+build-server: web-build
     @echo "Building web server..."
     @mkdir -p bin
     {{gocmd}} build -o ./bin/server ./cmd/server

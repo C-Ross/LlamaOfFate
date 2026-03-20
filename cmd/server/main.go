@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"log"
 	"log/slog"
 	"net/http"
@@ -21,6 +22,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/C-Ross/LlamaOfFate/internal/storage"
 	"github.com/C-Ross/LlamaOfFate/internal/ui/web"
+	webstatic "github.com/C-Ross/LlamaOfFate/web"
 )
 
 func main() {
@@ -50,7 +52,14 @@ func main() {
 		AllowCustom: true,
 	}
 
-	handler := web.NewHandler(factory, setupCfg, slog.Default())
+	// Serve the embedded React frontend from web/dist.
+	// The "dist" prefix is stripped so that dist/index.html is served at /.
+	frontend, err := fs.Sub(webstatic.Dist, "dist")
+	if err != nil {
+		log.Fatalf("failed to create frontend FS: %v", err)
+	}
+
+	handler := web.NewHandler(factory, setupCfg, slog.Default(), frontend)
 
 	srv := &http.Server{
 		Addr:              ":" + port,
