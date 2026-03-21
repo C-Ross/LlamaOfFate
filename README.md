@@ -85,45 +85,14 @@ timeout: 300
 
 ### Ollama Setup (Local)
 
-For a completely local experience without cloud dependencies, use [Ollama](https://ollama.ai/):
-
-**Installation:**
+For a fully local experience, install [Ollama](https://ollama.ai/), pull a model, and point LlamaOfFate at the local endpoint:
 
 ```bash
-# Install Ollama (see https://ollama.ai/ for your platform)
-# macOS/Linux:
-curl -fsSL https://ollama.ai/install.sh | sh
-
-# Pull a model
-./scripts/ollama-pull.sh
-# Or manually: ollama pull llama3.2:3b
-```
-
-**Configuration:**
-
-Edit `configs/ollama-llm.yaml` (default configuration provided):
-
-```yaml
-# Ollama's OpenAI-compatible endpoint
-api_endpoint: "http://localhost:11434/v1/chat/completions"
-api_key: "ollama"  # Ollama doesn't require a real key
-
-# Must match a pulled model
-model_name: "llama3.2:3b"
-
-timeout: 300
-```
-
-**Running with Ollama:**
-
-```bash
-# Ensure Ollama is running
-ollama serve  # or ollama is running as a service
-
-# Use the Ollama config
 export LLM_CONFIG=configs/ollama-llm.yaml
 just run
 ```
+
+The default `configs/ollama-llm.yaml` targets `http://localhost:11434` with model `llama3.2:3b`. See [Ollama's documentation](https://ollama.ai/) for installation and available models.
 
 ## Development Automation
 
@@ -206,22 +175,28 @@ Run `just` without arguments to see all available commands. Common commands incl
 
 ### Quick Start
 
+**Prerequisites**
+- [Go 1.22+](https://go.dev/dl/)
+- [Node.js 20+](https://nodejs.org/)
+- [just](https://github.com/casey/just/releases) — command runner
+- An LLM backend: [Ollama](https://ollama.ai/) (local) or a cloud provider (OpenAI, Azure)
+
+**Clone and build**
+
 ```bash
-# Install dependencies
+git clone https://github.com/C-Ross/LlamaOfFate.git
+cd LlamaOfFate
 just go-deps
 just web-install
-
-# Build the application
 just build
+```
 
-# Run all validations (recommended before committing)
-just validate
+**Configure and run**
 
-# Run the CLI application
+Set up your LLM backend (see [Configuration](#configuration) above), then:
+
+```bash
 just run
-
-# Start the web UI dev server
-just web-dev
 ```
 
 ## Saving and Loading Games
@@ -324,3 +299,13 @@ LlamaOfFate/
 - 📋 WebSocket integration connecting web UI to game engine
 - 📋 Public API packages for external integrations
 - 📋 Database backends for long-term storage
+
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, the `just validate` requirement, commit conventions, and the PR process.
+
+To report a bug or request a feature, please [open an issue](https://github.com/C-Ross/LlamaOfFate/issues).
+
+## Acknowledgements
+
+This project was developed with [GitHub Copilot](https://github.com/features/copilot).
