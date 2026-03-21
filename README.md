@@ -1,6 +1,7 @@
 # LlamaOfFate
 
 [![Validate](https://github.com/C-Ross/LlamaOfFate/actions/workflows/validate.yml/badge.svg)](https://github.com/C-Ross/LlamaOfFate/actions/workflows/validate.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A text-based RPG system implementing the Fate Core rules with LLM-powered generation and action interpretation.
 
@@ -167,6 +168,12 @@ LlamaOfFate is playable and implements core Fate Core mechanics (aspects, skills
 Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, the `just validate` requirement, commit conventions, and the PR process.
 
 Check out [open issues](https://github.com/C-Ross/LlamaOfFate/issues) for areas to contribute or to [report a bug or request a feature](https://github.com/C-Ross/LlamaOfFate/issues/new).
+
+## License
+
+The source code in this repository is licensed under the MIT License. See [LICENSE](LICENSE).
+
+Fate Core SRD-derived rules content remains licensed under [CC BY 3.0 Unported](https://creativecommons.org/licenses/by/3.0/), including SRD-derived material in prompt templates and other rules-reference text.
 
 ## Acknowledgements
 
