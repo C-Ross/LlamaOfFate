@@ -276,3 +276,42 @@ func TestBuildPrompt(t *testing.T) {
 	assert.Contains(t, prompt, "Dim Lighting")
 	assert.Contains(t, prompt, "situation")
 }
+
+func TestAspectGenerator_BuildPromptFallback(t *testing.T) {
+	mockClient := newTestLLMClient()
+	generator := NewAspectGenerator(mockClient)
+
+	char := core.NewCharacter("test-char", "Test Hero")
+	char.Aspects.HighConcept = "Brave Knight"
+	char.Aspects.Trouble = "Honor Before Reason"
+	char.SetSkill("Fight", dice.Good)
+
+	roller := dice.NewSeededRoller(42)
+	testAction := action.NewAction("act-1", "test-char", action.CreateAdvantage, "Fight", "Press the attack")
+	testAction.RawInput = "I press forward aggressively to off-balance my foe"
+	testAction.Difficulty = dice.Fair
+
+	result := roller.RollWithModifier(dice.Good, 0)
+	outcome := result.CompareAgainst(dice.Fair)
+
+	req := prompt.AspectGenerationRequest{
+		Character:       char,
+		Action:          testAction,
+		Outcome:         outcome,
+		Context:         "An open courtyard at midday",
+		TargetType:      "opponent",
+		ExistingAspects: []string{"On the Defensive", "Exposed Flank"},
+	}
+
+	text := generator.buildPromptFallback(req)
+
+	assert.Contains(t, text, "Test Hero")
+	assert.Contains(t, text, "Brave Knight")
+	assert.Contains(t, text, "Honor Before Reason")
+	assert.Contains(t, text, "Fight")
+	assert.Contains(t, text, "Press the attack")
+	assert.Contains(t, text, "An open courtyard at midday")
+	assert.Contains(t, text, "On the Defensive")
+	assert.Contains(t, text, "Exposed Flank")
+	assert.Contains(t, text, "opponent")
+}
