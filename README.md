@@ -4,6 +4,8 @@
 
 A text-based RPG system implementing the Fate Core rules with LLM-powered generation and action interpretation.
 
+![Action Roll with Dice](docs/screenshots/screenshot-ui-action-roll.png)
+
 ## Overview
 
 LlamaOfFate is a text-based RPG that brings the flexibility and narrative focus of Fate Core to a digital medium. The system leverages Large Language Models (LLMs) to:
@@ -12,6 +14,11 @@ LlamaOfFate is a text-based RPG that brings the flexibility and narrative focus 
 - Generate dynamic descriptions and narrative responses
 - Assist with scene management and story progression
 - Provide contextual suggestions for aspects and consequences
+
+### Conflict Resolution
+Conflicts display Fate Core mechanics in real-time, including dice rolls for defense, attack outcomes, and opportunities to invoke aspects:
+
+![Conflict with Dice Rolls](docs/screenshots/screenshot-ui-conflict.png)
 
 ## Core Design Philosophy
 
@@ -66,10 +73,6 @@ export AZURE_API_KEY="your-api-key-here"
 ```
 
 Environment variables take precedence over values in the configuration file, making it safe to commit your config to version control.
-
-**Configuration File:**
-
-Edit `configs/azure-llm.yaml` to set your preferred model and timeout:
 
 ```yaml
 # api_endpoint and api_key can be left empty if using environment variables
