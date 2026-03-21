@@ -176,6 +176,7 @@ func showHelp() {
 func showVersion() {
 	fmt.Printf("%s v%s\n", AppName, AppVersion)
 	fmt.Println("by C. Ross (https://github.com/C-Ross)")
+	fmt.Println("GitHub: https://github.com/C-Ross/LlamaOfFate")
 	fmt.Println("A Fate Core RPG with LLM integration")
 	fmt.Println()
 	fmt.Println("This work is based on Fate Core System,")

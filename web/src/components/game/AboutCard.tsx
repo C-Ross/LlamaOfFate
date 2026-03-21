@@ -36,6 +36,16 @@ export function AboutCard() {
                 C. Ross
               </a>
             </p>
+            <p>
+              <a
+                href="https://github.com/C-Ross/LlamaOfFate"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-foreground"
+              >
+                github.com/C-Ross/LlamaOfFate
+              </a>
+            </p>
             <p>A Fate Core RPG with LLM integration</p>
             <p>
               This work is based on Fate Core System, a product of Evil Hat

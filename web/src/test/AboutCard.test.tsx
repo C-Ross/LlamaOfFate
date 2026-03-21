@@ -48,4 +48,13 @@ describe("AboutCard", () => {
     })
     expect(authorLink).toHaveAttribute("href", "https://github.com/C-Ross")
   })
+
+  it("links to the project GitHub repository", () => {
+    render(<AboutCard />)
+    fireEvent.click(screen.getByRole("button", { name: /about/i }))
+    const repoLink = screen.getByRole("link", {
+      name: /github\.com\/C-Ross\/LlamaOfFate/,
+    })
+    expect(repoLink).toHaveAttribute("href", "https://github.com/C-Ross/LlamaOfFate")
+  })
 })
