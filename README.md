@@ -113,65 +113,16 @@ gh extension install github/gh-aw
 
 LlamaOfFate uses [`just`](https://github.com/casey/just) as a command runner for common development tasks.
 
-### Installing Just
+For installation, see [casey/just](https://github.com/casey/just/releases).
 
-**macOS:**
-```bash
-brew install just
-```
+### Just Commands
 
-**Linux:**
-```bash
-# Using cargo (Rust package manager)
-cargo install just
+Run `just` without arguments to see all available commands. Common starting points:
 
-# Or download pre-built binaries from:
-# https://github.com/casey/just/releases
-```
-
-**Windows:**
-```powershell
-# Using cargo (Rust package manager)
-cargo install just
-
-# Or using Chocolatey
-choco install just
-
-# Or using Scoop
-scoop install just
-```
-
-### Available Commands
-
-Run `just` without arguments to see all available commands. Common commands include:
-
-**Unified:**
 - **`just validate`** - Run all validation checks (Go + Web)
-- **`just clean`** - Clean all build artifacts
-
-**Go:**
 - **`just build`** - Build the CLI application
-- **`just build-server`** - Build the WebSocket server
-- **`just build-mcpserver`** - Build the MCP server
 - **`just run`** - Build and run the CLI
-- **`just serve`** - Build and run the WebSocket server
-- **`just go-test`** - Run Go tests
-- **`just go-lint`** - Run golangci-lint
-- **`just go-validate`** - vet + fmtcheck + lint + test + build
-- **`just test-llm`** - Run LLM evaluation tests (requires LLM credentials or LLM_PROVIDER=ollama)
-- **`just test-llm-track`** - Run LLM tests and track results for flakiness analysis
-- **`just test-llm-report`** - Show LLM test stability report
-- **`just test-llm-flaky`** - Show only flaky LLM tests
-- **`just test-llm-fetch`** - Fetch LLM test results from CI
-- **`just go-fmt`** - Format Go code with gofmt
-
-**Web:**
 - **`just web-dev`** - Start Vite dev server
-- **`just web-test`** - Run Vitest
-- **`just web-lint`** - Run ESLint
-- **`just web-build`** - Production build
-- **`just web-validate`** - lint + test + build
-- **`just web-install`** - Install npm dependencies
 
 ### Quick Start
 
@@ -199,112 +150,37 @@ Set up your LLM backend (see [Configuration](#configuration) above), then:
 just run
 ```
 
-## Saving and Loading Games
-
-LlamaOfFate automatically saves your game progress at key points during play. When you restart the application, it will automatically resume from your last save.
-
-- **Auto-save**: The game saves automatically at scene transitions and key moments
-- **Auto-resume**: On startup, the game resumes from the last unfinished scenario
-- **Save location**: Game saves are stored as YAML files (configurable via `GameSaver` interface)
-
-## Package Structure
+## Architecture
 
 ```
 LlamaOfFate/
-├── cmd/
-│   ├── cli/                    # Command-line interface
-│   ├── server/                 # WebSocket server entry point
-│   ├── mcpserver/              # MCP (Model Context Protocol) server
-│   └── llmeval-tracker/        # LLM test flakiness tracking tool
+├── cmd/                        # Entry points (CLI, web server, MCP server)
 ├── internal/
-│   ├── core/                   # Core game mechanics (character, aspects, stress, consequences, skills)
-│   │   ├── action/             # Action resolution system
-│   │   ├── dice/               # Dice rolling and probability
-│   │   └── scene/              # Scene and conflict management
-│   ├── engine/                 # Game engine (scene/scenario managers, action parsing, conflict resolution)
-│   ├── syncdriver/             # Synchronous blocking game loop (wraps async engine API)
-│   ├── llm/                    # LLM integration layer
-│   │   └── openai/             # OpenAI-compatible LLM implementation
-│   ├── prompt/                 # LLM prompt templates and response parsing
-│   ├── session/                # Session logging for game transcripts
-│   ├── storage/                # Game state persistence (YAML save/load)
-│   ├── logging/                # Application logging
-│   └── ui/
-│       ├── terminal/           # Terminal-based interface
-│       └── web/                # WebSocket UI implementation
-├── web/                        # React frontend (Vite, Tailwind v4, shadcn/ui)
-│   └── src/                    # Components, theme, tests
-├── examples/                   # Example programs and scenarios
-│   ├── llm-scene-loop/         # Interactive scene loop example
-│   ├── scenario-generator/     # Scenario generation example
-│   ├── scenario-walkthrough/   # Scenario walkthrough example
-│   └── scene-generator/        # Scene generation example
-├── scripts/                    # Utility scripts
-│   └── llmeval-fetch-results.sh # Fetch LLM test results from CI
-├── configs/                    # Configuration files (azure-llm.yaml)
-├── docs/                       # Documentation
-│   └── architecture.md         # Architecture documentation
-├── test/                       # Tests
-│   └── llmeval/                # LLM evaluation tests
-└── [standard Go project files]
+│   ├── core/                   # Fate Core mechanics (character, dice, skills, conflicts)
+│   ├── engine/                 # Game loop and scene/scenario management
+│   ├── llm/                    # LLM integration (OpenAI-compatible)
+│   ├── prompt/                 # LLM templates and response parsing
+│   ├── ui/                     # UI implementations (terminal, web)
+│   ├── session/                # Game transcript logging
+│   ├── storage/                # Game state persistence
+│   └── [other packages]
+├── web/                        # React frontend (Vite, Tailwind, shadcn/ui)
+├── examples/                   # Example programs (scene loops, scenario generation)
+├── configs/                    # Configuration files
+└── test/                       # Tests (unit, integration, LLM evaluation)
 ```
 
-### Package Responsibilities
+The engine is fully event-driven; UIs subscribe to GameEvents and drive gameplay via the GameSessionManager interface. See `docs/architecture.md` for details.
 
-- **`cmd/cli/`**: Entry point for the command-line application
-- **`cmd/server/`**: Entry point for the WebSocket server
-- **`cmd/mcpserver/`**: Entry point for the MCP server (programmatic game interaction via Model Context Protocol)
-- **`cmd/llmeval-tracker/`**: Tool for tracking LLM test flakiness and generating stability reports
-- **`internal/core/`**: Core Fate mechanics implementation (character, dice, scene, action, skills, challenges)
-- **`internal/engine/`**: Purely async/event-driven game engine (GameSessionManager interface: Start/HandleInput/ProvideInvokeResponse/ProvideMidFlowResponse/Save); emits GameEvents for UI rendering; includes conflict and challenge managers
-- **`internal/syncdriver/`**: Synchronous blocking game loop that wraps the engine's async API for terminal-style UIs (Run function drives: ReadInput → HandleInput → Emit events → drive prompts → repeat)
-- **`internal/llm/`**: LLM integration with OpenAI-compatible backends, including retry logic and response handling
-- **`internal/prompt/`**: LLM prompt template rendering and response parsing (template data types, render functions, marker extraction)
-- **`internal/session/`**: Session logging for game transcripts
-- **`internal/storage/`**: Game state persistence with YAML-based save/load
-- **`internal/uicontract/`**: UI interface contracts (UI, SceneInfo, GameEvent types, etc.) for decoupling engine from UI implementations
-- **`internal/ui/terminal/`**: Terminal UI implementation; handles meta-commands and renders GameEvents to console
-- **`internal/ui/web/`**: WebSocket UI implementation; bridges engine events to WebSocket clients
-- **`internal/mcpserver/`**: MCP server implementation; exposes game tools for programmatic interaction (start game, send input, inspect state)
-- **`web/`**: React frontend — Vite 7, React 19, TypeScript, Tailwind CSS v4, shadcn/ui, Vitest
-- **`examples/`**: Example programs demonstrating LLM scene loops, scenario generation, and walkthroughs
-- **`scripts/`**: Utility scripts for development and testing workflows
-- **`configs/`**: YAML configuration files (azure-llm.yaml)
-- **`test/llmeval/`**: LLM evaluation tests for prompt behavior
+## Status
 
-## Implementation Status
-
-### Completed Features
-- ✅ Core data structures (character, aspects, stress, consequences)
-- ✅ Complete Fate Core dice system (4dF) and skill ladder
-- ✅ All 18 default Fate Core skills with action mappings
-- ✅ Game engine with scene and scenario management
-- ✅ LLM integration with OpenAI-compatible endpoints (Azure, Ollama, OpenAI)
-- ✅ Action parsing from natural language input
-- ✅ Conflict resolution system with stress and consequences
-- ✅ Challenge system with multi-task tracking and outcome tallying
-- ✅ CLI interface for game interaction
-- ✅ Session logging for game transcripts
-- ✅ Game state persistence (save/load functionality via YAML)
-- ✅ Event-driven UI architecture with async invoke/input support
-- ✅ Integration tests and LLM evaluation tests
-- ✅ Web UI scaffold (React + Vite + Tailwind + shadcn/ui)
-- ✅ WebSocket server backend
-- ✅ MCP (Model Context Protocol) server for programmatic game interaction
-- ✅ Ollama support for local LLM backend (no cloud dependencies required)
-
-### Planned Features
-- 📋 Contest system (competitive opposed exchanges)
-- 📋 Additional LLM backends (OpenAI direct, other providers)
-- 📋 WebSocket integration connecting web UI to game engine
-- 📋 Public API packages for external integrations
-- 📋 Database backends for long-term storage
+LlamaOfFate is playable and implements core Fate Core mechanics (aspects, skills, stress, consequences, challenges, conflicts), but not all advanced rules. It runs locally with multiple LLM backends (Ollama, OpenAI, Azure) and UIs (CLI, web, MCP). The web server is a development build and not ready for public deployment. The system remains under active development with rough polish.
 
 ## Contributing
 
 Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, the `just validate` requirement, commit conventions, and the PR process.
 
-To report a bug or request a feature, please [open an issue](https://github.com/C-Ross/LlamaOfFate/issues).
+Check out [open issues](https://github.com/C-Ross/LlamaOfFate/issues) for areas to contribute or to [report a bug or request a feature](https://github.com/C-Ross/LlamaOfFate/issues/new).
 
 ## Acknowledgements
 
