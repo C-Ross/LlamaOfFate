@@ -15,9 +15,6 @@ LlamaOfFate is a text-based RPG that brings the flexibility and narrative focus 
 - Assist with scene management and story progression
 - Provide contextual suggestions for aspects and consequences
 
-### Conflict Resolution
-Conflicts display Fate Core mechanics in real-time, including dice rolls for defense, attack outcomes, and opportunities to invoke aspects:
-
 ![Conflict with Dice Rolls](docs/screenshots/screenshot-ui-conflict.png)
 
 ## Core Design Philosophy
