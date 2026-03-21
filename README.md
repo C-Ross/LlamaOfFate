@@ -56,46 +56,58 @@ Fate™ is a trademark of Evil Hat Productions, LLC.
 - **Challenge System**: Multi-step challenges with task tracking and partial success
 - **Narrative Continuity**: Maintain story context across scenes and sessions
 
-## Configuration
+## Quick Start
 
-LlamaOfFate supports multiple LLM backends for maximum flexibility. Choose the one that works best for your needs.
+### Prerequisites
 
-### Cloud LLM Setup (OpenAI-compatible)
+- [Go 1.22+](https://go.dev/dl/)
+- [Node.js 20+](https://nodejs.org/)
+- [`just`](https://github.com/casey/just/releases)
+- An LLM backend: [Ollama](https://ollama.ai/) (local) or a cloud provider (OpenAI-compatible/Azure)
 
-LlamaOfFate uses any OpenAI-compatible endpoint for LLM integration. Configuration is stored in `configs/azure-llm.yaml`.
-
-**Recommended Setup (Environment Variables):**
+### Clone and Build
 
 ```bash
-# Set your LLM credentials via environment variables
-export AZURE_API_ENDPOINT="https://your-resource.cognitiveservices.azure.com/openai/deployments/your-deployment/chat/completions?api-version=2024-05-01-preview"
-export AZURE_API_KEY="your-api-key-here"
+git clone https://github.com/C-Ross/LlamaOfFate.git
+cd LlamaOfFate
+just go-deps
+just web-install
+just build
 ```
 
-Environment variables take precedence over values in the configuration file, making it safe to commit your config to version control.
+### Configure Your LLM Backend
 
-```yaml
-# api_endpoint and api_key can be left empty if using environment variables
-api_endpoint: ""
-api_key: ""
+LlamaOfFate supports multiple backends. Pick one of the options below.
 
-# Choose your Llama model
-model_name: "Llama-4-Maverick-17B-128E-Instruct-FP8"
+#### Option A: Ollama (Local)
 
-# Request timeout in seconds
-timeout: 300
-```
-
-### Ollama Setup (Local)
-
-For a fully local experience, install [Ollama](https://ollama.ai/), pull a model, and point LlamaOfFate at the local endpoint:
+Install [Ollama](https://ollama.ai/), pull a model, then run:
 
 ```bash
 export LLM_CONFIG=configs/ollama-llm.yaml
 just run
 ```
 
-The default `configs/ollama-llm.yaml` targets `http://localhost:11434` with model `llama3.2:3b`. See [Ollama's documentation](https://ollama.ai/) for installation and available models.
+The default `configs/ollama-llm.yaml` targets `http://localhost:11434` with model `llama3.2:3b`.
+
+#### Option B: Cloud (OpenAI-compatible, including Azure)
+
+LlamaOfFate uses any OpenAI-compatible endpoint. The default config file is `configs/azure-llm.yaml`.
+
+```bash
+export AZURE_API_ENDPOINT="https://your-resource.cognitiveservices.azure.com/openai/deployments/your-deployment/chat/completions?api-version=2024-05-01-preview"
+export AZURE_API_KEY="your-api-key-here"
+just run
+```
+
+Environment variables take precedence over file values, so config files can safely keep empty credentials:
+
+```yaml
+api_endpoint: ""
+api_key: ""
+model_name: "Llama-4-Maverick-17B-128E-Instruct-FP8"
+timeout: 300
+```
 
 ## Development Automation
 
@@ -126,32 +138,6 @@ Run `just` without arguments to see all available commands. Common starting poin
 - **`just build`** - Build the CLI application
 - **`just run`** - Build and run the CLI
 - **`just web-dev`** - Start Vite dev server
-
-### Quick Start
-
-**Prerequisites**
-- [Go 1.22+](https://go.dev/dl/)
-- [Node.js 20+](https://nodejs.org/)
-- [just](https://github.com/casey/just/releases) — command runner
-- An LLM backend: [Ollama](https://ollama.ai/) (local) or a cloud provider (OpenAI, Azure)
-
-**Clone and build**
-
-```bash
-git clone https://github.com/C-Ross/LlamaOfFate.git
-cd LlamaOfFate
-just go-deps
-just web-install
-just build
-```
-
-**Configure and run**
-
-Set up your LLM backend (see [Configuration](#configuration) above), then:
-
-```bash
-just run
-```
 
 ## Architecture
 
