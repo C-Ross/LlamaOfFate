@@ -44,7 +44,7 @@ describe("AboutCard", () => {
     render(<AboutCard />)
     fireEvent.click(screen.getByRole("button", { name: /about/i }))
     const authorLink = screen.getByRole("link", {
-      name: /C\. Ross Eskridge/,
+      name: /C\. Ross/,
     })
     expect(authorLink).toHaveAttribute("href", "https://github.com/C-Ross")
   })

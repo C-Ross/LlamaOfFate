@@ -33,7 +33,7 @@ export function AboutCard() {
                 rel="noopener noreferrer"
                 className="underline hover:text-foreground"
               >
-                C. Ross Eskridge
+                C. Ross
               </a>
             </p>
             <p>A Fate Core RPG with LLM integration</p>
