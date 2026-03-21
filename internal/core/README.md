@@ -41,3 +41,9 @@ act.Outcome = result.CompareAgainst(act.Difficulty)
 
 - **67 unit tests** with 79-100% coverage per package
 - Run tests: `go test ./internal/core/... -v`
+
+## Fate Core SRD Attribution
+
+The game mechanics in this package are derived from the **[Fate Core System Reference Document](https://fate-srd.com/fate-core)**, a product of Evil Hat Productions, LLC. Covered mechanics include the skill list and ladder, the four action types and outcome resolution, character aspects, stress tracks, consequences, fate points, refresh, and conflict structure.
+
+This work is based on Fate Core System, a product of Evil Hat Productions, LLC, developed, authored, and edited by Leonard Balsera, Brian Engard, Jeremy Keller, Ryan Macklin, Mike Olson, Clark Valentine, Amanda Valentine, Fred Hicks, and Rob Donoghue, and licensed for our use under the [Creative Commons Attribution 3.0 Unported license](https://creativecommons.org/licenses/by/3.0/).
