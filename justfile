@@ -100,7 +100,7 @@ test-llm-fetch *args:
     ./scripts/llmeval-fetch-results.sh {{args}}
 
 # Run go vet
-go-vet:
+go-vet: web-build
     @echo "Running go vet..."
     {{gocmd}} vet ./...
 
