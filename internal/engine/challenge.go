@@ -71,7 +71,7 @@ func (chm *ChallengeManager) resolveTask(taskID string, outcome dice.OutcomeType
 	}
 
 	// Map dice outcome to task status
-	status := outcomeToTaskStatus(outcome)
+	status := scene.TaskStatusForOutcome(outcome)
 
 	if err := cs.ResolveTask(taskID, status, chm.player.ID); err != nil {
 		slog.Warn("Failed to resolve challenge task",
@@ -171,18 +171,4 @@ func (chm *ChallengeManager) playerSkillNames() []string {
 	}
 	sort.Strings(names)
 	return names
-}
-
-// outcomeToTaskStatus maps a dice outcome type to the corresponding task status.
-func outcomeToTaskStatus(outcome dice.OutcomeType) scene.TaskStatus {
-	switch outcome {
-	case dice.SuccessWithStyle:
-		return scene.TaskSucceededWithStyle
-	case dice.Success:
-		return scene.TaskSucceeded
-	case dice.Tie:
-		return scene.TaskTied
-	default:
-		return scene.TaskFailed
-	}
 }
