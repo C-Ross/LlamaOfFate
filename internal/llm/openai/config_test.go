@@ -165,7 +165,7 @@ func TestLoadConfigFileNotFound(t *testing.T) {
 	config, err := LoadConfig("/nonexistent/path/config.yaml")
 	assert.Error(t, err)
 	assert.Nil(t, config)
-	assert.Contains(t, err.Error(), "no such file or directory")
+	assert.Contains(t, err.Error(), "LLM config not found")
 }
 
 func TestLoadConfigInvalidYAML(t *testing.T) {
@@ -217,4 +217,40 @@ model_name: "Meta-Llama-3.1-70B-Instruct"
 	require.NotNil(t, config)
 
 	assert.Equal(t, "https://test.inference.ai.azure.com", config.APIEndpoint)
+}
+
+func TestLoadConfigEmptyEndpointValidation(t *testing.T) {
+	cleanup := clearLLMEnvVars(t)
+	defer cleanup()
+
+	tempDir := t.TempDir()
+	configPath := filepath.Join(tempDir, "llm-config.yaml")
+	configContent := `api_endpoint: ""
+api_key: "test-api-key"
+model_name: "Meta-Llama-3.1-70B-Instruct"
+`
+	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0600))
+
+	config, err := LoadConfig(configPath)
+	require.Error(t, err)
+	assert.Nil(t, config)
+	assert.Contains(t, err.Error(), "api_endpoint is empty")
+}
+
+func TestLoadConfigEmptyAPIKeyValidation(t *testing.T) {
+	cleanup := clearLLMEnvVars(t)
+	defer cleanup()
+
+	tempDir := t.TempDir()
+	configPath := filepath.Join(tempDir, "llm-config.yaml")
+	configContent := `api_endpoint: "https://test.inference.ai.azure.com"
+api_key: ""
+model_name: "Meta-Llama-3.1-70B-Instruct"
+`
+	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0600))
+
+	config, err := LoadConfig(configPath)
+	require.Error(t, err)
+	assert.Nil(t, config)
+	assert.Contains(t, err.Error(), "api_key is empty")
 }

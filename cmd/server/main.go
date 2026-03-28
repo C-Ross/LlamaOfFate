@@ -89,9 +89,6 @@ func main() {
 }
 
 func initLLMClient(configPath string) (llm.LLMClient, error) {
-	if _, err := os.Stat(configPath); err != nil {
-		return nil, fmt.Errorf("LLM config not found at %s", configPath)
-	}
 	config, err := openai.LoadConfig(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("load LLM config: %w", err)

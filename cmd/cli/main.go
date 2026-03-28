@@ -25,27 +25,22 @@ const (
 )
 
 // initializeEngine creates a game engine with LLM support
-func initializeEngine(sessionLogger session.SessionLogger) *engine.Engine {
-	configPath := "configs/azure-llm.yaml"
-	if _, err := os.Stat(configPath); err != nil {
-		log.Fatalf("LLM config not found at %s", configPath)
-	}
-
-	config, err := openai.LoadConfig(configPath)
-	if err != nil {
-		log.Fatalf("Found LLM config but failed to load it: %v", err)
-	}
-
-	llmClient := openai.NewClient(*config)
-	retryClient := llm.NewRetryingClient(llmClient, llm.DefaultRetryConfig())
-
-	gameEngine, err := engine.NewWithLLM(retryClient, sessionLogger)
+func initializeEngine(llmClient llm.LLMClient, sessionLogger session.SessionLogger) *engine.Engine {
+	gameEngine, err := engine.NewWithLLM(llmClient, sessionLogger)
 	if err != nil {
 		log.Fatalf("Failed to create engine with LLM: %v", err)
 	}
-
-	slog.Info("LLM integration enabled", slog.String("model", config.ModelName))
 	return gameEngine
+}
+
+func initLLMClient(configPath string) (llm.LLMClient, string, error) {
+	config, err := openai.LoadConfig(configPath)
+	if err != nil {
+		return nil, "", err
+	}
+	llmClient := openai.NewClient(*config)
+	retryClient := llm.NewRetryingClient(llmClient, llm.DefaultRetryConfig())
+	return retryClient, config.ModelName, nil
 }
 
 func main() {
@@ -69,6 +64,18 @@ func main() {
 
 	fmt.Printf("%s v%s - A Fate Core RPG with LLM integration\n", AppName, AppVersion)
 	fmt.Println("====================================================")
+
+	configPath := "configs/azure-llm.yaml"
+	if c := os.Getenv("LLM_CONFIG"); c != "" {
+		configPath = c
+	}
+
+	// Fail fast on LLM configuration before character creation prompts.
+	llmClient, modelName, err := initLLMClient(configPath)
+	if err != nil {
+		log.Fatalf("LLM init failed: %v", err)
+	}
+	slog.Info("LLM integration enabled", slog.String("model", modelName))
 
 	// Use hardcoded scenario and player (see scenario.go)
 	scenario := defaultScenario()
@@ -109,7 +116,7 @@ func main() {
 		sl = session.NullLogger{}
 	}
 
-	gameEngine := initializeEngine(sl)
+	gameEngine := initializeEngine(llmClient, sl)
 
 	// Wire everything into the GameManager and run
 	gm := engine.NewGameManager(gameEngine, sl)

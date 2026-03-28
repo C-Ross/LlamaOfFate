@@ -107,6 +107,25 @@ model_name: "Llama-4-Maverick-17B-128E-Instruct-FP8"
 timeout: 300
 ```
 
+#### Config File Lookup
+
+When the config path is relative, LlamaOfFate searches in order:
+
+1. Current working directory (e.g. `./configs/azure-llm.yaml`)
+2. Directory containing the executable
+3. OS user config directory:
+   - Linux/macOS: `~/.config/LlamaOfFate/`
+   - Windows: `%AppData%\LlamaOfFate\`
+
+This means a downloaded binary automatically finds its config when placed next to the executable, or in the OS user config directory — no need to run from a specific path.
+
+Override the config path entirely with `LLM_CONFIG`:
+
+```bash
+export LLM_CONFIG=/path/to/my-llm.yaml
+./llamaoffate-cli
+```
+
 ## Development Automation
 
 LlamaOfFate uses **GitHub Agentic Workflows** ([gh-aw](https://github.com/github/gh-aw)) for automated development tasks. The repository includes several AI-powered workflows:
@@ -137,9 +156,15 @@ Run `just` without arguments to see all available commands. Common starting poin
 - **`just run`** - Build and run the CLI
 - **`just web-dev`** - Start Vite dev server
 
+### Pre-built Binaries
+
+Download the latest release from [GitHub Releases](https://github.com/C-Ross/LlamaOfFate/releases). Each archive includes binaries for Linux, macOS (arm64/amd64), and Windows.
+
+See [README-RELEASE.md](README-RELEASE.md) included in each archive for setup and configuration instructions.
+
 ### Release Builds
 
-Use Goreleaser through `just` targets:
+Use Goreleaser through `just` targets (see [README-RELEASE.md](README-RELEASE.md) for full release guide):
 
 - **`just release --snapshot`** - Build release artifacts locally without a git tag or publishing
 - **`just release-dry-run`** - Build full multi-platform artifacts in snapshot mode
