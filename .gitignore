@@ -19,6 +19,7 @@ go.work
 
 # Build output
 bin/
+dist/
 
 # Action binaries and executables
 /action-parser

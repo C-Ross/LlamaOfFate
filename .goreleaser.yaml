@@ -1,0 +1,62 @@
+project_name: llamaoffate
+version: 2
+
+# Builds define how binaries are built
+builds:
+  - id: cli
+    main: ./cmd/cli
+    binary: llamaoffate-cli
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - CGO_ENABLED=0
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+  - id: server
+    main: ./cmd/server
+    binary: llamaoffate-server
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - CGO_ENABLED=0
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+# Archives package binaries into distributable formats
+archives:
+  - formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: >-
+      {{ .ProjectName }}-{{ .Binary }}-v{{ .Version }}-{{ .Os }}-{{ .Arch }}
+    files:
+      - README-RELEASE.md
+      - LICENSE
+      - SECURITY.md
+      - configs/azure-llm.yaml
+      - configs/ollama-llm.yaml
+
+# Checksum generation for verification
+checksum:
+  name_template: "{{ .ProjectName }}-v{{ .Version }}-checksums.txt"
+  algorithm: sha256
+
+# Release notes configuration
+release:
+  name_template: "v{{ .Version }}"

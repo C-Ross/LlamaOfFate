@@ -137,6 +137,22 @@ Run `just` without arguments to see all available commands. Common starting poin
 - **`just run`** - Build and run the CLI
 - **`just web-dev`** - Start Vite dev server
 
+### Release Builds
+
+Use Goreleaser through `just` targets:
+
+- **`just release --snapshot`** - Build release artifacts locally without a git tag or publishing
+- **`just release-dry-run`** - Build full multi-platform artifacts in snapshot mode
+- **`just release`** - Publish a real GitHub release from a git tag
+
+Published releases require a tag and `GITHUB_TOKEN`:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+just release
+```
+
 ## Architecture
 
 ```

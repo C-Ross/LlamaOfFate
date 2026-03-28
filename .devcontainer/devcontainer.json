@@ -9,6 +9,9 @@
         "ghcr.io/devcontainers/features/github-cli:1": {},
         "ghcr.io/devcontainers/features/copilot-cli:1": {},
         "ghcr.io/jsburckhardt/devcontainer-features/just:1": {},
+        "ghcr.io/guiyomh/features/goreleaser:0": {
+            "version": "2.14.3"
+        },
         "ghcr.io/devcontainers/features/node:1": {
             "version": "lts"
         }

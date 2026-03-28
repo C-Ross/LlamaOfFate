@@ -218,3 +218,31 @@ clean-sessions n="5":
     echo "Found $total session files, removing $to_delete oldest files (keeping {{n}})"
     find sessions -maxdepth 1 -type f -name "*.yaml" -printf '%T+ %p\0' | sort -z | head -z -n "$to_delete" | cut -z -d' ' -f2- | xargs -0 rm -v
     echo "Cleanup complete"
+
+# ─── Release targets ────────────────────────────────────────────────
+
+# Test build locally (snapshot mode - no publishing, single platform)
+release-snapshot:
+    @echo "Building snapshot (local test)..."
+    @command -v goreleaser >/dev/null 2>&1 || (echo "goreleaser not found. Install from https://goreleaser.com/install/" && exit 1)
+    goreleaser build --snapshot --clean
+
+# Test build for all platforms (dry-run - no publishing, would-be artifacts)
+release-dry-run:
+    @echo "Building for all platforms (dry-run, no publishing)..."
+    @command -v goreleaser >/dev/null 2>&1 || (echo "goreleaser not found. Install from https://goreleaser.com/install/" && exit 1)
+    goreleaser release --snapshot --clean
+
+# Validate goreleaser configuration
+release-validate:
+    @echo "Validating goreleaser config..."
+    @command -v goreleaser >/dev/null 2>&1 || (echo "goreleaser not found. Install from https://goreleaser.com/install/" && exit 1)
+    goreleaser check
+
+# Full release. Pass flags through to goreleaser, e.g. `just release --snapshot`.
+release *args: web-build release-validate
+    @echo "Running goreleaser release {{args}}"
+    @command -v goreleaser >/dev/null 2>&1 || (echo "goreleaser not found. Install from https://goreleaser.com/install/" && exit 1)
+    @echo "For a published release, tag first and set GITHUB_TOKEN"
+    @echo "Example: git tag v0.1.0 && git push origin v0.1.0 && just release"
+    goreleaser release --clean {{args}}
