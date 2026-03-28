@@ -347,13 +347,67 @@ default_player: hero
 
 	scenarios, err := LoadAll(root)
 	require.NoError(t, err)
-	require.Len(t, scenarios, 1)
+	require.GreaterOrEqual(t, len(scenarios), 1)
 
 	ls := scenarios["adventure"]
 	require.NotNil(t, ls)
 	assert.Equal(t, "Adventure", ls.Scenario.Title)
 	require.NotNil(t, ls.Player)
 	assert.Equal(t, "Hero", ls.Player.Name)
+}
+
+func TestLoadAll_UsesEmbeddedWhenConfigDirsMissing(t *testing.T) {
+	root := t.TempDir()
+
+	scenarios, err := LoadAll(root)
+	require.NoError(t, err)
+	require.NotEmpty(t, scenarios)
+
+	// One known built-in preset should always be available.
+	saloon, ok := scenarios["saloon"]
+	require.True(t, ok)
+	require.NotNil(t, saloon)
+	require.NotNil(t, saloon.Player)
+	assert.Equal(t, "Jesse Calhoun", saloon.Player.Name)
+}
+
+func TestLoadAll_FileSystemOverridesEmbedded(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "characters"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "scenarios"), 0o755))
+
+	writeFile(t, filepath.Join(root, "characters", "override.yaml"), `
+id: zero
+name: "Zero Override"
+aspects:
+  high_concept: "Altered"
+  trouble: "Still risky"
+skills:
+  Burglary: 2
+fate_points: 2
+refresh: 2
+`)
+
+	writeFile(t, filepath.Join(root, "scenarios", "heist.yaml"), `
+id: heist
+title: "Custom Heist"
+genre: "Cyberpunk"
+problem: "Custom problem"
+setting: "Custom setting"
+story_questions:
+  - "Will the override load?"
+default_player: zero
+`)
+
+	scenarios, err := LoadAll(root)
+	require.NoError(t, err)
+
+	// "heist" exists in embedded presets; local file should replace it.
+	heist := scenarios["heist"]
+	require.NotNil(t, heist)
+	assert.Equal(t, "Custom Heist", heist.Scenario.Title)
+	require.NotNil(t, heist.Player)
+	assert.Equal(t, "Zero Override", heist.Player.Name)
 }
 
 // ---------- Integration: real configs ----------------------------------------
@@ -467,32 +521,39 @@ default_player: some-hero
 	assert.Contains(t, err.Error(), "no characters were loaded")
 }
 
-func TestLoadAll_BadCharactersDir(t *testing.T) {
+func TestLoadAll_MissingCharactersDir_UsesEmbedded(t *testing.T) {
 	root := t.TempDir()
-	// No characters subdirectory — LoadCharacters should fail.
-	_, err := LoadAll(root)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "load characters")
+	// No characters subdirectory in filesystem — embedded presets should load.
+	scenarios, err := LoadAll(root)
+	require.NoError(t, err)
+	assert.NotEmpty(t, scenarios)
 }
 
-func TestLoadAll_BadScenariosDir(t *testing.T) {
+func TestLoadAll_MissingScenariosDir_UsesEmbedded(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "characters"), 0o755))
-	// No scenarios subdirectory.
-	_, err := LoadAll(root)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "read scenarios directory")
+	// No scenarios subdirectory in filesystem — embedded presets should load.
+	scenarios, err := LoadAll(root)
+	require.NoError(t, err)
+	require.NotEmpty(t, scenarios)
+	heist, ok := scenarios["heist"]
+	require.True(t, ok)
+	require.NotNil(t, heist)
+	require.NotNil(t, heist.Player)
+	assert.Equal(t, "Zero", heist.Player.Name)
 }
 
 func TestLoadAll_NonYAMLScenarioIgnored(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "characters"), 0o755))
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "scenarios"), 0o755))
-	// Only a non-YAML file in scenarios — should load zero scenarios.
+	// Only a non-YAML file in the filesystem scenarios dir — embedded presets still load.
 	writeFile(t, filepath.Join(root, "scenarios", "readme.txt"), "not a scenario")
 	scenarios, err := LoadAll(root)
 	require.NoError(t, err)
-	assert.Empty(t, scenarios)
+	require.NotEmpty(t, scenarios)
+	_, ok := scenarios["tower"]
+	assert.True(t, ok)
 }
 
 func TestLoadAll_BadScenario(t *testing.T) {

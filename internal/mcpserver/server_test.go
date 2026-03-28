@@ -309,7 +309,9 @@ func TestNew_InvalidConfigRoot(t *testing.T) {
 	gs, err := New(nil, "/nonexistent/path/to/configs")
 	require.NoError(t, err)
 	require.NotNil(t, gs)
-	assert.Empty(t, gs.presets)
+	require.NotEmpty(t, gs.presets)
+	_, ok := gs.presets["saloon"]
+	assert.True(t, ok)
 }
 
 // --- handleListPresets with presets ---
