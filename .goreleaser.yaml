@@ -44,7 +44,7 @@ archives:
         formats:
           - zip
     name_template: >-
-      {{ .ProjectName }}-{{ .Binary }}-v{{ .Version }}-{{ .Os }}-{{ .Arch }}
+      {{ .ProjectName }}-v{{ .Version }}-{{ .Os }}-{{ .Arch }}
     files:
       - README-RELEASE.md
       - LICENSE
