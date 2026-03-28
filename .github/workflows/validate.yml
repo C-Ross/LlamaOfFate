@@ -19,31 +19,25 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
       - name: Install dependencies
         run: go mod download
-
-      - name: Vet
-        run: go vet ./...
-
-      - name: Check formatting
-        run: |
-          if [ -n "$(gofmt -l .)" ]; then
-            echo "Code is not formatted. Run 'go fmt ./...'"
-            gofmt -d .
-            exit 1
-          fi
 
       - name: Install golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.8.0
-          args: --timeout=5m
+          install-only: true
 
       - name: Install just
         uses: extractions/setup-just@v2
 
-      - name: Build
-        run: just build
+      - name: Install web dependencies
+        run: just web-install
 
-      - name: Test
-        run: go test -v -race ./...
+      - name: Validate
+        run: just go-validate
