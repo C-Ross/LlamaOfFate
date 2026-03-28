@@ -36,8 +36,17 @@ jobs:
       - name: Install just
         uses: extractions/setup-just@v2
 
+      - name: Install Go dependencies
+        run: go mod download
+
       - name: Install web dependencies
         run: just web-install
+
+      - name: Install golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: version
 
       - name: Validate
         run: just validate
