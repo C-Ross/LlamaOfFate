@@ -149,6 +149,10 @@ func TestGenerateScenario_MarkdownWrappedJSON(t *testing.T) {
 	assert.Equal(t, "Neon Shadows", scenario.Title)
 }
 
+func TestWebUIURL(t *testing.T) {
+	assert.Equal(t, "http://localhost:8080", webUIURL("8080"))
+}
+
 // ---------------------------------------------------------------------------
 // buildCustomPlayerFromSetup tests
 // ---------------------------------------------------------------------------

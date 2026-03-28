@@ -60,6 +60,7 @@ func main() {
 	}
 
 	handler := web.NewHandler(factory, setupCfg, slog.Default(), frontend)
+	webViewURL := webUIURL(port)
 
 	srv := &http.Server{
 		Addr:              ":" + port,
@@ -69,6 +70,8 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+
+	fmt.Printf("Web UI available at %s\n", webViewURL)
 
 	go func() {
 		slog.Info("server starting", "port", port)
@@ -86,6 +89,10 @@ func main() {
 		log.Fatalf("shutdown error: %v", err)
 	}
 	slog.Info("server stopped")
+}
+
+func webUIURL(port string) string {
+	return fmt.Sprintf("http://localhost:%s", port)
 }
 
 func initLLMClient(configPath string) (llm.LLMClient, error) {
