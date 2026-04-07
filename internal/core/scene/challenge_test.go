@@ -3,6 +3,7 @@ package scene
 import (
 	"testing"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -237,6 +238,26 @@ func TestChallengeState_OverallOutcome(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cs := &ChallengeState{Tasks: tt.tasks}
 			assert.Equal(t, tt.expected, cs.OverallOutcome())
+		})
+	}
+}
+
+func TestTaskStatusForOutcome(t *testing.T) {
+	tests := []struct {
+		name     string
+		outcome  dice.OutcomeType
+		expected TaskStatus
+	}{
+		{"SuccessWithStyle → TaskSucceededWithStyle", dice.SuccessWithStyle, TaskSucceededWithStyle},
+		{"Success → TaskSucceeded", dice.Success, TaskSucceeded},
+		{"Tie → TaskTied", dice.Tie, TaskTied},
+		{"Failure → TaskFailed", dice.Failure, TaskFailed},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := TaskStatusForOutcome(tt.outcome)
+			assert.Equal(t, tt.expected, got)
 		})
 	}
 }

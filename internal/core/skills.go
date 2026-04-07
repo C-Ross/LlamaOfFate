@@ -5,10 +5,21 @@ package core
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 )
+
+// normalizeSkill converts a skill name to the canonical title-case form used
+// by the skill constants (e.g. "fight" → "Fight", "SHOOT" → "Shoot").
+// Callers do not need to worry about casing before calling skill functions.
+func normalizeSkill(skill string) string {
+	if skill == "" {
+		return ""
+	}
+	return strings.ToUpper(skill[:1]) + strings.ToLower(skill[1:])
+}
 
 func init() {
 	// Verify that every skill referenced in classification maps is a valid
@@ -18,6 +29,7 @@ func init() {
 		mentalAttackSkills,
 		physicalConflictSkills,
 		mentalConflictSkills,
+		defendSkills,
 	}
 	for _, m := range maps {
 		for skill := range m {
@@ -28,19 +40,31 @@ func init() {
 	}
 }
 
-// physicalAttackSkills are skills that deal physical stress when used to attack
+// physicalAttackSkills are skills that deal physical stress when used to attack.
+// Per Fate Core SRD: only Fight (melee) and Shoot (ranged) have the Attack action.
+// Physique is Overcome/Create Advantage only.
+// See: https://fate-srd.com/fate-core/default-skill-list
 var physicalAttackSkills = map[string]bool{
-	SkillFight:    true,
-	SkillShoot:    true,
-	SkillPhysique: true,
+	SkillFight: true,
+	SkillShoot: true,
 }
 
-// mentalAttackSkills are skills that deal mental stress when used to attack
+// mentalAttackSkills are skills that deal mental stress when used to attack.
+// Per Fate Core SRD: only Provoke has the Attack action for mental conflicts.
+// Deceive, Rapport, and Lore are Overcome/Create Advantage/Defend only.
+// See: https://fate-srd.com/fate-core/default-skill-list
 var mentalAttackSkills = map[string]bool{
 	SkillProvoke: true,
-	SkillDeceive: true,
-	SkillRapport: true,
-	SkillLore:    true, // Supernatural/magic attacks target mental stress
+}
+
+// defendSkills are skills that can be used for the Defend action in conflicts.
+// Per Fate Core SRD:
+// - Athletics is the primary physical defense skill (vs Fight/Shoot attacks).
+// - Will is the primary mental defense skill (vs Provoke attacks).
+// See: https://fate-srd.com/fate-core/default-skill-list
+var defendSkills = map[string]bool{
+	SkillAthletics: true,
+	SkillWill:      true,
 }
 
 // physicalConflictSkills trigger or indicate physical conflicts
@@ -62,13 +86,15 @@ var mentalConflictSkills = map[string]bool{
 
 // DefenseSkillForAttack returns the appropriate defense skill for an attack skill.
 // Per Fate Core rules:
-// - Physical attacks (Fight, Shoot, Physique) are defended with Athletics
-// - Mental/social attacks (Provoke, Deceive, Rapport, Lore) are defended with Will
+// - Physical attacks (Fight, Shoot) are defended with Athletics
+// - Mental/social attacks (Provoke) are defended with Will
+// Input is case-insensitive; "fight", "Fight", and "FIGHT" are equivalent.
 func DefenseSkillForAttack(attackSkill string) string {
-	if physicalAttackSkills[attackSkill] {
+	s := normalizeSkill(attackSkill)
+	if physicalAttackSkills[s] {
 		return SkillAthletics
 	}
-	if mentalAttackSkills[attackSkill] {
+	if mentalAttackSkills[s] {
 		return SkillWill
 	}
 	// Default to Athletics for unknown attack types
@@ -79,8 +105,9 @@ func DefenseSkillForAttack(attackSkill string) string {
 // Per Fate Core rules:
 // - Physical attacks target physical stress
 // - Mental/social attacks target mental stress
+// Input is case-insensitive; "fight", "Fight", and "FIGHT" are equivalent.
 func StressTypeForAttack(attackSkill string) StressTrackType {
-	if mentalAttackSkills[attackSkill] {
+	if mentalAttackSkills[normalizeSkill(attackSkill)] {
 		return MentalStress
 	}
 	return PhysicalStress
@@ -90,25 +117,36 @@ func StressTypeForAttack(attackSkill string) StressTrackType {
 // Per Fate Core rules:
 // - Physical skills (Fight, Shoot, Athletics, Physique) indicate physical conflict
 // - Mental skills (Provoke, Deceive, Rapport, Will, Empathy) indicate mental conflict
+// Input is case-insensitive; "fight", "Fight", and "FIGHT" are equivalent.
 func ConflictTypeForSkill(skill string) scene.ConflictType {
-	if physicalConflictSkills[skill] {
+	s := normalizeSkill(skill)
+	if physicalConflictSkills[s] {
 		return scene.PhysicalConflict
 	}
-	if mentalConflictSkills[skill] {
+	if mentalConflictSkills[s] {
 		return scene.MentalConflict
 	}
 	// Default to physical for unknown skills
 	return scene.PhysicalConflict
 }
 
-// IsPhysicalAttackSkill returns true if the skill deals physical damage
+// IsPhysicalAttackSkill returns true if the skill deals physical damage.
+// Input is case-insensitive; "fight", "Fight", and "FIGHT" are equivalent.
 func IsPhysicalAttackSkill(skill string) bool {
-	return physicalAttackSkills[skill]
+	return physicalAttackSkills[normalizeSkill(skill)]
 }
 
-// IsMentalAttackSkill returns true if the skill deals mental damage
+// IsMentalAttackSkill returns true if the skill deals mental damage.
+// Input is case-insensitive; "fight", "Fight", and "FIGHT" are equivalent.
 func IsMentalAttackSkill(skill string) bool {
-	return mentalAttackSkills[skill]
+	return mentalAttackSkills[normalizeSkill(skill)]
+}
+
+// IsDefendSkill returns true if the skill is a primary defense skill in Fate Core.
+// Per Fate Core SRD: Athletics (physical defense) and Will (mental defense).
+// Input is case-insensitive; "athletics", "Athletics", and "ATHLETICS" are equivalent.
+func IsDefendSkill(skill string) bool {
+	return defendSkills[normalizeSkill(skill)]
 }
 
 // InitiativeSkillsForConflict returns the ordered list of skills to check for initiative.
@@ -148,6 +186,17 @@ func DefaultAttackSkillForConflict(conflictType scene.ConflictType) string {
 		return SkillProvoke
 	}
 	return SkillFight
+}
+
+// StressTypeForConflict returns the stress track type for a given conflict type.
+// Per Fate Core rules:
+// - Physical conflicts deal physical stress
+// - Mental conflicts deal mental stress
+func StressTypeForConflict(conflictType scene.ConflictType) StressTrackType {
+	if conflictType == scene.MentalConflict {
+		return MentalStress
+	}
+	return PhysicalStress
 }
 
 // ConcessionFatePoints returns the number of fate points awarded for conceding a conflict.
