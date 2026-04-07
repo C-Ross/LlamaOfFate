@@ -81,3 +81,29 @@ func TestSceneManager_Restore_WiresConflictManager(t *testing.T) {
 	assert.Equal(t, player, sm.conflict.player)
 	assert.Equal(t, s, sm.conflict.currentScene)
 }
+
+func TestConflictManager_ConflictTypeString_DefaultPhysical(t *testing.T) {
+	cm := newConflictManager(nil, nil, session.NullLogger{})
+	s := scene.NewScene("s1", "Room", "A room")
+	cm.setSceneState(s, core.NewCharacter("p1", "Hero"))
+
+	assert.Equal(t, "physical", cm.conflictTypeString())
+}
+
+func TestConflictManager_ConflictTypeString_MentalConflict(t *testing.T) {
+	cm := newConflictManager(nil, nil, session.NullLogger{})
+	s := scene.NewScene("s1", "Room", "A room")
+	s.ConflictState = &scene.ConflictState{Type: scene.MentalConflict}
+	cm.setSceneState(s, core.NewCharacter("p1", "Hero"))
+
+	assert.Equal(t, "mental", cm.conflictTypeString())
+}
+
+func TestConflictManager_ConflictTypeString_PhysicalConflict(t *testing.T) {
+	cm := newConflictManager(nil, nil, session.NullLogger{})
+	s := scene.NewScene("s1", "Room", "A room")
+	s.ConflictState = &scene.ConflictState{Type: scene.PhysicalConflict}
+	cm.setSceneState(s, core.NewCharacter("p1", "Hero"))
+
+	assert.Equal(t, "physical", cm.conflictTypeString())
+}

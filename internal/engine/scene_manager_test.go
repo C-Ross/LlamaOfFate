@@ -1168,3 +1168,23 @@ func TestHandleInput_ActionDuringChallenge_CompletesChallenge(t *testing.T) {
 	// Scene should no longer be in challenge
 	assert.False(t, testScene.IsChallenge)
 }
+
+func TestSceneManager_GetLastTransition_InitiallyNil(t *testing.T) {
+	engine, err := New(session.NullLogger{})
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, nil, nil, session.NullLogger{})
+	assert.Nil(t, sm.GetLastTransition())
+}
+
+func TestSceneManager_GetLastTransition_AfterSet(t *testing.T) {
+	engine, err := New(session.NullLogger{})
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, nil, nil, session.NullLogger{})
+	transition := &prompt.SceneTransition{
+		Hint: "Test hint",
+	}
+	sm.lastTransition = transition
+	assert.Equal(t, transition, sm.GetLastTransition())
+}
