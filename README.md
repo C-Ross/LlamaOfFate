@@ -58,7 +58,7 @@ Fate™ is a trademark of Evil Hat Productions, LLC.
 
 ### Prerequisites
 
-- [Go 1.22+](https://go.dev/dl/)
+- [Go 1.27.3+](https://go.dev/dl/)
 - [Node.js 20+](https://nodejs.org/)
 - [`just`](https://github.com/casey/just/releases)
 - An LLM backend: [Ollama](https://ollama.ai/) (local) or a cloud provider (OpenAI-compatible/Azure)
