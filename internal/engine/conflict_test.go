@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
@@ -65,7 +65,7 @@ func TestSceneManager_CalculateInitiative_Physical(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	char := character.NewCharacter("char1", "Fighter")
+	char := core.NewCharacter("char1", "Fighter")
 	char.SetSkill("Notice", 3)
 	char.SetSkill("Athletics", 2)
 
@@ -80,7 +80,7 @@ func TestSceneManager_CalculateInitiative_Physical_NoNotice(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	char := character.NewCharacter("char1", "Fighter")
+	char := core.NewCharacter("char1", "Fighter")
 	char.SetSkill("Athletics", 2)
 
 	// Should fall back to Athletics when Notice is 0
@@ -94,7 +94,7 @@ func TestSceneManager_CalculateInitiative_Mental(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	char := character.NewCharacter("char1", "Wizard")
+	char := core.NewCharacter("char1", "Wizard")
 	char.SetSkill("Empathy", 4)
 	char.SetSkill("Rapport", 2)
 
@@ -109,7 +109,7 @@ func TestSceneManager_CalculateInitiative_Mental_NoEmpathy(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	char := character.NewCharacter("char1", "Diplomat")
+	char := core.NewCharacter("char1", "Diplomat")
 	char.SetSkill("Rapport", 3)
 
 	// Should fall back to Rapport when Empathy is 0
@@ -124,9 +124,9 @@ func TestSceneManager_InitiateConflict(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	// Create player and enemy
-	player := character.NewCharacter("player1", "Hero")
+	player := core.NewCharacter("player1", "Hero")
 	player.SetSkill("Notice", 3)
-	enemy := character.NewCharacter("enemy1", "Goblin")
+	enemy := core.NewCharacter("enemy1", "Goblin")
 	enemy.SetSkill("Notice", 1)
 
 	engine.AddCharacter(player)
@@ -159,8 +159,8 @@ func TestSceneManager_InitiateConflict_AlreadyInConflict(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	// Create characters
-	player := character.NewCharacter("player1", "Hero")
-	enemy := character.NewCharacter("enemy1", "Goblin")
+	player := core.NewCharacter("player1", "Hero")
+	enemy := core.NewCharacter("enemy1", "Goblin")
 	engine.AddCharacter(player)
 	engine.AddCharacter(enemy)
 
@@ -188,7 +188,7 @@ func TestSceneManager_InitiateConflict_NotEnoughParticipants(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	// Create only one character
-	player := character.NewCharacter("player1", "Hero")
+	player := core.NewCharacter("player1", "Hero")
 	engine.AddCharacter(player)
 
 	// Create scene with only player
@@ -210,8 +210,8 @@ func TestSceneManager_InitiateConflict_UnknownInitiator(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	// Create player and enemy
-	player := character.NewCharacter("player1", "Hero")
-	enemy := character.NewCharacter("enemy1", "Goblin")
+	player := core.NewCharacter("player1", "Hero")
+	enemy := core.NewCharacter("enemy1", "Goblin")
 	engine.AddCharacter(player)
 	engine.AddCharacter(enemy)
 
@@ -238,10 +238,10 @@ func TestSceneManager_HandleConflictEscalation(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	// Create characters
-	player := character.NewCharacter("player1", "Hero")
+	player := core.NewCharacter("player1", "Hero")
 	player.SetSkill("Notice", 2)
 	player.SetSkill("Empathy", 4)
-	enemy := character.NewCharacter("enemy1", "Antagonist")
+	enemy := core.NewCharacter("enemy1", "Antagonist")
 	enemy.SetSkill("Notice", 3)
 	enemy.SetSkill("Empathy", 1)
 	engine.AddCharacter(player)
@@ -341,9 +341,9 @@ func TestSceneManager_ResolveConflictPeacefully(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	// Create test characters
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	player.SetSkill("Notice", 2)
-	enemy := character.NewCharacter("enemy-1", "Goblin Guard")
+	enemy := core.NewCharacter("enemy-1", "Goblin Guard")
 	enemy.SetSkill("Notice", 1)
 
 	engine.AddCharacter(player)
@@ -379,21 +379,21 @@ func TestSceneManager_ResolveConflictPeacefully_ClearsStress(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
 	// Create test characters
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	player.SetSkill("Notice", 2)
-	enemy := character.NewCharacter("enemy-1", "Goblin Guard")
+	enemy := core.NewCharacter("enemy-1", "Goblin Guard")
 	enemy.SetSkill("Notice", 1)
 
 	engine.AddCharacter(player)
 	engine.AddCharacter(enemy)
 
 	// Take stress on both characters
-	player.TakeStress(character.PhysicalStress, 1)
-	player.TakeStress(character.MentalStress, 1)
-	enemy.TakeStress(character.PhysicalStress, 2)
+	player.TakeStress(core.PhysicalStress, 1)
+	player.TakeStress(core.MentalStress, 1)
+	enemy.TakeStress(core.PhysicalStress, 2)
 
-	assert.Equal(t, 1, player.GetStressTrack(character.PhysicalStress).AvailableBoxes())
-	assert.Equal(t, 1, player.GetStressTrack(character.MentalStress).AvailableBoxes())
+	assert.Equal(t, 1, player.GetStressTrack(core.PhysicalStress).AvailableBoxes())
+	assert.Equal(t, 1, player.GetStressTrack(core.MentalStress).AvailableBoxes())
 
 	// Setup scene
 	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
@@ -414,9 +414,9 @@ func TestSceneManager_ResolveConflictPeacefully_ClearsStress(t *testing.T) {
 	sm.conflict.resolveConflictPeacefully("surrender")
 
 	// Verify stress was cleared for all participants
-	assert.Equal(t, 2, player.GetStressTrack(character.PhysicalStress).AvailableBoxes())
-	assert.Equal(t, 2, player.GetStressTrack(character.MentalStress).AvailableBoxes())
-	assert.Equal(t, 2, enemy.GetStressTrack(character.PhysicalStress).AvailableBoxes())
+	assert.Equal(t, 2, player.GetStressTrack(core.PhysicalStress).AvailableBoxes())
+	assert.Equal(t, 2, player.GetStressTrack(core.MentalStress).AvailableBoxes())
+	assert.Equal(t, 2, enemy.GetStressTrack(core.PhysicalStress).AvailableBoxes())
 }
 
 func TestSceneManager_ResolveConflictPeacefully_NotInConflict(t *testing.T) {
@@ -456,9 +456,9 @@ func TestSceneManager_ResolveConflictPeacefully_AllReasons(t *testing.T) {
 			require.NoError(t, err)
 
 			sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
-			player := character.NewCharacter("p1", "Hero")
+			player := core.NewCharacter("p1", "Hero")
 			player.SetSkill("Notice", 2)
-			enemy := character.NewCharacter("e1", "Goblin")
+			enemy := core.NewCharacter("e1", "Goblin")
 			enemy.SetSkill("Notice", 1)
 			engine.AddCharacter(player)
 			engine.AddCharacter(enemy)
@@ -502,9 +502,9 @@ func TestSceneManager_HandleConflictEscalation_SameType(t *testing.T) {
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
-	player := character.NewCharacter("p1", "Hero")
+	player := core.NewCharacter("p1", "Hero")
 	player.SetSkill("Notice", 2)
-	enemy := character.NewCharacter("e1", "Goblin")
+	enemy := core.NewCharacter("e1", "Goblin")
 	enemy.SetSkill("Notice", 1)
 	engine.AddCharacter(player)
 	engine.AddCharacter(enemy)
@@ -531,11 +531,11 @@ func TestSceneManager_GatherInvokableAspects_ConsequencesAndSituation(t *testing
 	require.NoError(t, err)
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
-	player := character.NewCharacter("p1", "Hero")
+	player := core.NewCharacter("p1", "Hero")
 	player.Aspects.HighConcept = "Bold Knight"
-	player.AddConsequence(character.Consequence{
+	player.AddConsequence(core.Consequence{
 		ID:     "c1",
-		Type:   character.MildConsequence,
+		Type:   core.MildConsequence,
 		Aspect: "Bruised Ribs",
 	})
 	sm.player = player
@@ -580,7 +580,7 @@ func TestSceneManager_RollTargetDefense(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	sm.actions.roller = dice.NewSeededRoller(12345) // Predictable rolls
 
-	target := character.NewCharacter("target-1", "Goblin")
+	target := core.NewCharacter("target-1", "Goblin")
 	target.SetSkill("Athletics", 2)
 	target.SetSkill("Will", 1)
 
@@ -602,83 +602,180 @@ func TestSceneManager_ApplyDamageToTarget_StressAbsorbed(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	target := character.NewCharacter("target-1", "Goblin")
+	target := core.NewCharacter("target-1", "Goblin")
 	// Default stress track should be able to absorb small hits
 
-	dmgEvent := sm.conflict.applyDamageToTarget(context.Background(), target, 1, character.PhysicalStress)
+	dmgEvent := sm.conflict.applyDamageToTarget(context.Background(), target, 1, core.PhysicalStress)
 
 	// Check that stress was absorbed
 	assert.NotNil(t, dmgEvent.Absorbed, "Expected stress absorption")
 	assert.Equal(t, "physical", dmgEvent.Absorbed.TrackType)
 }
 
+// Issue #119: stress box + consequence combination must absorb a hit.
+func TestSceneManager_ApplyDamageToTarget_StressPlusConsequence_Survives(t *testing.T) {
+	engine, err := New(session.NullLogger{})
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
+	player := core.NewCharacter("player-1", "Hero")
+	sm.conflict.player = player
+
+	// NPC with 3 physical stress boxes, boxes 1 and 3 already checked.
+	target := core.NewCharacter("target-1", "Orc")
+	target.SetSkill("Physique", dice.Average) // Average → 3-box track
+	target.RecalculateStressTracks()
+	track := target.GetStressTrack(core.PhysicalStress)
+	require.Equal(t, 3, track.MaxBoxes)
+	track.Boxes[0] = true // box 1 checked
+	track.Boxes[2] = true // box 3 checked
+	// box 2 is free
+
+	// Hit for 3 shifts.
+	// Expected: mild consequence (absorbs 2) + box 2 (absorbs remaining 1) → survives.
+	dmgEvent := sm.conflict.applyDamageToTarget(context.Background(), target, 3, core.PhysicalStress)
+
+	assert.False(t, dmgEvent.TakenOut, "NPC should survive via consequence + stress combination")
+	require.NotNil(t, dmgEvent.Consequence, "Should have taken a consequence")
+	assert.Equal(t, "mild", dmgEvent.Consequence.Severity)
+	assert.Equal(t, 2, dmgEvent.Consequence.Absorbed)
+	require.NotNil(t, dmgEvent.RemainingAbsorbed, "Remaining 1 shift should be absorbed by stress")
+	assert.Equal(t, 1, dmgEvent.RemainingAbsorbed.Shifts)
+	assert.True(t, track.Boxes[1], "Box 2 should now be checked")
+}
+
+func TestSceneManager_ApplyDamageToTarget_HigherStressBoxAbsorbs(t *testing.T) {
+	engine, err := New(session.NullLogger{})
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
+
+	// NPC with 4-box physical track. Box 2 checked, box 3 free.
+	// A 2-shift hit should fall through to box 3.
+	target := core.NewCharacter("target-1", "Orc")
+	target.SetSkill("Physique", dice.Good) // Good → 4-box track
+	target.RecalculateStressTracks()
+	track := target.GetStressTrack(core.PhysicalStress)
+	require.Equal(t, 4, track.MaxBoxes)
+	track.Boxes[1] = true // box 2 checked
+
+	dmgEvent := sm.conflict.applyDamageToTarget(context.Background(), target, 2, core.PhysicalStress)
+
+	assert.False(t, dmgEvent.TakenOut)
+	require.NotNil(t, dmgEvent.Absorbed, "Should absorb via stress alone using higher box")
+	assert.Equal(t, 2, dmgEvent.Absorbed.Shifts)
+	assert.True(t, track.Boxes[2], "Box 3 should be checked (fallback from box 2)")
+	assert.False(t, track.Boxes[3], "Box 4 should remain free")
+}
+
+func TestSceneManager_ApplyDamageToTarget_NoBoxOrConsequence_TakenOut(t *testing.T) {
+	engine, err := New(session.NullLogger{})
+	require.NoError(t, err)
+
+	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
+
+	player := core.NewCharacter("player-1", "Hero")
+	target := core.NewCharacter("target-1", "Orc")
+	otherEnemy := core.NewCharacter("enemy-2", "Troll")
+
+	engine.AddCharacter(player)
+	engine.AddCharacter(target)
+	engine.AddCharacter(otherEnemy)
+
+	testScene := scene.NewScene("test-scene", "Arena", "A gladiator arena.")
+	testScene.AddCharacter(player.ID)
+	testScene.AddCharacter(target.ID)
+	testScene.AddCharacter(otherEnemy.ID)
+	sm.currentScene = testScene
+	sm.conflict.currentScene = testScene
+	sm.actions.currentScene = testScene
+	sm.player = player
+	sm.conflict.player = player
+	sm.actions.player = player
+	err = sm.conflict.initiateConflict(scene.PhysicalConflict, target.ID)
+	require.NoError(t, err)
+
+	// Fill all stress boxes AND all consequences so nothing can absorb.
+	track := target.GetStressTrack(core.PhysicalStress)
+	for i := range track.Boxes {
+		track.Boxes[i] = true
+	}
+	target.AddConsequence(core.Consequence{ID: "c1", Type: core.MildConsequence, Aspect: "Bruised"})
+	target.AddConsequence(core.Consequence{ID: "c2", Type: core.ModerateConsequence, Aspect: "Broken Arm"})
+	target.AddConsequence(core.Consequence{ID: "c3", Type: core.SevereConsequence, Aspect: "Shattered"})
+
+	dmgEvent := sm.conflict.applyDamageToTarget(context.Background(), target, 1, core.PhysicalStress)
+
+	assert.True(t, dmgEvent.TakenOut, "Should be taken out when nothing can absorb")
+}
+
 func TestHandleTargetStressOverflow_ConsequenceSelection(t *testing.T) {
 	tests := []struct {
 		name           string
-		available      []character.ConsequenceSlot
+		available      []core.ConsequenceSlot
 		shifts         int
-		expectedType   character.ConsequenceType
+		expectedType   core.ConsequenceType
 		expectedReason string
 	}{
 		{
 			name: "exact match picks that consequence",
-			available: []character.ConsequenceSlot{
-				{Type: character.MildConsequence, Value: 2},
-				{Type: character.ModerateConsequence, Value: 4},
-				{Type: character.SevereConsequence, Value: 6},
+			available: []core.ConsequenceSlot{
+				{Type: core.MildConsequence, Value: 2},
+				{Type: core.ModerateConsequence, Value: 4},
+				{Type: core.SevereConsequence, Value: 6},
 			},
 			shifts:       4,
-			expectedType: character.ModerateConsequence,
+			expectedType: core.ModerateConsequence,
 		},
 		{
 			name: "picks smallest consequence that covers shifts",
-			available: []character.ConsequenceSlot{
-				{Type: character.MildConsequence, Value: 2},
-				{Type: character.ModerateConsequence, Value: 4},
-				{Type: character.SevereConsequence, Value: 6},
+			available: []core.ConsequenceSlot{
+				{Type: core.MildConsequence, Value: 2},
+				{Type: core.ModerateConsequence, Value: 4},
+				{Type: core.SevereConsequence, Value: 6},
 			},
 			shifts:       3,
-			expectedType: character.ModerateConsequence,
+			expectedType: core.ModerateConsequence,
 		},
 		{
 			name: "large hit picks largest available when none covers",
-			available: []character.ConsequenceSlot{
-				{Type: character.MildConsequence, Value: 2},
-				{Type: character.ModerateConsequence, Value: 4},
+			available: []core.ConsequenceSlot{
+				{Type: core.MildConsequence, Value: 2},
+				{Type: core.ModerateConsequence, Value: 4},
 			},
 			shifts:       5,
-			expectedType: character.ModerateConsequence,
+			expectedType: core.ModerateConsequence,
 		},
 		{
 			name: "only mild available and shifts exceed it picks mild",
-			available: []character.ConsequenceSlot{
-				{Type: character.MildConsequence, Value: 2},
+			available: []core.ConsequenceSlot{
+				{Type: core.MildConsequence, Value: 2},
 			},
 			shifts:       5,
-			expectedType: character.MildConsequence,
+			expectedType: core.MildConsequence,
 		},
 		{
 			name: "single consequence that covers",
-			available: []character.ConsequenceSlot{
-				{Type: character.SevereConsequence, Value: 6},
+			available: []core.ConsequenceSlot{
+				{Type: core.SevereConsequence, Value: 6},
 			},
 			shifts:       3,
-			expectedType: character.SevereConsequence,
+			expectedType: core.SevereConsequence,
 		},
 		{
 			name: "prefers mild over severe when both cover",
-			available: []character.ConsequenceSlot{
-				{Type: character.SevereConsequence, Value: 6},
-				{Type: character.MildConsequence, Value: 2},
+			available: []core.ConsequenceSlot{
+				{Type: core.SevereConsequence, Value: 6},
+				{Type: core.MildConsequence, Value: 2},
 			},
 			shifts:       2,
-			expectedType: character.MildConsequence,
+			expectedType: core.MildConsequence,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			bestConseq, ok := character.BestConsequenceFor(tc.available, tc.shifts)
+			bestConseq, ok := core.BestConsequenceFor(tc.available, tc.shifts)
 			require.True(t, ok)
 
 			assert.Equal(t, tc.expectedType, bestConseq.Type,
@@ -693,9 +790,9 @@ func TestSceneManager_HandleTargetTakenOut(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	target := character.NewCharacter("target-1", "Goblin")
-	otherEnemy := character.NewCharacter("enemy-2", "Orc") // Another enemy so conflict doesn't auto-end
+	player := core.NewCharacter("player-1", "Hero")
+	target := core.NewCharacter("target-1", "Goblin")
+	otherEnemy := core.NewCharacter("enemy-2", "Orc") // Another enemy so conflict doesn't auto-end
 
 	engine.AddCharacter(player)
 	engine.AddCharacter(target)
@@ -737,8 +834,8 @@ func TestSceneManager_HandleTargetTakenOut_ConflictEnds(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	target := character.NewCharacter("target-1", "Goblin")
+	player := core.NewCharacter("player-1", "Hero")
+	target := core.NewCharacter("target-1", "Goblin")
 
 	engine.AddCharacter(player)
 	engine.AddCharacter(target)
@@ -774,8 +871,8 @@ func TestSceneManager_HandleTargetTakenOut_MarksSceneLevelTakenOut(t *testing.T)
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	target := character.NewCharacter("target-1", "Goblin")
+	player := core.NewCharacter("player-1", "Hero")
+	target := core.NewCharacter("target-1", "Goblin")
 
 	engine.AddCharacter(player)
 	engine.AddCharacter(target)
@@ -809,9 +906,9 @@ func TestSceneManager_InitiateConflict_ExcludesTakenOutCharacters(t *testing.T) 
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	enemy1 := character.NewCharacter("enemy-1", "Goblin")
-	enemy2 := character.NewCharacter("enemy-2", "Orc")
+	player := core.NewCharacter("player-1", "Hero")
+	enemy1 := core.NewCharacter("enemy-1", "Goblin")
+	enemy2 := core.NewCharacter("enemy-2", "Orc")
 
 	engine.AddCharacter(player)
 	engine.AddCharacter(enemy1)
@@ -860,8 +957,8 @@ func TestSceneManager_InitiateConflict_TakenOutInitiatorFails(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	enemy := character.NewCharacter("enemy-1", "Goblin")
+	player := core.NewCharacter("player-1", "Hero")
+	enemy := core.NewCharacter("enemy-1", "Goblin")
 
 	engine.AddCharacter(player)
 	engine.AddCharacter(enemy)
@@ -899,8 +996,8 @@ func TestSceneManager_ApplyActionEffects_Attack(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	target := character.NewCharacter("target-1", "Goblin")
+	player := core.NewCharacter("player-1", "Hero")
+	target := core.NewCharacter("target-1", "Goblin")
 
 	engine.AddCharacter(player)
 	engine.AddCharacter(target)
@@ -977,8 +1074,8 @@ func TestSceneManager_HandleConcession(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	enemy := character.NewCharacter("enemy-1", "Goblin")
+	player := core.NewCharacter("player-1", "Hero")
+	enemy := core.NewCharacter("enemy-1", "Goblin")
 	player.FatePoints = 1 // Start with 1 fate point
 
 	engine.AddCharacter(player)
@@ -1017,18 +1114,18 @@ func TestSceneManager_HandleConcession_WithConsequences(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	enemy := character.NewCharacter("enemy-1", "Goblin")
+	player := core.NewCharacter("player-1", "Hero")
+	enemy := core.NewCharacter("enemy-1", "Goblin")
 	player.FatePoints = 1 // Start with 1 fate point
 
 	// Add a consequence to the player
-	player.AddConsequence(character.Consequence{
+	player.AddConsequence(core.Consequence{
 		ID:   "conseq-1",
-		Type: character.MildConsequence,
+		Type: core.MildConsequence,
 	})
-	player.AddConsequence(character.Consequence{
+	player.AddConsequence(core.Consequence{
 		ID:   "conseq-2",
-		Type: character.ModerateConsequence,
+		Type: core.ModerateConsequence,
 	})
 
 	engine.AddCharacter(player)
@@ -1072,7 +1169,7 @@ func TestSceneManager_ApplyActionEffects_Attack_NilTarget_ShowsError(t *testing.
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
 	testScene.AddCharacter(player.ID)
 	err = sm.StartScene(testScene, player)
@@ -1107,8 +1204,8 @@ func TestSceneManager_ApplyActionEffects_Attack_DealsDamage(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	target := character.NewCharacter("target-1", "Goblin")
+	player := core.NewCharacter("player-1", "Hero")
+	target := core.NewCharacter("target-1", "Goblin")
 
 	engine.AddCharacter(player)
 	engine.AddCharacter(target)
@@ -1120,7 +1217,7 @@ func TestSceneManager_ApplyActionEffects_Attack_DealsDamage(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify target starts with full stress
-	initialAvailable := target.GetStressTrack(character.PhysicalStress).AvailableBoxes()
+	initialAvailable := target.GetStressTrack(core.PhysicalStress).AvailableBoxes()
 
 	// Create a successful attack action
 	testAction := action.NewActionWithTarget(
@@ -1139,7 +1236,7 @@ func TestSceneManager_ApplyActionEffects_Attack_DealsDamage(t *testing.T) {
 	events := sm.actions.applyActionEffects(context.Background(), testAction, target)
 
 	// Verify stress was actually applied
-	afterAvailable := target.GetStressTrack(character.PhysicalStress).AvailableBoxes()
+	afterAvailable := target.GetStressTrack(core.PhysicalStress).AvailableBoxes()
 	assert.Less(t, afterAvailable, initialAvailable, "Target should have taken stress")
 
 	// Verify events contain attack result and damage resolution
@@ -1158,8 +1255,8 @@ func TestSceneManager_ApplyActionEffects_Attack_Tie_GrantsBoost(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	target := character.NewCharacter("target-1", "Goblin")
+	player := core.NewCharacter("player-1", "Hero")
+	target := core.NewCharacter("target-1", "Goblin")
 
 	engine.AddCharacter(player)
 	engine.AddCharacter(target)
@@ -1209,8 +1306,8 @@ func TestSceneManager_ApplyActionEffects_Attack_Failure_DefendWithStyle_GrantsTa
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	target := character.NewCharacter("target-1", "Goblin")
+	player := core.NewCharacter("player-1", "Hero")
+	target := core.NewCharacter("target-1", "Goblin")
 
 	engine.AddCharacter(player)
 	engine.AddCharacter(target)
@@ -1243,7 +1340,7 @@ func TestSceneManager_ApplyActionEffects_CreateAdvantage_Tie_CreatesBoost(t *tes
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	engine.AddCharacter(player)
 
 	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
@@ -1273,7 +1370,7 @@ func TestSceneManager_ApplyActionEffects_Overcome_SWS_CreatesBoost(t *testing.T)
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	engine.AddCharacter(player)
 
 	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
@@ -1318,7 +1415,7 @@ func TestGenerateBoostName_FallbackOnError(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	sm.actions.aspectGenerator = &errorAspectGenerator{}
 
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	engine.AddCharacter(player)
 
 	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
@@ -1337,7 +1434,7 @@ func TestGenerateBoostName_FallbackOnEmptyResponse(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	sm.actions.aspectGenerator = &emptyAspectGenerator{}
 
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	engine.AddCharacter(player)
 
 	testScene := scene.NewScene("test-scene", "Test Room", "A test room.")
@@ -1359,9 +1456,9 @@ func TestSceneManager_ResolveAction_TargetByName(t *testing.T) {
 	sm.actions.roller = dice.NewSeededRoller(42)
 
 	// Create player and NPC with different ID and name
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	player.SetSkill("Fight", dice.Good)
-	npc := character.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
+	npc := core.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
 	npc.SetSkill("Athletics", dice.Fair)
 
 	engine.AddCharacter(player)
@@ -1424,10 +1521,10 @@ func TestSceneManager_ResolveAction_UnknownTarget_AbortsWithoutConsumingTurn(t *
 	sm := engine.GetSceneManager()
 	sm.actions.roller = dice.NewSeededRoller(42)
 
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	player.SetSkill("Fight", dice.Good)
 	player.SetSkill("Notice", dice.Fair)
-	npc := character.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
+	npc := core.NewCharacter("scene-abc_npc_0", "Bart the Outlaw")
 	npc.SetSkill("Notice", dice.Average)
 
 	engine.AddCharacter(player)
@@ -1488,10 +1585,10 @@ func TestSceneManager_HandleAction_ExcludesTakenOutFromTargets(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	player.SetSkill("Fight", dice.Good)
-	activeNPC := character.NewCharacter("active-npc", "Angry Orc")
-	takenOutNPC := character.NewCharacter("taken-out-npc", "Defeated Goblin")
+	activeNPC := core.NewCharacter("active-npc", "Angry Orc")
+	takenOutNPC := core.NewCharacter("taken-out-npc", "Defeated Goblin")
 
 	engine.AddCharacter(player)
 	engine.AddCharacter(activeNPC)
@@ -1534,8 +1631,8 @@ func TestApplyTargetTakenOut_SetsFateOnCharacter(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	target := character.NewCharacter("target-1", "Goblin")
+	player := core.NewCharacter("player-1", "Hero")
+	target := core.NewCharacter("target-1", "Goblin")
 
 	engine.AddCharacter(player)
 	engine.AddCharacter(target)

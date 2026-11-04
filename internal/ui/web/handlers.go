@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/coder/websocket"
@@ -41,9 +43,10 @@ type Handler struct {
 	mux         *http.ServeMux
 }
 
-// NewHandler creates an HTTP handler with WebSocket and health endpoints.
-// TODO: serve static files from web/dist for production builds (no Vite proxy).
-func NewHandler(factory GameSessionManagerFactory, setupCfg SetupConfig, logger *slog.Logger) *Handler {
+// NewHandler creates an HTTP handler with WebSocket, health, and optional
+// static file serving endpoints. When staticFS is non-nil, the handler serves
+// the embedded frontend files and falls back to index.html for SPA routing.
+func NewHandler(factory GameSessionManagerFactory, setupCfg SetupConfig, logger *slog.Logger, staticFS fs.FS) *Handler {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -55,6 +58,9 @@ func NewHandler(factory GameSessionManagerFactory, setupCfg SetupConfig, logger 
 	}
 	h.mux.HandleFunc("GET /ws", h.handleWebSocket)
 	h.mux.HandleFunc("GET /health", h.handleHealth)
+	if staticFS != nil {
+		h.mux.Handle("GET /", spaHandler(staticFS))
+	}
 	return h
 }
 
@@ -154,4 +160,26 @@ func isNormalClose(err error) bool {
 	}
 	status := websocket.CloseStatus(err)
 	return status == websocket.StatusNormalClosure || status == websocket.StatusGoingAway
+}
+
+// spaHandler returns an http.Handler that serves static files from the given
+// filesystem. If the requested path doesn't match a real file (e.g. a
+// client-side route like /game/123), it falls back to index.html so the
+// React SPA can handle routing.
+func spaHandler(staticFS fs.FS) http.Handler {
+	fileServer := http.FileServerFS(staticFS)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Try to serve the exact file. Clean the path to prevent traversal.
+		path := strings.TrimPrefix(r.URL.Path, "/")
+		if path == "" {
+			path = "index.html"
+		}
+		if _, err := fs.Stat(staticFS, path); err == nil {
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+		// File not found — serve index.html for SPA routing.
+		r.URL.Path = "/"
+		fileServer.ServeHTTP(w, r)
+	})
 }

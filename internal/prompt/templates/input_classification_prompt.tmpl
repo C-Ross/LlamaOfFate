@@ -7,6 +7,16 @@ FATE CORE GUIDANCE ON WHEN TO ROLL:
 - Roll when there's meaningful opposition, obstacles, or consequences
 - Simple questions about the environment should be answered directly
 
+{{- if .CharacterAspects}}
+CHARACTER ASPECTS:
+{{- range .CharacterAspects}}
+- {{.}}
+{{- end}}
+{{- end}}
+{{- if .Genre}}
+SETTING GENRE: {{.Genre}}
+{{- end}}
+
 KEY TEST: Ask yourself "What happens if they fail?"
 - If failure means nothing interesting (they just... walk through the door anyway) → narrative
 - If failure means detection, injury, or meaningful consequence → action
@@ -23,6 +33,7 @@ Classify this input as one of these types:
 - "clarification" - The player wants to examine, look at, or understand something in the environment (NO DICE ROLL)
 - "narrative" - The player performs a mundane physical action with no meaningful opposition: walking somewhere, opening an unlocked door, sitting down, entering a building (NO DICE ROLL)
 - "action" - The player attempts something where both success AND failure would be interesting, because there is real opposition, danger, time pressure, or consequences for failure
+- "unreasonable" - The player claims abilities, powers, objects, or technology that are IMPOSSIBLE given their character aspects AND the setting genre. Use ONLY when the input clearly conflicts with both the character and setting. Err on the side of allowing creative play — if any aspect could plausibly justify the action, classify as action instead.
 
 SCENE CONTEXT MATTERS:
 The scene description may contain aspects (like "tension hangs in the air" or "guards patrol nearby") that create opposition. The same physical action can be narrative in a calm scene but action in a tense one. Consider whether the scene establishes opposition that makes failure interesting.
@@ -30,6 +41,13 @@ The scene description may contain aspects (like "tension hangs in the air" or "g
 IMPORTANT: Distinguish between CAUTIOUS MANNER and STEALTH INTENT:
 - Words like "carefully", "cautiously", "slowly" describe HOW someone performs an otherwise mundane action. Unless the scene describes specific dangers (traps, guards, enemies), these are just narrative manner — no roll needed.
 - Words like "sneak", "creep", "tiptoe", "silently", "slip", "keeping to the shadows" express INTENT to avoid detection. These imply the player is actively trying to overcome opposition (being seen/heard) and require an action roll regardless of scene context.
+
+UNREASONABLE CLASSIFICATION GUIDE:
+Classify as unreasonable when EITHER condition is true:
+1. The action requires supernatural abilities that NO character aspect supports (magic without magical aspects, flight without flight aspects, telekinesis without psychic aspects)
+2. The action uses objects or technology that DON'T EXIST in the setting genre (smartphones in Western, computers in Fantasy, laser guns in Western)
+HOWEVER, if any character aspect could PLAUSIBLY justify the ability (even loosely), classify as action instead.
+If the action is extreme but physically possible (punching a door, intimidating a crowd, leaping a gap), classify as action — let the dice decide.
 
 Examples:
 - "What do I see?" -> clarification (just provide information)
@@ -42,6 +60,7 @@ Examples:
 - "Open the door and step through" -> narrative (no opposition)
 - "I pace around the room" -> narrative (mundane movement)
 - "I walk over to the table and sit down" -> narrative (trivial action)
+- "I think about what happened earlier" -> clarification (internal reflection, no physical action)
 - "Examine the mysterious door" -> clarification (unless there's danger/time pressure)
 - "Notice if anyone is watching" in a safe place -> clarification (basic awareness)
 - "Check if anyone is following me" when in danger/being pursued -> action (failure has consequences)
@@ -52,7 +71,14 @@ Examples:
 - "Climb the tower during a storm" -> action (environmental obstacles)
 - "Carefully open the door and step inside" in a dungeon without stated traps/guards -> narrative (cautious manner, no specific opposition)
 - "Carefully make my way across the floor" in a room with visible traps -> action (specific opposition present)
+- "I punch the door down" -> action (extreme but physically possible)
+- "I intimidate the whole room" -> action (social skill, no supernatural claim)
+- "I cast a spell" with magical aspects like [Trained by the College of Mages] -> action (aspects support it)
+- "I use telekinesis" with aspects [Veteran Nuclear Engineer, Old-School Troubleshooter] -> unreasonable (no supernatural aspects)
+- "I pull out my smartphone" in a Western setting -> unreasonable (technology doesn't exist)
+- "I fly over the canyon" with no flight-related aspects -> unreasonable (humans can't fly)
+- "I hack into the computer" in a Fantasy setting -> unreasonable (computers don't exist)
+- "I draw my laser pistol" in a Western setting -> unreasonable (laser weapons don't exist)
+- "I summon a dragon" with aspects [Netrunner, Cybernetic Reflexes] -> unreasonable (no summoning aspects)
 
-Remember: Most simple observation and information gathering should be clarification, not action. Routine purchases and honest social requests are dialog. Walking somewhere or performing trivial physical tasks is narrative. Only classify as "action" when there's real opposition, danger, time pressure, or other factors that make both success and failure interesting.
-
-Respond with ONLY the classification word: dialog, clarification, narrative, or action
+Respond with ONLY a single word: dialog, clarification, narrative, action, or unreasonable

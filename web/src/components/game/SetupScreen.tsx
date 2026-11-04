@@ -2,11 +2,21 @@ import { useState } from "react"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { SkillPyramidForm } from "@/components/game/SkillPyramidForm"
+import { validateSkillPyramid } from "@/lib/validateSkillPyramid"
+import { getDefaultPyramid, ladderLabel, PYRAMID_SHAPE } from "@/lib/skills"
+import type { LadderLevel } from "@/lib/skills"
 import type { ScenarioPreset, CustomSetup } from "@/lib/types"
 
 // ---------------------------------------------------------------------------
-// Genre badge color helpers
+// Constants
 // ---------------------------------------------------------------------------
+
+const aspectPlaceholders = [
+  "e.g. Well Connected in the Underworld",
+  "e.g. My Father's Sword",
+  "e.g. Never Leave a Friend Behind",
+]
 
 const genreColors: Record<string, string> = {
   Western: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
@@ -52,12 +62,20 @@ export function SetupScreen({
   onContinue,
 }: SetupScreenProps) {
   const [mode, setMode] = useState<"pick" | "custom">("pick")
+  const [wizardStep, setWizardStep] = useState<"identity" | "skills" | "review">("identity")
 
   // Custom form state
   const [name, setName] = useState("")
   const [highConcept, setHighConcept] = useState("")
   const [trouble, setTrouble] = useState("")
   const [genre, setGenre] = useState("")
+  const [aspects, setAspects] = useState<string[]>(["", "", ""])
+  const [skills, setSkills] = useState<Record<string, number>>(getDefaultPyramid)
+
+  const resetCustomForm = () => {
+    setMode("pick")
+    setWizardStep("identity")
+  }
 
   // While generating, show a spinner overlay
   if (generatingMessage) {
@@ -71,15 +89,21 @@ export function SetupScreen({
     )
   }
 
-  if (mode === "custom") {
-    const canSubmit = name.trim() && highConcept.trim() && trouble.trim() && genre.trim()
+  // ---------------------------------------------------------------------------
+  // Custom wizard — Step 1: Identity & Aspects
+  // ---------------------------------------------------------------------------
+  if (mode === "custom" && wizardStep === "identity") {
+    const canProceed = name.trim() && highConcept.trim() && trouble.trim() && genre.trim()
 
     return (
-      <div className="flex h-full items-center justify-center p-6" data-testid="setup-custom">
+      <div className="flex h-full items-center justify-center p-6" data-testid="setup-custom" data-step="identity">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="font-heading text-xl">Create Your Character</CardTitle>
-            <CardDescription>Describe your character and genre. We&apos;ll generate a scenario.</CardDescription>
+            <div className="flex items-center justify-between">
+              <CardTitle className="font-heading text-xl">Create Your Character</CardTitle>
+              <span className="text-xs text-muted-foreground">Step 1 of 3</span>
+            </div>
+            <CardDescription>Define who your character is.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <label className="block space-y-1">
@@ -98,13 +122,158 @@ export function SetupScreen({
               <span className="text-sm font-medium">Genre</span>
               <Input value={genre} onChange={(e) => setGenre(e.target.value)} placeholder="e.g. Cyberpunk, Western, Fantasy" />
             </label>
+
+            {/* Optional additional aspects */}
+            <div className="space-y-2 pt-2">
+              <span className="text-sm font-medium text-muted-foreground">Additional Aspects (optional)</span>
+              {aspects.map((a, i) => (
+                <Input
+                  key={i}
+                  value={a}
+                  onChange={(e) => {
+                    const next = [...aspects]
+                    next[i] = e.target.value
+                    setAspects(next)
+                  }}
+                  placeholder={aspectPlaceholders[i]}
+                  data-testid={`aspect-input-${i}`}
+                />
+              ))}
+            </div>
+
             <div className="flex gap-3 pt-2">
-              <Button variant="outline" onClick={() => setMode("pick")}>Back</Button>
+              <Button variant="outline" onClick={resetCustomForm}>Back</Button>
+              <Button disabled={!canProceed} onClick={() => setWizardStep("skills")} data-testid="next-to-skills">
+                Next: Skills
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // ---------------------------------------------------------------------------
+  // Custom wizard — Step 2: Skills
+  // ---------------------------------------------------------------------------
+  if (mode === "custom" && wizardStep === "skills") {
+    const pyramidValid = validateSkillPyramid(skills).valid
+
+    return (
+      <div className="flex h-full items-center justify-center p-6" data-testid="setup-custom" data-step="skills">
+        <Card className="w-full max-w-lg">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="font-heading text-xl">Skill Pyramid</CardTitle>
+              <span className="text-xs text-muted-foreground">Step 2 of 3</span>
+            </div>
+            <CardDescription>
+              Assign 10 skills in a pyramid: 1 Great, 2 Good, 3 Fair, 4 Average.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <SkillPyramidForm skills={skills} onChange={setSkills} />
+
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" onClick={() => setWizardStep("identity")} data-testid="back-to-identity">
+                Back
+              </Button>
               <Button
-                disabled={!canSubmit}
-                onClick={() => onSelectCustom({ name: name.trim(), highConcept: highConcept.trim(), trouble: trouble.trim(), genre: genre.trim() })}
+                disabled={!pyramidValid}
+                onClick={() => setWizardStep("review")}
+                data-testid="next-to-review"
               >
-                Generate Scenario
+                Next: Review
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // ---------------------------------------------------------------------------
+  // Custom wizard — Step 3: Review
+  // ---------------------------------------------------------------------------
+  if (mode === "custom" && wizardStep === "review") {
+    const filteredAspects = aspects.map((a) => a.trim()).filter(Boolean)
+    const submission: CustomSetup = {
+      name: name.trim(),
+      highConcept: highConcept.trim(),
+      trouble: trouble.trim(),
+      genre: genre.trim(),
+      ...(filteredAspects.length > 0 ? { aspects: filteredAspects } : {}),
+      skills,
+    }
+
+    // Group skills by tier for display.
+    const skillsByTier = new Map<number, string[]>()
+    for (const [skill, level] of Object.entries(skills)) {
+      const arr = skillsByTier.get(level) ?? []
+      arr.push(skill)
+      skillsByTier.set(level, arr)
+    }
+
+    return (
+      <div className="flex h-full items-center justify-center p-6" data-testid="setup-custom" data-step="review">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="font-heading text-xl">Review Character</CardTitle>
+              <span className="text-xs text-muted-foreground">Step 3 of 3</span>
+            </div>
+            <CardDescription>Confirm your character before starting.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Identity */}
+            <div className="space-y-1">
+              <p className="text-sm"><span className="font-medium">Name:</span> {submission.name}</p>
+              <p className="text-sm"><span className="font-medium">High Concept:</span> {submission.highConcept}</p>
+              <p className="text-sm"><span className="font-medium">Trouble:</span> {submission.trouble}</p>
+              <p className="text-sm"><span className="font-medium">Genre:</span> {submission.genre}</p>
+            </div>
+
+            {/* Aspects */}
+            {filteredAspects.length > 0 && (
+              <div className="space-y-1" data-testid="review-aspects">
+                <p className="text-sm font-medium">Additional Aspects</p>
+                <ul className="list-disc list-inside text-sm text-muted-foreground">
+                  {filteredAspects.map((a, i) => (
+                    <li key={i}>{a}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Skills */}
+            <div className="space-y-1" data-testid="review-skills">
+              <p className="text-sm font-medium">Skills</p>
+              <div className="space-y-1 text-sm text-muted-foreground">
+                {PYRAMID_SHAPE.map(({ level }) => {
+                  const tierSkills = skillsByTier.get(level)
+                  if (!tierSkills?.length) return null
+                  return (
+                    <p key={level}>
+                      <span className="font-medium">{ladderLabel(level as LadderLevel)}:</span>{" "}
+                      {tierSkills.join(", ")}
+                    </p>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Fate Core defaults */}
+            <div className="space-y-1 text-sm text-muted-foreground">
+              <p><span className="font-medium">Refresh:</span> 3</p>
+              <p><span className="font-medium">Stress:</span> 2 Physical, 2 Mental</p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" onClick={() => setWizardStep("skills")} data-testid="back-to-skills">
+                Back
+              </Button>
+              <Button onClick={() => onSelectCustom(submission)} data-testid="start-adventure">
+                Start Adventure
               </Button>
             </div>
           </CardContent>

@@ -14,7 +14,7 @@ internal/
   core/                     - Fate Core mechanics (action, character, dice, scene)
   engine/                   - Game loop, LLM orchestration (game_manager → scene_flow → scene_manager)
   prompt/                   - LLM prompt system (Go templates, data structs, marker parsing)
-  llm/                      - LLM client interface and retry logic (azure/ implementation)
+  llm/                      - LLM client interface and retry logic (openai/ implementation)
   logging/                  - Structured logging (slog)
   session/                  - Session logging for game transcripts (YAML)
   ui/terminal/              - Terminal UI implementation
@@ -101,3 +101,17 @@ When you need to consider the rules use the Fate Core SRD at https://fate-srd.co
 When adding features that affect gameplay flow, add logging in `scene_manager.go`:
 `sm.sessionLogger.Log("event_type", map[string]any{...})`
 Or log existing structs directly: `sm.sessionLogger.Log("action_parse", parsedAction)`
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs are tracked in GitHub Issues; use the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the canonical labels `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a single-context repo; read the root `GLOSSARY.md` and relevant ADRs in `docs/adr/` when present. See `docs/agents/domain.md`.

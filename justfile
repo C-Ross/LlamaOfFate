@@ -22,7 +22,7 @@ validate: go-validate web-validate
 # ─── Go targets ─────────────────────────────────────────────────────
 
 # Run all Go validation checks
-go-validate: go-vet go-fmtcheck go-lint go-test go-build-llmeval build-server build-mcpserver
+go-validate: go-vet go-fmtcheck go-lint go-test go-build-llmeval build-server build-mcpserver build-examples
     @echo "Go validations passed!"
 
 # Build the CLI application
@@ -32,8 +32,8 @@ build:
     {{gocmd}} build -o {{binary_path}} {{main_path}}
     @echo "Build complete: {{binary_path}}"
 
-# Build the web server
-build-server:
+# Build the web server (includes embedded frontend from web/dist)
+build-server: web-build
     @echo "Building web server..."
     @mkdir -p bin
     {{gocmd}} build -o ./bin/server ./cmd/server
@@ -45,6 +45,10 @@ build-mcpserver:
     @mkdir -p bin
     {{gocmd}} build -o ./bin/mcpserver ./cmd/mcpserver
     @echo "Build complete: ./bin/mcpserver"
+
+# Build all example evaluation tools
+build-examples: scenario-generator scene-generator scenario-walkthrough
+    @echo "Example builds complete!"
 
 # Build and run the web server
 serve: build-server
@@ -61,10 +65,10 @@ go-build-llmeval:
     @echo "Checking llmeval tests compile..."
     {{gocmd}} test -tags=llmeval -count=0 ./test/llmeval/...
 
-# Run LLM evaluation tests (requires AZURE_API_ENDPOINT and AZURE_API_KEY)
+# Run LLM evaluation tests (requires AZURE_API_ENDPOINT and AZURE_API_KEY, or LLM_PROVIDER=ollama)
 test-llm:
     @echo "Running LLM evaluation tests..."
-    @echo "Requires AZURE_API_ENDPOINT and AZURE_API_KEY environment variables"
+    @echo "Requires AZURE_API_ENDPOINT and AZURE_API_KEY, or LLM_PROVIDER=ollama"
     {{gocmd}} test -v -tags=llmeval ./test/llmeval/...
 
 # Run LLM eval tests and record results for flakiness tracking
@@ -96,7 +100,7 @@ test-llm-fetch *args:
     ./scripts/llmeval-fetch-results.sh {{args}}
 
 # Run go vet
-go-vet:
+go-vet: web-build
     @echo "Running go vet..."
     {{gocmd}} vet ./...
 
@@ -137,10 +141,10 @@ web-install:
     @echo "Installing web dependencies..."
     cd web && npm install
 
-# Start web UI dev server (Vite) — demos enabled at /demo.html and /dice-demo.html
+# Start web UI dev server (Vite)
 web-dev:
     @echo "Starting web dev server..."
-    cd web && VITE_ENABLE_DEMOS=true npm run dev
+    cd web && npm run dev
 
 # Build web UI for production (set VITE_ENABLE_DEMOS=true to include demo pages)
 web-build:
@@ -156,6 +160,16 @@ web-test:
 web-lint:
     @echo "Linting web UI..."
     cd web && npm run lint
+
+# Start Storybook dev server
+web-storybook:
+    @echo "Starting Storybook..."
+    cd web && npm run storybook
+
+# Build Storybook static site
+web-storybook-build:
+    @echo "Building Storybook..."
+    cd web && npm run build-storybook
 
 # ─── Utilities ──────────────────────────────────────────────────────
 
@@ -204,3 +218,31 @@ clean-sessions n="5":
     echo "Found $total session files, removing $to_delete oldest files (keeping {{n}})"
     find sessions -maxdepth 1 -type f -name "*.yaml" -printf '%T+ %p\0' | sort -z | head -z -n "$to_delete" | cut -z -d' ' -f2- | xargs -0 rm -v
     echo "Cleanup complete"
+
+# ─── Release targets ────────────────────────────────────────────────
+
+# Test build locally (snapshot mode - no publishing, single platform)
+release-snapshot:
+    @echo "Building snapshot (local test)..."
+    @command -v goreleaser >/dev/null 2>&1 || (echo "goreleaser not found. Install from https://goreleaser.com/install/" && exit 1)
+    goreleaser build --snapshot --clean
+
+# Test build for all platforms (dry-run - no publishing, would-be artifacts)
+release-dry-run:
+    @echo "Building for all platforms (dry-run, no publishing)..."
+    @command -v goreleaser >/dev/null 2>&1 || (echo "goreleaser not found. Install from https://goreleaser.com/install/" && exit 1)
+    goreleaser release --snapshot --clean
+
+# Validate goreleaser configuration
+release-validate:
+    @echo "Validating goreleaser config..."
+    @command -v goreleaser >/dev/null 2>&1 || (echo "goreleaser not found. Install from https://goreleaser.com/install/" && exit 1)
+    goreleaser check
+
+# Full release. Pass flags through to goreleaser, e.g. `just release --snapshot`.
+release *args: web-build release-validate
+    @echo "Running goreleaser release {{args}}"
+    @command -v goreleaser >/dev/null 2>&1 || (echo "goreleaser not found. Install from https://goreleaser.com/install/" && exit 1)
+    @echo "For a published release, tag first and set GITHUB_TOKEN"
+    @echo "Example: git tag v0.1.0 && git push origin v0.1.0 && just release"
+    goreleaser release --clean {{args}}

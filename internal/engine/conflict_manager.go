@@ -1,7 +1,7 @@
 package engine
 
 import (
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
@@ -22,7 +22,7 @@ type ConflictManager struct {
 	actions *ActionResolver
 
 	// Per-scene state — wired by SceneManager.StartScene / resetConflictState.
-	player       *character.Character
+	player       *core.Character
 	currentScene *scene.Scene
 
 	// Conflict-specific mutable state — reset each scene.
@@ -51,7 +51,7 @@ func newConflictManager(
 }
 
 // setSceneState wires per-scene references. Called by SceneManager.StartScene.
-func (cm *ConflictManager) setSceneState(s *scene.Scene, player *character.Character) {
+func (cm *ConflictManager) setSceneState(s *scene.Scene, player *core.Character) {
 	cm.currentScene = s
 	cm.player = player
 }

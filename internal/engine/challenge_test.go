@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
@@ -15,8 +15,8 @@ import (
 
 // --- ChallengeManager unit tests ---
 
-func newChallengeTestSetup() (*ChallengeManager, *scene.Scene, *character.Character) {
-	player := character.NewCharacter("player-1", "Test Hero")
+func newChallengeTestSetup() (*ChallengeManager, *scene.Scene, *core.Character) {
+	player := core.NewCharacter("player-1", "Test Hero")
 	player.Skills = map[string]dice.Ladder{
 		"Athletics": dice.Good,
 		"Stealth":   dice.Fair,

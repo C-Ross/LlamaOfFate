@@ -19,6 +19,7 @@ go.work
 
 # Build output
 bin/
+dist/
 
 # Action binaries and executables
 /action-parser
@@ -44,7 +45,8 @@ logs/
 
 # Web UI
 web/node_modules/
-web/dist/
+web/dist/*
+!web/dist/.keep
 
 # Playwright MCP session artifacts
 .playwright-mcp/

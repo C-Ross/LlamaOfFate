@@ -1,9 +1,9 @@
 ---
 description: Detects significant repository changes on push to main and directly creates a PR to update the README.
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
+# on:
+#   push:
+#     branches: [main]
+#   workflow_dispatch:
 permissions:
   contents: read
   issues: read

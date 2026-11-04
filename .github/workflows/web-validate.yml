@@ -1,0 +1,38 @@
+name: Web Validate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'justfile'
+      - '.github/workflows/web-validate.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'justfile'
+      - '.github/workflows/web-validate.yml'
+
+jobs:
+  web-validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install just
+        uses: extractions/setup-just@v2
+
+      - name: Install dependencies
+        run: just web-install
+
+      - name: Validate
+        run: just web-validate

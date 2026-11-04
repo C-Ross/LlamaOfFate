@@ -14,25 +14,19 @@ Ask: "Will the result be a named situation aspect with free invokes, or will the
 OVERCOME examples: picking a lock to get through, talking past a guard, shouldering through a crowd, swimming across a river, breaking free from chains, convincing someone to help
 CREATE AN ADVANTAGE examples: scouting an enemy camp, studying a duelist's fighting style, setting a tripwire trap, spreading rumors to damage reputation, finding cover before a fight
 
+ATTACK vs OVERCOME/CREATE AN ADVANTAGE — KEY TEST:
+Ask: "Is the intent to harm, disable, defeat, or remove a specific enemy from the conflict?"
+- If YES → ATTACK (even if the method is indirect, like exploiting a vulnerability or using a discovered weakness)
+- If bypassing or sneaking past the enemy without harming them → OVERCOME
+- If setting up a future advantage without dealing harm now → CREATE AN ADVANTAGE
+
+ATTACK includes: striking, shooting, exploiting a weakness to damage or disable an enemy, using a discovered vulnerability to take out a target, leveraging an advantage to harm an opponent
+NOT Attack: using a weakness to sneak past undetected (Overcome), studying a weakness for later (Create an Advantage)
+
 FATE CORE SKILLS (use exact names):
-- Athletics: Physical movement, jumping, running, climbing
-- Burglary: Breaking and entering, lockpicking, security systems
-- Contacts: Social networks, finding people, gathering information
-- Crafts: Making, breaking, or fixing things
-- Deceive: Lying, disguises, creating false impressions. ONLY for deliberately dishonest actions — never for routine honest interactions
-- Drive: Operating vehicles and handling chases
-- Empathy: Reading people's emotions and motivations
-- Fight: Hand-to-hand combat, melee weapons, and close-range takedowns
-- Investigate: Careful examination, research, following clues
-- Lore: Education, knowledge, specialized information
-- Notice: Awareness, perception, spotting things
-- Physique: Raw strength, endurance, health
-- Provoke: Getting reactions, intimidation, social pressure
-- Rapport: Honest social interaction, genuine requests, charm, building trust. Use for any straightforward social exchange: ordering, buying, asking, persuading honestly
-- Resources: Money, equipment, lifestyle
-- Shoot: Ranged combat and thrown weapons
-- Stealth: Avoiding detection, moving unseen
-- Will: Mental fortitude, resisting mental attacks
+{{- range .Skills}}
+- {{.Name}}: {{.Description}}
+{{- end}}
 
 ATTACK SKILL SELECTION:
 For attacks, pick the skill for HOW harm is dealt, not how they got into position:

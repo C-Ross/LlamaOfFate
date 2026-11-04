@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,7 +23,7 @@ import (
 //	[3] player defense dice (against NPC counter-attack)
 //
 // Provide at least 4 planned rolls. Extra 0s are safe padding.
-func setupAttackSM(t *testing.T, fatePoints int) (*SceneManager, *character.Character) {
+func setupAttackSM(t *testing.T, fatePoints int) (*SceneManager, *core.Character) {
 	t.Helper()
 	sm, _, npc := setupTestSM(t, smTestOpts{
 		llmResponses: []string{`{"action":"attack","skill":"Fight","target":"player-1","description":"counter-attack","reasoning":"test"}`},
@@ -95,8 +95,8 @@ func TestResolveAction_Attack_Success_DealsDamage(t *testing.T) {
 
 // Fate Core SRD (Attack, SWS): "You deal a hit just like a success, but you
 // also have the option to reduce ... shifts by one and create a boost."
-// Full pipeline test — verifies extra shifts are dealt.
-func TestResolveAction_Attack_SWS_DealsExtraDamage(t *testing.T) {
+// Default behavior: full shifts are dealt (optional boost is not taken).
+func TestResolveAction_Attack_SWS_DealsFullShifts(t *testing.T) {
 	sm, npc := setupAttackSM(t, 0)
 
 	// [0] Attack dice 2 → Good(+3)+2 = +5.

@@ -6,7 +6,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
@@ -27,12 +27,12 @@ type DontResolveTestCase struct {
 	ChallengeDesc       string
 	ChallengeTasks      []scene.ChallengeTask
 	ConversationContext string
-	OtherCharacters     []*character.Character
+	OtherCharacters     []*core.Character
 	Description         string
 }
 
 func getDontResolveTestCases() []DontResolveTestCase {
-	drPatel := character.NewCharacter("dr-patel", "Dr. Patel")
+	drPatel := core.NewCharacter("dr-patel", "Dr. Patel")
 	drPatel.Aspects.HighConcept = "Brilliant Research Lead Under Pressure"
 
 	return []DontResolveTestCase{
@@ -50,7 +50,7 @@ func getDontResolveTestCases() []DontResolveTestCase {
 				{ID: "task-3", Description: "Maintain focus through the rising heat and pressure", Skill: "Will", Difficulty: int(dice.Fair), Status: scene.TaskPending},
 			},
 			ConversationContext: "GM: The reactor control room is chaos. Warning indicators flash across every panel as the temperature gauge climbs steadily into the red zone.",
-			OtherCharacters:     []*character.Character{drPatel},
+			OtherCharacters:     []*core.Character{drPatel},
 			Description:         "NPC response should describe the situation but NOT narrate any task being completed — the player still needs to roll for each task",
 		},
 		{
@@ -107,7 +107,7 @@ func evaluateDontResolve(ctx context.Context, client llm.LLMClient, tc DontResol
 	}
 
 	// Create player character
-	player := character.NewCharacter("player1", "John MacDougal")
+	player := core.NewCharacter("player1", "John MacDougal")
 	player.Aspects.HighConcept = "Resourceful Station Engineer"
 	player.Aspects.Trouble = "First Day on Europa"
 

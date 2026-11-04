@@ -8,7 +8,7 @@ graph TB
     CLI[cmd/cli] --> Engine[internal/engine]
     CLI --> TerminalUI[internal/ui/terminal]
     CLI --> LLM[internal/llm]
-    CLI --> Azure[internal/llm/azure]
+    CLI --> OpenAI[internal/llm/openai]
     CLI --> Logging[internal/logging]
     CLI --> Session[internal/session]
     CLI --> Scene[internal/core/scene]
@@ -16,7 +16,7 @@ graph TB
     Server[cmd/server] --> Engine
     Server --> WebUI[internal/ui/web]
     Server --> LLM
-    Server --> Azure
+    Server --> OpenAI
     Server --> Logging
     Server --> Session
     Server --> Scene
@@ -34,22 +34,20 @@ graph TB
     Engine --> Session
     Engine --> Core[internal/core]
     Engine --> Dice[internal/core/dice]
-    Engine --> Character[internal/core/character]
     Engine --> Action[internal/core/action]
     Engine --> Scene
 
     %% Prompt Dependencies
     Prompt --> Scene
-    Prompt --> Character
+    Prompt --> Core
     Prompt --> Action
     Prompt --> Dice
 
     %% LLM Implementations
-    Azure --> LLM
+    OpenAI --> LLM
 
     %% Core Package Internal Dependencies
     Core --> Dice
-    Core --> Character
     Core --> Action
     Core --> Scene
 
@@ -64,9 +62,9 @@ graph TB
     classDef frontend fill:#fce4ec
 
     class CLI,TerminalUI,Server,WebUI entryPoint
-    class Engine,Core,Dice,Character,Action,Scene core
+    class Engine,Core,Dice,Action,Scene core
     class Prompt infrastructure
-    class LLM,Azure infrastructure
+    class LLM,OpenAI infrastructure
     class Session,Logging external
     class WebFrontend frontend
 ```

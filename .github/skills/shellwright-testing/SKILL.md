@@ -66,7 +66,7 @@ go build -o ./bin/scenario-walkthrough ./examples/scenario-walkthrough
 go build -o ./bin/scene-generator ./examples/scene-generator
 ```
 
-All programs require `configs/azure-llm.yaml` for LLM access.
+All programs require an LLM config file (e.g., `configs/azure-llm.yaml` or `configs/ollama-llm.yaml`) for LLM access.
 
 ## Program Inventory
 

@@ -11,7 +11,7 @@ import (
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
-	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+	"github.com/C-Ross/LlamaOfFate/internal/llm/openai"
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/C-Ross/LlamaOfFate/internal/storage"
@@ -25,27 +25,22 @@ const (
 )
 
 // initializeEngine creates a game engine with LLM support
-func initializeEngine(sessionLogger session.SessionLogger) *engine.Engine {
-	configPath := "configs/azure-llm.yaml"
-	if _, err := os.Stat(configPath); err != nil {
-		log.Fatalf("LLM config not found at %s", configPath)
-	}
-
-	config, err := azure.LoadConfig(configPath)
-	if err != nil {
-		log.Fatalf("Found LLM config but failed to load it: %v", err)
-	}
-
-	azureClient := azure.NewClient(*config)
-	retryClient := llm.NewRetryingClient(azureClient, llm.DefaultRetryConfig())
-
-	gameEngine, err := engine.NewWithLLM(retryClient, sessionLogger)
+func initializeEngine(llmClient llm.LLMClient, sessionLogger session.SessionLogger) *engine.Engine {
+	gameEngine, err := engine.NewWithLLM(llmClient, sessionLogger)
 	if err != nil {
 		log.Fatalf("Failed to create engine with LLM: %v", err)
 	}
-
-	slog.Info("LLM integration enabled", slog.String("model", config.ModelName))
 	return gameEngine
+}
+
+func initLLMClient(configPath string) (llm.LLMClient, string, error) {
+	config, err := openai.LoadConfig(configPath)
+	if err != nil {
+		return nil, "", err
+	}
+	llmClient := openai.NewClient(*config)
+	retryClient := llm.NewRetryingClient(llmClient, llm.DefaultRetryConfig())
+	return retryClient, config.ModelName, nil
 }
 
 func main() {
@@ -70,12 +65,31 @@ func main() {
 	fmt.Printf("%s v%s - A Fate Core RPG with LLM integration\n", AppName, AppVersion)
 	fmt.Println("====================================================")
 
+	configPath := "configs/azure-llm.yaml"
+	if c := os.Getenv("LLM_CONFIG"); c != "" {
+		configPath = c
+	}
+
+	// Fail fast on LLM configuration before character creation prompts.
+	llmClient, modelName, err := initLLMClient(configPath)
+	if err != nil {
+		log.Fatalf("LLM init failed: %v", err)
+	}
+	slog.Info("LLM integration enabled", slog.String("model", modelName))
+
 	// Use hardcoded scenario and player (see scenario.go)
 	scenario := defaultScenario()
-	player := defaultPlayer()
+	preset := defaultPlayer()
 
 	fmt.Printf("Scenario: %s (%s)\n", scenario.Title, scenario.Genre)
-	fmt.Printf("Player:   %s — \"%s\"\n", player.Name, player.Aspects.HighConcept)
+	fmt.Println()
+
+	// Character creation — prompt for customisation using preset as defaults
+	terminalUI := terminal.NewTerminalUI()
+	setup := terminalUI.PromptForCharacterSetup(preset)
+	player := applySetup(preset, setup)
+
+	fmt.Printf("\nPlaying as: %s — \"%s\"\n", player.Name, player.Aspects.HighConcept)
 	fmt.Println()
 
 	// Set up session logging
@@ -96,16 +110,15 @@ func main() {
 			"name":         player.Name,
 			"high_concept": player.Aspects.HighConcept,
 			"trouble":      player.Aspects.Trouble,
+			"aspects":      player.Aspects.OtherAspects,
 		})
 	} else {
 		sl = session.NullLogger{}
 	}
 
-	gameEngine := initializeEngine(sl)
+	gameEngine := initializeEngine(llmClient, sl)
 
 	// Wire everything into the GameManager and run
-	terminalUI := terminal.NewTerminalUI()
-
 	gm := engine.NewGameManager(gameEngine, sl)
 	gm.SetPlayer(player)
 	gm.SetScenario(scenario)
@@ -169,7 +182,8 @@ func showHelp() {
 
 func showVersion() {
 	fmt.Printf("%s v%s\n", AppName, AppVersion)
-	fmt.Println("by C. Ross Eskridge (https://github.com/C-Ross)")
+	fmt.Println("by C. Ross (https://github.com/C-Ross)")
+	fmt.Println("GitHub: https://github.com/C-Ross/LlamaOfFate")
 	fmt.Println("A Fate Core RPG with LLM integration")
 	fmt.Println()
 	fmt.Println("This work is based on Fate Core System,")

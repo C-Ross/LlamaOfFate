@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
@@ -33,7 +33,7 @@ func TestHandleInput_SceneTransitionSuppressedDuringChallenge(t *testing.T) {
 	sm.conflict.exitOnSceneTransition = true
 
 	testScene := scene.NewScene("mine", "Collapsing Mine", "A mine with crumbling walls")
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	player.SetSkill("Athletics", dice.Good)
 	player.SetSkill("Notice", dice.Fair)
 	engine.AddCharacter(player)
@@ -86,7 +86,7 @@ func TestHandleInput_SceneTransitionAllowedWithoutChallenge(t *testing.T) {
 	sm.conflict.exitOnSceneTransition = true
 
 	testScene := scene.NewScene("tavern", "Tavern", "A dimly lit tavern")
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	engine.AddCharacter(player)
 	testScene.AddCharacter(player.ID)
 
@@ -130,7 +130,7 @@ func TestHandleInput_ChallengeCreateAdvantageOverriddenToOvercome(t *testing.T) 
 	sm.actions.roller = dice.NewSeededRoller(42)
 
 	testScene := scene.NewScene("mine", "Collapsing Mine", "A mine with crumbling walls")
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	player.SetSkill("Notice", dice.Fair) // +2
 	engine.AddCharacter(player)
 	testScene.AddCharacter(player.ID)
@@ -181,7 +181,7 @@ func TestHandleInput_ChallengeOvercomeNotOverridden(t *testing.T) {
 	sm.actions.roller = dice.NewSeededRoller(42)
 
 	testScene := scene.NewScene("mine", "Collapsing Mine", "A mine with crumbling walls")
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	player.SetSkill("Athletics", dice.Good) // +3
 	engine.AddCharacter(player)
 	testScene.AddCharacter(player.ID)
@@ -236,7 +236,7 @@ func TestHandleInput_ChallengeDifficultyOverridesLLM(t *testing.T) {
 	sm.actions.roller = dice.NewSeededRoller(42)
 
 	testScene := scene.NewScene("tower", "The Wizard's Tower", "A dark tower full of magical traps")
-	player := character.NewCharacter("player-1", "Lyra")
+	player := core.NewCharacter("player-1", "Lyra")
 	player.SetSkill("Stealth", dice.Fair) // +2
 	engine.AddCharacter(player)
 	testScene.AddCharacter(player.ID)
@@ -289,7 +289,7 @@ func TestHandleInput_ChallengeDifficultyMatchesLLM(t *testing.T) {
 	sm.actions.roller = dice.NewSeededRoller(42)
 
 	testScene := scene.NewScene("mine", "Collapsing Mine", "A mine with crumbling walls")
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	player.SetSkill("Athletics", dice.Good) // +3
 	engine.AddCharacter(player)
 	testScene.AddCharacter(player.ID)

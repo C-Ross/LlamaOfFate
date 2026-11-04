@@ -12,7 +12,7 @@ import (
 	gameconfig "github.com/C-Ross/LlamaOfFate/internal/config"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
-	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+	"github.com/C-Ross/LlamaOfFate/internal/llm/openai"
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
@@ -70,21 +70,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Load Azure config
+	// Load LLM config
 	configPath := "configs/azure-llm.yaml"
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		fmt.Printf("Azure LLM config not found at %s\n", configPath)
+		fmt.Printf("LLM config not found at %s\n", configPath)
 		fmt.Println("Please copy configs/azure-llm.yaml.example to configs/azure-llm.yaml")
-		fmt.Println("and configure your Azure OpenAI credentials.")
+		fmt.Println("and configure your LLM credentials.")
 		os.Exit(1)
 	}
 
-	config, err := azure.LoadConfig(configPath)
+	config, err := openai.LoadConfig(configPath)
 	if err != nil {
-		log.Fatalf("Failed to load Azure config: %v", err)
+		log.Fatalf("Failed to load LLM config: %v", err)
 	}
 
-	azureClient := azure.NewClient(*config)
+	llmClient := openai.NewClient(*config)
 
 	// Set up session logging
 	var sessionLogger *session.Logger
@@ -132,7 +132,7 @@ func main() {
 		fmt.Println("=== Using Predefined Scenario ===")
 	} else {
 		fmt.Println("=== Generating Scenario ===")
-		scenario, err = generateScenario(ctx, azureClient, *nameFlag, *conceptFlag, *troubleFlag, *genreFlag, *debugFlag, *rawFlag, sessionLogger)
+		scenario, err = generateScenario(ctx, llmClient, *nameFlag, *conceptFlag, *troubleFlag, *genreFlag, *debugFlag, *rawFlag, sessionLogger)
 		if err != nil {
 			log.Fatalf("Failed to generate scenario: %v", err)
 		}
@@ -154,7 +154,7 @@ func main() {
 		sceneCount++
 
 		fmt.Printf("\n=== Generating Scene %d ===\n", sceneCount)
-		generated, err := generateScene(ctx, azureClient, transitionHint, scenario, *nameFlag, *conceptFlag, *troubleFlag, sceneSummaries, *debugFlag, *rawFlag, sessionLogger)
+		generated, err := generateScene(ctx, llmClient, transitionHint, scenario, *nameFlag, *conceptFlag, *troubleFlag, sceneSummaries, *debugFlag, *rawFlag, sessionLogger)
 		if err != nil {
 			log.Fatalf("Failed to generate scene %d: %v", sceneCount, err)
 		}
@@ -191,7 +191,7 @@ func main() {
 		transitionHint = extractTransitionHint(narration)
 
 		fmt.Printf("\n--- Generating Scene %d Summary ---\n", sceneCount)
-		summary, err := generateSummaryFromNarration(ctx, azureClient, generated, narration, transitionHint, *debugFlag, *rawFlag, sessionLogger)
+		summary, err := generateSummaryFromNarration(ctx, llmClient, generated, narration, transitionHint, *debugFlag, *rawFlag, sessionLogger)
 		if err != nil {
 			fmt.Printf("Warning: Failed to generate summary: %v\n", err)
 			fmt.Println("Continuing without summary...")
@@ -210,7 +210,7 @@ func main() {
 		// Check scenario resolution
 		if len(scenario.StoryQuestions) > 0 && len(sceneSummaries) > 0 {
 			fmt.Printf("\n--- Resolution Check ---\n")
-			resolution, err := checkResolution(ctx, azureClient, scenario, sceneSummaries, *nameFlag, *conceptFlag, *troubleFlag, *debugFlag, *rawFlag, sessionLogger)
+			resolution, err := checkResolution(ctx, llmClient, scenario, sceneSummaries, *nameFlag, *conceptFlag, *troubleFlag, *debugFlag, *rawFlag, sessionLogger)
 			if err != nil {
 				fmt.Printf("Warning: Failed to check resolution: %v\n", err)
 			} else {

@@ -1,30 +1,35 @@
 // Package config loads scenario and character definitions from YAML files.
 //
 // YAML files live under configs/scenarios/ and configs/characters/. The loader
-// converts them into the core domain types (scene.Scenario, character.Character,
+// converts them into the core domain types (scene.Scenario, core.Character,
 // etc.) used by the rest of the codebase.
 //
-// Character YAML files unmarshal directly into character.Character (which carries
+// Character YAML files unmarshal directly into core.Character (which carries
 // yaml struct tags). The loader then calls InitDefaults() to set up runtime
 // fields (stress tracks, timestamps, etc.) that are not stored on disk.
 package config
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
+	"maps"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
+	configassets "github.com/C-Ross/LlamaOfFate/configs"
 	"gopkg.in/yaml.v3"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 )
 
 // ---------- YAML data shapes -------------------------------------------------
 //
-// Character YAML unmarshals directly into character.Character — no wrapper needed.
+// Character YAML unmarshals directly into core.Character — no wrapper needed.
 // The types below cover scenario-level structures that have no direct domain equivalent.
 
 // ScenarioFile is the on-disk YAML shape for a scenario.
@@ -64,25 +69,44 @@ type LoadedScenario struct {
 
 	// Converted domain objects.
 	Scenario *scene.Scenario
-	Player   *character.Character // nil when DefaultPlayer is empty
-	NPCs     []*character.Character
+	Player   *core.Character // nil when DefaultPlayer is empty
+	NPCs     []*core.Character
 	Scene    *scene.Scene // nil when InitialScene is absent
 	Farewell string       // scenario-level farewell message
 }
 
+const (
+	charactersDirName = "characters"
+	scenariosDirName  = "scenarios"
+)
+
 // ---------- Public loader functions -------------------------------------------
 
 // LoadCharacter reads a single character YAML file and returns a Character.
-// The YAML is unmarshaled directly into character.Character, then InitDefaults
+// The YAML is unmarshaled directly into core.Character, then InitDefaults
 // is called to set up stress tracks and other runtime fields.
-func LoadCharacter(path string) (*character.Character, error) {
-	data, err := os.ReadFile(path)
+func LoadCharacter(path string) (*core.Character, error) {
+	dir := filepath.Dir(path)
+	name := filepath.Base(path)
+	c, err := loadCharacterFromFS(os.DirFS(dir), name)
+	if err != nil {
+		return nil, fmt.Errorf("load character file %s: %w", path, err)
+	}
+	return c, nil
+}
+
+func loadCharacterFromFS(fsys fs.FS, path string) (*core.Character, error) {
+	data, err := fs.ReadFile(fsys, path)
 	if err != nil {
 		return nil, fmt.Errorf("read character file %s: %w", path, err)
 	}
-	var c character.Character
+	return parseCharacterData(data, path)
+}
+
+func parseCharacterData(data []byte, source string) (*core.Character, error) {
+	var c core.Character
 	if err := yaml.Unmarshal(data, &c); err != nil {
-		return nil, fmt.Errorf("parse character file %s: %w", path, err)
+		return nil, fmt.Errorf("parse character file %s: %w", source, err)
 	}
 	c.InitDefaults()
 	return &c, nil
@@ -90,34 +114,37 @@ func LoadCharacter(path string) (*character.Character, error) {
 
 // LoadCharacters reads all .yaml files in a directory and returns a map keyed
 // by character ID.
-func LoadCharacters(dir string) (map[string]*character.Character, error) {
-	entries, err := os.ReadDir(dir)
+func LoadCharacters(dir string) (map[string]*core.Character, error) {
+	chars, err := loadCharactersFromFS(os.DirFS(dir), ".")
 	if err != nil {
 		return nil, fmt.Errorf("read characters directory %s: %w", dir, err)
-	}
-	chars := make(map[string]*character.Character)
-	for _, e := range entries {
-		if e.IsDir() || !isYAML(e.Name()) {
-			continue
-		}
-		c, err := LoadCharacter(filepath.Join(dir, e.Name()))
-		if err != nil {
-			return nil, err
-		}
-		chars[c.ID] = c
 	}
 	return chars, nil
 }
 
 // LoadScenarioFile reads a single scenario YAML.
 func LoadScenarioFile(path string) (*ScenarioFile, error) {
-	data, err := os.ReadFile(path)
+	dir := filepath.Dir(path)
+	name := filepath.Base(path)
+	sf, err := loadScenarioFileFromFS(os.DirFS(dir), name)
+	if err != nil {
+		return nil, fmt.Errorf("load scenario file %s: %w", path, err)
+	}
+	return sf, nil
+}
+
+func loadScenarioFileFromFS(fsys fs.FS, path string) (*ScenarioFile, error) {
+	data, err := fs.ReadFile(fsys, path)
 	if err != nil {
 		return nil, fmt.Errorf("read scenario file %s: %w", path, err)
 	}
+	return parseScenarioData(data, path)
+}
+
+func parseScenarioData(data []byte, source string) (*ScenarioFile, error) {
 	var sf ScenarioFile
 	if err := yaml.Unmarshal(data, &sf); err != nil {
-		return nil, fmt.Errorf("parse scenario file %s: %w", path, err)
+		return nil, fmt.Errorf("parse scenario file %s: %w", source, err)
 	}
 	return &sf, nil
 }
@@ -125,7 +152,7 @@ func LoadScenarioFile(path string) (*ScenarioFile, error) {
 // LoadScenario reads a scenario YAML and resolves its DefaultPlayer from the
 // provided character map. Pass nil for characters if you don't need player
 // resolution.
-func LoadScenario(path string, characters map[string]*character.Character) (*LoadedScenario, error) {
+func LoadScenario(path string, characters map[string]*core.Character) (*LoadedScenario, error) {
 	sf, err := LoadScenarioFile(path)
 	if err != nil {
 		return nil, err
@@ -135,37 +162,45 @@ func LoadScenario(path string, characters map[string]*character.Character) (*Loa
 
 // LoadAll loads every scenario and character from the given config root
 // (e.g. "configs"). It expects subdirectories "scenarios/" and "characters/".
+// Embedded presets are always loaded first, and filesystem entries with the
+// same IDs override embedded defaults.
 func LoadAll(configRoot string) (map[string]*LoadedScenario, error) {
-	charDir := filepath.Join(configRoot, "characters")
-	scenDir := filepath.Join(configRoot, "scenarios")
-
-	characters, err := LoadCharacters(charDir)
+	characters, err := loadCharactersFromFS(configassets.Presets, charactersDirName)
 	if err != nil {
+		return nil, fmt.Errorf("load embedded preset characters (required): %w", err)
+	}
+
+	charDir := filepath.Join(configRoot, charactersDirName)
+	scenDir := filepath.Join(configRoot, scenariosDirName)
+
+	fileCharacters, err := LoadCharacters(charDir)
+	if err != nil && !isNotExist(err) {
 		return nil, fmt.Errorf("load characters: %w", err)
 	}
+	// Filesystem characters override embedded presets by character ID.
+	maps.Copy(characters, fileCharacters)
 
-	entries, err := os.ReadDir(scenDir)
+	scenarios, err := loadScenariosFromFS(configassets.Presets, scenariosDirName, characters)
 	if err != nil {
-		return nil, fmt.Errorf("read scenarios directory %s: %w", scenDir, err)
+		return nil, fmt.Errorf("load embedded preset scenarios (required): %w", err)
 	}
 
-	scenarios := make(map[string]*LoadedScenario)
-	for _, e := range entries {
-		if e.IsDir() || !isYAML(e.Name()) {
-			continue
+	fileScenarios, err := loadScenariosFromFS(os.DirFS(scenDir), ".", characters)
+	if err != nil {
+		if !isNotExist(err) {
+			return nil, fmt.Errorf("read scenarios directory %s: %w", scenDir, err)
 		}
-		ls, err := LoadScenario(filepath.Join(scenDir, e.Name()), characters)
-		if err != nil {
-			return nil, err
-		}
-		scenarios[ls.Raw.ID] = ls
+		return scenarios, nil
 	}
+
+	// Filesystem scenarios override embedded presets by scenario ID.
+	maps.Copy(scenarios, fileScenarios)
 	return scenarios, nil
 }
 
 // ---------- Internal helpers --------------------------------------------------
 
-func resolveScenario(sf *ScenarioFile, characters map[string]*character.Character) (*LoadedScenario, error) {
+func resolveScenario(sf *ScenarioFile, characters map[string]*core.Character) (*LoadedScenario, error) {
 	ls := &LoadedScenario{Raw: *sf}
 
 	// Build core Scenario
@@ -208,32 +243,32 @@ func resolveScenario(sf *ScenarioFile, characters map[string]*character.Characte
 	return ls, nil
 }
 
-func buildNPC(nd NPCDef) (*character.Character, error) {
-	var npc *character.Character
+func buildNPC(nd NPCDef) (*core.Character, error) {
+	var npc *core.Character
 
 	switch nd.Type {
 	case "supporting":
-		npc = character.NewSupportingNPC(nd.ID, nd.Name, nd.HighConcept)
+		npc = core.NewSupportingNPC(nd.ID, nd.Name, nd.HighConcept)
 	case "nameless_good":
 		if nd.PrimarySkill == "" {
 			return nil, fmt.Errorf("nameless NPC requires primary_skill")
 		}
-		npc = character.NewNamelessNPC(nd.ID, nd.Name, character.CharacterTypeNamelessGood, nd.PrimarySkill)
+		npc = core.NewNamelessNPC(nd.ID, nd.Name, core.CharacterTypeNamelessGood, nd.PrimarySkill)
 		npc.Aspects.HighConcept = nd.HighConcept
 	case "nameless_fair":
 		if nd.PrimarySkill == "" {
 			return nil, fmt.Errorf("nameless NPC requires primary_skill")
 		}
-		npc = character.NewNamelessNPC(nd.ID, nd.Name, character.CharacterTypeNamelessFair, nd.PrimarySkill)
+		npc = core.NewNamelessNPC(nd.ID, nd.Name, core.CharacterTypeNamelessFair, nd.PrimarySkill)
 		npc.Aspects.HighConcept = nd.HighConcept
 	case "nameless_average":
 		if nd.PrimarySkill == "" {
 			return nil, fmt.Errorf("nameless NPC requires primary_skill")
 		}
-		npc = character.NewNamelessNPC(nd.ID, nd.Name, character.CharacterTypeNamelessAverage, nd.PrimarySkill)
+		npc = core.NewNamelessNPC(nd.ID, nd.Name, core.CharacterTypeNamelessAverage, nd.PrimarySkill)
 		npc.Aspects.HighConcept = nd.HighConcept
 	case "main":
-		npc = character.NewMainNPC(nd.ID, nd.Name)
+		npc = core.NewMainNPC(nd.ID, nd.Name)
 		npc.Aspects.HighConcept = nd.HighConcept
 	default:
 		return nil, fmt.Errorf("unknown NPC type %q", nd.Type)
@@ -255,4 +290,67 @@ func buildNPC(nd NPCDef) (*character.Character, error) {
 func isYAML(name string) bool {
 	ext := strings.ToLower(filepath.Ext(name))
 	return ext == ".yaml" || ext == ".yml"
+}
+
+func loadCharactersFromFS(fsys fs.FS, dir string) (map[string]*core.Character, error) {
+	chars := make(map[string]*core.Character)
+	err := forEachYAMLFile(fsys, dir, func(filePath string) error {
+		c, err := loadCharacterFromFS(fsys, filePath)
+		if err != nil {
+			return err
+		}
+		chars[c.ID] = c
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return chars, nil
+}
+
+func loadScenariosFromFS(fsys fs.FS, dir string, characters map[string]*core.Character) (map[string]*LoadedScenario, error) {
+	scenarios := make(map[string]*LoadedScenario)
+	err := forEachYAMLFile(fsys, dir, func(filePath string) error {
+		sf, err := loadScenarioFileFromFS(fsys, filePath)
+		if err != nil {
+			return err
+		}
+
+		ls, err := resolveScenario(sf, characters)
+		if err != nil {
+			return err
+		}
+		scenarios[ls.Raw.ID] = ls
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return scenarios, nil
+}
+
+func forEachYAMLFile(fsys fs.FS, dir string, fn func(filePath string) error) error {
+	entries, err := fs.ReadDir(fsys, dir)
+	if err != nil {
+		return err
+	}
+
+	for _, e := range entries {
+		if e.IsDir() || !isYAML(e.Name()) {
+			continue
+		}
+		if err := fn(path.Join(dir, e.Name())); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func isNotExist(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errors.Is(err, fs.ErrNotExist)
 }

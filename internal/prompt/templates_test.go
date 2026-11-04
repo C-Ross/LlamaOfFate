@@ -2,10 +2,12 @@ package prompt
 
 import (
 	"bytes"
+	"regexp"
+	"sort"
 	"testing"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/stretchr/testify/assert"
@@ -364,7 +366,7 @@ func TestRenderConflictResponse(t *testing.T) {
 		PlayerInput:          "I attack the goblin",
 		CurrentCharacterName: "Hero",
 		ParticipantMap:       map[string]*scene.ConflictParticipant{},
-		CharacterMap:         map[string]*character.Character{},
+		CharacterMap:         map[string]*core.Character{},
 	}
 
 	result, err := RenderConflictResponse(data)
@@ -503,7 +505,7 @@ func TestRenderNPCAttack(t *testing.T) {
 }
 
 func TestRenderActionParse(t *testing.T) {
-	char := character.NewCharacter("player-1", "Aria Swift")
+	char := core.NewCharacter("player-1", "Aria Swift")
 	char.Skills["Athletics"] = dice.Great
 	char.Skills["Fight"] = dice.Good
 	data := ActionParseTemplateData{
@@ -544,7 +546,7 @@ func TestRenderActionParseSystem(t *testing.T) {
 }
 
 func TestRenderAspectGeneration(t *testing.T) {
-	char := character.NewCharacter("player-1", "Rex Bold")
+	char := core.NewCharacter("player-1", "Rex Bold")
 	act := action.NewAction("act-1", "player-1", action.CreateAdvantage, "Notice", "Search the crime scene")
 	act.Outcome = &dice.Outcome{Type: dice.Success, Shifts: 1}
 	outcome := &dice.Outcome{Type: dice.Success, Shifts: 1}
@@ -649,4 +651,36 @@ func TestRenderScenarioResolution(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, result, "The Conspiracy")
 	assert.Contains(t, result, "A secret society controls the city government")
+}
+
+// TestActionParseSystemPrompt_SkillsMatchCanonicalList verifies that the skill
+// names in the rendered prompt exactly match the canonical FateCoreSkills list.
+// Since skills are now data-driven via FateCoreSkillDescriptions, this test
+// confirms the rendering pipeline produces the expected skill lines.
+func TestActionParseSystemPrompt_SkillsMatchCanonicalList(t *testing.T) {
+	result, err := RenderActionParseSystem(ActionParseSystemData{HasOtherCharacters: true})
+	require.NoError(t, err)
+
+	// The template lists skills as "- SkillName: description"
+	re := regexp.MustCompile(`(?m)^- ([A-Z][a-z]+): `)
+	matches := re.FindAllStringSubmatch(result, -1)
+	require.NotEmpty(t, matches, "no skills found in rendered prompt — regex may need updating")
+
+	var templateSkills []string
+	for _, m := range matches {
+		templateSkills = append(templateSkills, m[1])
+	}
+	sort.Strings(templateSkills)
+
+	assert.Equal(t, core.FateCoreSkills, templateSkills,
+		"skills in rendered action_parse_system_prompt must match core.FateCoreSkills")
+
+	// Verify FateCoreSkillDescriptions covers exactly the canonical list.
+	var descNames []string
+	for _, sd := range FateCoreSkillDescriptions {
+		descNames = append(descNames, sd.Name)
+	}
+	sort.Strings(descNames)
+	assert.Equal(t, core.FateCoreSkills, descNames,
+		"FateCoreSkillDescriptions must cover exactly core.FateCoreSkills")
 }

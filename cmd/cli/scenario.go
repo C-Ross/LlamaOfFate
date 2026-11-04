@@ -6,8 +6,9 @@ import (
 	"log"
 
 	"github.com/C-Ross/LlamaOfFate/internal/config"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
+	"github.com/C-Ross/LlamaOfFate/internal/ui/terminal"
 )
 
 const defaultScenarioID = "saloon"
@@ -29,6 +30,24 @@ func defaultScenario() *scene.Scenario {
 }
 
 // defaultPlayer returns the default player character for the saloon scenario.
-func defaultPlayer() *character.Character {
+func defaultPlayer() *core.Character {
 	return loadedScenarios[defaultScenarioID].Player
+}
+
+// applySetup applies the CharacterSetup choices to a copy of the preset player.
+func applySetup(preset *core.Character, setup terminal.CharacterSetup) *core.Character {
+	player := core.NewCharacter(preset.ID, setup.Name)
+	player.Aspects.HighConcept = setup.HighConcept
+	player.Aspects.Trouble = setup.Trouble
+	for _, a := range setup.Aspects {
+		player.Aspects.AddAspect(a)
+	}
+	player.FatePoints = preset.FatePoints
+	player.Refresh = preset.Refresh
+
+	// Apply skills (triggers stress track recalculation via SetSkill)
+	for name, level := range setup.Skills {
+		player.SetSkill(name, level)
+	}
+	return player
 }

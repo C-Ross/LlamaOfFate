@@ -81,17 +81,22 @@ func (cs *ChallengeState) IsComplete() bool {
 }
 
 // OverallOutcome returns an overall result based on the tally:
-//   - ChallengeSuccess if more than half the tasks succeeded
-//   - ChallengeFailure if more than half the tasks failed
+//   - ChallengeSuccess if more than half the decisive tasks succeeded
+//   - ChallengeFailure if more than half the decisive tasks failed
 //   - ChallengePartial otherwise (mixed results)
+//
+// Ties are excluded from the majority threshold because in Fate Core a tie
+// means "you achieve your goal but at a minor cost" — it is neither a clear
+// success nor a failure, so it should not inflate the denominator.
 func (cs *ChallengeState) OverallOutcome() ChallengeResult {
-	successes, failures, _ := cs.Tally()
+	successes, failures, ties := cs.Tally()
 	total := len(cs.Tasks)
 	if total == 0 {
 		return ChallengeSuccess
 	}
 
-	half := total / 2
+	decisive := total - ties
+	half := decisive / 2
 	if successes > half {
 		return ChallengeSuccess
 	}

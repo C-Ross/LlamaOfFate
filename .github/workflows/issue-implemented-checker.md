@@ -1,7 +1,7 @@
 ---
 description: Weekly scan of open issues to detect ones that appear to have been implemented, comment with evidence, and auto-close when confidence is very high.
-on:
-  schedule: weekly
+# on:
+#   schedule: weekly
 permissions:
   contents: read
   issues: read

@@ -11,7 +11,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 
 	"github.com/C-Ross/LlamaOfFate/internal/config"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
@@ -139,6 +139,13 @@ var startGameTool = mcp.NewTool("start_game",
 	),
 	mcp.WithString("player_trouble",
 		mcp.Description("Override the default player trouble aspect."),
+	),
+	mcp.WithArray("player_aspects",
+		mcp.Description("Additional character aspects (up to 3). These are added beyond high concept and trouble."),
+		mcp.WithStringItems(),
+	),
+	mcp.WithObject("player_skills",
+		mcp.Description("Custom skill pyramid as {skill_name: level} where level is 1=Average, 2=Fair, 3=Good, 4=Great. Must form a valid pyramid: 1 Great, 2 Good, 3 Fair, 4 Average (10 skills total). When omitted the preset default skills are used."),
 	),
 )
 
@@ -287,6 +294,20 @@ func (gs *GameServer) handleStartGame(ctx context.Context, req mcp.CallToolReque
 	}
 	if trouble := req.GetString("player_trouble", ""); trouble != "" {
 		player.Aspects.Trouble = trouble
+	}
+
+	// Additional aspects (appended to any preset aspects)
+	if extraAspects := req.GetStringSlice("player_aspects", nil); len(extraAspects) > 0 {
+		for _, a := range extraAspects {
+			if a != "" {
+				player.Aspects.AddAspect(a)
+			}
+		}
+	}
+
+	// Custom skill pyramid (replaces preset skills when provided)
+	if err := applySkillOverrides(req, player); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
 	}
 
 	// Close any previous session logger before starting a new one
@@ -465,10 +486,56 @@ func (gs *GameServer) newEngine(sessionLogger session.SessionLogger) (*engine.En
 	return engine.New(sessionLogger)
 }
 
+// applySkillOverrides extracts player_skills from the request and, when present,
+// validates and replaces the player's skills with the custom pyramid.
+func applySkillOverrides(req mcp.CallToolRequest, player *core.Character) error {
+	args := req.GetArguments()
+	raw, ok := args["player_skills"]
+	if !ok || raw == nil {
+		return nil
+	}
+
+	obj, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("player_skills must be an object mapping skill names to numeric levels")
+	}
+
+	if len(obj) == 0 {
+		return nil
+	}
+
+	ladderSkills := make(map[string]dice.Ladder, len(obj))
+	for name, val := range obj {
+		var level float64
+		switch v := val.(type) {
+		case float64:
+			level = v
+		case int:
+			level = float64(v)
+		default:
+			return fmt.Errorf("player_skills[%q]: expected a number, got %T", name, val)
+		}
+		ladderSkills[name] = dice.Ladder(int(level))
+	}
+
+	if err := core.ValidateStandardSkillPyramid(ladderSkills); err != nil {
+		return fmt.Errorf("invalid skill pyramid: %w", err)
+	}
+
+	// Clear existing skills and apply the custom ones.
+	for k := range player.Skills {
+		delete(player.Skills, k)
+	}
+	for name, level := range ladderSkills {
+		player.SetSkill(name, level)
+	}
+	return nil
+}
+
 // createSessionLogger builds a session logger for this game, mirroring the CLI's
 // setupSessionLogger. The log file is written to the sessions/ directory.
 // Caller must hold gs.mu.
-func (gs *GameServer) createSessionLogger(ls *config.LoadedScenario, player *character.Character) (*session.Logger, error) {
+func (gs *GameServer) createSessionLogger(ls *config.LoadedScenario, player *core.Character) (*session.Logger, error) {
 	label := ls.Raw.Genre
 	if label == "" {
 		label = ls.Raw.ID
@@ -489,19 +556,19 @@ func (gs *GameServer) createSessionLogger(ls *config.LoadedScenario, player *cha
 
 // clonePlayer creates a shallow copy of the player character so that
 // modifications (name/aspect overrides) don't mutate the preset.
-func clonePlayer(src *character.Character) *character.Character {
+func clonePlayer(src *core.Character) *core.Character {
 	if src == nil {
-		p := character.NewCharacter("player1", "Player")
+		p := core.NewCharacter("player1", "Player")
 		return p
 	}
 	cp := *src
-	cp.Aspects = character.Aspects{
+	cp.Aspects = core.Aspects{
 		HighConcept:  src.Aspects.HighConcept,
 		Trouble:      src.Aspects.Trouble,
 		OtherAspects: append([]string(nil), src.Aspects.OtherAspects...),
 	}
 	// Deep copy stress tracks
-	cp.StressTracks = make(map[string]*character.StressTrack, len(src.StressTracks))
+	cp.StressTracks = make(map[string]*core.StressTrack, len(src.StressTracks))
 	for k, v := range src.StressTracks {
 		track := *v
 		track.Boxes = append([]bool(nil), v.Boxes...)

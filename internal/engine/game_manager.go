@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 )
@@ -33,7 +33,7 @@ var _ GameSessionManager = (*GameManager)(nil)
 // how to render events and collect input.
 type GameManager struct {
 	engine          *Engine
-	player          *character.Character
+	player          *core.Character
 	sessionLogger   session.SessionLogger
 	scenario        *scene.Scenario     // The scenario to run (can be provided or generated)
 	initialScene    *InitialSceneConfig // Optional pre-configured starting scene (for demos/tests)
@@ -53,7 +53,7 @@ func NewGameManager(engine *Engine, sessionLogger session.SessionLogger) *GameMa
 }
 
 // SetPlayer sets the player character
-func (g *GameManager) SetPlayer(player *character.Character) {
+func (g *GameManager) SetPlayer(player *core.Character) {
 	g.player = player
 }
 
@@ -395,6 +395,6 @@ func (g *GameManager) BuildStateSnapshot() GameStateSnapshotEvent {
 // InitialSceneConfig holds configuration for starting with a pre-built scene
 type InitialSceneConfig struct {
 	Scene          *scene.Scene
-	NPCs           []*character.Character
+	NPCs           []*core.Character
 	ExitAfterScene bool // Exit the game after the initial scene ends instead of generating next scenes
 }

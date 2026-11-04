@@ -190,24 +190,15 @@ func (ag *LLMAspectGenerator) parseResponse(content string, outcome *dice.Outcom
 	}
 
 	// Set defaults based on outcome type
-	switch outcome.Type {
-	case dice.SuccessWithStyle:
-		response.FreeInvokes = 2
-		response.IsBoost = false
-	case dice.Success:
-		response.FreeInvokes = 1
-		response.IsBoost = false
-	case dice.Tie:
-		response.FreeInvokes = 1
-		response.IsBoost = true
-		response.Duration = "scene" // Boosts last until used or end of scene
-	case dice.Failure:
-		response.FreeInvokes = 0
-		response.IsBoost = false
+	if outcome.Type == dice.Failure {
 		response.AspectText = ""
 		response.Description = "No aspect created due to failure"
 		response.Reasoning = "The Create an Advantage attempt failed"
 		return response, nil
+	}
+	response.FreeInvokes, response.IsBoost = action.FreeInvokesForOutcome(outcome.Type)
+	if response.IsBoost {
+		response.Duration = "scene" // Boosts last until used or end of scene
 	}
 
 	// Try to extract aspect text from the response

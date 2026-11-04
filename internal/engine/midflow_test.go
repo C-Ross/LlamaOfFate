@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
@@ -21,8 +21,8 @@ func TestStressOverflowEmitsChoiceEvent(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	attacker := character.NewCharacter("enemy-1", "Orc")
+	player := core.NewCharacter("player-1", "Hero")
+	attacker := core.NewCharacter("enemy-1", "Orc")
 	engine.AddCharacter(player)
 	engine.AddCharacter(attacker)
 
@@ -35,7 +35,7 @@ func TestStressOverflowEmitsChoiceEvent(t *testing.T) {
 	// Call handleStressOverflow directly — player has default consequence slots.
 	ctx := context.Background()
 	attackCtx := prompt.AttackContext{Skill: "Fight", Description: "Slash", Shifts: 3}
-	sm.conflict.handleStressOverflow(ctx, 3, character.PhysicalStress, attacker, attackCtx)
+	sm.conflict.handleStressOverflow(ctx, 3, core.PhysicalStress, attacker, attackCtx)
 
 	// Should have set pendingMidFlow.
 	require.NotNil(t, sm.actions.pendingMidFlow, "expected pendingMidFlow to be set")
@@ -67,12 +67,12 @@ func TestStressOverflowNoConsequences_TakenOut(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	attacker := character.NewCharacter("enemy-1", "Orc")
+	player := core.NewCharacter("player-1", "Hero")
+	attacker := core.NewCharacter("enemy-1", "Orc")
 	// Fill all consequence slots so none are available.
-	player.AddConsequence(character.Consequence{ID: "c1", Type: character.MildConsequence, Aspect: "Bruised"})
-	player.AddConsequence(character.Consequence{ID: "c2", Type: character.ModerateConsequence, Aspect: "Broken Arm"})
-	player.AddConsequence(character.Consequence{ID: "c3", Type: character.SevereConsequence, Aspect: "Shattered Leg"})
+	player.AddConsequence(core.Consequence{ID: "c1", Type: core.MildConsequence, Aspect: "Bruised"})
+	player.AddConsequence(core.Consequence{ID: "c2", Type: core.ModerateConsequence, Aspect: "Broken Arm"})
+	player.AddConsequence(core.Consequence{ID: "c3", Type: core.SevereConsequence, Aspect: "Shattered Leg"})
 
 	engine.AddCharacter(player)
 	engine.AddCharacter(attacker)
@@ -85,7 +85,7 @@ func TestStressOverflowNoConsequences_TakenOut(t *testing.T) {
 
 	ctx := context.Background()
 	attackCtx := prompt.AttackContext{Skill: "Fight", Description: "Slash", Shifts: 3}
-	events := sm.conflict.handleStressOverflow(ctx, 3, character.PhysicalStress, attacker, attackCtx)
+	events := sm.conflict.handleStressOverflow(ctx, 3, core.PhysicalStress, attacker, attackCtx)
 
 	// No consequences available → should NOT set pendingMidFlow, should go straight to taken out.
 	assert.Nil(t, sm.actions.pendingMidFlow, "expected no pending mid-flow when no consequences available")
@@ -104,9 +104,9 @@ func TestProvideMidFlowResponse_ConsequenceChoice(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	player.SetSkill("Fight", 2)
-	attacker := character.NewCharacter("enemy-1", "Orc")
+	attacker := core.NewCharacter("enemy-1", "Orc")
 	engine.AddCharacter(player)
 	engine.AddCharacter(attacker)
 
@@ -120,7 +120,7 @@ func TestProvideMidFlowResponse_ConsequenceChoice(t *testing.T) {
 	attackCtx := prompt.AttackContext{Skill: "Fight", Description: "Slash", Shifts: 2}
 
 	// Trigger stress overflow to get a pending mid-flow.
-	sm.conflict.handleStressOverflow(ctx, 2, character.PhysicalStress, attacker, attackCtx)
+	sm.conflict.handleStressOverflow(ctx, 2, core.PhysicalStress, attacker, attackCtx)
 	require.NotNil(t, sm.actions.pendingMidFlow)
 
 	// Choose the first consequence (mild = absorbs 2).
@@ -131,7 +131,7 @@ func TestProvideMidFlowResponse_ConsequenceChoice(t *testing.T) {
 	// pendingMidFlow should be cleared (unless recursive overflow created a new one).
 	// The mild consequence should be applied.
 	assert.Len(t, player.Consequences, 1, "expected one consequence applied")
-	assert.Equal(t, character.MildConsequence, player.Consequences[0].Type)
+	assert.Equal(t, core.MildConsequence, player.Consequences[0].Type)
 }
 
 func TestProvideMidFlowResponse_TakenOutChoice(t *testing.T) {
@@ -143,8 +143,8 @@ func TestProvideMidFlowResponse_TakenOutChoice(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	attacker := character.NewCharacter("enemy-1", "Orc")
+	player := core.NewCharacter("player-1", "Hero")
+	attacker := core.NewCharacter("enemy-1", "Orc")
 	engine.AddCharacter(player)
 	engine.AddCharacter(attacker)
 
@@ -156,7 +156,7 @@ func TestProvideMidFlowResponse_TakenOutChoice(t *testing.T) {
 
 	ctx := context.Background()
 	attackCtx := prompt.AttackContext{Skill: "Fight", Description: "Slash", Shifts: 3}
-	sm.conflict.handleStressOverflow(ctx, 3, character.PhysicalStress, attacker, attackCtx)
+	sm.conflict.handleStressOverflow(ctx, 3, core.PhysicalStress, attacker, attackCtx)
 	require.NotNil(t, sm.actions.pendingMidFlow)
 
 	// Choose the last option (taken out). Available = 3 consequence slots, so index 3 = taken out.
@@ -178,10 +178,10 @@ func TestFateNarrationEmitsFreeTextEvent(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	npc1 := character.NewCharacter("npc-1", "Goblin Scout")
+	player := core.NewCharacter("player-1", "Hero")
+	npc1 := core.NewCharacter("npc-1", "Goblin Scout")
 	npc1.Aspects.HighConcept = "Sneaky Goblin"
-	npc2 := character.NewCharacter("npc-2", "Goblin Chief")
+	npc2 := core.NewCharacter("npc-2", "Goblin Chief")
 	npc2.Aspects.HighConcept = "Fearsome Leader"
 
 	engine.AddCharacter(player)
@@ -223,7 +223,7 @@ func TestFateNarrationNoTakenOut_NoPendingMidFlow(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	engine.AddCharacter(player)
 
 	testScene := scene.NewScene("test-scene", "Room", "A room.")
@@ -249,8 +249,8 @@ func TestProvideMidFlowResponse_FateNarration(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	npc1 := character.NewCharacter("npc-1", "Goblin Scout")
+	player := core.NewCharacter("player-1", "Hero")
+	npc1 := core.NewCharacter("npc-1", "Goblin Scout")
 	npc1.Aspects.HighConcept = "Sneaky Goblin"
 	engine.AddCharacter(player)
 	engine.AddCharacter(npc1)
@@ -287,8 +287,8 @@ func TestConcessionEmitsFreeTextEvent(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	enemy := character.NewCharacter("enemy-1", "Goblin")
+	player := core.NewCharacter("player-1", "Hero")
+	enemy := core.NewCharacter("enemy-1", "Goblin")
 	player.FatePoints = 1
 	engine.AddCharacter(player)
 	engine.AddCharacter(enemy)
@@ -333,8 +333,8 @@ func TestProvideMidFlowResponse_ConcessionNarration(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	enemy := character.NewCharacter("enemy-1", "Goblin")
+	player := core.NewCharacter("player-1", "Hero")
+	enemy := core.NewCharacter("enemy-1", "Goblin")
 	player.FatePoints = 1
 	engine.AddCharacter(player)
 	engine.AddCharacter(enemy)
@@ -377,8 +377,8 @@ func TestProvideMidFlowResponse_EmptyConcessionNarration(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	enemy := character.NewCharacter("enemy-1", "Goblin")
+	player := core.NewCharacter("player-1", "Hero")
+	enemy := core.NewCharacter("enemy-1", "Goblin")
 	player.FatePoints = 1
 	engine.AddCharacter(player)
 	engine.AddCharacter(enemy)
@@ -432,8 +432,8 @@ func TestHandleInput_ConcessionSetsAwaitingMidFlow(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	enemy := character.NewCharacter("enemy-1", "Goblin")
+	player := core.NewCharacter("player-1", "Hero")
+	enemy := core.NewCharacter("enemy-1", "Goblin")
 	player.FatePoints = 1
 	engine.AddCharacter(player)
 	engine.AddCharacter(enemy)
@@ -473,7 +473,7 @@ func TestHandleInput_RejectsInputWhileMidFlowPending(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
+	player := core.NewCharacter("player-1", "Hero")
 	engine.AddCharacter(player)
 
 	testScene := scene.NewScene("test-scene", "Room", "A room.")
@@ -507,8 +507,8 @@ func TestProvideMidFlowResponse_NumberedChoice(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	attacker := character.NewCharacter("enemy-1", "Orc")
+	player := core.NewCharacter("player-1", "Hero")
+	attacker := core.NewCharacter("enemy-1", "Orc")
 	engine.AddCharacter(player)
 	engine.AddCharacter(attacker)
 
@@ -521,7 +521,7 @@ func TestProvideMidFlowResponse_NumberedChoice(t *testing.T) {
 	// Trigger stress overflow to set pendingMidFlow with a numbered choice.
 	ctx := context.Background()
 	attackCtx := prompt.AttackContext{Skill: "Fight", Description: "Slash", Shifts: 2}
-	sm.conflict.handleStressOverflow(ctx, 2, character.PhysicalStress, attacker, attackCtx)
+	sm.conflict.handleStressOverflow(ctx, 2, core.PhysicalStress, attacker, attackCtx)
 	require.NotNil(t, sm.actions.pendingMidFlow)
 	assert.Equal(t, uicontract.InputRequestNumberedChoice, sm.actions.pendingMidFlow.event.Type)
 
@@ -532,7 +532,7 @@ func TestProvideMidFlowResponse_NumberedChoice(t *testing.T) {
 
 	// Mild consequence should have been applied.
 	assert.Len(t, player.Consequences, 1)
-	assert.Equal(t, character.MildConsequence, player.Consequences[0].Type)
+	assert.Equal(t, core.MildConsequence, player.Consequences[0].Type)
 }
 
 func TestProvideMidFlowResponse_FreeText(t *testing.T) {
@@ -541,8 +541,8 @@ func TestProvideMidFlowResponse_FreeText(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	enemy := character.NewCharacter("enemy-1", "Goblin")
+	player := core.NewCharacter("player-1", "Hero")
+	enemy := core.NewCharacter("enemy-1", "Goblin")
 	player.FatePoints = 1
 	engine.AddCharacter(player)
 	engine.AddCharacter(enemy)
@@ -581,8 +581,8 @@ func TestStressOverflowContextFields(t *testing.T) {
 
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 
-	player := character.NewCharacter("player-1", "Hero")
-	attacker := character.NewCharacter("enemy-1", "Orc")
+	player := core.NewCharacter("player-1", "Hero")
+	attacker := core.NewCharacter("enemy-1", "Orc")
 	engine.AddCharacter(player)
 	engine.AddCharacter(attacker)
 
@@ -594,7 +594,7 @@ func TestStressOverflowContextFields(t *testing.T) {
 
 	ctx := context.Background()
 	attackCtx := prompt.AttackContext{Skill: "Fight", Description: "A mighty blow", Shifts: 5}
-	sm.conflict.handleStressOverflow(ctx, 5, character.PhysicalStress, attacker, attackCtx)
+	sm.conflict.handleStressOverflow(ctx, 5, core.PhysicalStress, attacker, attackCtx)
 	require.NotNil(t, sm.actions.pendingMidFlow)
 
 	event := sm.actions.pendingMidFlow.event

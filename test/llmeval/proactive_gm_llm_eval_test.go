@@ -6,7 +6,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
@@ -50,7 +50,7 @@ type ProactiveGMTestCase struct {
 	SceneName           string
 	SceneDescription    string
 	ScenePurpose        string
-	OtherCharacters     []*character.Character
+	OtherCharacters     []*core.Character
 	ConversationContext string
 	PlayerName          string
 	PlayerHighConcept   string
@@ -89,7 +89,7 @@ func getTroublePressureTestCases() []ProactiveGMTestCase {
 			SceneName:            "The Dusty Spur Saloon",
 			SceneDescription:     "A dimly lit saloon packed with miners and cowboys. Wanted posters line the wall behind the bar.",
 			ScenePurpose:         "Can Jesse find an ally in Redemption Gulch?",
-			OtherCharacters:      []*character.Character{bartender},
+			OtherCharacters:      []*core.Character{bartender},
 			ConversationContext:  `GM: The saloon buzzes with low conversation. Maggie polishes a glass, watching the door.`,
 			PlayerName:           "Jesse Calhoun",
 			PlayerHighConcept:    "Vengeful Rancher with Nothing Left to Lose",
@@ -103,7 +103,7 @@ func getTroublePressureTestCases() []ProactiveGMTestCase {
 			SceneName:            "The Dusty Spur Saloon",
 			SceneDescription:     "A saloon with creaky floorboards and a dusty chandelier. The crowd is thin tonight.",
 			ScenePurpose:         "Can Jesse learn how deep the Cortez gang's control runs?",
-			OtherCharacters:      []*character.Character{bartender},
+			OtherCharacters:      []*core.Character{bartender},
 			ConversationContext:  `GM: Maggie leans on the bar, looking tired. "Long enough to know trouble when I see it."`,
 			PlayerName:           "Jesse Calhoun",
 			PlayerHighConcept:    "Vengeful Rancher with Nothing Left to Lose",
@@ -129,11 +129,11 @@ func getTroublePressureTestCases() []ProactiveGMTestCase {
 }
 
 func getScenePurposeTestCases() []ProactiveGMTestCase {
-	sheriff := character.NewCharacter("sheriff", "Sheriff Daniels")
+	sheriff := core.NewCharacter("sheriff", "Sheriff Daniels")
 	sheriff.Aspects.HighConcept = "Tired Lawman Who Looks the Other Way"
 	sheriff.Aspects.Trouble = "In Cortez's Pocket"
 
-	rival := character.NewCharacter("rival", "Magister Voss")
+	rival := core.NewCharacter("rival", "Magister Voss")
 	rival.Aspects.HighConcept = "Ambitious Arcanist with Hidden Loyalties"
 
 	return []ProactiveGMTestCase{
@@ -143,7 +143,7 @@ func getScenePurposeTestCases() []ProactiveGMTestCase {
 			SceneName:           "The Sheriff's Office",
 			SceneDescription:    "A small office with a desk, gun rack, and wanted posters. The sheriff sits behind his desk.",
 			ScenePurpose:        "Will Jesse discover that the sheriff is working with the Cortez gang?",
-			OtherCharacters:     []*character.Character{sheriff},
+			OtherCharacters:     []*core.Character{sheriff},
 			ConversationContext: `GM: Sheriff Daniels looks up from a stack of papers. A half-empty whiskey bottle sits on his desk.`,
 			PlayerName:          "Jesse Calhoun",
 			PlayerHighConcept:   "Vengeful Rancher with Nothing Left to Lose",
@@ -157,7 +157,7 @@ func getScenePurposeTestCases() []ProactiveGMTestCase {
 			SceneName:           "The Sheriff's Office",
 			SceneDescription:    "A small frontier office. Through the window, the sun sets over Redemption Gulch.",
 			ScenePurpose:        "Will Jesse discover that the sheriff is working with the Cortez gang?",
-			OtherCharacters:     []*character.Character{sheriff},
+			OtherCharacters:     []*core.Character{sheriff},
 			ConversationContext: `GM: The sheriff glances at the window and shifts uncomfortably in his chair.`,
 			PlayerName:          "Jesse Calhoun",
 			PlayerHighConcept:   "Vengeful Rancher with Nothing Left to Lose",
@@ -171,7 +171,7 @@ func getScenePurposeTestCases() []ProactiveGMTestCase {
 			SceneName:           "The Collegia Library",
 			SceneDescription:    "Towering shelves of ancient tomes. Arcane sigils glow on the ceiling. A few scholars study quietly.",
 			ScenePurpose:        "Can Zird find evidence of the conspiracy before the conspirators find him?",
-			OtherCharacters:     []*character.Character{rival},
+			OtherCharacters:     []*core.Character{rival},
 			ConversationContext: `GM: Magister Voss glances up from his own reading as Zird enters. His expression is unreadable.`,
 			PlayerName:          "Zird the Arcane",
 			PlayerHighConcept:   "Wizard Detective on the Trail of Forbidden Knowledge",
@@ -187,7 +187,7 @@ func getNPCInitiativeTestCases() []ProactiveGMTestCase {
 
 	bartender := NewBartender()
 
-	gangLt := character.NewCharacter("gang_lt", "El Sombra")
+	gangLt := core.NewCharacter("gang_lt", "El Sombra")
 	gangLt.Aspects.HighConcept = "Cortez's Ruthless Lieutenant"
 	gangLt.Aspects.Trouble = "Enjoys Cruelty Too Much"
 
@@ -198,7 +198,7 @@ func getNPCInitiativeTestCases() []ProactiveGMTestCase {
 			SceneName:           "Windmill on the Outskirts",
 			SceneDescription:    "An old abandoned windmill. The creaking blades echo. Black Jack McCoy stands near the entrance.",
 			ScenePurpose:        "Can Jesse get Black Jack to reveal the gang's location?",
-			OtherCharacters:     []*character.Character{blackJack},
+			OtherCharacters:     []*core.Character{blackJack},
 			ConversationContext: `GM: Black Jack's hand rests on his holster. His eyes scan the horizon behind Jesse.`,
 			PlayerName:          "Jesse Calhoun",
 			PlayerHighConcept:   "Vengeful Rancher with Nothing Left to Lose",
@@ -212,7 +212,7 @@ func getNPCInitiativeTestCases() []ProactiveGMTestCase {
 			SceneName:           "The Dusty Spur Saloon",
 			SceneDescription:    "A dimly lit saloon. Maggie stands behind the bar.",
 			ScenePurpose:        "Can Jesse find an ally in Redemption Gulch?",
-			OtherCharacters:     []*character.Character{bartender},
+			OtherCharacters:     []*core.Character{bartender},
 			ConversationContext: `GM: Maggie narrows her eyes. "You look like you're carrying more than just a saddlebag, stranger."`,
 			PlayerName:          "Jesse Calhoun",
 			PlayerHighConcept:   "Vengeful Rancher with Nothing Left to Lose",
@@ -226,7 +226,7 @@ func getNPCInitiativeTestCases() []ProactiveGMTestCase {
 			SceneName:           "The Abandoned Mine Entrance",
 			SceneDescription:    "A dark mine entrance flanked by rotting timber. El Sombra blocks the path, flanked by two thugs.",
 			ScenePurpose:        "Can Jesse confront the gang's lieutenant and survive?",
-			OtherCharacters:     []*character.Character{gangLt},
+			OtherCharacters:     []*core.Character{gangLt},
 			ConversationContext: `GM: El Sombra grins, revealing a gold tooth. "Well, well. The rancher who won't stay dead."`,
 			PlayerName:          "Jesse Calhoun",
 			PlayerHighConcept:   "Vengeful Rancher with Nothing Left to Lose",
@@ -244,7 +244,7 @@ func evaluateProactiveGM(ctx context.Context, client llm.LLMClient, tc Proactive
 	testScene := scene.NewScene("test-scene", tc.SceneName, tc.SceneDescription)
 
 	// Create player character
-	player := character.NewCharacter("player1", tc.PlayerName)
+	player := core.NewCharacter("player1", tc.PlayerName)
 	player.Aspects.HighConcept = tc.PlayerHighConcept
 	player.Aspects.Trouble = tc.PlayerTrouble
 	for _, a := range tc.PlayerAspects {
@@ -500,7 +500,7 @@ func TestProactiveGM_NPCInitiative_LLMEvaluation(t *testing.T) {
 	}
 }
 
-func describeNPCs(chars []*character.Character) string {
+func describeNPCs(chars []*core.Character) string {
 	if len(chars) == 0 {
 		return "(none)"
 	}

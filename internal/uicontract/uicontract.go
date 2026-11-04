@@ -11,14 +11,14 @@ package uicontract
 import (
 	"time"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 )
 
 // SceneInfo provides read-only access to scene state for display purposes.
 type SceneInfo interface {
 	GetCurrentScene() *scene.Scene
-	GetPlayer() *character.Character
+	GetPlayer() *core.Character
 	GetConversationHistory() []ConversationEntry
 }
 

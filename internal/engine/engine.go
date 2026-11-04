@@ -3,7 +3,7 @@ package engine
 import (
 	"strings"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
@@ -12,9 +12,9 @@ import (
 // CharacterResolver provides read-only access to the character registry.
 // Engine satisfies this interface — no new implementation code is needed.
 type CharacterResolver interface {
-	GetCharacter(id string) *character.Character
-	ResolveCharacter(target string) *character.Character
-	GetCharactersByScene(s *scene.Scene) map[string]*character.Character
+	GetCharacter(id string) *core.Character
+	ResolveCharacter(target string) *core.Character
+	GetCharactersByScene(s *scene.Scene) map[string]*core.Character
 }
 
 // Engine represents the core game engine
@@ -22,7 +22,7 @@ type Engine struct {
 	actionParser      ActionParser
 	sceneManager      *SceneManager
 	llmClient         llm.LLMClient
-	characterRegistry map[string]*character.Character
+	characterRegistry map[string]*core.Character
 	sessionLogger     session.SessionLogger
 }
 
@@ -30,7 +30,7 @@ type Engine struct {
 // sessionLogger must not be nil; use session.NullLogger{} when logging is not needed.
 func New(sessionLogger session.SessionLogger) (*Engine, error) {
 	engine := &Engine{
-		characterRegistry: make(map[string]*character.Character),
+		characterRegistry: make(map[string]*core.Character),
 		sessionLogger:     sessionLogger,
 	}
 	engine.sceneManager = NewSceneManager(engine, nil, nil, sessionLogger)
@@ -43,7 +43,7 @@ func NewWithLLM(llmClient llm.LLMClient, sessionLogger session.SessionLogger) (*
 	engine := &Engine{
 		llmClient:         llmClient,
 		actionParser:      NewActionParser(llmClient),
-		characterRegistry: make(map[string]*character.Character),
+		characterRegistry: make(map[string]*core.Character),
 		sessionLogger:     sessionLogger,
 	}
 	engine.sceneManager = NewSceneManager(engine, llmClient, engine.actionParser, sessionLogger)
@@ -76,19 +76,19 @@ func (e *Engine) GetSceneManager() *SceneManager {
 }
 
 // AddCharacter adds a character to the registry
-func (e *Engine) AddCharacter(char *character.Character) {
+func (e *Engine) AddCharacter(char *core.Character) {
 	e.characterRegistry[char.ID] = char
 }
 
 // GetCharacter retrieves a character from the registry by ID
-func (e *Engine) GetCharacter(id string) *character.Character {
+func (e *Engine) GetCharacter(id string) *core.Character {
 	return e.characterRegistry[id]
 }
 
 // GetCharacterByName retrieves a character from the registry by name.
 // It performs a case-insensitive match against character names.
 // Returns nil if no match is found.
-func (e *Engine) GetCharacterByName(name string) *character.Character {
+func (e *Engine) GetCharacterByName(name string) *core.Character {
 	lowerName := strings.ToLower(strings.TrimSpace(name))
 	for _, char := range e.characterRegistry {
 		if strings.ToLower(char.Name) == lowerName {
@@ -101,7 +101,7 @@ func (e *Engine) GetCharacterByName(name string) *character.Character {
 // ResolveCharacter attempts to find a character using flexible matching.
 // It handles the "Name (ID)" format that LLMs produce from prompt context,
 // as well as plain ID or plain name lookups.
-func (e *Engine) ResolveCharacter(target string) *character.Character {
+func (e *Engine) ResolveCharacter(target string) *core.Character {
 	target = strings.TrimSpace(target)
 	if target == "" {
 		return nil
@@ -141,13 +141,13 @@ func (e *Engine) ResolveCharacter(target string) *character.Character {
 }
 
 // GetAllCharacters returns all characters in the registry
-func (e *Engine) GetAllCharacters() map[string]*character.Character {
+func (e *Engine) GetAllCharacters() map[string]*core.Character {
 	return e.characterRegistry
 }
 
 // GetCharactersByScene returns characters that are present in a given scene
-func (e *Engine) GetCharactersByScene(scene *scene.Scene) map[string]*character.Character {
-	characters := make(map[string]*character.Character)
+func (e *Engine) GetCharactersByScene(scene *scene.Scene) map[string]*core.Character {
+	characters := make(map[string]*core.Character)
 	for _, charID := range scene.Characters {
 		if char, exists := e.characterRegistry[charID]; exists {
 			characters[charID] = char

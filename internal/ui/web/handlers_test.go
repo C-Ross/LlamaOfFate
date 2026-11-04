@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
@@ -21,7 +22,7 @@ import (
 func TestHandler_Health(t *testing.T) {
 	h := NewHandler(func(_ context.Context, _ string, _ *GameSetup) (engine.GameSessionManager, error) {
 		return nil, nil
-	}, SetupConfig{}, nil)
+	}, SetupConfig{}, nil, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	w := httptest.NewRecorder()
@@ -29,6 +30,68 @@ func TestHandler_Health(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), `"status":"ok"`)
+}
+
+func TestHandler_StaticFiles(t *testing.T) {
+	staticFS := fstest.MapFS{
+		"index.html":       {Data: []byte("<html>hello</html>")},
+		"assets/app.js":    {Data: []byte("console.log('hi')")},
+		"assets/style.css": {Data: []byte("body{}")},
+	}
+
+	noopFactory := func(_ context.Context, _ string, _ *GameSetup) (engine.GameSessionManager, error) {
+		return nil, nil
+	}
+	h := NewHandler(noopFactory, SetupConfig{}, nil, staticFS)
+
+	t.Run("serves index.html at root", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Contains(t, w.Body.String(), "<html>hello</html>")
+	})
+
+	t.Run("serves asset files", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/assets/app.js", nil)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Contains(t, w.Body.String(), "console.log")
+	})
+
+	t.Run("SPA fallback for unknown paths", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/game/some-id", nil)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Contains(t, w.Body.String(), "<html>hello</html>")
+	})
+
+	t.Run("health still works with static FS", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/health", nil)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Contains(t, w.Body.String(), `"status":"ok"`)
+	})
+}
+
+func TestHandler_NoStaticFS(t *testing.T) {
+	noopFactory := func(_ context.Context, _ string, _ *GameSetup) (engine.GameSessionManager, error) {
+		return nil, nil
+	}
+	h := NewHandler(noopFactory, SetupConfig{}, nil, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
 }
 
 func TestHandler_WebSocket_FullRoundTrip(t *testing.T) {
@@ -46,7 +109,7 @@ func TestHandler_WebSocket_FullRoundTrip(t *testing.T) {
 		}, nil
 	}
 
-	h := NewHandler(factory, SetupConfig{}, nil)
+	h := NewHandler(factory, SetupConfig{}, nil, nil)
 	server := httptest.NewServer(h)
 	defer server.Close()
 
@@ -111,7 +174,7 @@ func TestHandler_WebSocket_MultipleEvents(t *testing.T) {
 		}, nil
 	}
 
-	h := NewHandler(factory, SetupConfig{}, nil)
+	h := NewHandler(factory, SetupConfig{}, nil, nil)
 	server := httptest.NewServer(h)
 	defer server.Close()
 
@@ -170,7 +233,7 @@ func TestHandler_WebSocket_CorruptSave_SendsErrorNotification(t *testing.T) {
 		AllowCustom: false,
 	}
 
-	h := NewHandler(factory, setupCfg, nil)
+	h := NewHandler(factory, setupCfg, nil, nil)
 	server := httptest.NewServer(h)
 	defer server.Close()
 

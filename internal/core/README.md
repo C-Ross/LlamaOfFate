@@ -2,37 +2,48 @@
 
 Implements the fundamental Fate Core game mechanics.
 
-## Packages
+## Sub-packages
 
 - **`dice/`** - Fate ladder system and 4dF rolling
-- **`character/`** - Characters with aspects, skills, stress, consequences  
 - **`action/`** - Four action types and resolution
 - **`scene/`** - Scene management and conflict system
+
+## Files in this package
+
+- **`character.go`** - Characters with aspects, skills, stress, consequences
+- **`character_type.go`** - NPC threat levels (nameless, supporting, main NPC, PC)
 - **`skills.go`** - Skill classification (attack/defense mappings, stress types, initiative)
+- **`skills_list.go`** - Named constants for the 18 default Fate Core skills
 
 ## Usage
 
 ```go
 // Create a character
-char := character.NewCharacter("hero", "Zara the Bold")
+char := core.NewCharacter("hero", "Zara the Bold")
 char.Aspects.HighConcept = "Daring Sky Pirate"
-char.SetSkill("Athletics", dice.Good)
+char.SetSkill(core.SkillAthletics, dice.Good)
 
 // Create a scene
-scene := scene.NewScene("deck", "Burning Airship", "...")
-scene.AddCharacter(char.ID)
+sc := scene.NewScene("deck", "Burning Airship", "...")
+sc.AddCharacter(char.ID)
 
 // Create and resolve an action
-action := action.NewAction("leap", char.ID, action.Overcome, "Athletics", "Jump the gap")
-action.Difficulty = dice.Great
+act := action.NewAction("leap", char.ID, action.Overcome, core.SkillAthletics, "Jump the gap")
+act.Difficulty = dice.Great
 
 // Roll and resolve
 roller := dice.NewRoller()
-result := roller.RollWithModifier(char.GetSkill("Athletics"), 0)
-action.Outcome = result.CompareAgainst(action.Difficulty)
+result := roller.RollWithModifier(char.GetSkill(core.SkillAthletics), 0)
+act.Outcome = result.CompareAgainst(act.Difficulty)
 ```
 
 ## Test Coverage
 
 - **67 unit tests** with 79-100% coverage per package
 - Run tests: `go test ./internal/core/... -v`
+
+## Fate Core SRD Attribution
+
+The game mechanics in this package are derived from the **[Fate Core System Reference Document](https://fate-srd.com/fate-core)**, a product of Evil Hat Productions, LLC. Covered mechanics include the skill list and ladder, the four action types and outcome resolution, character aspects, stress tracks, consequences, fate points, refresh, and conflict structure.
+
+This work is based on Fate Core System, a product of Evil Hat Productions, LLC, developed, authored, and edited by Leonard Balsera, Brian Engard, Jeremy Keller, Ryan Macklin, Mike Olson, Clark Valentine, Amanda Valentine, Fred Hicks, and Rob Donoghue, and licensed for our use under the [Creative Commons Attribution 3.0 Unported license](https://creativecommons.org/licenses/by/3.0/).

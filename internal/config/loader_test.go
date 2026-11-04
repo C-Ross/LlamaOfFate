@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 )
 
@@ -166,7 +166,7 @@ story_questions: []
 default_player: nonexistent
 `)
 
-	_, err := LoadScenario(path, map[string]*character.Character{})
+	_, err := LoadScenario(path, map[string]*core.Character{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown player")
 }
@@ -216,7 +216,7 @@ npcs:
 	// Supporting NPC
 	bart := ls.NPCs[0]
 	assert.Equal(t, "Bartender", bart.Name)
-	assert.Equal(t, character.CharacterTypeSupportingNPC, bart.CharacterType)
+	assert.Equal(t, core.CharacterTypeSupportingNPC, bart.CharacterType)
 	assert.Equal(t, "Friendly Barkeep", bart.Aspects.HighConcept)
 	assert.Equal(t, []string{"Knows Everyone"}, bart.Aspects.OtherAspects)
 	assert.Equal(t, dice.Good, bart.Skills["Rapport"])
@@ -224,18 +224,18 @@ npcs:
 
 	// Nameless Fair
 	guard := ls.NPCs[1]
-	assert.Equal(t, character.CharacterTypeNamelessFair, guard.CharacterType)
+	assert.Equal(t, core.CharacterTypeNamelessFair, guard.CharacterType)
 	assert.Equal(t, dice.Fair, guard.Skills["Notice"])
 	assert.Equal(t, dice.Average, guard.Skills["Shoot"])
 
 	// Nameless Good
 	goblin := ls.NPCs[2]
-	assert.Equal(t, character.CharacterTypeNamelessGood, goblin.CharacterType)
+	assert.Equal(t, core.CharacterTypeNamelessGood, goblin.CharacterType)
 	assert.Equal(t, dice.Good, goblin.Skills["Fight"])
 
 	// Nameless Average
 	peasant := ls.NPCs[3]
-	assert.Equal(t, character.CharacterTypeNamelessAverage, peasant.CharacterType)
+	assert.Equal(t, core.CharacterTypeNamelessAverage, peasant.CharacterType)
 }
 
 func TestLoadScenario_WithScene(t *testing.T) {
@@ -347,13 +347,67 @@ default_player: hero
 
 	scenarios, err := LoadAll(root)
 	require.NoError(t, err)
-	require.Len(t, scenarios, 1)
+	require.GreaterOrEqual(t, len(scenarios), 1)
 
 	ls := scenarios["adventure"]
 	require.NotNil(t, ls)
 	assert.Equal(t, "Adventure", ls.Scenario.Title)
 	require.NotNil(t, ls.Player)
 	assert.Equal(t, "Hero", ls.Player.Name)
+}
+
+func TestLoadAll_UsesEmbeddedWhenConfigDirsMissing(t *testing.T) {
+	root := t.TempDir()
+
+	scenarios, err := LoadAll(root)
+	require.NoError(t, err)
+	require.NotEmpty(t, scenarios)
+
+	// One known built-in preset should always be available.
+	saloon, ok := scenarios["saloon"]
+	require.True(t, ok)
+	require.NotNil(t, saloon)
+	require.NotNil(t, saloon.Player)
+	assert.Equal(t, "Jesse Calhoun", saloon.Player.Name)
+}
+
+func TestLoadAll_FileSystemOverridesEmbedded(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "characters"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "scenarios"), 0o755))
+
+	writeFile(t, filepath.Join(root, "characters", "override.yaml"), `
+id: zero
+name: "Zero Override"
+aspects:
+  high_concept: "Altered"
+  trouble: "Still risky"
+skills:
+  Burglary: 2
+fate_points: 2
+refresh: 2
+`)
+
+	writeFile(t, filepath.Join(root, "scenarios", "heist.yaml"), `
+id: heist
+title: "Custom Heist"
+genre: "Cyberpunk"
+problem: "Custom problem"
+setting: "Custom setting"
+story_questions:
+  - "Will the override load?"
+default_player: zero
+`)
+
+	scenarios, err := LoadAll(root)
+	require.NoError(t, err)
+
+	// "heist" exists in embedded presets; local file should replace it.
+	heist := scenarios["heist"]
+	require.NotNil(t, heist)
+	assert.Equal(t, "Custom Heist", heist.Scenario.Title)
+	require.NotNil(t, heist.Player)
+	assert.Equal(t, "Zero Override", heist.Player.Name)
 }
 
 // ---------- Integration: real configs ----------------------------------------
@@ -411,6 +465,174 @@ func TestLoadAll_RealConfigs(t *testing.T) {
 	require.Len(t, europa.NPCs, 3)
 	require.NotNil(t, europa.Scene)
 	assert.Equal(t, "Reactor Control Room", europa.Scene.Name)
+}
+
+// ---------- Error handling paths ---------------------------------------------
+
+func TestLoadCharacter_InvalidYAML(t *testing.T) {
+	path := writeTemp(t, "bad.yaml", ": this is not valid yaml: [{{")
+	_, err := LoadCharacter(path)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "parse character file")
+}
+
+func TestLoadCharacters_BadDirectory(t *testing.T) {
+	_, err := LoadCharacters("/nonexistent/dir/that/does/not/exist")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "read characters directory")
+}
+
+func TestLoadCharacters_InvalidYAMLFile(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "bad.yaml"), ": invalid: [{{")
+	_, err := LoadCharacters(dir)
+	require.Error(t, err)
+}
+
+func TestLoadScenarioFile_MissingFile(t *testing.T) {
+	_, err := LoadScenarioFile("/nonexistent/path/scenario.yaml")
+	require.Error(t, err)
+}
+
+func TestLoadScenarioFile_InvalidYAML(t *testing.T) {
+	path := writeTemp(t, "bad_scenario.yaml", ": not: valid: yaml: [{{")
+	_, err := LoadScenarioFile(path)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "parse scenario file")
+}
+
+func TestLoadScenario_MissingFile(t *testing.T) {
+	_, err := LoadScenario("/nonexistent/scenario.yaml", nil)
+	require.Error(t, err)
+}
+
+func TestLoadScenario_NilCharactersWithPlayer(t *testing.T) {
+	path := writeTemp(t, "scenario.yaml", `
+id: needs-player
+title: "Needs Player"
+genre: Fantasy
+problem: "p"
+setting: "s"
+story_questions: []
+default_player: some-hero
+`)
+	_, err := LoadScenario(path, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no characters were loaded")
+}
+
+func TestLoadAll_MissingCharactersDir_UsesEmbedded(t *testing.T) {
+	root := t.TempDir()
+	// No characters subdirectory in filesystem — embedded presets should load.
+	scenarios, err := LoadAll(root)
+	require.NoError(t, err)
+	assert.NotEmpty(t, scenarios)
+}
+
+func TestLoadAll_MissingScenariosDir_UsesEmbedded(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "characters"), 0o755))
+	// No scenarios subdirectory in filesystem — embedded presets should load.
+	scenarios, err := LoadAll(root)
+	require.NoError(t, err)
+	require.NotEmpty(t, scenarios)
+	heist, ok := scenarios["heist"]
+	require.True(t, ok)
+	require.NotNil(t, heist)
+	require.NotNil(t, heist.Player)
+	assert.Equal(t, "Zero", heist.Player.Name)
+}
+
+func TestLoadAll_NonYAMLScenarioIgnored(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "characters"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "scenarios"), 0o755))
+	// Only a non-YAML file in the filesystem scenarios dir — embedded presets still load.
+	writeFile(t, filepath.Join(root, "scenarios", "readme.txt"), "not a scenario")
+	scenarios, err := LoadAll(root)
+	require.NoError(t, err)
+	require.NotEmpty(t, scenarios)
+	_, ok := scenarios["tower"]
+	assert.True(t, ok)
+}
+
+func TestLoadAll_BadScenario(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "characters"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "scenarios"), 0o755))
+	writeFile(t, filepath.Join(root, "scenarios", "bad.yaml"), ": invalid yaml: [{{")
+	_, err := LoadAll(root)
+	require.Error(t, err)
+}
+
+// ---------- NPC type coverage ------------------------------------------------
+
+func TestLoadScenario_NPC_MainType(t *testing.T) {
+	path := writeTemp(t, "scenario.yaml", `
+id: main-npc-test
+title: "Main NPC Test"
+genre: Fantasy
+problem: "p"
+setting: "s"
+story_questions: []
+npcs:
+  - id: villain
+    name: "The Villain"
+    type: main
+    high_concept: "Scheming Mastermind"
+    aspects:
+      - "Ruthless and Cunning"
+    skills:
+      Deceive: 4
+    fate_points: 3
+`)
+	ls, err := LoadScenario(path, nil)
+	require.NoError(t, err)
+	require.Len(t, ls.NPCs, 1)
+	villain := ls.NPCs[0]
+	assert.Equal(t, "The Villain", villain.Name)
+	assert.Equal(t, core.CharacterTypeMainNPC, villain.CharacterType)
+	assert.Equal(t, "Scheming Mastermind", villain.Aspects.HighConcept)
+	assert.Equal(t, []string{"Ruthless and Cunning"}, villain.Aspects.OtherAspects)
+	assert.Equal(t, 3, villain.FatePoints)
+}
+
+func TestLoadScenario_NPC_NamelessGood_MissingPrimarySkill(t *testing.T) {
+	path := writeTemp(t, "scenario.yaml", `
+id: bad-npc-good
+title: "Bad NPC"
+genre: Fantasy
+problem: "p"
+setting: "s"
+story_questions: []
+npcs:
+  - id: g
+    name: "G"
+    type: nameless_good
+    high_concept: "Tough"
+`)
+	_, err := LoadScenario(path, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "primary_skill")
+}
+
+func TestLoadScenario_NPC_NamelessAverage_MissingPrimarySkill(t *testing.T) {
+	path := writeTemp(t, "scenario.yaml", `
+id: bad-npc-avg
+title: "Bad NPC Avg"
+genre: Fantasy
+problem: "p"
+setting: "s"
+story_questions: []
+npcs:
+  - id: a
+    name: "A"
+    type: nameless_average
+    high_concept: "Weak"
+`)
+	_, err := LoadScenario(path, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "primary_skill")
 }
 
 // ---------- Helpers ----------------------------------------------------------

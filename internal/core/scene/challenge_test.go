@@ -202,6 +202,35 @@ func TestChallengeState_OverallOutcome(t *testing.T) {
 			tasks:    []ChallengeTask{},
 			expected: ChallengeSuccess,
 		},
+		{
+			name: "ties excluded from majority (2 succeed 1 tie 1 fail) → success",
+			tasks: []ChallengeTask{
+				{Status: TaskSucceeded},
+				{Status: TaskSucceeded},
+				{Status: TaskTied},
+				{Status: TaskFailed},
+			},
+			expected: ChallengeSuccess,
+		},
+		{
+			name: "ties excluded from majority (2 fail 1 tie 1 succeed) → failure",
+			tasks: []ChallengeTask{
+				{Status: TaskFailed},
+				{Status: TaskFailed},
+				{Status: TaskTied},
+				{Status: TaskSucceeded},
+			},
+			expected: ChallengeFailure,
+		},
+		{
+			name: "all ties → partial",
+			tasks: []ChallengeTask{
+				{Status: TaskTied},
+				{Status: TaskTied},
+				{Status: TaskTied},
+			},
+			expected: ChallengePartial,
+		},
 	}
 
 	for _, tt := range tests {

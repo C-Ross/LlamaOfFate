@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from "@testing-library/react"
 import { describe, it, expect, vi } from "vitest"
 import { SetupScreen } from "@/components/game/SetupScreen"
+import { getDefaultPyramid } from "@/lib/skills"
 import type { ScenarioPreset } from "@/lib/types"
 
 const presets: ScenarioPreset[] = [
@@ -86,38 +87,7 @@ describe("SetupScreen", () => {
     expect(screen.queryByTestId("custom-button")).not.toBeInTheDocument()
   })
 
-  it("switches to custom form and submits", () => {
-    const onSelectCustom = vi.fn()
-    render(
-      <SetupScreen
-        presets={presets}
-        allowCustom={true}
-        generatingMessage={null}
-        onSelectPreset={vi.fn()}
-        onSelectCustom={onSelectCustom}
-      />,
-    )
-
-    // Click to go to custom form
-    fireEvent.click(screen.getByTestId("custom-button"))
-    expect(screen.getByTestId("setup-custom")).toBeInTheDocument()
-
-    // Fill the form
-    fireEvent.change(screen.getByPlaceholderText("e.g. Ada Lovelace"), { target: { value: "Ada" } })
-    fireEvent.change(screen.getByPlaceholderText("e.g. Rogue AI Whisperer"), { target: { value: "Hacker Supreme" } })
-    fireEvent.change(screen.getByPlaceholderText("e.g. Trusts Machines More Than People"), { target: { value: "Too Curious" } })
-    fireEvent.change(screen.getByPlaceholderText("e.g. Cyberpunk, Western, Fantasy"), { target: { value: "Cyberpunk" } })
-
-    fireEvent.click(screen.getByText("Generate Scenario"))
-    expect(onSelectCustom).toHaveBeenCalledWith({
-      name: "Ada",
-      highConcept: "Hacker Supreme",
-      trouble: "Too Curious",
-      genre: "Cyberpunk",
-    })
-  })
-
-  it("disables submit button when form is incomplete", () => {
+  it("switches to custom form and shows identity step", () => {
     render(
       <SetupScreen
         presets={presets}
@@ -129,12 +99,27 @@ describe("SetupScreen", () => {
     )
 
     fireEvent.click(screen.getByTestId("custom-button"))
-
-    const submitButton = screen.getByText("Generate Scenario")
-    expect(submitButton).toBeDisabled()
+    expect(screen.getByTestId("setup-custom")).toBeInTheDocument()
+    expect(screen.getByTestId("setup-custom")).toHaveAttribute("data-step", "identity")
+    expect(screen.getByText("Step 1 of 3")).toBeInTheDocument()
   })
 
-  it("shows Back button in custom form", () => {
+  it("disables Next button when identity form is incomplete", () => {
+    render(
+      <SetupScreen
+        presets={presets}
+        allowCustom={true}
+        generatingMessage={null}
+        onSelectPreset={vi.fn()}
+        onSelectCustom={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId("custom-button"))
+    expect(screen.getByTestId("next-to-skills")).toBeDisabled()
+  })
+
+  it("Back button in identity step returns to picker", () => {
     render(
       <SetupScreen
         presets={presets}
@@ -148,7 +133,6 @@ describe("SetupScreen", () => {
     fireEvent.click(screen.getByTestId("custom-button"))
     expect(screen.getByText("Back")).toBeInTheDocument()
 
-    // Clicking Back returns to picker
     fireEvent.click(screen.getByText("Back"))
     expect(screen.getByTestId("setup-picker")).toBeInTheDocument()
   })
@@ -203,5 +187,146 @@ describe("SetupScreen", () => {
     )
 
     expect(screen.queryByTestId("continue-game")).not.toBeInTheDocument()
+  })
+
+  // ---------------------------------------------------------------------------
+  // Wizard navigation tests
+  // ---------------------------------------------------------------------------
+
+  function fillIdentity() {
+    fireEvent.change(screen.getByPlaceholderText("e.g. Ada Lovelace"), { target: { value: "Ada" } })
+    fireEvent.change(screen.getByPlaceholderText("e.g. Rogue AI Whisperer"), { target: { value: "Hacker Supreme" } })
+    fireEvent.change(screen.getByPlaceholderText("e.g. Trusts Machines More Than People"), { target: { value: "Too Curious" } })
+    fireEvent.change(screen.getByPlaceholderText("e.g. Cyberpunk, Western, Fantasy"), { target: { value: "Cyberpunk" } })
+  }
+
+  function renderCustomWizard(onSelectCustom = vi.fn()) {
+    render(
+      <SetupScreen
+        presets={presets}
+        allowCustom={true}
+        generatingMessage={null}
+        onSelectPreset={vi.fn()}
+        onSelectCustom={onSelectCustom}
+      />,
+    )
+    fireEvent.click(screen.getByTestId("custom-button"))
+  }
+
+  it("navigates from identity to skills step", () => {
+    renderCustomWizard()
+    fillIdentity()
+
+    fireEvent.click(screen.getByTestId("next-to-skills"))
+    expect(screen.getByTestId("setup-custom")).toHaveAttribute("data-step", "skills")
+    expect(screen.getByText("Step 2 of 3")).toBeInTheDocument()
+    expect(screen.getByText("Skill Pyramid")).toBeInTheDocument()
+  })
+
+  it("shows additional aspect inputs on identity step", () => {
+    renderCustomWizard()
+
+    expect(screen.getByTestId("aspect-input-0")).toBeInTheDocument()
+    expect(screen.getByTestId("aspect-input-1")).toBeInTheDocument()
+    expect(screen.getByTestId("aspect-input-2")).toBeInTheDocument()
+  })
+
+  it("navigates back from skills to identity step", () => {
+    renderCustomWizard()
+    fillIdentity()
+    fireEvent.click(screen.getByTestId("next-to-skills"))
+
+    fireEvent.click(screen.getByTestId("back-to-identity"))
+    expect(screen.getByTestId("setup-custom")).toHaveAttribute("data-step", "identity")
+  })
+
+  it("skills step starts with default pyramid pre-populated", () => {
+    renderCustomWizard()
+    fillIdentity()
+    fireEvent.click(screen.getByTestId("next-to-skills"))
+
+    // Next: Review should be enabled because defaults form a valid pyramid
+    expect(screen.getByTestId("next-to-review")).not.toBeDisabled()
+  })
+
+  it("review step shows identity fields", () => {
+    renderCustomWizard()
+    fillIdentity()
+    fireEvent.click(screen.getByTestId("next-to-skills"))
+    fireEvent.click(screen.getByTestId("next-to-review"))
+
+    expect(screen.getByText("Step 3 of 3")).toBeInTheDocument()
+    expect(screen.getByText("Ada")).toBeInTheDocument()
+    expect(screen.getByText("Hacker Supreme")).toBeInTheDocument()
+    expect(screen.getByText("Too Curious")).toBeInTheDocument()
+    expect(screen.getByText("Cyberpunk")).toBeInTheDocument()
+  })
+
+  it("review step shows default skills", () => {
+    renderCustomWizard()
+    fillIdentity()
+    fireEvent.click(screen.getByTestId("next-to-skills"))
+    fireEvent.click(screen.getByTestId("next-to-review"))
+
+    expect(screen.getByText("Skills")).toBeInTheDocument()
+    expect(screen.getByText(/Notice/)).toBeInTheDocument()
+  })
+
+  it("review step shows additional aspects when provided", () => {
+    renderCustomWizard()
+    fillIdentity()
+    fireEvent.change(screen.getByTestId("aspect-input-0"), { target: { value: "Well Connected" } })
+    fireEvent.click(screen.getByTestId("next-to-skills"))
+    fireEvent.click(screen.getByTestId("next-to-review"))
+
+    expect(screen.getByTestId("review-aspects")).toBeInTheDocument()
+    expect(screen.getByText("Well Connected")).toBeInTheDocument()
+  })
+
+  it("navigates back from review to skills", () => {
+    renderCustomWizard()
+    fillIdentity()
+    fireEvent.click(screen.getByTestId("next-to-skills"))
+    fireEvent.click(screen.getByTestId("next-to-review"))
+
+    fireEvent.click(screen.getByTestId("back-to-skills"))
+    expect(screen.getByTestId("setup-custom")).toHaveAttribute("data-step", "skills")
+  })
+
+  it("submits from review with default skills", () => {
+    const onSelectCustom = vi.fn()
+    renderCustomWizard(onSelectCustom)
+    fillIdentity()
+    fireEvent.click(screen.getByTestId("next-to-skills"))
+    fireEvent.click(screen.getByTestId("next-to-review"))
+
+    fireEvent.click(screen.getByTestId("start-adventure"))
+    expect(onSelectCustom).toHaveBeenCalledWith({
+      name: "Ada",
+      highConcept: "Hacker Supreme",
+      trouble: "Too Curious",
+      genre: "Cyberpunk",
+      skills: getDefaultPyramid(),
+    })
+  })
+
+  it("submits from review with aspects and default skills", () => {
+    const onSelectCustom = vi.fn()
+    renderCustomWizard(onSelectCustom)
+    fillIdentity()
+    fireEvent.change(screen.getByTestId("aspect-input-0"), { target: { value: "Well Connected" } })
+    fireEvent.change(screen.getByTestId("aspect-input-2"), { target: { value: "Never Backs Down" } })
+    fireEvent.click(screen.getByTestId("next-to-skills"))
+    fireEvent.click(screen.getByTestId("next-to-review"))
+
+    fireEvent.click(screen.getByTestId("start-adventure"))
+    expect(onSelectCustom).toHaveBeenCalledWith({
+      name: "Ada",
+      highConcept: "Hacker Supreme",
+      trouble: "Too Curious",
+      genre: "Cyberpunk",
+      aspects: ["Well Connected", "Never Backs Down"],
+      skills: getDefaultPyramid(),
+    })
   })
 })

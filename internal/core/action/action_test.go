@@ -161,6 +161,28 @@ func TestAspectInvoke(t *testing.T) {
 	assert.Equal(t, 2, invoke.Bonus)
 }
 
+func TestFreeInvokesForOutcome(t *testing.T) {
+	tests := []struct {
+		name            string
+		outcome         dice.OutcomeType
+		wantFreeInvokes int
+		wantIsBoost     bool
+	}{
+		{"SuccessWithStyle", dice.SuccessWithStyle, 2, false},
+		{"Success", dice.Success, 1, false},
+		{"Tie", dice.Tie, 1, true},
+		{"Failure", dice.Failure, 0, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			freeInvokes, isBoost := FreeInvokesForOutcome(tt.outcome)
+			assert.Equal(t, tt.wantFreeInvokes, freeInvokes)
+			assert.Equal(t, tt.wantIsBoost, isBoost)
+		})
+	}
+}
+
 func TestEffect(t *testing.T) {
 	effect := Effect{
 		Type:        "stress",

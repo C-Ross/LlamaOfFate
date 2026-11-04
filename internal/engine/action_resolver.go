@@ -8,7 +8,6 @@ import (
 
 	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
@@ -60,7 +59,7 @@ type ActionResolver struct {
 	challenge *ChallengeManager
 
 	// Per-scene state — wired by SceneManager.StartScene.
-	player       *character.Character
+	player       *core.Character
 	currentScene *scene.Scene
 
 	// Action-resolution mutable state — reset each scene.
@@ -87,7 +86,7 @@ func (ar *ActionResolver) SetNarrativeProvider(np NarrativeProvider) {
 }
 
 // setSceneState wires per-scene references. Called by SceneManager.StartScene.
-func (ar *ActionResolver) setSceneState(s *scene.Scene, player *character.Character) {
+func (ar *ActionResolver) setSceneState(s *scene.Scene, player *core.Character) {
 	ar.currentScene = s
 	ar.player = player
 }
@@ -175,7 +174,7 @@ func (ar *ActionResolver) resolveAction(ctx context.Context, parsedAction *actio
 
 	// For attacks against characters, use active defense instead of static difficulty
 	var defenseResult *dice.CheckResult
-	var targetChar *character.Character
+	var targetChar *core.Character
 	if parsedAction.Type == action.Attack && parsedAction.Target != "" {
 		targetChar = ar.characters.ResolveCharacter(parsedAction.Target)
 		if targetChar == nil {
@@ -196,7 +195,7 @@ func (ar *ActionResolver) resolveAction(ctx context.Context, parsedAction *actio
 	// For non-attack actions with active NPC opposition (Fate Core: active vs passive),
 	// roll the NPC's skill as opposition instead of using a flat difficulty.
 	var oppositionResult *dice.CheckResult
-	var opposingChar *character.Character
+	var opposingChar *core.Character
 	if parsedAction.Type != action.Attack && parsedAction.OpposingNPCID != "" {
 		opposingChar = ar.characters.ResolveCharacter(parsedAction.OpposingNPCID)
 		if opposingChar != nil {
@@ -293,7 +292,7 @@ func (ar *ActionResolver) finishResolveAction(
 	result *dice.CheckResult,
 	parsedAction *action.Action,
 	initialOutcome *dice.Outcome,
-	targetChar *character.Character,
+	targetChar *core.Character,
 	events []GameEvent,
 ) []GameEvent {
 	parsedAction.CheckResult = result
@@ -360,7 +359,7 @@ func (ar *ActionResolver) finishResolveAction(
 
 // rollTargetDefense rolls an active defense for a target character
 // and returns the roll result plus a DefenseRollEvent.
-func (ar *ActionResolver) rollTargetDefense(target *character.Character, attackSkill string) (*dice.CheckResult, DefenseRollEvent) {
+func (ar *ActionResolver) rollTargetDefense(target *core.Character, attackSkill string) (*dice.CheckResult, DefenseRollEvent) {
 	// Determine defense skill based on attack skill type
 	defenseSkill := core.DefenseSkillForAttack(attackSkill)
 	defenseLevel := target.GetSkill(defenseSkill)
@@ -434,7 +433,7 @@ func (ar *ActionResolver) gatherInvokableAspects(usedAspects map[string]bool) []
 // Create Advantage effects (aspect creation) are handled here directly.
 // Attack damage is delegated to ConflictManager since it touches
 // conflict-specific state (stress, consequences, taken-out, victory).
-func (ar *ActionResolver) applyActionEffects(ctx context.Context, parsedAction *action.Action, target *character.Character) []GameEvent {
+func (ar *ActionResolver) applyActionEffects(ctx context.Context, parsedAction *action.Action, target *core.Character) []GameEvent {
 	if parsedAction.Outcome == nil {
 		return nil
 	}
@@ -465,50 +464,7 @@ func (ar *ActionResolver) applyActionEffects(ctx context.Context, parsedAction *
 		}
 
 	case action.Attack:
-		if target == nil {
-			slog.Warn("Attack has no valid target, cannot apply damage",
-				"component", componentSceneManager,
-				"action_id", parsedAction.ID,
-				"target", parsedAction.Target)
-			events = append(events, PlayerAttackResultEvent{
-				TargetMissing: true,
-				TargetHint:    parsedAction.Target,
-			})
-			return events
-		}
-
-		if parsedAction.IsSuccess() {
-			shifts := parsedAction.Outcome.Shifts
-			if shifts < 1 {
-				shifts = 1 // Minimum 1 shift on success
-			}
-
-			// Determine stress type based on attack skill
-			stressType := core.StressTypeForAttack(parsedAction.Skill)
-
-			events = append(events, PlayerAttackResultEvent{
-				TargetName: target.Name,
-				Shifts:     shifts,
-			})
-
-			// Delegate damage application to ConflictManager (conflict-specific state)
-			dmgEvent := ar.conflict.applyDamageToTarget(ctx, target, shifts, stressType)
-			events = append(events, dmgEvent)
-		} else if parsedAction.Outcome.Type == dice.Tie {
-			// On a tie, attacker gets a boost (no damage dealt) — Fate Core SRD Attack.
-			events = append(events, PlayerAttackResultEvent{
-				TargetName: target.Name,
-				IsTie:      true,
-			})
-			boostName := ar.generateBoostName(ctx, ar.player, parsedAction.Skill, parsedAction.Description, "Fleeting Opening")
-			events = append(events, ar.createBoost(boostName, ar.player.ID))
-		} else if parsedAction.Outcome.Type == dice.Failure && parsedAction.Outcome.Shifts <= -3 {
-			// Target defended with style — defender gets a boost (Fate Core SRD Defend).
-			defDesc := fmt.Sprintf("defending against %s's attack", ar.player.Name)
-			defSkill := core.DefenseSkillForAttack(parsedAction.Skill)
-			boostName := ar.generateBoostName(ctx, target, defSkill, defDesc, "Deflected with Ease")
-			events = append(events, ar.createBoost(boostName, target.ID))
-		}
+		events = append(events, ar.conflict.resolvePlayerAttack(ctx, parsedAction, target)...)
 
 	case action.Overcome:
 		if parsedAction.IsSuccessWithStyle() {
@@ -534,7 +490,7 @@ func (ar *ActionResolver) createBoost(name, createdByID string) AspectCreatedEve
 // It constructs a synthetic CreateAdvantage action with a Tie outcome so the existing
 // aspect generation prompt can produce a thematic boost name.
 // Falls back to the provided fallback string if no generator is available or the call fails.
-func (ar *ActionResolver) generateBoostName(ctx context.Context, char *character.Character, skill, description, fallback string) string {
+func (ar *ActionResolver) generateBoostName(ctx context.Context, char *core.Character, skill, description, fallback string) string {
 	if ar.aspectGenerator == nil {
 		return fallback
 	}
@@ -578,10 +534,7 @@ func (ar *ActionResolver) generateBoostName(ctx context.Context, char *character
 // Falls back to a simple description-based name if the LLM is unavailable or fails.
 func (ar *ActionResolver) generateAspectName(ctx context.Context, parsedAction *action.Action) (string, int) {
 	// Determine free invokes based on outcome
-	freeInvokes := 1
-	if parsedAction.IsSuccessWithStyle() {
-		freeInvokes = 2
-	}
+	freeInvokes, _ := action.FreeInvokesForOutcome(parsedAction.Outcome.Type)
 
 	// Fallback name if LLM generation fails
 	fallbackName := fmt.Sprintf("Advantage from %s", parsedAction.Description)

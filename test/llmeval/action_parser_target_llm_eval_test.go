@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
@@ -20,7 +20,7 @@ type TargetTestCase struct {
 	Name            string
 	RawInput        string
 	Context         string
-	OtherCharacters []*character.Character
+	OtherCharacters []*core.Character
 	ExpectedType    action.ActionType
 	ExpectedSkills  []string
 	// ValidTargets lists acceptable target values. The LLM should return one of these.
@@ -43,53 +43,53 @@ type TargetEvalResult struct {
 }
 
 // getSceneNPCs creates a set of NPCs for targeting tests
-func getSceneNPCs() []*character.Character {
-	bandit := character.NewCharacter("scene_2_npc_0", "Bandit Leader")
+func getSceneNPCs() []*core.Character {
+	bandit := core.NewCharacter("scene_2_npc_0", "Bandit Leader")
 	bandit.Aspects.HighConcept = "Ruthless Outlaw Boss"
 	bandit.Aspects.Trouble = "Wanted Dead or Alive"
 	bandit.SetSkill("Fight", dice.Good)
 	bandit.SetSkill("Shoot", dice.Fair)
 	bandit.SetSkill("Provoke", dice.Fair)
 
-	scout := character.NewCharacter("scene_4_npc_1", "Outlaw Scout")
+	scout := core.NewCharacter("scene_4_npc_1", "Outlaw Scout")
 	scout.Aspects.HighConcept = "Sharp-Eyed Canyon Watcher"
 	scout.Aspects.Trouble = "Jumpy and Paranoid"
 	scout.SetSkill("Shoot", dice.Good)
 	scout.SetSkill("Notice", dice.Good)
 	scout.SetSkill("Stealth", dice.Fair)
 
-	sheriff := character.NewCharacter("scene_1_npc_0", "Sheriff Morgan")
+	sheriff := core.NewCharacter("scene_1_npc_0", "Sheriff Morgan")
 	sheriff.Aspects.HighConcept = "Weary Lawman Past His Prime"
 	sheriff.Aspects.Trouble = "Too Old for This"
 	sheriff.SetSkill("Shoot", dice.Fair)
 	sheriff.SetSkill("Rapport", dice.Good)
 	sheriff.SetSkill("Notice", dice.Fair)
 
-	return []*character.Character{bandit, scout, sheriff}
+	return []*core.Character{bandit, scout, sheriff}
 }
 
 // getNonPatternNPCs creates NPCs with non-conventional IDs (no scene_N_npc_N pattern).
 // These IDs match what the scenario generator actually produces (short descriptive slugs).
-func getNonPatternNPCs() []*character.Character {
-	agent := character.NewCharacter("corp-agent", "Agent Chen")
+func getNonPatternNPCs() []*core.Character {
+	agent := core.NewCharacter("corp-agent", "Agent Chen")
 	agent.Aspects.HighConcept = "Ruthless Corporate Troubleshooter"
 	agent.Aspects.Trouble = "Answers to the Board"
 	agent.SetSkill("Shoot", dice.Good)
 	agent.SetSkill("Fight", dice.Fair)
 	agent.SetSkill("Notice", dice.Fair)
 
-	drone := character.NewCharacter("drone-1", "Security Drone Alpha")
+	drone := core.NewCharacter("drone-1", "Security Drone Alpha")
 	drone.Aspects.HighConcept = "Automated Patrol Unit"
 	drone.SetSkill("Shoot", dice.Great)
 	drone.SetSkill("Notice", dice.Good)
 
-	mechanic := character.NewCharacter("npc_42", "Grease Monkey Voss")
+	mechanic := core.NewCharacter("npc_42", "Grease Monkey Voss")
 	mechanic.Aspects.HighConcept = "Underground Tech Genius"
 	mechanic.Aspects.Trouble = "Owes Favors to Everyone"
 	mechanic.SetSkill("Crafts", dice.Great)
 	mechanic.SetSkill("Contacts", dice.Fair)
 
-	return []*character.Character{agent, drone, mechanic}
+	return []*core.Character{agent, drone, mechanic}
 }
 
 // getAttackTargetTestCases returns test cases where the player attacks a specific NPC
@@ -274,7 +274,7 @@ func getNonPatternTargetTestCases() []TargetTestCase {
 }
 
 // evaluateTargetTestCase runs a single targeting test case
-func evaluateTargetTestCase(ctx context.Context, parser engine.ActionParser, char *character.Character, tc TargetTestCase) TargetEvalResult {
+func evaluateTargetTestCase(ctx context.Context, parser engine.ActionParser, char *core.Character, tc TargetTestCase) TargetEvalResult {
 	req := engine.ActionParseRequest{
 		Character:       char,
 		RawInput:        tc.RawInput,
@@ -347,7 +347,7 @@ func evaluateTargetTestCase(ctx context.Context, parser engine.ActionParser, cha
 }
 
 // isCharacterTarget checks if the target string references any of the given characters
-func isCharacterTarget(target string, chars []*character.Character) bool {
+func isCharacterTarget(target string, chars []*core.Character) bool {
 	lower := strings.ToLower(target)
 	for _, c := range chars {
 		if strings.Contains(lower, strings.ToLower(c.ID)) ||

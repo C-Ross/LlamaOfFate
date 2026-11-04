@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
 	promptpkg "github.com/C-Ross/LlamaOfFate/internal/prompt"
@@ -20,7 +20,7 @@ type SceneTransitionTestCase struct {
 	PlayerInput            string
 	SceneName              string
 	SceneDescription       string
-	OtherCharacters        []*character.Character
+	OtherCharacters        []*core.Character
 	ExpectTransitionMarker bool   // Should the LLM add a SCENE_TRANSITION marker?
 	ExpectedHintContains   string // Optional: check if the hint contains this text
 	Description            string // Human-readable description of why this should/shouldn't trigger transition
@@ -36,7 +36,7 @@ func getExitTestCases() []SceneTransitionTestCase {
 			PlayerInput:            "Jesse turns and walks out of the saloon",
 			SceneName:              "The Dusty Spur Saloon",
 			SceneDescription:       "A dimly lit saloon with swinging doors, a long bar, and the smell of whiskey",
-			OtherCharacters:        []*character.Character{bartender},
+			OtherCharacters:        []*core.Character{bartender},
 			ExpectTransitionMarker: true,
 			Description:            "Explicitly walking out should trigger scene transition",
 		},
@@ -45,7 +45,7 @@ func getExitTestCases() []SceneTransitionTestCase {
 			PlayerInput:            "\"Thanks for the drink.\" Jesse tips his hat and saunters out.",
 			SceneName:              "The Dusty Spur Saloon",
 			SceneDescription:       "A dimly lit saloon with swinging doors, a long bar, and the smell of whiskey",
-			OtherCharacters:        []*character.Character{bartender},
+			OtherCharacters:        []*core.Character{bartender},
 			ExpectTransitionMarker: true,
 			Description:            "Farewell dialog combined with leaving should trigger transition",
 		},
@@ -119,7 +119,7 @@ func getNoExitTestCases() []SceneTransitionTestCase {
 			PlayerInput:            "I walk up to the bar and sit down",
 			SceneName:              "The Dusty Spur Saloon",
 			SceneDescription:       "A dimly lit saloon with a long bar",
-			OtherCharacters:        []*character.Character{bartender},
+			OtherCharacters:        []*core.Character{bartender},
 			ExpectTransitionMarker: false,
 			Description:            "Approaching something within the scene is not leaving",
 		},
@@ -144,7 +144,7 @@ func getNoExitTestCases() []SceneTransitionTestCase {
 			PlayerInput:            "I order a whiskey",
 			SceneName:              "The Dusty Spur Saloon",
 			SceneDescription:       "A dimly lit saloon",
-			OtherCharacters:        []*character.Character{bartender},
+			OtherCharacters:        []*core.Character{bartender},
 			ExpectTransitionMarker: false,
 			Description:            "Normal interaction should not trigger transition",
 		},
@@ -153,7 +153,7 @@ func getNoExitTestCases() []SceneTransitionTestCase {
 			PlayerInput:            "\"Tell me about the Cortez Gang\"",
 			SceneName:              "The Dusty Spur Saloon",
 			SceneDescription:       "A dimly lit saloon",
-			OtherCharacters:        []*character.Character{bartender},
+			OtherCharacters:        []*core.Character{bartender},
 			ExpectTransitionMarker: false,
 			Description:            "Dialog without movement should not trigger transition",
 		},
@@ -312,7 +312,7 @@ func evaluateSceneTransition(ctx context.Context, client llm.LLMClient, tc Scene
 	testScene := scene.NewScene("test-scene", tc.SceneName, tc.SceneDescription)
 
 	// Create a test player character
-	player := character.NewCharacter("player1", "Test Character")
+	player := core.NewCharacter("player1", "Test Character")
 	player.Aspects.HighConcept = "Wandering Stranger"
 
 	// Build character context

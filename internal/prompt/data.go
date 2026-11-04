@@ -3,8 +3,8 @@ package prompt
 import (
 	"fmt"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/uicontract"
@@ -73,6 +73,8 @@ type InputClassificationData struct {
 	Scene                 *scene.Scene
 	PlayerInput           string
 	ActiveChallengeSkills []string // Pending task skills from an active challenge (e.g., ["Notice", "Stealth"])
+	CharacterAspects      []string // All character aspects (high concept, trouble, other) for unreasonable-input detection
+	Genre                 string   // Setting genre (e.g., "Western", "Sci-Fi", "Fantasy") for anachronism detection
 }
 
 // SceneResponseData holds the data for scene response template
@@ -83,9 +85,9 @@ type SceneResponseData struct {
 	ConversationContext string
 	PlayerInput         string
 	InteractionType     string
-	OtherCharacters     []*character.Character
-	TakenOutCharacters  []*character.Character // Characters defeated earlier in this scene
-	ScenePurpose        string                 // Dramatic question driving this scene
+	OtherCharacters     []*core.Character
+	TakenOutCharacters  []*core.Character // Characters defeated earlier in this scene
+	ScenePurpose        string            // Dramatic question driving this scene
 }
 
 // ConflictResponseData holds the data for conflict response template
@@ -95,11 +97,11 @@ type ConflictResponseData struct {
 	AspectsContext       string
 	ConversationContext  string
 	PlayerInput          string
-	OtherCharacters      []*character.Character
-	TakenOutCharacters   []*character.Character // Characters defeated earlier in this scene
+	OtherCharacters      []*core.Character
+	TakenOutCharacters   []*core.Character // Characters defeated earlier in this scene
 	CurrentCharacterName string
 	ParticipantMap       map[string]*scene.ConflictParticipant
-	CharacterMap         map[string]*character.Character
+	CharacterMap         map[string]*core.Character
 	ScenePurpose         string // Dramatic question driving this scene
 }
 
@@ -110,7 +112,7 @@ type ActionNarrativeData struct {
 	AspectsContext       string
 	ConversationContext  string
 	Action               *action.Action
-	OtherCharacters      []*character.Character
+	OtherCharacters      []*core.Character
 	ChallengeDescription string // Overall challenge description, if active
 	ChallengeTaskDesc    string // Specific task being resolved, if any
 }
@@ -305,11 +307,11 @@ type ChallengeContext struct {
 
 // ActionParseTemplateData holds the data for action parse template
 type ActionParseTemplateData struct {
-	Character          *character.Character
+	Character          *core.Character
 	RawInput           string
 	Context            string
 	Scene              interface{}
-	OtherCharacters    []*character.Character
+	OtherCharacters    []*core.Character
 	DifficultyGuidance                   // Embedded difficulty thresholds
 	ChallengeContext   *ChallengeContext // Non-nil when an active challenge is in progress
 }
@@ -317,7 +319,39 @@ type ActionParseTemplateData struct {
 // ActionParseSystemData holds the data for the action parse system prompt template.
 // It controls conditional sections like active vs passive opposition guidance.
 type ActionParseSystemData struct {
-	HasOtherCharacters bool // When false, the prompt presents passive opposition as the only option
+	HasOtherCharacters bool               // When false, the prompt presents passive opposition as the only option
+	Skills             []SkillDescription // Skill list for the prompt; if nil, defaults to FateCoreSkillDescriptions
+}
+
+// SkillDescription pairs a skill name with its LLM-facing description for
+// the action parse system prompt.
+type SkillDescription struct {
+	Name        string
+	Description string
+}
+
+// FateCoreSkillDescriptions provides the canonical 18 Fate Core skills with
+// descriptions suitable for the LLM action-parse prompt. The slice is in
+// alphabetical order matching core.FateCoreSkills.
+var FateCoreSkillDescriptions = []SkillDescription{
+	{core.SkillAthletics, "Physical movement, jumping, running, climbing"},
+	{core.SkillBurglary, "Breaking and entering, lockpicking, security systems"},
+	{core.SkillContacts, "Social networks, finding people, gathering information"},
+	{core.SkillCrafts, "Making, breaking, or fixing things"},
+	{core.SkillDeceive, "Lying, disguises, creating false impressions. ONLY for deliberately dishonest actions \u2014 never for routine honest interactions"},
+	{core.SkillDrive, "Operating vehicles and handling chases"},
+	{core.SkillEmpathy, "Reading people's emotions and motivations"},
+	{core.SkillFight, "Hand-to-hand combat, melee weapons, and close-range takedowns"},
+	{core.SkillInvestigate, "Careful examination, research, following clues"},
+	{core.SkillLore, "Education, knowledge, specialized information"},
+	{core.SkillNotice, "Awareness, perception, spotting things"},
+	{core.SkillPhysique, "Raw strength, endurance, health"},
+	{core.SkillProvoke, "Getting reactions, intimidation, social pressure"},
+	{core.SkillRapport, "Honest social interaction, genuine requests, charm, building trust. Use for any straightforward social exchange: ordering, buying, asking, persuading honestly"},
+	{core.SkillResources, "Money, equipment, lifestyle"},
+	{core.SkillShoot, "Ranged combat and thrown weapons"},
+	{core.SkillStealth, "Avoiding detection, moving unseen"},
+	{core.SkillWill, "Mental fortitude, resisting mental attacks"},
 }
 
 // FateNarrationData holds the data for the fate narration template.
@@ -354,10 +388,10 @@ type FateNarrationResult struct {
 
 // AspectGenerationRequest holds the data for aspect generation template
 type AspectGenerationRequest struct {
-	Character       *character.Character `json:"character"`
-	Action          *action.Action       `json:"action"`
-	Outcome         *dice.Outcome        `json:"outcome"`
-	Context         string               `json:"context"`                    // Scene description or situational context
-	TargetType      string               `json:"target_type"`                // "character", "scene", "object", "situation"
-	ExistingAspects []string             `json:"existing_aspects,omitempty"` // Aspects already in play
+	Character       *core.Character `json:"character"`
+	Action          *action.Action  `json:"action"`
+	Outcome         *dice.Outcome   `json:"outcome"`
+	Context         string          `json:"context"`                    // Scene description or situational context
+	TargetType      string          `json:"target_type"`                // "character", "scene", "object", "situation"
+	ExistingAspects []string        `json:"existing_aspects,omitempty"` // Aspects already in play
 }

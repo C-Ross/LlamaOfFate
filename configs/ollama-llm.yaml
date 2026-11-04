@@ -3,7 +3,7 @@
 # Requires a running Ollama instance on localhost:11434.
 # Pull a model first:  ./scripts/ollama-pull.sh
 #
-# Uses Ollama's OpenAI-compatible endpoint so we can reuse the Azure client.
+# Uses Ollama's OpenAI-compatible endpoint.
 
 # Ollama's OpenAI-compatible chat completions endpoint
 api_endpoint: "http://localhost:11434/v1/chat/completions"

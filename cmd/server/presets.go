@@ -5,7 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/C-Ross/LlamaOfFate/internal/config"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/ui/web"
@@ -14,7 +14,7 @@ import (
 // presetEntry bundles a scenario with its matching default player character.
 type presetEntry struct {
 	Scenario *scene.Scenario
-	Player   *character.Character
+	Player   *core.Character
 	Meta     web.ScenarioPreset // Wire-format metadata for the setup screen
 }
 
@@ -66,7 +66,7 @@ func allPresetMeta() []web.ScenarioPreset {
 
 // lookupPreset returns the scenario and player for a given preset ID,
 // or an error if the ID is not recognized.
-func lookupPreset(id string) (*scene.Scenario, *character.Character, error) {
+func lookupPreset(id string) (*scene.Scenario, *core.Character, error) {
 	p, ok := getPreset(id)
 	if !ok {
 		return nil, nil, fmt.Errorf("unknown preset: %q", id)
@@ -74,10 +74,43 @@ func lookupPreset(id string) (*scene.Scenario, *character.Character, error) {
 	return p.Scenario, p.Player, nil
 }
 
+// buildCustomPlayerFromSetup creates a player character from the full custom
+// setup data. It applies additional aspects and custom skills when provided,
+// falling back to genre defaults for skills when setup.Skills is nil.
+func buildCustomPlayerFromSetup(setup *web.CustomSetup) (*core.Character, error) {
+	player := core.NewCharacter("player1", setup.Name)
+	player.Aspects.HighConcept = setup.HighConcept
+	player.Aspects.Trouble = setup.Trouble
+
+	for _, a := range setup.Aspects {
+		player.Aspects.AddAspect(a)
+	}
+
+	if len(setup.Skills) > 0 {
+		// Convert wire format (int) to dice.Ladder for validation.
+		ladderSkills := make(map[string]dice.Ladder, len(setup.Skills))
+		for name, level := range setup.Skills {
+			ladderSkills[name] = dice.Ladder(level)
+		}
+		if err := core.ValidateStandardSkillPyramid(ladderSkills); err != nil {
+			return nil, fmt.Errorf("invalid skill pyramid: %w", err)
+		}
+		for name, level := range ladderSkills {
+			player.SetSkill(name, level)
+		}
+	} else {
+		applyDefaultSkillPyramid(player, setup.Genre)
+	}
+
+	return player, nil
+}
+
 // buildCustomPlayer creates a player character from custom setup data with
 // a default skill pyramid. The genre determines which skills are selected.
-func buildCustomPlayer(name, highConcept, trouble, genre string) *character.Character {
-	player := character.NewCharacter("player1", name)
+//
+// Deprecated: Use buildCustomPlayerFromSetup for new code.
+func buildCustomPlayer(name, highConcept, trouble, genre string) *core.Character {
+	player := core.NewCharacter("player1", name)
 	player.Aspects.HighConcept = highConcept
 	player.Aspects.Trouble = trouble
 	applyDefaultSkillPyramid(player, genre)
@@ -85,41 +118,41 @@ func buildCustomPlayer(name, highConcept, trouble, genre string) *character.Char
 }
 
 // applyDefaultSkillPyramid assigns a genre-appropriate default skill pyramid.
-func applyDefaultSkillPyramid(player *character.Character, genre string) {
+func applyDefaultSkillPyramid(player *core.Character, genre string) {
 	switch genre {
 	case "Cyberpunk":
-		player.SetSkill("Burglary", dice.Great)
-		player.SetSkill("Stealth", dice.Good)
-		player.SetSkill("Notice", dice.Good)
-		player.SetSkill("Shoot", dice.Fair)
-		player.SetSkill("Athletics", dice.Fair)
-		player.SetSkill("Deceive", dice.Fair)
-		player.SetSkill("Investigate", dice.Average)
-		player.SetSkill("Will", dice.Average)
-		player.SetSkill("Contacts", dice.Average)
-		player.SetSkill("Lore", dice.Average)
+		player.SetSkill(core.SkillBurglary, dice.Great)
+		player.SetSkill(core.SkillStealth, dice.Good)
+		player.SetSkill(core.SkillNotice, dice.Good)
+		player.SetSkill(core.SkillShoot, dice.Fair)
+		player.SetSkill(core.SkillAthletics, dice.Fair)
+		player.SetSkill(core.SkillDeceive, dice.Fair)
+		player.SetSkill(core.SkillInvestigate, dice.Average)
+		player.SetSkill(core.SkillWill, dice.Average)
+		player.SetSkill(core.SkillContacts, dice.Average)
+		player.SetSkill(core.SkillLore, dice.Average)
 	case "Fantasy":
-		player.SetSkill("Lore", dice.Great)
-		player.SetSkill("Investigate", dice.Good)
-		player.SetSkill("Notice", dice.Good)
-		player.SetSkill("Will", dice.Fair)
-		player.SetSkill("Rapport", dice.Fair)
-		player.SetSkill("Athletics", dice.Fair)
-		player.SetSkill("Empathy", dice.Average)
-		player.SetSkill("Stealth", dice.Average)
-		player.SetSkill("Shoot", dice.Average)
-		player.SetSkill("Physique", dice.Average)
+		player.SetSkill(core.SkillLore, dice.Great)
+		player.SetSkill(core.SkillInvestigate, dice.Good)
+		player.SetSkill(core.SkillNotice, dice.Good)
+		player.SetSkill(core.SkillWill, dice.Fair)
+		player.SetSkill(core.SkillRapport, dice.Fair)
+		player.SetSkill(core.SkillAthletics, dice.Fair)
+		player.SetSkill(core.SkillEmpathy, dice.Average)
+		player.SetSkill(core.SkillStealth, dice.Average)
+		player.SetSkill(core.SkillShoot, dice.Average)
+		player.SetSkill(core.SkillPhysique, dice.Average)
 	default:
 		// Western / generic fallback
-		player.SetSkill("Shoot", dice.Great)
-		player.SetSkill("Athletics", dice.Good)
-		player.SetSkill("Notice", dice.Good)
-		player.SetSkill("Fight", dice.Fair)
-		player.SetSkill("Will", dice.Fair)
-		player.SetSkill("Investigate", dice.Fair)
-		player.SetSkill("Physique", dice.Average)
-		player.SetSkill("Provoke", dice.Average)
-		player.SetSkill("Stealth", dice.Average)
-		player.SetSkill("Rapport", dice.Average)
+		player.SetSkill(core.SkillShoot, dice.Great)
+		player.SetSkill(core.SkillAthletics, dice.Good)
+		player.SetSkill(core.SkillNotice, dice.Good)
+		player.SetSkill(core.SkillFight, dice.Fair)
+		player.SetSkill(core.SkillWill, dice.Fair)
+		player.SetSkill(core.SkillInvestigate, dice.Fair)
+		player.SetSkill(core.SkillPhysique, dice.Average)
+		player.SetSkill(core.SkillProvoke, dice.Average)
+		player.SetSkill(core.SkillStealth, dice.Average)
+		player.SetSkill(core.SkillRapport, dice.Average)
 	}
 }

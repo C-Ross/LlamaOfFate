@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
@@ -42,11 +42,11 @@ type AspectGeneratorEvaluationSummary struct {
 }
 
 func TestAspectGeneratorLLMEvaluation(t *testing.T) {
-	azureClient := RequireLLMClient(t)
+	llmClient := RequireLLMClient(t)
 	verboseLogging := VerboseLoggingEnabled()
 
 	// Create aspect generator
-	aspectGenerator := engine.NewAspectGenerator(azureClient)
+	aspectGenerator := engine.NewAspectGenerator(llmClient)
 
 	// Create a test character
 	char := createTestCharacter()
@@ -221,8 +221,8 @@ func TestAspectGeneratorLLMEvaluation(t *testing.T) {
 	}
 }
 
-func createTestCharacter() *character.Character {
-	char := character.NewCharacter("player-001", "Zara the Swift")
+func createTestCharacter() *core.Character {
+	char := core.NewCharacter("player-001", "Zara the Swift")
 	char.Aspects.HighConcept = "Acrobatic Cat Burglar"
 	char.Aspects.Trouble = "Can't Resist a Shiny Challenge"
 	char.Aspects.AddAspect("Friends in Low Places")
@@ -454,10 +454,10 @@ func getAspectGeneratorTestCases() []AspectGeneratorTestCase {
 }
 
 func TestAspectGeneratorEdgeCases(t *testing.T) {
-	azureClient := RequireLLMClient(t)
+	llmClient := RequireLLMClient(t)
 	verboseLogging := VerboseLoggingEnabled()
 
-	aspectGenerator := engine.NewAspectGenerator(azureClient)
+	aspectGenerator := engine.NewAspectGenerator(llmClient)
 	char := createTestCharacter()
 	ctx := context.Background()
 

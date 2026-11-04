@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/C-Ross/LlamaOfFate/internal/config"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
@@ -83,7 +83,7 @@ func TestClonePlayer_NilSource(t *testing.T) {
 }
 
 func TestClonePlayer_DeepCopies(t *testing.T) {
-	src := character.NewCharacter("p1", "Hero")
+	src := core.NewCharacter("p1", "Hero")
 	src.Aspects.HighConcept = "Brave Warrior"
 	src.Aspects.Trouble = "Quick to Anger"
 	src.Aspects.OtherAspects = []string{"Well Connected"}
@@ -309,7 +309,9 @@ func TestNew_InvalidConfigRoot(t *testing.T) {
 	gs, err := New(nil, "/nonexistent/path/to/configs")
 	require.NoError(t, err)
 	require.NotNil(t, gs)
-	assert.Empty(t, gs.presets)
+	require.NotEmpty(t, gs.presets)
+	_, ok := gs.presets["saloon"]
+	assert.True(t, ok)
 }
 
 // --- handleListPresets with presets ---
@@ -504,7 +506,7 @@ func TestGetGameState_WithGameManager(t *testing.T) {
 	require.NoError(t, err)
 
 	gm := engine.NewGameManager(eng, session.NullLogger{})
-	player := character.NewCharacter("player1", "Test Hero")
+	player := core.NewCharacter("player1", "Test Hero")
 	player.Aspects.HighConcept = "Courageous Fighter"
 	gm.SetPlayer(player)
 
@@ -636,7 +638,7 @@ func TestCreateSessionLogger_Success(t *testing.T) {
 		},
 		Scenario: &scene.Scenario{Title: "Test Scenario"},
 	}
-	player := character.NewCharacter("p1", "Test Hero")
+	player := core.NewCharacter("p1", "Test Hero")
 
 	logger, err := gs.createSessionLogger(ls, player)
 	if err != nil {
@@ -658,7 +660,7 @@ func TestCreateSessionLogger_FallsBackToID(t *testing.T) {
 		},
 		Scenario: &scene.Scenario{Title: "My Scenario"},
 	}
-	player := character.NewCharacter("p1", "Adventurer")
+	player := core.NewCharacter("p1", "Adventurer")
 
 	logger, err := gs.createSessionLogger(ls, player)
 	if err != nil {
@@ -702,7 +704,7 @@ func TestHandleStartGame_PlayerOverrides(t *testing.T) {
 			Genre: "sci-fi",
 		},
 		Scenario: &scene.Scenario{Title: "Hero Scenario"},
-		Player:   character.NewCharacter("p1", "Default Hero"),
+		Player:   core.NewCharacter("p1", "Default Hero"),
 	}
 
 	result := callTool(t, gs, makeRequest("start_game", map[string]any{
@@ -717,4 +719,111 @@ func TestHandleStartGame_PlayerOverrides(t *testing.T) {
 	require.NotNil(t, result)
 	assert.True(t, result.IsError)
 	assert.Contains(t, extractText(t, result), "start failed")
+}
+
+func TestHandleStartGame_PlayerAspects(t *testing.T) {
+	gs := newTestServer(t)
+	gs.presets["hero"] = &config.LoadedScenario{
+		Raw:      config.ScenarioFile{ID: "hero", Genre: "fantasy"},
+		Scenario: &scene.Scenario{Title: "Hero Scenario"},
+		Player:   core.NewCharacter("p1", "Default Hero"),
+	}
+
+	result := callTool(t, gs, makeRequest("start_game", map[string]any{
+		"preset_id":      "hero",
+		"player_aspects": []string{"Born Under a Bad Sign", "My Father's Sword"},
+	}))
+
+	// Engine fails without LLM, but player aspects were applied before that.
+	require.NotNil(t, result)
+	assert.True(t, result.IsError)
+	assert.Contains(t, extractText(t, result), "start failed")
+}
+
+func TestHandleStartGame_PlayerSkills_Valid(t *testing.T) {
+	gs := newTestServer(t)
+	player := core.NewCharacter("p1", "Default Hero")
+	player.SetSkill("Lore", dice.Great) // preset skill that should be replaced
+	gs.presets["hero"] = &config.LoadedScenario{
+		Raw:      config.ScenarioFile{ID: "hero", Genre: "fantasy"},
+		Scenario: &scene.Scenario{Title: "Hero Scenario"},
+		Player:   player,
+	}
+
+	result := callTool(t, gs, makeRequest("start_game", map[string]any{
+		"preset_id": "hero",
+		"player_skills": map[string]any{
+			"Notice":      float64(4),
+			"Athletics":   float64(3),
+			"Will":        float64(3),
+			"Investigate": float64(2),
+			"Rapport":     float64(2),
+			"Fight":       float64(2),
+			"Stealth":     float64(1),
+			"Physique":    float64(1),
+			"Empathy":     float64(1),
+			"Shoot":       float64(1),
+		},
+	}))
+
+	// Engine fails without LLM, but skill validation passed.
+	require.NotNil(t, result)
+	assert.True(t, result.IsError)
+	assert.Contains(t, extractText(t, result), "start failed")
+}
+
+func TestHandleStartGame_PlayerSkills_Invalid(t *testing.T) {
+	gs := newTestServer(t)
+	gs.presets["hero"] = &config.LoadedScenario{
+		Raw:      config.ScenarioFile{ID: "hero", Genre: "fantasy"},
+		Scenario: &scene.Scenario{Title: "Hero Scenario"},
+		Player:   core.NewCharacter("p1", "Default Hero"),
+	}
+
+	// Two Great skills — invalid pyramid
+	result := callTool(t, gs, makeRequest("start_game", map[string]any{
+		"preset_id": "hero",
+		"player_skills": map[string]any{
+			"Notice":    float64(4),
+			"Athletics": float64(4),
+		},
+	}))
+
+	require.NotNil(t, result)
+	assert.True(t, result.IsError)
+	text := extractText(t, result)
+	assert.Contains(t, text, "invalid skill pyramid")
+}
+
+func TestHandleStartGame_EmptySkillsUsesPreset(t *testing.T) {
+	gs := newTestServer(t)
+	gs.presets["hero"] = &config.LoadedScenario{
+		Raw:      config.ScenarioFile{ID: "hero", Genre: "fantasy"},
+		Scenario: &scene.Scenario{Title: "Hero Scenario"},
+		Player:   core.NewCharacter("p1", "Default Hero"),
+	}
+
+	// Empty object should be treated as "no override"
+	result := callTool(t, gs, makeRequest("start_game", map[string]any{
+		"preset_id":     "hero",
+		"player_skills": map[string]any{},
+	}))
+
+	// Should not fail on validation — passes through to engine start
+	require.NotNil(t, result)
+	assert.True(t, result.IsError)
+	assert.Contains(t, extractText(t, result), "start failed")
+}
+
+func TestApplySkillOverrides_BadType(t *testing.T) {
+	player := core.NewCharacter("p1", "Hero")
+	req := makeRequest("start_game", map[string]any{
+		"player_skills": map[string]any{
+			"Notice": "not-a-number",
+		},
+	})
+
+	err := applySkillOverrides(req, player)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "expected a number")
 }

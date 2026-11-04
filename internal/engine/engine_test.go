@@ -3,14 +3,14 @@ package engine
 import (
 	"testing"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func newTestNPC(id, name string) *character.Character {
-	return character.NewCharacter(id, name)
+func newTestNPC(id, name string) *core.Character {
+	return core.NewCharacter(id, name)
 }
 
 func TestResolveCharacter(t *testing.T) {

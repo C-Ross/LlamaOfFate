@@ -3,7 +3,7 @@ package engine
 import (
 	"testing"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/stretchr/testify/assert"
@@ -20,7 +20,7 @@ func TestNewConflictManager(t *testing.T) {
 
 func TestConflictManager_SetSceneState(t *testing.T) {
 	cm := newConflictManager(nil, nil, session.NullLogger{})
-	player := character.NewCharacter("p1", "Hero")
+	player := core.NewCharacter("p1", "Hero")
 	s := scene.NewScene("s1", "Room", "A room")
 
 	cm.setSceneState(s, player)
@@ -45,7 +45,7 @@ func TestSceneManager_ConflictManagerWiring(t *testing.T) {
 	sm := NewSceneManager(engine, engine.llmClient, engine.actionParser, session.NullLogger{})
 	require.NotNil(t, sm.conflict, "ConflictManager should be created by NewSceneManager")
 
-	player := character.NewCharacter("p1", "Hero")
+	player := core.NewCharacter("p1", "Hero")
 	s := scene.NewScene("s1", "Room", "A room")
 	err = sm.StartScene(s, player)
 	require.NoError(t, err)
@@ -69,7 +69,7 @@ func TestSceneManager_ResetSceneState_ResetsConflictManager(t *testing.T) {
 
 func TestSceneManager_Restore_WiresConflictManager(t *testing.T) {
 	sm := NewSceneManager(nil, nil, nil, session.NullLogger{})
-	player := character.NewCharacter("p1", "Hero")
+	player := core.NewCharacter("p1", "Hero")
 	s := scene.NewScene("s1", "Room", "A room")
 
 	state := SceneState{

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/stretchr/testify/assert"
@@ -27,7 +27,7 @@ func TestGameManager_SetPlayer(t *testing.T) {
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine, session.NullLogger{})
-	player := character.NewCharacter("player1", "Test Hero")
+	player := core.NewCharacter("player1", "Test Hero")
 
 	gm.SetPlayer(player)
 
@@ -77,12 +77,12 @@ func TestGameManager_GetEngine(t *testing.T) {
 
 func TestInitialSceneConfig_Fields(t *testing.T) {
 	testScene := scene.NewScene("scene1", "Test Scene", "A test scene")
-	npc1 := character.NewCharacter("npc1", "NPC One")
-	npc2 := character.NewCharacter("npc2", "NPC Two")
+	npc1 := core.NewCharacter("npc1", "NPC One")
+	npc2 := core.NewCharacter("npc2", "NPC Two")
 
 	config := &InitialSceneConfig{
 		Scene: testScene,
-		NPCs:  []*character.Character{npc1, npc2},
+		NPCs:  []*core.Character{npc1, npc2},
 	}
 
 	assert.Equal(t, testScene, config.Scene)
@@ -94,7 +94,7 @@ func TestGameManager_HandleMilestone_ReturnsMilestoneEvent(t *testing.T) {
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine, session.NullLogger{})
-	player := character.NewCharacter("player1", "Test Hero")
+	player := core.NewCharacter("player1", "Test Hero")
 	player.FatePoints = 1
 	player.Refresh = 3
 	gm.SetPlayer(player)
@@ -121,14 +121,14 @@ func TestGameManager_HandleMilestone_WithConsequenceRecovery(t *testing.T) {
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine, session.NullLogger{})
-	player := character.NewCharacter("player1", "Test Hero")
+	player := core.NewCharacter("player1", "Test Hero")
 	player.FatePoints = 2
 	player.Refresh = 3
 	// Add a recovering moderate consequence that should heal at scenario milestone
-	player.Consequences = []character.Consequence{
+	player.Consequences = []core.Consequence{
 		{
 			ID:                    "c1",
-			Type:                  character.ModerateConsequence,
+			Type:                  core.ModerateConsequence,
 			Aspect:                "Broken Arm",
 			Recovering:            true,
 			RecoveryStartScene:    0,
@@ -161,7 +161,7 @@ func TestGameManager_HandleMilestone_NilScenario(t *testing.T) {
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine, session.NullLogger{})
-	player := character.NewCharacter("player1", "Test Hero")
+	player := core.NewCharacter("player1", "Test Hero")
 	player.Refresh = 3
 	gm.SetPlayer(player)
 	// No scenario set
@@ -218,7 +218,7 @@ func TestGameManager_Start_FreshStart(t *testing.T) {
 	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Test Hero")
+	player := core.NewCharacter("player1", "Test Hero")
 	player.Aspects.HighConcept = "Brave Knight"
 
 	gm := NewGameManager(engine, session.NullLogger{})
@@ -242,7 +242,7 @@ func TestGameManager_HandleInput_BeforeStart(t *testing.T) {
 	require.NoError(t, err)
 
 	gm := NewGameManager(engine, session.NullLogger{})
-	gm.SetPlayer(character.NewCharacter("player1", "Test Hero"))
+	gm.SetPlayer(core.NewCharacter("player1", "Test Hero"))
 
 	_, err = gm.HandleInput(context.Background(), "hello")
 	assert.Error(t, err)
@@ -275,7 +275,7 @@ func TestGameManager_Start_ResumeFromSave(t *testing.T) {
 	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Test Hero")
+	player := core.NewCharacter("player1", "Test Hero")
 	player.FatePoints = 3
 
 	testScene := scene.NewScene("scene1", "The Vault", "A bank vault")
@@ -313,7 +313,7 @@ func TestGameManager_Start_LoadFailure_EmitsErrorNotification(t *testing.T) {
 	engine, err := NewWithLLM(newTestLLMClient(), session.NullLogger{})
 	require.NoError(t, err)
 
-	player := character.NewCharacter("player1", "Test Hero")
+	player := core.NewCharacter("player1", "Test Hero")
 	player.Aspects.HighConcept = "Brave Knight"
 
 	gm := NewGameManager(engine, session.NullLogger{})

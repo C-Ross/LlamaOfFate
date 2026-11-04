@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"log"
 	"log/slog"
 	"net/http"
@@ -11,16 +12,17 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
 	"github.com/C-Ross/LlamaOfFate/internal/llm"
-	"github.com/C-Ross/LlamaOfFate/internal/llm/azure"
+	"github.com/C-Ross/LlamaOfFate/internal/llm/openai"
 	"github.com/C-Ross/LlamaOfFate/internal/logging"
 	"github.com/C-Ross/LlamaOfFate/internal/prompt"
 	"github.com/C-Ross/LlamaOfFate/internal/session"
 	"github.com/C-Ross/LlamaOfFate/internal/storage"
 	"github.com/C-Ross/LlamaOfFate/internal/ui/web"
+	webstatic "github.com/C-Ross/LlamaOfFate/web"
 )
 
 func main() {
@@ -50,7 +52,15 @@ func main() {
 		AllowCustom: true,
 	}
 
-	handler := web.NewHandler(factory, setupCfg, slog.Default())
+	// Serve the embedded React frontend from web/dist.
+	// The "dist" prefix is stripped so that dist/index.html is served at /.
+	frontend, err := fs.Sub(webstatic.Dist, "dist")
+	if err != nil {
+		log.Fatalf("failed to create frontend FS: %v", err)
+	}
+
+	handler := web.NewHandler(factory, setupCfg, slog.Default(), frontend)
+	webViewURL := webUIURL(port)
 
 	srv := &http.Server{
 		Addr:              ":" + port,
@@ -60,6 +70,8 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+
+	fmt.Printf("Web UI available at %s\n", webViewURL)
 
 	go func() {
 		slog.Info("server starting", "port", port)
@@ -79,16 +91,17 @@ func main() {
 	slog.Info("server stopped")
 }
 
+func webUIURL(port string) string {
+	return fmt.Sprintf("http://localhost:%s", port)
+}
+
 func initLLMClient(configPath string) (llm.LLMClient, error) {
-	if _, err := os.Stat(configPath); err != nil {
-		return nil, fmt.Errorf("LLM config not found at %s", configPath)
-	}
-	config, err := azure.LoadConfig(configPath)
+	config, err := openai.LoadConfig(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("load LLM config: %w", err)
 	}
-	azureClient := azure.NewClient(*config)
-	retryClient := llm.NewRetryingClient(azureClient, llm.DefaultRetryConfig())
+	llmClient := openai.NewClient(*config)
+	retryClient := llm.NewRetryingClient(llmClient, llm.DefaultRetryConfig())
 	slog.Info("LLM integration enabled", "model", config.ModelName)
 	return retryClient, nil
 }
@@ -133,7 +146,7 @@ func newGameSession(ctx context.Context, llmClient llm.LLMClient, gameID string,
 
 	// Setup provided — create fresh game with chosen scenario + player.
 	var scenario *scene.Scenario
-	var player *character.Character
+	var player *core.Character
 
 	if setup.PresetID != "" {
 		var err error
@@ -142,13 +155,11 @@ func newGameSession(ctx context.Context, llmClient llm.LLMClient, gameID string,
 			return nil, err
 		}
 	} else if setup.Custom != nil {
-		player = buildCustomPlayer(
-			setup.Custom.Name,
-			setup.Custom.HighConcept,
-			setup.Custom.Trouble,
-			setup.Custom.Genre,
-		)
 		var err error
+		player, err = buildCustomPlayerFromSetup(setup.Custom)
+		if err != nil {
+			return nil, fmt.Errorf("custom player: %w", err)
+		}
 		scenario, err = generateScenario(ctx, llmClient, setup.Custom)
 		if err != nil {
 			return nil, fmt.Errorf("scenario generation: %w", err)
@@ -201,6 +212,7 @@ func generateScenario(ctx context.Context, client llm.LLMClient, custom *web.Cus
 		PlayerName:        custom.Name,
 		PlayerHighConcept: custom.HighConcept,
 		PlayerTrouble:     custom.Trouble,
+		PlayerAspects:     custom.Aspects,
 		Genre:             custom.Genre,
 	}
 

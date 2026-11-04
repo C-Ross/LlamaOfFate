@@ -6,8 +6,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/C-Ross/LlamaOfFate/internal/core"
 	"github.com/C-Ross/LlamaOfFate/internal/core/action"
-	"github.com/C-Ross/LlamaOfFate/internal/core/character"
 	"github.com/C-Ross/LlamaOfFate/internal/core/dice"
 	"github.com/C-Ross/LlamaOfFate/internal/core/scene"
 	"github.com/C-Ross/LlamaOfFate/internal/engine"
@@ -100,8 +100,8 @@ type ChallengeActionParserResult struct {
 	Error           error
 }
 
-func getChallengeTestCharacter() *character.Character {
-	char := character.NewCharacter("eval-char", "Magnus the Versatile")
+func getChallengeTestCharacter() *core.Character {
+	char := core.NewCharacter("eval-char", "Magnus the Versatile")
 	char.Aspects.HighConcept = "Resourceful Problem Solver"
 	char.Aspects.Trouble = "Curiosity Killed the Cat"
 	char.SetSkill("Athletics", dice.Good)
@@ -114,7 +114,7 @@ func getChallengeTestCharacter() *character.Character {
 	return char
 }
 
-func evaluateChallengeAction(ctx context.Context, parser engine.ActionParser, char *character.Character, tc ChallengeActionParserTestCase) ChallengeActionParserResult {
+func evaluateChallengeAction(ctx context.Context, parser engine.ActionParser, char *core.Character, tc ChallengeActionParserTestCase) ChallengeActionParserResult {
 	// Build a Scene with an active challenge so the parser populates ChallengeContext
 	testScene := scene.NewScene("test-scene", "Challenge Scene", tc.Context)
 	err := testScene.StartChallenge("Active challenge", tc.ChallengeTasks)
