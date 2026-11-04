@@ -183,11 +183,11 @@ export function useGameSocket(url: string): UseGameSocketReturn {
   const newGame = useCallback(() => {
     // Stash the current game ID so the player can "Continue" later,
     // then clear it so the server creates a fresh session.
-    const currentId = localStorage.getItem(GAME_ID_STORAGE_KEY)
+    const currentId = window.localStorage.getItem(GAME_ID_STORAGE_KEY)
     if (currentId) {
-      localStorage.setItem(SAVED_GAME_ID_KEY, currentId)
+      window.localStorage.setItem(SAVED_GAME_ID_KEY, currentId)
     }
-    localStorage.removeItem(GAME_ID_STORAGE_KEY)
+    window.localStorage.removeItem(GAME_ID_STORAGE_KEY)
     dispatch({ type: "new_game", hasSavedGame: !!currentId })
 
     // Tear down the current WebSocket and reconnect without a game_id.
@@ -206,11 +206,11 @@ export function useGameSocket(url: string): UseGameSocketReturn {
   }, [])
 
   const continueGame = useCallback(() => {
-    const savedId = localStorage.getItem(SAVED_GAME_ID_KEY)
+    const savedId = window.localStorage.getItem(SAVED_GAME_ID_KEY)
     if (!savedId) return
     // Restore the saved game ID and reconnect.
-    localStorage.setItem(GAME_ID_STORAGE_KEY, savedId)
-    localStorage.removeItem(SAVED_GAME_ID_KEY)
+    window.localStorage.setItem(GAME_ID_STORAGE_KEY, savedId)
+    window.localStorage.removeItem(SAVED_GAME_ID_KEY)
     dispatch({ type: "new_game", hasSavedGame: false })
 
     if (reconnectTimer.current) {
@@ -230,7 +230,7 @@ export function useGameSocket(url: string): UseGameSocketReturn {
   useEffect(() => {
     function connect() {
       // Append the game ID (from localStorage) so the server can resume the game.
-      const storedGameId = localStorage.getItem(GAME_ID_STORAGE_KEY)
+      const storedGameId = window.localStorage.getItem(GAME_ID_STORAGE_KEY)
       let connectUrl = url
       if (storedGameId) {
         const sep = url.includes("?") ? "&" : "?"
@@ -270,7 +270,7 @@ export function useGameSocket(url: string): UseGameSocketReturn {
           if (msg.event === "session_init") {
             const initData = msg.data as SessionInitEventData
             if (initData.gameId) {
-              localStorage.setItem(GAME_ID_STORAGE_KEY, initData.gameId)
+              window.localStorage.setItem(GAME_ID_STORAGE_KEY, initData.gameId)
               dispatch({ type: "session_init", gameId: initData.gameId })
             }
             return
