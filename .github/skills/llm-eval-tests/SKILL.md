@@ -60,7 +60,7 @@ package llmeval_test
 ```
 
 ### Config and Client Setup
-Use `RequireLLMClient()` from `evaltest_helpers_test.go` to get an LLM client. Supports both Ollama (local) and Azure/OpenAI-compatible endpoints:
+Use `RequireLLMClient()` from `evaltest_helpers_test.go` to get an LLM client. Supports both Ollama (local) and OpenAI-compatible endpoints:
 ```go
 // In test/llmeval/evaltest_helpers_test.go:
 // RequireLLMClient returns a ready-to-use LLM client, using either Ollama or
@@ -125,6 +125,9 @@ for _, r := range results {
 ```bash
 # Run all tests (requires AZURE_API_ENDPOINT and AZURE_API_KEY, or LLM_PROVIDER=ollama)
 just test-llm
+
+# Run with Ollama local backend
+LLM_PROVIDER=ollama just test-llm
 
 # Run tests and track results for flakiness analysis
 just test-llm-track

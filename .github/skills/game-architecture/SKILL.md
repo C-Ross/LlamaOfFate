@@ -135,6 +135,8 @@ initiateChallenge(type) → ChallengeGenerator.Generate() → builds tasks
   → all tasks resolved → tallyChallengeOutcome() → Victory/Partial/Defeat
 ```
 
+**`EnforceTaskDifficulty(action)`**: Replaces the LLM-provided difficulty with the stored task difficulty to ensure fairness. Called from `handleAction()` after parsing, before resolution.
+
 Challenge data stored in `scene.Challenge`. Each task has skill, difficulty, status (pending/success/failure).
 
 **Difficulty Enforcement**: `EnforceTaskDifficulty(action)` replaces the LLM-provided difficulty with the stored challenge task difficulty when the action's skill matches a pending task. This ensures deterministic resolution regardless of LLM variance. Called by `SceneManager.handleAction()` after parsing, before dice rolling.
