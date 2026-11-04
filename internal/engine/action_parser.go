@@ -202,20 +202,13 @@ func parseActionType(actionTypeStr string) (action.ActionType, error) {
 		return action.Defend, nil
 	}
 
-	// Check if LLM returned a skill name instead of action type
-	// Map aggressive/confrontational skills to Attack
-	attackSkills := map[string]bool{
-		"fight": true, "shoot": true, "provoke": true,
-	}
-	if attackSkills[normalized] {
+	// Check if LLM returned a skill name instead of action type.
+	if core.IsPhysicalAttackSkill(normalized) || core.IsMentalAttackSkill(normalized) {
 		return action.Attack, nil
 	}
 
-	// Map defensive skills to Defend
-	defendSkills := map[string]bool{
-		"athletics": true, "will": true, "physique": true,
-	}
-	if defendSkills[normalized] {
+	// Map well-known defensive skills to Defend.
+	if core.IsDefendSkill(normalized) {
 		return action.Defend, nil
 	}
 

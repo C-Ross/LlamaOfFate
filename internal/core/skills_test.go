@@ -16,13 +16,9 @@ func TestDefenseSkillForAttack(t *testing.T) {
 		// Physical attacks -> Athletics defense
 		{"Fight uses Athletics", "Fight", "Athletics"},
 		{"Shoot uses Athletics", "Shoot", "Athletics"},
-		{"Physique uses Athletics", "Physique", "Athletics"},
 
 		// Mental attacks -> Will defense
 		{"Provoke uses Will", "Provoke", "Will"},
-		{"Deceive uses Will", "Deceive", "Will"},
-		{"Rapport uses Will", "Rapport", "Will"},
-		{"Lore uses Will", "Lore", "Will"},
 
 		// Unknown defaults to Athletics
 		{"Unknown skill defaults to Athletics", "Crafts", "Athletics"},
@@ -46,13 +42,9 @@ func TestStressTypeForAttack(t *testing.T) {
 		// Physical attacks -> Physical stress
 		{"Fight targets physical", "Fight", PhysicalStress},
 		{"Shoot targets physical", "Shoot", PhysicalStress},
-		{"Physique targets physical", "Physique", PhysicalStress},
 
 		// Mental attacks -> Mental stress
 		{"Provoke targets mental", "Provoke", MentalStress},
-		{"Deceive targets mental", "Deceive", MentalStress},
-		{"Rapport targets mental", "Rapport", MentalStress},
-		{"Lore targets mental", "Lore", MentalStress},
 
 		// Unknown defaults to Physical
 		{"Unknown skill defaults to physical", "Crafts", PhysicalStress},
@@ -102,24 +94,44 @@ func TestConflictTypeForSkill(t *testing.T) {
 func TestIsPhysicalAttackSkill(t *testing.T) {
 	assert.True(t, IsPhysicalAttackSkill("Fight"))
 	assert.True(t, IsPhysicalAttackSkill("Shoot"))
-	assert.True(t, IsPhysicalAttackSkill("Physique"))
+	assert.False(t, IsPhysicalAttackSkill("Physique"))
 	assert.False(t, IsPhysicalAttackSkill("Provoke"))
 	assert.False(t, IsPhysicalAttackSkill("Lore"))
 	assert.False(t, IsPhysicalAttackSkill("Unknown"))
+	// Case-insensitive
+	assert.True(t, IsPhysicalAttackSkill("fight"))
+	assert.True(t, IsPhysicalAttackSkill("SHOOT"))
+	assert.False(t, IsPhysicalAttackSkill("physique"))
 }
 
 func TestIsMentalAttackSkill(t *testing.T) {
 	assert.True(t, IsMentalAttackSkill("Provoke"))
-	assert.True(t, IsMentalAttackSkill("Deceive"))
-	assert.True(t, IsMentalAttackSkill("Rapport"))
-	assert.True(t, IsMentalAttackSkill("Lore"))
+	assert.False(t, IsMentalAttackSkill("Deceive"))
+	assert.False(t, IsMentalAttackSkill("Rapport"))
+	assert.False(t, IsMentalAttackSkill("Lore"))
 	assert.False(t, IsMentalAttackSkill("Fight"))
 	assert.False(t, IsMentalAttackSkill("Shoot"))
 	assert.False(t, IsMentalAttackSkill("Unknown"))
+	// Case-insensitive
+	assert.True(t, IsMentalAttackSkill("provoke"))
+	assert.True(t, IsMentalAttackSkill("PROVOKE"))
+	assert.False(t, IsMentalAttackSkill("deceive"))
+}
+
+func TestIsDefendSkill(t *testing.T) {
+	assert.True(t, IsDefendSkill("Athletics"))
+	assert.True(t, IsDefendSkill("Will"))
+	assert.False(t, IsDefendSkill("Fight"))
+	assert.False(t, IsDefendSkill("Shoot"))
+	assert.False(t, IsDefendSkill("Provoke"))
+	assert.False(t, IsDefendSkill("Unknown"))
+	// Case-insensitive
+	assert.True(t, IsDefendSkill("athletics"))
+	assert.True(t, IsDefendSkill("WILL"))
+	assert.False(t, IsDefendSkill("fight"))
 }
 
 func TestInitiativeSkillsForConflict(t *testing.T) {
-	// Physical conflicts use Notice, then Athletics
 	physSkills := InitiativeSkillsForConflict(scene.PhysicalConflict)
 	assert.Equal(t, []string{"Notice", "Athletics"}, physSkills)
 
@@ -162,6 +174,11 @@ func TestCalculateInitiative(t *testing.T) {
 	// Returns 0 when no relevant skills
 	char5 := NewCharacter("test-5", "Test Character 5")
 	assert.Equal(t, 0, CalculateInitiative(char5, scene.PhysicalConflict))
+}
+
+func TestStressTypeForConflict(t *testing.T) {
+	assert.Equal(t, PhysicalStress, StressTypeForConflict(scene.PhysicalConflict))
+	assert.Equal(t, MentalStress, StressTypeForConflict(scene.MentalConflict))
 }
 
 func TestConcessionFatePoints(t *testing.T) {

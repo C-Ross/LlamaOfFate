@@ -638,10 +638,7 @@ func (cm *ConflictManager) resolveAttackOutcome(
 func (cm *ConflictManager) applyAttackDamageToPlayer(ctx context.Context, outcome *dice.Outcome, attacker *core.Character, attackCtx prompt.AttackContext) []GameEvent {
 	return cm.resolveAttackOutcome(ctx, outcome, attacker, cm.player, attackCtx.Skill, attackCtx.Description, attackCallbacks{
 		onDamage: func(shifts int) []GameEvent {
-			stressType := core.PhysicalStress
-			if cm.currentScene.ConflictState.Type == scene.MentalConflict {
-				stressType = core.MentalStress
-			}
+			stressType := core.StressTypeForConflict(cm.currentScene.ConflictState.Type)
 			absorbed := cm.player.TakeStress(stressType, shifts)
 			if absorbed {
 				return []GameEvent{PlayerStressEvent{
