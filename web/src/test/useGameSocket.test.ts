@@ -43,7 +43,7 @@ beforeEach(() => {
   MockWebSocket.instances = []
   vi.stubGlobal("WebSocket", MockWebSocket)
   vi.useFakeTimers()
-  localStorage.clear()
+  window.localStorage.clear()
 })
 
 afterEach(() => {
@@ -190,7 +190,7 @@ describe("useGameSocket", () => {
       })
     })
 
-    expect(localStorage.getItem("llamaoffate_game_id")).toBe("abc123")
+    expect(window.localStorage.getItem("llamaoffate_game_id")).toBe("abc123")
     expect(result.current.gameId).toBe("abc123")
   })
 
@@ -340,13 +340,13 @@ describe("useGameSocket", () => {
     act(() => {
       getLastWs().simulateMessage({ event: "session_init", data: { gameId: "old-game" } })
     })
-    expect(localStorage.getItem("llamaoffate_game_id")).toBe("old-game")
+    expect(window.localStorage.getItem("llamaoffate_game_id")).toBe("old-game")
 
     // Start new game
     act(() => result.current.newGame())
 
-    expect(localStorage.getItem("llamaoffate_game_id")).toBeNull()
-    expect(localStorage.getItem("llamaoffate_saved_game_id")).toBe("old-game")
+    expect(window.localStorage.getItem("llamaoffate_game_id")).toBeNull()
+    expect(window.localStorage.getItem("llamaoffate_saved_game_id")).toBe("old-game")
     expect(result.current.events).toHaveLength(0)
     expect(result.current.gameId).toBeNull()
     expect(result.current.hasSavedGame).toBe(true)
@@ -371,8 +371,8 @@ describe("useGameSocket", () => {
     // Continue the saved game
     act(() => result.current.continueGame())
 
-    expect(localStorage.getItem("llamaoffate_game_id")).toBe("saved-game")
-    expect(localStorage.getItem("llamaoffate_saved_game_id")).toBeNull()
+    expect(window.localStorage.getItem("llamaoffate_game_id")).toBe("saved-game")
+    expect(window.localStorage.getItem("llamaoffate_saved_game_id")).toBeNull()
     expect(result.current.hasSavedGame).toBe(false)
 
     // A new WebSocket should have been created with the saved game_id
