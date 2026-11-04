@@ -123,12 +123,12 @@ func (ag *LLMAspectGenerator) buildPromptFallback(req prompt.AspectGenerationReq
 	prompt.WriteString("Generate an aspect for a Create an Advantage action with the following details:\n\n")
 
 	// Character information
-	prompt.WriteString(fmt.Sprintf("CHARACTER: %s\n", req.Character.Name))
+	fmt.Fprintf(&prompt, "CHARACTER: %s\n", req.Character.Name)
 	if req.Character.Aspects.HighConcept != "" {
-		prompt.WriteString(fmt.Sprintf("High Concept: %s\n", req.Character.Aspects.HighConcept))
+		fmt.Fprintf(&prompt, "High Concept: %s\n", req.Character.Aspects.HighConcept)
 	}
 	if req.Character.Aspects.Trouble != "" {
-		prompt.WriteString(fmt.Sprintf("Trouble: %s\n", req.Character.Aspects.Trouble))
+		fmt.Fprintf(&prompt, "Trouble: %s\n", req.Character.Aspects.Trouble)
 	}
 	characterAspects := req.Character.Aspects.GetAll()
 	if len(characterAspects) > 2 {
@@ -144,36 +144,36 @@ func (ag *LLMAspectGenerator) buildPromptFallback(req prompt.AspectGenerationReq
 
 	// Action details
 	prompt.WriteString("\nACTION ATTEMPT:\n")
-	prompt.WriteString(fmt.Sprintf("Skill Used: %s (%s)\n", req.Action.Skill, req.Character.GetSkill(req.Action.Skill).String()))
-	prompt.WriteString(fmt.Sprintf("Description: %s\n", req.Action.Description))
+	fmt.Fprintf(&prompt, "Skill Used: %s (%s)\n", req.Action.Skill, req.Character.GetSkill(req.Action.Skill).String())
+	fmt.Fprintf(&prompt, "Description: %s\n", req.Action.Description)
 	if req.Action.RawInput != "" {
-		prompt.WriteString(fmt.Sprintf("Player's Intent: %s\n", req.Action.RawInput))
+		fmt.Fprintf(&prompt, "Player's Intent: %s\n", req.Action.RawInput)
 	}
 
 	// Roll outcome
 	prompt.WriteString("\nROLL OUTCOME:\n")
-	prompt.WriteString(fmt.Sprintf("Result: %s (%+d shifts)\n", req.Outcome.Type.String(), req.Outcome.Shifts))
+	fmt.Fprintf(&prompt, "Result: %s (%+d shifts)\n", req.Outcome.Type.String(), req.Outcome.Shifts)
 	if req.Outcome.Result != nil && req.Outcome.Result.Roll != nil {
-		prompt.WriteString(fmt.Sprintf("Dice Roll: %s (Total: %+d)\n", req.Outcome.Result.Roll.String(), req.Outcome.Result.Roll.Total))
-		prompt.WriteString(fmt.Sprintf("Final Value: %s vs Difficulty %s\n",
-			req.Outcome.Result.FinalValue.String(), req.Outcome.Difficulty.String()))
+		fmt.Fprintf(&prompt, "Dice Roll: %s (Total: %+d)\n", req.Outcome.Result.Roll.String(), req.Outcome.Result.Roll.Total)
+		fmt.Fprintf(&prompt, "Final Value: %s vs Difficulty %s\n",
+			req.Outcome.Result.FinalValue.String(), req.Outcome.Difficulty.String())
 	} else {
-		prompt.WriteString(fmt.Sprintf("Difficulty: %s\n", req.Outcome.Difficulty.String()))
+		fmt.Fprintf(&prompt, "Difficulty: %s\n", req.Outcome.Difficulty.String())
 	}
 
 	// Context and existing aspects
 	if req.Context != "" {
-		prompt.WriteString(fmt.Sprintf("\nSCENE CONTEXT:\n%s\n", req.Context))
+		fmt.Fprintf(&prompt, "\nSCENE CONTEXT:\n%s\n", req.Context)
 	}
 
 	if len(req.ExistingAspects) > 0 {
 		prompt.WriteString("\nEXISTING ASPECTS IN PLAY:\n")
 		for _, aspect := range req.ExistingAspects {
-			prompt.WriteString(fmt.Sprintf("- %s\n", aspect))
+			fmt.Fprintf(&prompt, "- %s\n", aspect)
 		}
 	}
 
-	prompt.WriteString(fmt.Sprintf("\nTARGET TYPE: %s\n", req.TargetType))
+	fmt.Fprintf(&prompt, "\nTARGET TYPE: %s\n", req.TargetType)
 
 	prompt.WriteString("\nGenerate an appropriate aspect based on this Create an Advantage attempt:")
 

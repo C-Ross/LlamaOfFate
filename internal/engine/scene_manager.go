@@ -797,7 +797,7 @@ func (sm *SceneManager) buildConversationContext() string {
 
 	for i := start; i < len(sm.conversationHistory); i++ {
 		entry := sm.conversationHistory[i]
-		context.WriteString(fmt.Sprintf("Player: %s\nGM: %s\n", entry.PlayerInput, entry.GMResponse))
+		fmt.Fprintf(&context, "Player: %s\nGM: %s\n", entry.PlayerInput, entry.GMResponse)
 	}
 
 	return context.String()
@@ -831,9 +831,9 @@ func (sm *SceneManager) buildCharacterContext() string {
 	}
 
 	var context strings.Builder
-	context.WriteString(fmt.Sprintf("Name: %s\n", sm.player.Name))
-	context.WriteString(fmt.Sprintf("High Concept: %s\n", sm.player.Aspects.HighConcept))
-	context.WriteString(fmt.Sprintf("Trouble: %s\n", sm.player.Aspects.Trouble))
+	fmt.Fprintf(&context, "Name: %s\n", sm.player.Name)
+	fmt.Fprintf(&context, "High Concept: %s\n", sm.player.Aspects.HighConcept)
+	fmt.Fprintf(&context, "Trouble: %s\n", sm.player.Aspects.Trouble)
 
 	if len(sm.player.Aspects.OtherAspects) > 0 {
 		context.WriteString("Other Aspects: ")
