@@ -1,5 +1,10 @@
 import "@testing-library/jest-dom/vitest"
 
+Object.defineProperty(globalThis, "localStorage", {
+  configurable: true,
+  value: window.localStorage,
+})
+
 // Mock window.matchMedia — required by sonner (toast library) in jsdom.
 Object.defineProperty(window, "matchMedia", {
   writable: true,
