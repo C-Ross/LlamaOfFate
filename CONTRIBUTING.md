@@ -7,7 +7,7 @@ Thank you for your interest in contributing! LlamaOfFate is a text-based RPG imp
 ### Prerequisites
 
 - **Go 1.27.3+**
-- **Node.js 20+** (for the web frontend)
+- **Node.js 20.19+, 22.12+, or 24+** (for the web frontend)
 - **[just](https://github.com/casey/just)** command runner
 - **An LLM backend** — either [Ollama](https://ollama.ai/) (free, local) or an OpenAI-compatible API
 
